@@ -11,6 +11,8 @@ add_executable(test_job_io
     test_io_factory.cpp
 
     test_url.cpp
+    test_ipaddr.cpp
+    test_http_header.cpp
 
 )
 

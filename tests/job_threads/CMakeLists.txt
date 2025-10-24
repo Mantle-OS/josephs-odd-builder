@@ -1,5 +1,4 @@
 cmake_minimum_required(VERSION 3.16)
-
 add_executable(test_job_threads
     main.cpp
     test_task_queue.cpp

@@ -23,6 +23,8 @@ set(JOBIO_SOURCES
     serial/udev_monitor_thread.cpp
 
     socket/job_url.cpp
+    socket/job_ipaddr.cpp
+    socket/job_http_header.cpp
 )
 set(JOBIO_HEADERS
     io_base.h
@@ -30,14 +32,19 @@ set(JOBIO_HEADERS
     file_io.h
     mock_io.h
     io_factory.h
-
+    # uart
     serial/serial_info.h
     serial/serial_io.h
     serial/serial_manager.h
     serial/serial_settings.h
     serial/udev_monitor_thread.h
-
+    # tcp and friends
+    socket/socket_error.h
+    socket/ssl_error.h
+    socket/job_iana.h
+    socket/job_http_header.h
     socket/job_url.h
+    socket/job_ipaddr.h
 )
 
 add_library(JosephsOddBuilder_IO SHARED
@@ -62,6 +69,7 @@ target_include_directories(JosephsOddBuilder_IO PRIVATE
 
 target_link_libraries(JosephsOddBuilder_IO PRIVATE
     ${LibUdev_LIBRARIES}
+    ${LibOpenSSL_LIBRARIES}
     JosephsOddBuilder_Threads
     JosephsOddBuilder_Crypto
 )
