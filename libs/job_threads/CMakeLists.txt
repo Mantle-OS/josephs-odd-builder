@@ -45,7 +45,10 @@ set_target_properties(JosephsOddBuilder_Threads PROPERTIES
     OUTPUT_NAME "jobthreads"
 )
 
-target_link_libraries(JosephsOddBuilder_Threads PUBLIC Threads::Threads)
+target_link_libraries(JosephsOddBuilder_Threads PUBLIC
+    Threads::Threads
+    JosephsOddBuilder_Core
+)
 target_include_directories(JosephsOddBuilder_Threads PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/>

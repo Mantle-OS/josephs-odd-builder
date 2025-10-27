@@ -1,12 +1,12 @@
 #include "pty_io.h"
 
 #include <fcntl.h>
-#include <signal.h>
 #include <errno.h>
 #include <cstring>
 
 #include <sys/wait.h>
 #include <poll.h>
+
 namespace job::io {
 
 PtyIO::PtyIO()

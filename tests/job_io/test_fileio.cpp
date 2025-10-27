@@ -3,11 +3,10 @@
 #include <string>
 #include <filesystem>
 
-#include "file_io.h"
+#include <file_io.h>
 
 using namespace job::io;
 namespace fs = std::filesystem;
-
 
 [[nodiscard]] bool deleteFile(const std::string &ab_file_path)
 {
@@ -59,7 +58,7 @@ TEST_CASE("FileIO write and read back content", "[fileio]") {
     const std::string data = "Hello FileIO!\n";
     REQUIRE(deleteFile(path));
 
-    REQUIRE(setupFile(data, path)); // <---- Move this up here
+    REQUIRE(setupFile(data, path));
 
     SECTION("Write data to file") {
         FileIO writer(path, FileMode::RegularFile, true);

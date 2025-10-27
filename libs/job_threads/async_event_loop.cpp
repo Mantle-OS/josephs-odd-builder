@@ -2,7 +2,6 @@
 
 #include <iostream>
 #include <chrono>
-#include <algorithm>
 #include <pthread.h>
 
 namespace job::threads {
@@ -19,11 +18,10 @@ void AsyncEventLoop::start()
     if (m_running.exchange(true))
         return;
 
-    m_thread = std::jthread([this](std::stop_token token)
-                            {
-                                pthread_setname_np(pthread_self(), "AsyncLoop");
-                                this->loop(token);
-                            });
+    m_thread = std::jthread([this](std::stop_token token) {
+        pthread_setname_np(pthread_self(), "AsyncLoop");
+        this->loop(token);
+    });
 }
 
 void AsyncEventLoop::stop()
@@ -73,7 +71,7 @@ uint64_t AsyncEventLoop::addTimer(std::function<void()> callback,
     const uint64_t id = m_nextTimerId.fetch_add(1, std::memory_order_relaxed);
     const auto now = std::chrono::steady_clock::now();
 
-    Timer timer;
+    core::JobTimer timer;
     timer.id = id;
     timer.nextFire = now + interval;
     timer.interval = interval;
@@ -94,7 +92,7 @@ bool AsyncEventLoop::cancelTimer(uint64_t id)
 {
     std::scoped_lock lock(m_timerMutex);
     const auto before = m_timers.size();
-    std::erase_if(m_timers, [id](const Timer &t) { return t.id == id; });
+    std::erase_if(m_timers, [id](const core::JobTimer &t) { return t.id == id; });
     return m_timers.size() != before;
 }
 
@@ -106,10 +104,8 @@ void AsyncEventLoop::processTimers()
     {
         std::scoped_lock lock(m_timerMutex);
 
-        for (auto &timer : m_timers)
-        {
-            if (timer.nextFire <= now)
-            {
+        for (auto &timer : m_timers) {
+            if (timer.nextFire <= now) {
                 ready.push_back(timer.callback);
                 if (timer.repeat)
                     timer.nextFire = now + timer.interval;
@@ -117,24 +113,17 @@ void AsyncEventLoop::processTimers()
         }
 
         // Remove one-shot timers that have fired
-        std::erase_if(m_timers, [now](const Timer &t)
-                      {
-                          return !t.repeat && t.nextFire <= now;
-                      });
+        std::erase_if(m_timers, [now](const core::JobTimer &t) {
+            return !t.repeat && t.nextFire <= now;
+        });
     }
 
-    for (auto &cb : ready)
-    {
-        try
-        {
+    for (auto &cb : ready) {
+        try {
             cb();
-        }
-        catch (const std::exception &e)
-        {
+        } catch (const std::exception &e) {
             std::cerr << "[AsyncEventLoop] Timer exception: " << e.what() << '\n';
-        }
-        catch (...)
-        {
+        } catch (...) {
             std::cerr << "[AsyncEventLoop] Timer unknown exception\n";
         }
     }
@@ -144,22 +133,15 @@ void AsyncEventLoop::loop(std::stop_token token)
 {
     using namespace std::chrono_literals;
 
-    while (!token.stop_requested())
-    {
+    while (!token.stop_requested()) {
         auto taskOpt = m_queue.take(std::chrono::milliseconds(50));
 
-        if (taskOpt.has_value())
-        {
-            try
-            {
+        if (taskOpt.has_value()) {
+            try {
                 taskOpt.value()();
-            }
-            catch (const std::exception &e)
-            {
+            } catch (const std::exception &e) {
                 std::cerr << "[AsyncEventLoop] Task exception: " << e.what() << '\n';
-            }
-            catch (...)
-            {
+            } catch (...) {
                 std::cerr << "[AsyncEventLoop] Unknown task exception\n";
             }
         }
@@ -172,18 +154,12 @@ void AsyncEventLoop::runOnce()
 {
     processTimers();
     auto taskOpt = m_queue.take(std::chrono::milliseconds(10));
-    if (taskOpt.has_value())
-    {
-        try
-        {
+    if (taskOpt.has_value()) {
+        try {
             taskOpt.value()();
-        }
-        catch (const std::exception &e)
-        {
+        } catch (const std::exception &e) {
             std::cerr << "[AsyncEventLoop] Unhandled exception: " << e.what() << '\n';
-        }
-        catch (...)
-        {
+        } catch (...) {
             std::cerr << "[AsyncEventLoop] Unknown exception in runOnce\n";
         }
     }

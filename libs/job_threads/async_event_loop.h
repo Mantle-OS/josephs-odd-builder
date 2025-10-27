@@ -9,6 +9,8 @@
 #include <mutex>
 #include <vector>
 
+#include <job_timer.h>
+
 namespace job::threads {
 
 class AsyncEventLoop final {
@@ -40,14 +42,6 @@ public:
     }
 
 private:
-    struct Timer {
-        uint64_t id{0};
-        std::chrono::steady_clock::time_point nextFire;
-        std::chrono::milliseconds interval{0};
-        bool repeat{false};
-        std::function<void()> callback;
-    };
-
     void loop(std::stop_token token);
     void processTimers();
 
@@ -56,7 +50,7 @@ private:
     std::atomic<bool>                m_running{false};
 
     std::mutex                       m_timerMutex;
-    std::vector<Timer>               m_timers;
+    std::vector<core::JobTimer>      m_timers;
     std::atomic<uint64_t>            m_nextTimerId{1};
 };
 

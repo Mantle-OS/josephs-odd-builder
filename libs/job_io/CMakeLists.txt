@@ -7,44 +7,17 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(LibUdev REQUIRED libudev) # libudev-dev
-
 set(JOBIO_SOURCES
     pty_io.cpp
     file_io.cpp
     mock_io.cpp
     io_factory.cpp
-
-    serial/serial_info.cpp
-    serial/serial_io.cpp
-    serial/serial_manager.cpp
-    serial/serial_settings.cpp
-    serial/udev_monitor_thread.cpp
-
-    socket/job_url.cpp
-    socket/job_ipaddr.cpp
-    socket/job_http_header.cpp
 )
 set(JOBIO_HEADERS
-    io_base.h
     pty_io.h
     file_io.h
     mock_io.h
     io_factory.h
-    # uart
-    serial/serial_info.h
-    serial/serial_io.h
-    serial/serial_manager.h
-    serial/serial_settings.h
-    serial/udev_monitor_thread.h
-    # tcp and friends
-    socket/socket_error.h
-    socket/ssl_error.h
-    socket/job_iana.h
-    socket/job_http_header.h
-    socket/job_url.h
-    socket/job_ipaddr.h
 )
 
 add_library(JosephsOddBuilder_IO SHARED
@@ -63,15 +36,9 @@ target_include_directories(JosephsOddBuilder_IO PUBLIC
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/>
 )
 
-target_include_directories(JosephsOddBuilder_IO PRIVATE
-    ${LibUdev_INCLUDE_DIRS}
-)
-
 target_link_libraries(JosephsOddBuilder_IO PRIVATE
-    ${LibUdev_LIBRARIES}
-    ${LibOpenSSL_LIBRARIES}
+    JosephsOddBuilder_Core
     JosephsOddBuilder_Threads
-    JosephsOddBuilder_Crypto
 )
 
 install(TARGETS JosephsOddBuilder_IO

@@ -1,9 +1,9 @@
 #pragma once
 
-#include "io_base.h"
-
 #include <memory>
 #include <string>
+
+#include <io_base.h>
 
 namespace job::io {
 
@@ -12,14 +12,13 @@ enum class FactoryType {
     FILE_STD_IN,
     FILE_STD_OUT,
     FILE_STD_ERR,
-    FILE_NAME,
-    SERIAL
+    FILE_NAME
 };
 
 class IOFactory {
 public:
-    [[nodiscard]] static std::shared_ptr<IODevice> createFromType(FactoryType fType, const std::string &target);
-    [[nodiscard]] static std::shared_ptr<IODevice> createFromURI(const std::string &uri);
+    [[nodiscard]] static std::shared_ptr<core::IODevice> createFromType(FactoryType fType, const std::string &target);
+    [[nodiscard]] static std::shared_ptr<core::IODevice> createFromURI(const std::string &uri);
 };
 
 } // namespace job::io

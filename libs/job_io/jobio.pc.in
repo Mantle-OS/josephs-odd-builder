@@ -6,7 +6,5 @@ includedir=@CMAKE_INSTALL_FULL_INCLUDEDIR@/jobio
 Name: jobio
 Description: IO library for JOB (Joseph's Odd Builder)
 Version: @PROJECT_VERSION@
-Requires.private: libcrypto
-Libs.private: -lz -lzstd -ldl -pthread
-Libs: -L${libdir} -ljobio -ludev -lssl
+Libs: -L${libdir} -ljobio
 Cflags: -I${includedir}

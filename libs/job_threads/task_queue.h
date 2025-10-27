@@ -27,7 +27,6 @@ public:
     void setMaxSize(size_t maxSize);
     [[nodiscard]] bool isEmpty() const;
 
-
     [[nodiscard]] bool stopped() const noexcept;
 
     void clear();
@@ -40,9 +39,22 @@ public:
     [[nodiscard]] bool pop();
     void push(std::function<void()> task, int priority);
 
-    template <typename InputIt>
-    void push_range(InputIt first, InputIt last);
+    template<typename InputIt>
+    void push_range(InputIt first, InputIt last)
+    {
+        std::unique_lock lock(m_mutex);
 
+        for (; first != last; first++) {
+            if (m_stopped.load())
+                break;
+
+            const auto &[priority, func] = *first;
+            m_queue.emplace(priority, func);
+            m_count.fetch_add(1, std::memory_order_relaxed);
+        }
+
+        m_condition.notify_all();
+    }
     void swap(TaskQueue &other);
 
 
@@ -53,8 +65,9 @@ private:
     std::condition_variable m_condition;
 
     struct TaskCompare {
+        // lower priority number = higher priority
         bool operator()(const TaskItem &a, const TaskItem &b) const {
-            return a.first > b.first; // lower priority number = higher priority
+            return a.first > b.first;
         }
     };
 

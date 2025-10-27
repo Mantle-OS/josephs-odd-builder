@@ -35,14 +35,13 @@ struct JobThreadOptions final {
     static constexpr uint8_t  kCoreUnbound          = 0xFF; // 255
     static constexpr uint16_t kDefaultHeartbeatMs   = 50;
 
-    // Preset configurations
+    // Preset
     [[nodiscard]] static constexpr JobThreadOptions normal() noexcept
     {
         JobThreadOptions opts{};
         opts.priority = kDefaultPriority;
         return opts;
     }
-
     [[nodiscard]] static constexpr JobThreadOptions realtimeDefault() noexcept
     {
         JobThreadOptions opts{};
@@ -54,7 +53,8 @@ struct JobThreadOptions final {
         return opts;
     }
 
-    [[nodiscard]] constexpr bool valid() const noexcept
+
+    [[nodiscard]] constexpr bool valid() const
     {
         bool ret = true;
         if (realtime && policy == SchedulingPolicy::Other)

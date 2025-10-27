@@ -5,6 +5,7 @@ project(JosephsOddBuilder
 )
 
 set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -30,6 +31,10 @@ pkg_check_modules(LibZstd    REQUIRED libzstd)    # libzstd-dev
 pkg_check_modules(LibZ       REQUIRED zlib)       # zlib1g-dev
 pkg_check_modules(LibSodium  REQUIRED libsodium)  # libsodium-dev
 # snappy
+
+
+## UART
+pkg_check_modules(LibUdev REQUIRED libudev) # libudev-dev
 
 ## TRANSLATIONS
 

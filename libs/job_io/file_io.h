@@ -1,10 +1,11 @@
 #pragma once
 
-#include "io_base.h"
 #include <fstream>
 #include <mutex>
 #include <string>
 #include <iostream>
+
+#include <io_base.h>
 
 // #include <filesystem> // todo use filesystem later on
 
@@ -17,7 +18,7 @@ enum class FileMode {
     StdErr
 };
 
-class FileIO : public IODevice
+class FileIO : public core::IODevice
 {
 public:
     explicit FileIO(const std::string &path,

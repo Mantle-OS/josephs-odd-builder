@@ -13,24 +13,21 @@ ThreadPool::Ptr ThreadPool::create(size_t threadCount, const JobThreadOptions &o
     return pool;
 }
 
-ThreadPool::ThreadPool(size_t threadCount, const JobThreadOptions &options)
-    : m_threadOptions(options)
+ThreadPool::ThreadPool(size_t threadCount, const JobThreadOptions &options) :
+    m_threadOptions(options)
 {
     m_tasks = std::make_shared<TaskQueue>();
     m_watcher = std::make_shared<ThreadWatcher>();
     m_watcher->attachQueue(m_tasks);
-    // m_watcher->attachPool(shared_from_this());
-    for (size_t i = 0; i < threadCount; ++i)
-    {
+
+    for (size_t i = 0; i < threadCount; i++) {
         auto worker = std::make_shared<JobThread>(m_threadOptions);
-        worker->setRunFunction([this](std::stop_token token)
-        {
+        worker->setRunFunction([this](std::stop_token token) {
             this->workerLoop(token);
         });
 
         const auto result = worker->start();
-        switch (result)
-        {
+        switch (result) {
         case JobThread::StartResult::Started:
             m_watcher->addThread(worker, std::chrono::seconds(30), static_cast<int>(i));
             m_workers.push_back(worker);
@@ -69,14 +66,16 @@ ThreadPool::TaskMetrics ThreadPool::snapshotMetrics() const noexcept
         // safe, scoped copy of queue state
         std::scoped_lock lock(m_tasks->m_mutex);
         auto tmp = m_tasks->m_queue; // copy the priority queue
-        while (!tmp.empty())
-        {
+        while (!tmp.empty()) {
             int prio = tmp.top().first;
             tmp.pop();
+
             if (prio < 0)
                 prio = 0;
+
             if (static_cast<size_t>(prio) >= metrics.byPriority.size())
                 metrics.byPriority.resize(prio + 1, 0);
+
             metrics.byPriority[prio]++;
         }
     }
@@ -102,8 +101,7 @@ void ThreadPool::shutdown()
     if (m_stopping.exchange(true))
         return;
 
-    if (m_watcher)
-    {
+    if (m_watcher) {
         m_watcher->stop();
         m_watcher.reset();
     }
@@ -111,8 +109,7 @@ void ThreadPool::shutdown()
     if (m_tasks)
         m_tasks->stop();
 
-    for (auto &worker : m_workers)
-    {
+    for (auto &worker : m_workers) {
         worker->requestStop();
         worker->join();
     }
@@ -145,34 +142,25 @@ void ThreadPool::setTaskRange(int min, int max)
 
 void ThreadPool::workerLoop(std::stop_token token)
 {
-    while (!token.stop_requested())
-    {
+    while (!token.stop_requested()) {
         std::function<void()> task;
         if (auto optTask = m_tasks->take(std::chrono::milliseconds(100)))
-        {
             task = std::move(*optTask);
-        }
 
-        if (!task)
-        {
+        if (!task) {
             if (m_stopping.load())
                 return;
 
             continue;
         }
 
-        try
-        {
+        try {
             task();
             m_progress.fetch_add(1, std::memory_order_relaxed);
-        }
-        catch (const std::exception &e)
-        {
+        } catch (const std::exception &e) {
             std::cerr << "[ThreadPool] Worker task threw exception: " << e.what() << '\n';
         }
     }
 }
-
-
 
 } // namespace job::threads

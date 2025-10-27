@@ -10,7 +10,6 @@
 
 #include "task_queue.h"
 
-
 namespace job::threads {
 
 class ThreadPool;
@@ -44,16 +43,12 @@ public:
 
     [[nodiscard]] bool isRunning() const;
 
-
-
 private:
     void monitorLoop(std::stop_token token);
     std::vector<WatchedThread> m_threads;
 
     std::weak_ptr<TaskQueue> m_queue;
     std::weak_ptr<ThreadPool> m_threadPool;
-
-
 
     mutable std::mutex m_mutex;
     std::atomic<bool> m_running{false};

@@ -68,7 +68,7 @@ protected:
 
 private:
     std::vector<std::shared_ptr<JobThread>> m_workers;
-    std::shared_ptr<TaskQueue> m_tasks;               // now heap-allocated so watcher can hold weak_ptr
+    std::shared_ptr<TaskQueue> m_tasks;
     std::shared_ptr<ThreadWatcher> m_watcher;
 
     std::atomic<bool> m_stopping{false};

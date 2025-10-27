@@ -1,8 +1,5 @@
 #pragma once
 
-#include "io_base.h"
-
-
 #include <string>
 #include <atomic>
 #include <functional>
@@ -11,11 +8,13 @@
 #include <unistd.h>
 #include <string_view>
 
+#include <io_base.h>
+
 #include <job_thread.h>
 
 namespace job::io {
 
-class PtyIO : public IODevice {
+class PtyIO : public core::IODevice {
 public:
     enum class State {
         Closed = 0,

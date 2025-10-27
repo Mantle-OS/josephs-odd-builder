@@ -3,13 +3,15 @@
 #include <algorithm>
 #include <stdexcept>
 
+#include <io_base.h>
+
 #include "pty_io.h"
 #include "file_io.h"
-#include "serial/serial_io.h"
+
 
 namespace job::io {
 
-std::shared_ptr<IODevice> IOFactory::createFromType(FactoryType fType, const std::string &target)
+std::shared_ptr<core::IODevice> IOFactory::createFromType(FactoryType fType, const std::string &target)
 {
     switch (fType) {
     case FactoryType::PTY:
@@ -27,17 +29,12 @@ std::shared_ptr<IODevice> IOFactory::createFromType(FactoryType fType, const std
     case FactoryType::FILE_NAME:
         return std::make_shared<FileIO>(target, FileMode::RegularFile, true);
 
-    case FactoryType::SERIAL: {
-        auto serial = std::make_shared<SerialIO>();
-        serial->setLocation(target);
-        return serial;
-    }
     }
 
     throw std::runtime_error("Unsupported FactoryType in IOFactory::createFromType()");
 }
 
-std::shared_ptr<IODevice> IOFactory::createFromURI(const std::string &uri)
+std::shared_ptr<core::IODevice> IOFactory::createFromURI(const std::string &uri)
 {
     const auto sep = uri.find(':');
     if (sep == std::string::npos || sep == 0)
@@ -47,9 +44,9 @@ std::shared_ptr<IODevice> IOFactory::createFromURI(const std::string &uri)
     std::string target = (sep < uri.length() - 1) ? uri.substr(sep + 1) : "";
     std::transform(type.begin(), type.end(), type.begin(), ::tolower);
 
-    if (type == "pty")
+    if (type == "pty"){
         return createFromType(FactoryType::PTY, target);
-    else if (type == "file") {
+    }else if (type == "file") {
         if (target == "stdout")
             return createFromType(FactoryType::FILE_STD_OUT, "");
         if (target == "stderr")
@@ -59,10 +56,8 @@ std::shared_ptr<IODevice> IOFactory::createFromURI(const std::string &uri)
         if (!target.empty())
             return createFromType(FactoryType::FILE_NAME, target);
         throw std::invalid_argument("Missing file target for 'file:' URI");
-    } else if (type == "serial")
-        return createFromType(FactoryType::SERIAL, target);
-
-    throw std::runtime_error("Unsupported IO type: '" + type + "'");
+    }else{
+        throw std::runtime_error("Unsupported IO type: '" + type + "'");
+    }
 }
-
 } // namespace job::io

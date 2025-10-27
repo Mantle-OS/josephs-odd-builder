@@ -7,7 +7,6 @@
 namespace job::threads {
 // static constexpr auto kSummaryInterval = std::chrono::seconds(5);
 
-
 ThreadWatcher::ThreadWatcher() = default;
 
 ThreadWatcher::~ThreadWatcher() {
@@ -15,8 +14,7 @@ ThreadWatcher::~ThreadWatcher() {
 }
 
 void ThreadWatcher::addThread(const std::shared_ptr<JobThread> &thread,
-                              Duration timeout,
-                              int id) {
+                              Duration timeout, int id) {
     std::lock_guard<std::mutex> lock(m_mutex);
     m_threads.push_back( WatchedThread{
         .thread = thread,
@@ -89,21 +87,18 @@ void ThreadWatcher::monitorLoop(std::stop_token token)
 
     auto lastSummary = Clock::now();
 
-    while (!token.stop_requested())
-    {
+    while (!token.stop_requested()) {
         std::this_thread::sleep_for(100ms);
 
         std::lock_guard lock(m_mutex);
         const auto now = Clock::now();
 
-        for (auto &wt : m_threads)
-        {
+        for (auto &wt : m_threads) {
             if (!wt.thread->isRunning())
                 continue;
 
             const auto elapsed = std::chrono::duration_cast<Duration>(now - wt.startTime);
-            if (elapsed > wt.timeout)
-            {
+            if (elapsed > wt.timeout) {
                 std::cerr << "[ThreadWatcher] Thread ID " << wt.id
                           << " exceeded timeout of " << wt.timeout.count()
                           << " ms (elapsed: " << elapsed.count() << " ms)\n";
@@ -111,21 +106,16 @@ void ThreadWatcher::monitorLoop(std::stop_token token)
             }
         }
 
-        if (auto q = m_queue.lock())
-        {
-            if (q->stopped())
-            {
+        if (auto q = m_queue.lock()) {
+            if (q->stopped()) {
                 std::cerr << "[ThreadWatcher] TaskQueue stopped\n";
-            }
-            else if (q->isEmpty())
-            {
+            } else if (q->isEmpty()) {
                 std::cerr << "[ThreadWatcher] TaskQueue empty — possible starvation detected\n";
             }
         }
 
         static constexpr auto kSummaryInterval = std::chrono::seconds(5);
-        if (now - lastSummary >= kSummaryInterval)
-        {
+        if (now - lastSummary >= kSummaryInterval) {
             size_t threadCount = m_threads.size();
             size_t queueSize = 0;
             double loadAvg = 0.0;
@@ -133,8 +123,8 @@ void ThreadWatcher::monitorLoop(std::stop_token token)
             if (auto q = m_queue.lock())
                 queueSize = q->size();
 
-            if (auto pool = m_threadPool.lock())  // optional weak_ptr<ThreadPool> member
-            {
+            // optional weak_ptr<ThreadPool> member
+            if (auto pool = m_threadPool.lock())   {
                 auto m = pool->snapshotMetrics();
                 loadAvg = m.loadAvg;
             }
@@ -148,6 +138,5 @@ void ThreadWatcher::monitorLoop(std::stop_token token)
         }
     }
 }
-
 
 } // job::threads

@@ -13,7 +13,8 @@ FileIO::FileIO(const std::string &path, FileMode mode, bool writeMode) :
 
 FileIO::~FileIO()
 {
-    this->closeDevice();
+    if (m_open)
+        closeDevice();
 
     if(m_stdOut)
         m_stdOut = nullptr;

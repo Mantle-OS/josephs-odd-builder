@@ -81,6 +81,7 @@ void TaskQueue::clear()
     std::scoped_lock lock(m_mutex);
     while (!m_queue.empty())
         m_queue.pop();
+
     m_count.store(0, std::memory_order_relaxed);
 }
 
@@ -91,12 +92,10 @@ void TaskQueue::emplace(std::function<void ()> task, int priority)
     if (m_stopped.load())
         return;
 
-    if (m_maxSize > 0)
-    {
-        m_condition.wait(lock, [&]()
-                         {
-                             return m_queue.size() < m_maxSize || m_stopped.load();
-                         });
+    if (m_maxSize > 0) {
+        m_condition.wait(lock, [&]() {
+            return m_queue.size() < m_maxSize || m_stopped.load();
+        });
 
         if (m_stopped.load())
             return;
@@ -123,8 +122,7 @@ bool TaskQueue::pop()
     bool ret = false;
     std::scoped_lock lock(m_mutex);
 
-    if (!m_queue.empty())
-    {
+    if (!m_queue.empty()) {
         m_queue.pop();
         m_count.fetch_sub(1, std::memory_order_relaxed);
         ret = true;
@@ -168,11 +166,12 @@ std::optional<std::function<void ()> > TaskQueue::back()
     std::optional<std::function<void()>> ret;
 
     // priority_queue has no direct "back" access — this is the lowest-priority item
-    if (!m_queue.empty())
-    {
+    if (!m_queue.empty()) {
         auto tmp = m_queue;
+
         while (tmp.size() > 1)
             tmp.pop();
+
         ret = tmp.top().second;
     }
 
@@ -183,24 +182,6 @@ bool TaskQueue::stopped() const noexcept
 {
     bool ret = m_stopped.load();
     return ret;
-}
-
-template<typename InputIt>
-void TaskQueue::push_range(InputIt first, InputIt last)
-{
-    std::unique_lock lock(m_mutex);
-
-    for (; first != last; ++first)
-    {
-        if (m_stopped.load())
-            break;
-
-        const auto &[priority, func] = *first;
-        m_queue.emplace(priority, func);
-        m_count.fetch_add(1, std::memory_order_relaxed);
-    }
-
-    m_condition.notify_all();
 }
 
 } // job::threads

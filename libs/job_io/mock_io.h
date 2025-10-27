@@ -1,14 +1,14 @@
 #pragma once
 
-#include "io_base.h"
-
 #include <string>
 #include <deque>
 #include <mutex>
 
+#include <io_base.h>
+
 namespace job::io {
 
-class MockIO : public IODevice {
+class MockIO : public core::IODevice {
 public:
     MockIO();
     ~MockIO() override = default;
