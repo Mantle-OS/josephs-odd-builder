@@ -79,11 +79,15 @@ TEST_CASE("JobIpAddr invalid address handling", "[job_ipaddr][invalid]") {
     REQUIRE_FALSE(empty.isValid());
     REQUIRE(empty.family() == JobIpAddr::Family::Unknown);
 
-    REQUIRE_FALSE(JobIpAddr::isValidPort(UINT16_MAX+1));
     REQUIRE(JobIpAddr::isValidPort(80));
-    REQUIRE_FALSE(JobIpAddr::isValidPort(70000));
-}
+    REQUIRE(JobIpAddr::isValidPort(0));
+    REQUIRE(JobIpAddr::isValidPort(65535));
 
+    REQUIRE_FALSE(JobIpAddr::isValidPort(-1));
+    REQUIRE_FALSE(JobIpAddr::isValidPort(70000));
+
+    REQUIRE_FALSE(JobIpAddr::isValidPort(static_cast<int32_t>(UINT16_MAX) + 1));
+}
 TEST_CASE("JobIpAddr classification: global vs local", "[job_ipaddr][global][local]") {
     JobIpAddr local1("10.0.0.1");
     JobIpAddr local2("172.20.0.5");

@@ -27,14 +27,14 @@ public:
     [[nodiscard]] bool contains(std::string_view name) const;
     [[nodiscard]] bool contains(JobIana::IanaHeaders name) const;
 
-    [[nodiscard]] bool	append(std::string_view  name, std::string_view value);
-    [[nodiscard]] bool	append(JobIana::IanaHeaders name, std::string_view value);
+    [[nodiscard]] bool append(std::string_view  name, std::string_view value);
+    [[nodiscard]] bool append(JobIana::IanaHeaders name, std::string_view value);
 
-    [[nodiscard]] bool	prepend(std::string_view  name, std::string_view value);
-    [[nodiscard]] bool	prepend(JobIana::IanaHeaders name, std::string_view value);
+    [[nodiscard]] bool prepend(std::string_view  name, std::string_view value);
+    [[nodiscard]] bool prepend(JobIana::IanaHeaders name, std::string_view value);
 
-    [[nodiscard]] bool	insert(std::string_view name, std::string_view value, uint16_t pos);
-    [[nodiscard]] bool	insert(JobIana::IanaHeaders name, std::string_view value, uint16_t pos);
+    [[nodiscard]] bool insert(std::string_view name, std::string_view value, uint16_t pos);
+    [[nodiscard]] bool insert(JobIana::IanaHeaders name, std::string_view value, uint16_t pos);
 
     [[nodiscard]] bool replace(size_t pos, std::string_view name, std::string_view val);
     [[nodiscard]] bool replace(size_t pos, JobIana::IanaHeaders name, std::string_view val);

@@ -7,10 +7,6 @@ project(JosephOddBuild_Net
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-#find_package(PkgConfig REQUIRED)
-#pkg_check_modules(LibCrypto  REQUIRED libcrypto)  # libssl-dev
-#pkg_check_modules(LibOpenSSL REQUIRED libssl)     # libssl-dev
-
 set(JOBNET_SOURCES
     job_url.cpp
     job_ipaddr.cpp
@@ -76,7 +72,7 @@ install(TARGETS JosephsOddBuilder_Net
     INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 )
 
-install(FILES ${JOBIO_HEADERS}
+install(FILES ${JOBNET_HEADERS}
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobnet
 )
 

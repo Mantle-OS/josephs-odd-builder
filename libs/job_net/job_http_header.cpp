@@ -2,6 +2,8 @@
 #include <iostream>
 #include <sstream>
 
+// NOTE FOR LATER Logging with JOB_LOG_ERROR etc
+
 namespace job::net {
 
 JobHttpHeader::JobHttpHeader() = default;
@@ -58,6 +60,7 @@ bool JobHttpHeader::contains(JobIana::IanaHeaders name) const
 
 bool JobHttpHeader::append(std::string_view name, std::string_view value)
 {
+    // FIXME one return statment should be here. right now it is blindly true no matter what !
     std::string key = normalizeKey(name);
     auto it = m_headers.find(key);
     if (it == m_headers.end()) {
@@ -75,11 +78,14 @@ bool JobHttpHeader::append(JobIana::IanaHeaders name, std::string_view value)
 
 bool JobHttpHeader::prepend(std::string_view name, std::string_view value)
 {
+    // FIXME one return statment should be here. right now it is blindly true no matter what !
+    // bool ret = false;
     std::string key = normalizeKey(name);
     auto it = m_headers.find(key);
     if (it == m_headers.end()) {
         m_headers.emplace(std::move(key), HeaderValue{std::string(name), std::string(value)});
         return true;
+        //JUMP
     }
     it->second.value = std::string(value) + ", " + it->second.value;
     return true;
@@ -93,7 +99,10 @@ bool JobHttpHeader::prepend(JobIana::IanaHeaders name, std::string_view value)
 
 bool JobHttpHeader::insert(std::string_view name, std::string_view value, uint16_t /*pos*/)
 {
-    // HTTP headers are unordered by RFC semantics; insert acts like append.
+    // FIXME
+    // !! HTTP headers are unordered by RFC semantics; insert acts like append. !!
+    // I know that this is the case HOWEVER we might need to retain the order for tracking
+    // Reasons later on. So because of that this function needs to be re-wrote to really use pos.
     return append(name, value);
 }
 
@@ -104,14 +113,16 @@ bool JobHttpHeader::insert(JobIana::IanaHeaders name, std::string_view value, ui
 
 bool JobHttpHeader::replace(size_t /*pos*/, std::string_view name, std::string_view val)
 {
+    // Again with pos
+    bool ret = false;
     std::string key = normalizeKey(name);
     auto it = m_headers.find(key);
     if (it != m_headers.end()) {
         it->second.value = std::string(val);
         it->second.displayKey = std::string(name);
-        return true;
+        ret = true;
     }
-    return false;
+    return ret;
 }
 
 
@@ -160,7 +171,6 @@ void JobHttpHeader::clear()
     m_headers.clear();
 }
 
-
 std::string_view JobHttpHeader::value(std::string_view name, std::string_view defaultVal) const
 {
     auto it = m_headers.find(normalizeKey(name));
@@ -178,12 +188,11 @@ std::string_view JobHttpHeader::valueAt(size_t pos) const
 {
     if (pos >= m_headers.size())
         return {};
+
     auto it = m_headers.begin();
     std::advance(it, pos);
     return it->second.value;
 }
-
-
 
 std::forward_list<std::string_view> JobHttpHeader::values(std::string_view name) const
 {

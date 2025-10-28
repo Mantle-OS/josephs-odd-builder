@@ -13,6 +13,7 @@
 
 namespace job::threads {
 
+// NOTES / FIXME noexcept and other bits that could be added for compiler fun
 
 class JobThread : public std::enable_shared_from_this<JobThread> {
 public:

@@ -47,8 +47,7 @@ public:
     [[nodiscard]] static inline bool isValidPort(int32_t port) noexcept
     {
         bool ret = false;
-        // 0 reserved always true
-        if(port >= 0 && port < 65535)
+        if(port >= 0 && port <= 65535)
             ret = true;
         else
             ret = false;
@@ -65,18 +64,6 @@ private:
     sockaddr_storage m_storage{};
     socklen_t m_len{0};
     bool m_valid{false};
-
-    static sockaddr_in s_ipv4;
-    static sockaddr_in6 s_ipv6;
 };
 
 } // namespace job::net
-
-
-
-// Static s_ipv4 / s_ipv6 Members
-// currently use static temporaries for assignment:
-// s_ipv4.sin_family = AF_INET;
-// s_ipv4.sin_port = htons(port);
-// std::memcpy(&m_storage, &s_ipv4, sizeof(sockaddr_in));
-// This introduces potential thread-safety issues because s_ipv4 and s_ipv6 are shared across all instances.

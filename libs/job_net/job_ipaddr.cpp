@@ -9,14 +9,12 @@
 namespace job::net {
 
 namespace {
-constexpr std::string_view kIPv4Regex = R"(^(\d{1,3}\.){3}\d{1,3}$)";
-constexpr std::string_view kIPv6Regex = R"(^([0-9A-Fa-f]{0,4}:){1,7}[0-9A-Fa-f]{0,4}$)";
-const std::regex kIPv4Pattern(kIPv4Regex.data());
-const std::regex kIPv6Pattern(kIPv6Regex.data());
+    constexpr std::string_view kIPv4Regex = R"(^(\d{1,3}\.){3}\d{1,3}$)";
+    constexpr std::string_view kIPv6Regex = R"(^([0-9A-Fa-f]{0,4}:){1,7}[0-9A-Fa-f]{0,4}$)";
+    const std::regex kIPv4Pattern(kIPv4Regex.data());
+    const std::regex kIPv6Pattern(kIPv6Regex.data());
 } // namespace
 
-sockaddr_in  JobIpAddr::s_ipv4{};
-sockaddr_in6 JobIpAddr::s_ipv6{};
 
 JobIpAddr::JobIpAddr() = default;
 JobIpAddr::JobIpAddr(const std::string &addr, uint16_t port) { setAddress(addr, port); }
@@ -48,10 +46,12 @@ bool JobIpAddr::setAddress(const std::string &addr, uint16_t port) {
 
     // --- IPv4 ---
     if (isIPv4(addr)) {
-        s_ipv4.sin_family = AF_INET;
-        s_ipv4.sin_port = htons(port);
-        if (inet_pton(AF_INET, addr.c_str(), &s_ipv4.sin_addr) == 1) {
-            std::memcpy(&m_storage, &s_ipv4, sizeof(sockaddr_in));
+        sockaddr_in ipv4_addr{};
+
+        ipv4_addr.sin_family = AF_INET;
+        ipv4_addr.sin_port = htons(port);
+        if (inet_pton(AF_INET, addr.c_str(), &ipv4_addr.sin_addr) == 1) {
+            std::memcpy(&m_storage, &ipv4_addr, sizeof(sockaddr_in));
             m_family = Family::IPv4;
             m_len = sizeof(sockaddr_in);
             m_port = port;
@@ -62,10 +62,12 @@ bool JobIpAddr::setAddress(const std::string &addr, uint16_t port) {
 
     // --- IPv6 ---
     if (isIPv6(addr)) {
-        s_ipv6.sin6_family = AF_INET6;
-        s_ipv6.sin6_port = htons(port);
-        if (inet_pton(AF_INET6, addr.c_str(), &s_ipv6.sin6_addr) == 1) {
-            std::memcpy(&m_storage, &s_ipv6, sizeof(sockaddr_in6));
+        sockaddr_in6 ipv6_addr{};
+
+        ipv6_addr.sin6_family = AF_INET6;
+        ipv6_addr.sin6_port = htons(port);
+        if (inet_pton(AF_INET6, addr.c_str(), &ipv6_addr.sin6_addr) == 1) {
+            std::memcpy(&m_storage, &ipv6_addr, sizeof(sockaddr_in6));
             m_family = Family::IPv6;
             m_len = sizeof(sockaddr_in6);
             m_port = port;
