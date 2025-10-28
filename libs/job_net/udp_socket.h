@@ -21,7 +21,7 @@ public:
     {
         return false;
     }
-    std::unique_ptr<ISocketIO> accept() override
+    std::shared_ptr<ISocketIO> accept() override
     {
         return nullptr;
     }

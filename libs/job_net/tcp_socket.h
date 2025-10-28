@@ -10,8 +10,7 @@
 
 namespace job::net {
 
-class TcpSocket final : public ISocketIO,
-                        public std::enable_shared_from_this<TcpSocket>
+class TcpSocket : public ISocketIO, public std::enable_shared_from_this<TcpSocket>
 {
 public:
     using Ptr = std::shared_ptr<TcpSocket>;
@@ -23,7 +22,7 @@ public:
     bool bind(const JobIpAddr &addr) override;
     bool bind(const std::string &address, uint16_t port) override;
     bool listen(int backlog = 5) override;
-    std::unique_ptr<ISocketIO> accept() override;
+    std::shared_ptr<ISocketIO> accept() override;
     void disconnect() override;
 
     ssize_t read(void *buffer, size_t size) override;
@@ -52,8 +51,14 @@ public:
 
     [[nodiscard]] int fd() const noexcept;
 
-private:
+
+
     void registerEvents();
+protected:
+    SocketErrors m_errors;
+    std::weak_ptr<threads::AsyncEventLoop> m_loop;
+
+private:
     void handleEvents(uint32_t events);
     void handleRead();
     void handleWrite();
@@ -62,9 +67,7 @@ private:
 
     int m_fd{-1};
     std::atomic<SocketState> m_state{SocketState::Unconnected};
-    SocketErrors m_errors;
 
-    std::weak_ptr<threads::AsyncEventLoop> m_loop;
     std::atomic<bool> m_nonBlocking{true};
 
     std::string m_peerAddr;

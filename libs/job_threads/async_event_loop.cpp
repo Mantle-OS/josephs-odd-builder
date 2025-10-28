@@ -71,12 +71,14 @@ uint64_t AsyncEventLoop::addTimer(std::function<void()> callback,
     const uint64_t id = m_nextTimerId.fetch_add(1, std::memory_order_relaxed);
     const auto now = std::chrono::steady_clock::now();
 
-    core::JobTimer timer;
-    timer.id = id;
-    timer.nextFire = now + interval;
-    timer.interval = interval;
-    timer.repeat = repeat;
-    timer.callback = std::move(callback);
+    core::JobTimer timer{
+        id,
+        (now + interval),
+        interval,
+        repeat,
+        true,
+        std::move(callback)
+    };
 
     {
         std::scoped_lock lock(m_timerMutex);
@@ -92,7 +94,9 @@ bool AsyncEventLoop::cancelTimer(uint64_t id)
 {
     std::scoped_lock lock(m_timerMutex);
     const auto before = m_timers.size();
-    std::erase_if(m_timers, [id](const core::JobTimer &t) { return t.id == id; });
+    std::erase_if(m_timers, [id](const core::JobTimer &t) {
+        return t.id() == id;
+    });
     return m_timers.size() != before;
 }
 
@@ -105,16 +109,16 @@ void AsyncEventLoop::processTimers()
         std::scoped_lock lock(m_timerMutex);
 
         for (auto &timer : m_timers) {
-            if (timer.nextFire <= now) {
-                ready.push_back(timer.callback);
-                if (timer.repeat)
-                    timer.nextFire = now + timer.interval;
+            if (timer.next() <= now) {
+                ready.push_back(timer.callback());
+                if (timer.repeat())
+                    timer.set_next(now + timer.interval());
             }
         }
 
         // Remove one-shot timers that have fired
         std::erase_if(m_timers, [now](const core::JobTimer &t) {
-            return !t.repeat && t.nextFire <= now;
+            return !t.repeat() && t.next() <= now;
         });
     }
 

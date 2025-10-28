@@ -116,9 +116,9 @@ bool TcpSocket::listen(int backlog)
     return ret;
 }
 
-std::unique_ptr<ISocketIO> TcpSocket::accept()
+std::shared_ptr<ISocketIO> TcpSocket::accept()
 {
-    std::unique_ptr<ISocketIO> ret;
+    std::shared_ptr<ISocketIO> ret;
 
     if (m_fd < 0)
         return ret;
@@ -132,7 +132,7 @@ std::unique_ptr<ISocketIO> TcpSocket::accept()
         return ret;
     }
 
-    auto sock = std::make_unique<TcpSocket>(m_loop.lock());
+    auto sock = std::make_shared<TcpSocket>(m_loop.lock());
     sock->m_fd = clientFd;
     sock->m_state.store(SocketState::Connected, std::memory_order_relaxed);
     sock->m_peerAddr = inet_ntoa(client.sin_addr);
@@ -391,5 +391,6 @@ void TcpSocket::postToLoop(std::function<void()> fn)
     if (auto loop = m_loop.lock())
         loop->post(std::move(fn));
 }
+
 
 } // namespace job::net

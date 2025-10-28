@@ -38,6 +38,9 @@ JobThread::StartResult JobThread::start()
 
             self->m_running.store(true);
 
+            if (!self->m_options.name.empty())
+                ::pthread_setname_np(::pthread_self(), self->m_options.name.c_str());
+
             if (self->m_runFunc)
                 self->m_runFunc(token);
             else

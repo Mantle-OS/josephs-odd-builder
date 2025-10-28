@@ -43,7 +43,7 @@ public:
     virtual bool bind(const JobIpAddr &addr) = 0;
     virtual bool bind(const std::string &address, uint16_t port) = 0;
     virtual bool listen(int backlog = 5) = 0;
-    virtual std::unique_ptr<ISocketIO> accept() = 0;
+    virtual std::shared_ptr<ISocketIO> accept() = 0;
     virtual void disconnect() = 0;
 
     virtual ssize_t read(void *buffer, size_t size) = 0;
@@ -61,6 +61,27 @@ public:
     virtual uint16_t localPort() const = 0;
 
     virtual void dumpState() const = 0;
+
+
 };
+constexpr ISocketIO::SocketOption operator|(
+    ISocketIO::SocketOption a,
+    ISocketIO::SocketOption b) noexcept
+{
+    using T = std::underlying_type_t<ISocketIO::SocketOption>;
+    return static_cast<ISocketIO::SocketOption>(
+        static_cast<T>(a) | static_cast<T>(b)
+        );
+}
+
+constexpr ISocketIO::SocketOption operator&(
+    ISocketIO::SocketOption a,
+    ISocketIO::SocketOption b) noexcept
+{
+    using T = std::underlying_type_t<ISocketIO::SocketOption>;
+    return static_cast<ISocketIO::SocketOption>(
+        static_cast<T>(a) & static_cast<T>(b)
+        );
+}
 
 } // namespace job::net

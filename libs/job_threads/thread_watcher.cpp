@@ -14,11 +14,11 @@ ThreadWatcher::~ThreadWatcher() {
 }
 
 void ThreadWatcher::addThread(const std::shared_ptr<JobThread> &thread,
-                              Duration timeout, int id) {
+                              core::JobTimer::Duration timeout, int id) {
     std::lock_guard<std::mutex> lock(m_mutex);
     m_threads.push_back( WatchedThread{
         .thread = thread,
-        .startTime = Clock::now(),
+        .startTime = core::JobTimer::Clock::now(),
         .timeout = timeout,
         .id = id
     });
@@ -85,19 +85,19 @@ void ThreadWatcher::monitorLoop(std::stop_token token)
 {
     using namespace std::chrono_literals;
 
-    auto lastSummary = Clock::now();
+    auto lastSummary = core::JobTimer::Clock::now();
 
     while (!token.stop_requested()) {
         std::this_thread::sleep_for(100ms);
 
         std::lock_guard lock(m_mutex);
-        const auto now = Clock::now();
+        const auto now = core::JobTimer::Clock::now();
 
         for (auto &wt : m_threads) {
             if (!wt.thread->isRunning())
                 continue;
 
-            const auto elapsed = std::chrono::duration_cast<Duration>(now - wt.startTime);
+            const auto elapsed = std::chrono::duration_cast<core::JobTimer::Duration>(now - wt.startTime);
             if (elapsed > wt.timeout) {
                 std::cerr << "[ThreadWatcher] Thread ID " << wt.id
                           << " exceeded timeout of " << wt.timeout.count()

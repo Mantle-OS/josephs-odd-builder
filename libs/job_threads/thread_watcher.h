@@ -6,6 +6,8 @@
 #include <mutex>
 #include <atomic>
 
+#include <job_timer.h>
+
 #include "job_thread.h"
 
 #include "task_queue.h"
@@ -16,13 +18,10 @@ class ThreadPool;
 class ThreadWatcher {
 
 public:
-    using Clock = std::chrono::steady_clock;
-    using Duration = std::chrono::milliseconds;
-
     struct WatchedThread {
         std::shared_ptr<JobThread> thread;
-        Clock::time_point startTime;
-        Duration timeout;
+        core::JobTimer::Clock::time_point startTime;
+        core::JobTimer::Duration timeout;
         int id;
     };
 
@@ -33,7 +32,7 @@ public:
     ThreadWatcher &operator=(const ThreadWatcher &) = delete;
 
     void addThread(const std::shared_ptr<JobThread> &thread,
-                   Duration timeout,
+                   core::JobTimer::Duration timeout,
                    int id = -1);
 
     void attachQueue(const std::shared_ptr<TaskQueue> &queue);

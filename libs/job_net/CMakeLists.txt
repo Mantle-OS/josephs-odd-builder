@@ -15,7 +15,11 @@ set(JOBNET_SOURCES
     job_url.cpp
     job_ipaddr.cpp
     job_http_header.cpp
+    #tcp
     tcp_socket.cpp
+    tcp_client.cpp
+    tcp_server.cpp
+    #udp
     udp_socket.cpp
     # ssl
     ssl/job_ssl_cert.h
@@ -28,7 +32,11 @@ set(JOBNET_HEADERS
     job_url.h
     job_ipaddr.h
     isocket_io.h
+    #tcp
     tcp_socket.h
+    tcp_client.h
+    tcp_server.h
+    #udp
     udp_socket.h
     # ssl
     ssl/ssl_error.h

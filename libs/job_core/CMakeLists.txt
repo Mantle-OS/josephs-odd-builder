@@ -10,10 +10,12 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 set(JOBCORE_SOURCES
     job_timer.cpp
+    job_logger.cpp
 )
 set(JOBCORE_HEADERS
     io_base.h
     job_timer.h
+    job_logger.h
 )
 
 add_library(JosephsOddBuilder_Core SHARED

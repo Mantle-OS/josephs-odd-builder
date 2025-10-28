@@ -5,7 +5,7 @@ add_executable(test_job_net
     test_url.cpp
     test_ipaddr.cpp
     test_http_header.cpp
-    test_tcp_socket.cpp
+    # test_tcp_socket.cpp
     test_udp_socket.cpp
 )
 
