@@ -4,13 +4,15 @@
 #include <cstdint>
 #include <memory>
 
+#include "async_event_loop.h"
 #include "job_url.h"
 #include "job_ipaddr.h"
 #include "socket_error.h"
 
 namespace job::net {
 
-class ISocketIO {
+class ISocketIO : public std::enable_shared_from_this<ISocketIO> {
+
 public:
     enum class SocketType : uint8_t {
         Unknown = 0,
@@ -36,7 +38,10 @@ public:
         Broadcast    = 1 << 4,
         NonBlocking  = 1 << 5
     };
-
+    explicit ISocketIO(std::shared_ptr<threads::AsyncEventLoop> loop = nullptr):
+        m_loop{loop}
+    {
+    }
     virtual ~ISocketIO() = default;
 
     virtual bool connectToHost(const JobUrl &url) = 0;
@@ -62,8 +67,47 @@ public:
 
     virtual void dumpState() const = 0;
 
+    int fd() const noexcept
+    {
+        return m_fd;
+    }
 
+    void registerEvents()
+    {
+        if (auto loop = m_loop.lock()) {
+            loop->post([self = shared_from_this()]{
+                self->pollEvents();
+            });
+        }
+    }
+    void setLoop(const std::shared_ptr<threads::AsyncEventLoop> &loop)
+    {
+        m_loop = loop;
+    }
+    static constexpr bool hasFlag(ISocketIO::SocketOption value, ISocketIO::SocketOption flag) noexcept {
+        using T = std::underlying_type_t<ISocketIO::SocketOption>;
+        return (static_cast<T>(value) & static_cast<T>(flag)) != 0;
+    }
+
+    // Event callbacks (common to all socket types)
+    std::function<void()> onConnect;
+    std::function<void(const char*, size_t)> onRead;
+    std::function<void()> onReady;
+
+    std::function<void()> onDisconnect;
+    std::function<void(int)> onError;
+
+    std::atomic<bool> running{true};
+
+
+protected:
+    virtual void pollEvents() = 0;
+    virtual void handleEvents(uint32_t events) = 0;
+
+    std::weak_ptr<threads::AsyncEventLoop> m_loop;
+    int m_fd{-1};
 };
+
 constexpr ISocketIO::SocketOption operator|(
     ISocketIO::SocketOption a,
     ISocketIO::SocketOption b) noexcept

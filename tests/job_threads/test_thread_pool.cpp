@@ -28,3 +28,38 @@ TEST_CASE("ThreadPool range tracking", "[thread_pool]") {
     REQUIRE(pool->taskMax() == 10);
     pool->shutdown();
 }
+
+TEST_CASE("ThreadPool handles exceptions safely", "[thread_pool]") {
+    auto pool = ThreadPool::create(2);
+    std::atomic<bool> ran{false};
+
+    auto f = pool->submit([&]{
+        ran = true;
+        throw std::runtime_error("boom");
+    });
+
+    f.wait();
+    REQUIRE(ran);
+    pool->shutdown();
+}
+
+
+TEST_CASE("ThreadPool runs many small tasks", "[thread_pool][stress]") {
+    auto pool = ThreadPool::create(8);
+    std::atomic<int> counter{0};
+
+    for (int i = 0; i < 1000; ++i)
+        pool->submit([&]{ counter.fetch_add(1, std::memory_order_relaxed); });
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(300));
+    pool->shutdown();
+
+    REQUIRE(counter.load() == 1000);
+}
+
+TEST_CASE("ThreadPool shutdown stops idle workers", "[thread_pool][shutdown]") {
+    auto pool = ThreadPool::create(2);
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    pool->shutdown();
+    REQUIRE(pool->taskCount() == 0);
+}

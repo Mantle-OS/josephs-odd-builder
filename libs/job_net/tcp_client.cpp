@@ -1,158 +1,143 @@
 #include "tcp_client.h"
-#include <job_logger.h>
 
 namespace job::net {
 
-TcpClient::TcpClient(const JobUrl &url, bool auto_connect) {
-    if (auto_connect)
-        if(connectTo(url, true)){
-            //debug
-        }
+TcpClient::TcpClient()
+{
+    m_loop = std::make_shared<threads::AsyncEventLoop>();
+    m_socket = std::make_shared<TcpSocket>(m_loop);
 }
 
-TcpClient::TcpClient(const JobIpAddr &address, bool auto_connect) {
-    if (auto_connect)
-        if(connectTo(address, true)){
-
-        }
+TcpClient::TcpClient(const std::shared_ptr<threads::AsyncEventLoop> &loop)
+    : m_loop(loop)
+{
+    m_socket = std::make_shared<TcpSocket>(m_loop);
 }
 
-TcpClient::~TcpClient() {
+TcpClient::~TcpClient()
+{
     disconnect();
 }
 
-bool TcpClient::connectTo(const JobUrl &url, bool autoReconnect) {
-    m_autoReconnect.store(autoReconnect, std::memory_order_relaxed);
-
-    const std::string host = url.host();
-    const uint16_t port = url.port();
-    return connectTo(host, port, autoReconnect);
-}
-
-bool TcpClient::connectTo(const JobIpAddr &address, bool autoReconnect) {
-    m_autoReconnect.store(autoReconnect, std::memory_order_relaxed);
-
-    std::string host;
-    uint16_t port = address.port();
-
-    // Determine address string
-    switch (address.family()) {
-    case JobIpAddr::Family::IPv4:
-    case JobIpAddr::Family::IPv6:
-        host = address.toString(false);
-        break;
-    default:
-        m_errors.setError(EINVAL);
-        return false;
-    }
-
-    return connectTo(host, port, autoReconnect);
-}
-
-bool TcpClient::connectTo(const std::string &host, uint16_t port, bool autoReconnect) {
-    if (isConnected())
+bool TcpClient::connectToHost(const std::string &host, uint16_t port)
+{
+    JobUrl url;
+    url.setScheme("tcp");
+    url.setHost(host);
+    url.setPort(port);
+    if(connectToHost(url)){
+        // registerEvents();
         return true;
+    }
 
-    m_host = host;
-    m_port = port;
-    m_autoReconnect.store(autoReconnect, std::memory_order_relaxed);
+    return false;
+}
 
-    JobUrl url(std::string("tcp://") + host + ":" + std::to_string(port));
-    bool ret = TcpSocket::connectToHost(url);
-
-    if (!ret) {
-        m_connected.store(false, std::memory_order_relaxed);
-        if (onConnectError)
-            onConnectError(static_cast<int>(lastError()));
-
-        if (m_autoReconnect.load())
-            handleReconnect();
+bool TcpClient::connectToHost(const JobUrl &url)
+{
+    m_socket = std::make_shared<TcpSocket>(m_loop);
+    if (!m_socket->connectToHost(url)) {
+        if (onError)
+            onError(static_cast<int>(m_socket->lastError()));
         return false;
     }
 
-    m_connected.store(true, std::memory_order_relaxed);
-    registerSocketEvents();
-
-    if (onConnectSuccess)
-        onConnectSuccess();
-
+    setupSocketCallbacks();
+    m_socket->registerEvents(); // Looks like it already does that
     return true;
 }
 
-void TcpClient::disconnect() noexcept {
-    if (!isConnected())
-        return;
-
-    TcpSocket::disconnect();
-    m_connected.store(false, std::memory_order_relaxed);
-
-    if (onDisconnectEvent)
-        onDisconnectEvent();
-
-    if (m_autoReconnect.load())
-        handleReconnect();
+void TcpClient::disconnect()
+{
+    if (m_socket) {
+        m_socket->disconnect();
+        m_socket.reset();
+        m_connected.store(false, std::memory_order_relaxed);
+    }
 }
 
-bool TcpClient::isConnected() const noexcept {
+ssize_t TcpClient::send(const void *data, size_t size)
+{
+    if (!m_socket || !isConnected())
+        return -1;
+    return m_socket->write(data, size);
+}
+
+ssize_t TcpClient::send(const std::string &data)
+{
+    return send(data.data(), data.size());
+}
+
+bool TcpClient::isConnected() const noexcept
+{
     return m_connected.load(std::memory_order_relaxed);
 }
 
-void TcpClient::setReconnectDelay(core::JobTimer::Duration delay) noexcept {
-    m_reconnectDelay = delay;
+SocketErrors::SocketErrNo TcpClient::lastError() const noexcept
+{
+    if (!m_socket)
+        return SocketErrors::SocketErrNo::None;
+    return m_socket->lastError();
 }
 
-core::JobTimer::Duration TcpClient::reconnectDelay() const noexcept {
-    return m_reconnectDelay;
+std::string TcpClient::lastErrorString() const noexcept
+{
+    if (!m_socket)
+        return "None";
+    return m_socket->lastErrorString();
 }
 
-void TcpClient::handleReconnect() {
-    if (m_host.empty() || m_port == 0)
+void TcpClient::setSocket(const std::shared_ptr<ISocketIO> &socket) {
+    m_socket = std::dynamic_pointer_cast<TcpSocket>(socket);
+    m_connected.store(true);
+}
+
+void TcpClient::registerEvents()
+{
+    if (m_socket) {
+        m_socket->onRead = [this](const char *data, size_t len) {
+            if (onMessage) {
+                onMessage(data, len);
+            }
+        };
+
+        m_socket->onDisconnect = [this]() {
+            if (onDisconnect) {
+                onDisconnect();
+            }
+        };
+
+        m_socket->registerEvents();
+    }
+}
+
+void TcpClient::setupSocketCallbacks()
+{
+    if (!m_socket)
         return;
 
-    // Capture weak_ptr to avoid dangling shared_from_this()
-    std::weak_ptr<TcpClient> weakSelf = std::dynamic_pointer_cast<TcpClient>(shared_from_this());
-
-    // Launch lightweight thread for reconnection delay
-    std::thread([weakSelf, delay = m_reconnectDelay]() {
-        std::this_thread::sleep_for(delay);
-        if (auto self = weakSelf.lock()) {
-            if (!self->isConnected()) {
-                // JobLogger::warn("TcpClient", "Attempting reconnect to {}:{}", self->m_host, self->m_port);
-                self->connectTo(self->m_host, self->m_port, true);
-            }
-        }
-    }).detach();
-}
-
-void TcpClient::registerSocketEvents() {
-    onConnect = [this]() {
+    m_socket->onConnect = [this]() {
         m_connected.store(true, std::memory_order_relaxed);
-        if (onConnectSuccess)
-            onConnectSuccess();
+        if (onConnect)
+            onConnect();
     };
 
-    onDisconnect = [this]() {
+    m_socket->onRead = [this](const char *data, size_t len) {
+        if (onMessage)
+            onMessage(data, len);
+    };
+
+    m_socket->onDisconnect = [this]() {
         m_connected.store(false, std::memory_order_relaxed);
-        if (onDisconnectEvent)
-            onDisconnectEvent();
-        if (m_autoReconnect.load())
-            handleReconnect();
+        if (onDisconnect)
+            onDisconnect();
     };
 
-    onRead = [this](const char *data, size_t len) {
-        if (onData)
-            onData(data, len);
-    };
-
-    onError = [this](int err) {
+    m_socket->onError = [this](int err) {
         m_connected.store(false, std::memory_order_relaxed);
-        if (onConnectError)
-            onConnectError(err);
-        if (m_autoReconnect.load())
-            handleReconnect();
+        if (onError)
+            onError(err);
     };
-
-    registerEvents();
 }
 
 } // namespace job::net

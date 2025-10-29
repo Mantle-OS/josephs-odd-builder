@@ -17,6 +17,8 @@ set(JOBNET_SOURCES
     tcp_server.cpp
     #udp
     udp_socket.cpp
+    # unix
+    unix_socket.cpp
     # ssl
     ssl/job_ssl_cert.h
     ssl/ssl_socket.cpp
@@ -34,6 +36,8 @@ set(JOBNET_HEADERS
     tcp_server.h
     #udp
     udp_socket.h
+    # unix
+    unix_socket.h
     # ssl
     ssl/ssl_error.h
     ssl/job_ssl_cert.h

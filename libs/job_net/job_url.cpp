@@ -65,7 +65,6 @@ bool JobUrl::parse(const std::string &urlString)
             throw std::invalid_argument("Invalid URL format: " + urlString);
         return false;
     }
-
     try {
         m_scheme = schemeFromString(match[1]);
         if (match[2].matched)
@@ -157,6 +156,9 @@ size_t JobUrl::size() const noexcept
 
 void JobUrl::clear() noexcept
 {
+    auto savedMode = m_passwdMode;
+    auto savedBase64 = m_base64EncodePwd;
+
     m_scheme = Scheme::Unknown;
     m_host.clear();
     m_port = 0;
@@ -166,6 +168,10 @@ void JobUrl::clear() noexcept
     m_username.clear();
     m_password.reset();
     m_valid = false;
+
+    // Restore persistent settings
+    m_passwdMode = savedMode;
+    m_base64EncodePwd = savedBase64;
 }
 
 JobUrl::Scheme JobUrl::scheme() const noexcept
@@ -181,7 +187,7 @@ void JobUrl::setScheme(const std::string &schemeStr)
     m_scheme = schemeFromString(schemeStr);
 }
 
-std::string JobUrl::schemeToString(Scheme scheme)
+std::string JobUrl::schemeToString(Scheme scheme) noexcept
 {
     switch (scheme) {
     case Scheme::File:
@@ -211,7 +217,7 @@ std::string JobUrl::schemeToString(Scheme scheme)
     }
 }
 
-JobUrl::Scheme JobUrl::schemeFromString(const std::string &str)
+JobUrl::Scheme JobUrl::schemeFromString(const std::string &str) noexcept
 {
     std::string lower;
     lower.resize(str.size());

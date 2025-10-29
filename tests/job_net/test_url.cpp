@@ -117,7 +117,7 @@ TEST_CASE("JobUrl invalid URL handling", "[job_url][invalid]") {
     JobUrl url;
     url.setPasswdMode(JobUrl::PasswdMode::Lenient);
 
-    REQUIRE_FALSE(url.parse("bad://no//authority"));
+    REQUIRE_FALSE(url.parse("bad://no//authority")); //line 120
     REQUIRE_FALSE(url.isValid());
 
     url.setPasswdMode(JobUrl::PasswdMode::Strict);

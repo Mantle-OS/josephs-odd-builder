@@ -1,5 +1,6 @@
 #include "thread_pool.h"
-#include <iostream>
+
+#include <job_logger.h>
 
 namespace job::threads {
 
@@ -33,13 +34,13 @@ ThreadPool::ThreadPool(size_t threadCount, const JobThreadOptions &options) :
             m_workers.push_back(worker);
             break;
         case JobThread::StartResult::SchedulingFailed:
-            std::cerr << "[ThreadPool] Worker scheduling failed\n";
+            JOB_LOG_ERROR("[ThreadPool] Worker scheduling failed");
             break;
         case JobThread::StartResult::AffinityFailed:
-            std::cerr << "[ThreadPool] Worker CPU affinity failed\n";
+            JOB_LOG_ERROR("[ThreadPool] Worker CPU affinity failed");
             break;
         default:
-            std::cerr << "[ThreadPool] Failed to start worker thread\n";
+            JOB_LOG_ERROR("[ThreadPool] Failed to start worker thread");
             break;
         }
     }
@@ -158,7 +159,7 @@ void ThreadPool::workerLoop(std::stop_token token)
             task();
             m_progress.fetch_add(1, std::memory_order_relaxed);
         } catch (const std::exception &e) {
-            std::cerr << "[ThreadPool] Worker task threw exception: " << e.what() << '\n';
+            JOB_LOG_ERROR("[ThreadPool] Worker task threw exception: %s", e.what());
         }
     }
 }

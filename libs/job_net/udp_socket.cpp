@@ -1,5 +1,6 @@
 #include "udp_socket.h"
 
+#include <sys/poll.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <iostream>
@@ -12,8 +13,10 @@
 
 namespace job::net {
 
-UdpSocket::UdpSocket()
+UdpSocket::UdpSocket(const std::shared_ptr<threads::AsyncEventLoop> &loop):
+    ISocketIO{loop}
 {
+
     m_state.store(SocketState::Unconnected);
 }
 
@@ -274,6 +277,45 @@ void UdpSocket::dumpState() const
               << " peer=" << m_peerAddr.toString(true)
               << " lastError=" << SocketErrors::toString(m_errors.lastError())
               << std::endl;
+}
+
+void UdpSocket::pollEvents()
+{
+    running.store(true, std::memory_order_relaxed);
+
+    std::thread([self = shared_from_this()]() {
+        auto socket = std::static_pointer_cast<UdpSocket>(self);
+        struct pollfd pfd{};
+        pfd.fd = socket->m_fd;
+        pfd.events = POLLIN | POLLERR | POLLHUP;
+
+        if (socket->onReady)
+            socket->onReady();
+
+        while (socket->running.load(std::memory_order_relaxed) &&
+               socket->state() == SocketState::Connected) {
+            int rc = ::poll(&pfd, 1, 100);
+            if (rc > 0)
+                socket->handleEvents(pfd.revents);
+        }
+    }).detach();
+}
+
+void UdpSocket::handleEvents(uint32_t events)
+{
+    if (events & (POLLERR | POLLHUP)) {
+        if (onError)
+            onError(errno);
+        return;
+    }
+
+    if (events & POLLIN) {
+        char buf[4096];
+        JobIpAddr sender;
+        ssize_t n = recvFrom(buf, sizeof(buf), sender);
+        if (n > 0 && onRead)
+            onRead(buf, static_cast<size_t>(n));
+    }
 }
 
 } // namespace job::net

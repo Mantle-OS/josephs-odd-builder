@@ -1,55 +1,53 @@
 #pragma once
 
-#include <functional>
-#include <atomic>
-#include <string>
-
-#include <job_timer.h>
-
-#include <async_event_loop.h>
-
 #include "tcp_socket.h"
+#include "job_url.h"
+#include <atomic>
+#include <functional>
+#include <memory>
+#include <string>
 
 namespace job::net {
 
-class TcpClient final : public TcpSocket {
+class TcpClient {
 public:
-    using ClientPtr = std::shared_ptr<TcpClient>;
+    explicit TcpClient();
+    explicit TcpClient(const std::shared_ptr<threads::AsyncEventLoop> &loop);
+    ~TcpClient();
 
-    TcpClient() = default;
-    TcpClient(const JobUrl &url, bool auto_connnect = false);
-    TcpClient(const JobIpAddr &address, bool auto_connnect = false);
-    ~TcpClient() override;
+    // Connect / Disconnect
+    bool connectToHost(const std::string &host, uint16_t port);
+    bool connectToHost(const JobUrl &url);
+    void disconnect();
 
-    [[nodiscard]] bool connectTo(const JobUrl &url, bool autoReconnect = false);
-    [[nodiscard]] bool connectTo(const JobIpAddr &address, bool autoReconnect = false);
+    // Sending data
+    ssize_t send(const void *data, size_t size);
+    ssize_t send(const std::string &data);
 
-    void disconnect() noexcept override;
-
+    // Accessors
     [[nodiscard]] bool isConnected() const noexcept;
+    [[nodiscard]] SocketErrors::SocketErrNo lastError() const noexcept;
+    [[nodiscard]] std::string lastErrorString() const noexcept;
 
-    // Lifecycle callbacks
-    std::function<void()> onConnectSuccess;
-    std::function<void(int)> onConnectError;
-    std::function<void()> onDisconnectEvent;
-    std::function<void(const char *data, size_t len)> onData;
 
-    // Reconnect control
-    void setReconnectDelay(core::JobTimer::Duration delay) noexcept;
-    [[nodiscard]] core::JobTimer::Duration reconnectDelay() const noexcept;
+
+    // Event callbacks
+    std::function<void()> onConnect;
+    std::function<void(const char*, size_t)> onMessage;
+    std::function<void()> onDisconnect;
+    std::function<void(int)> onError;
+
+    void setSocket(const std::shared_ptr<ISocketIO> &socket);
+    void registerEvents();
+
+
 
 private:
-    void handleReconnect();
-    void registerSocketEvents();
+    void setupSocketCallbacks();
 
-private:
-    bool connectTo(const std::string &host, uint16_t port, bool autoReconnect = false);
+    std::shared_ptr<threads::AsyncEventLoop> m_loop;
+    std::shared_ptr<TcpSocket> m_socket;
     std::atomic<bool> m_connected{false};
-    std::atomic<bool> m_autoReconnect{false};
-    core::JobTimer::Duration m_reconnectDelay{2000};
-
-    std::string m_host;
-    uint16_t m_port{0};
 };
 
 } // namespace job::net

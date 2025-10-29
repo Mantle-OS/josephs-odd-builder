@@ -94,7 +94,6 @@ public:
         }
     }
 
-
     static std::string toString(SocketErrNo code)
     {
         switch (code) {
@@ -147,16 +146,25 @@ public:
         }
     }
 
-
     void setError(int err)
     {
         recordError(err);
     }
 
-    void recordError(int err)
+    void inline recordError(int err) noexcept
     {
         m_lastError = fromErrno(err);
-        m_lastErrorString = std::strerror(err);
+
+#ifdef _GNU_SOURCE
+        char buf[128];
+        if (strerror_r(err, buf, sizeof(buf)) == 0)
+            m_lastErrorString = buf;
+        else
+            m_lastErrorString = "Unknown";
+#else
+        const char *msg = std::strerror(err);
+        m_lastErrorString = msg ? msg : "Unknown";
+#endif
 
         if (m_callback)
             m_callback(m_lastError, m_lastErrorString);

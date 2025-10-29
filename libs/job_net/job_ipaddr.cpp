@@ -8,15 +8,7 @@
 #include <unistd.h>
 namespace job::net {
 
-namespace {
-    constexpr std::string_view kIPv4Regex = R"(^(\d{1,3}\.){3}\d{1,3}$)";
-    constexpr std::string_view kIPv6Regex = R"(^([0-9A-Fa-f]{0,4}:){1,7}[0-9A-Fa-f]{0,4}$)";
-    const std::regex kIPv4Pattern(kIPv4Regex.data());
-    const std::regex kIPv6Pattern(kIPv6Regex.data());
-} // namespace
 
-
-JobIpAddr::JobIpAddr() = default;
 JobIpAddr::JobIpAddr(const std::string &addr, uint16_t port) { setAddress(addr, port); }
 JobIpAddr::JobIpAddr(const JobIpAddr &other) = default;
 JobIpAddr &JobIpAddr::operator=(const JobIpAddr &other) = default;
@@ -35,6 +27,9 @@ bool JobIpAddr::setAddress(const std::string &addr, uint16_t port) {
 
     // --- UNIX socket ---
     if (isUnixPath(addr)) {
+        if (addr.size() >= sizeof(reinterpret_cast<sockaddr_un*>(&m_storage)->sun_path))
+            return false;
+
         m_family = Family::Unix;
         sockaddr_un *un = reinterpret_cast<sockaddr_un*>(&m_storage);
         un->sun_family = AF_UNIX;
@@ -63,7 +58,6 @@ bool JobIpAddr::setAddress(const std::string &addr, uint16_t port) {
     // --- IPv6 ---
     if (isIPv6(addr)) {
         sockaddr_in6 ipv6_addr{};
-
         ipv6_addr.sin6_family = AF_INET6;
         ipv6_addr.sin6_port = htons(port);
         if (inet_pton(AF_INET6, addr.c_str(), &ipv6_addr.sin6_addr) == 1) {
@@ -98,25 +92,25 @@ uint16_t JobIpAddr::port() const noexcept
 
 std::string JobIpAddr::toString(bool includePort) const
 {
-    char buf[INET6_ADDRSTRLEN] = {0};
+    std::array<char, INET6_ADDRSTRLEN> buf{};
     std::ostringstream oss;
 
     switch (m_family) {
     case Family::IPv4: {
         auto *ipv4 = reinterpret_cast<const sockaddr_in*>(&m_storage);
-        inet_ntop(AF_INET, &ipv4->sin_addr, buf, sizeof(buf));
-        oss << buf;
+        inet_ntop(AF_INET, &ipv4->sin_addr, buf.data(), buf.size());
+        oss << buf.data();
         if (includePort && ipv4->sin_port)
             oss << ":" << ntohs(ipv4->sin_port);
         break;
     }
     case Family::IPv6: {
         auto *ipv6 = reinterpret_cast<const sockaddr_in6*>(&m_storage);
-        inet_ntop(AF_INET6, &ipv6->sin6_addr, buf, sizeof(buf));
+        inet_ntop(AF_INET6, &ipv6->sin6_addr, buf.data(), buf.size());
         if (includePort && ipv6->sin6_port)
-            oss << "[" << buf << "]:" << ntohs(ipv6->sin6_port);
+            oss << "[" << buf.data() << "]:" << ntohs(ipv6->sin6_port);
         else
-            oss << buf;
+            oss << buf.data();
         break;
     }
     case Family::Unix: {
@@ -132,6 +126,7 @@ std::string JobIpAddr::toString(bool includePort) const
     return oss.str();
 }
 
+
 const sockaddr *JobIpAddr::sockAddr() const noexcept
 {
     return reinterpret_cast<const sockaddr*>(&m_storage);
@@ -142,16 +137,6 @@ socklen_t JobIpAddr::sockAddrLen() const noexcept
     return m_len;
 }
 
-
-bool JobIpAddr::isIPv4(const std::string &ip)
-{
-    return std::regex_match(ip, kIPv4Pattern);
-}
-
-bool JobIpAddr::isIPv6(const std::string &ip)
-{
-    return std::regex_match(ip, kIPv6Pattern);
-}
 
 bool JobIpAddr::isUnixPath(const std::string &path) {
     return !path.empty() && path[0] == '/';
@@ -284,24 +269,11 @@ bool JobIpAddr::isBroadcast() const noexcept
     return reinterpret_cast<const sockaddr_in*>(&m_storage)->sin_addr.s_addr == INADDR_BROADCAST;
 }
 
-// FIXME
 bool JobIpAddr::isUnixPermitted() const noexcept
 {
+    // FIXME
     // Placeholder for future permission checks (e.g. stat() or ACL logic)
     return true;
-}
-
-std::string JobIpAddr::versionString(Family f) {
-    switch (f) {
-    case Family::IPv4:
-        return "IPv4";
-    case Family::IPv6:
-        return "IPv6";
-    case Family::Unix:
-        return "Unix";
-    default:
-        return "Unknown";
-    }
 }
 
 bool JobIpAddr::fromSockAddr(const sockaddr *sa, socklen_t len)
@@ -335,6 +307,30 @@ bool JobIpAddr::fromSockAddr(const sockaddr *sa, socklen_t len)
     }
 
     return true;
+}
+
+const std::regex &JobIpAddr::ipv4Pattern() noexcept
+{
+    static const std::regex re(R"(^(\d{1,3}\.){3}\d{1,3}$)");
+    return re;
+}
+
+const std::regex &JobIpAddr::ipv6Pattern() noexcept
+{
+    static const std::regex re(R"(^([0-9A-Fa-f]{0,4}:){1,7}[0-9A-Fa-f]{0,4}$)");
+    return re;
+}
+
+bool JobIpAddr::operator==(const JobIpAddr &o) const noexcept
+{
+    return m_family == o.m_family &&
+           m_port == o.m_port &&
+           std::memcmp(&m_storage, &o.m_storage, sizeof(sockaddr_storage)) == 0;
+}
+
+bool JobIpAddr::operator!=(const JobIpAddr &o) const noexcept
+{
+    return !(*this == o);
 }
 
 

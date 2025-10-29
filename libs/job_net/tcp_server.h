@@ -1,60 +1,44 @@
 #pragma once
 
-#include <atomic>
 #include <memory>
+#include <mutex>
+#include <atomic>
 #include <functional>
+#include <vector>
 
-#include <async_event_loop.h>
 #include "tcp_socket.h"
-
+#include "tcp_client.h"
 namespace job::net {
 
-class TcpServer : public TcpSocket,
-                  std::enable_shared_from_this<TcpServer>
-{
+class TcpServer {
 public:
-
-    using ServerPtr = std::shared_ptr<TcpServer>;
+    using ClientPtr = std::shared_ptr<TcpClient>;
 
     explicit TcpServer();
+    explicit TcpServer(const std::shared_ptr<threads::AsyncEventLoop> &loop);
     ~TcpServer();
 
-    [[nodiscard]] bool start(const JobUrl &url, int backlog = 10) noexcept;
-    [[nodiscard]] bool start(const JobIpAddr &addr, int backlog = 10) noexcept;
-    [[nodiscard]] bool start(const std::string &address, uint16_t port, int backlog = 10) noexcept;
-
-
-    void stop() noexcept;
-
-    [[nodiscard]] bool isRunning() const noexcept
-    {
-        return m_running.load();
-    }
-
-    // Event callbacks
-    std::function<void(ServerPtr)> onClientConnected;
-    std::function<void(ServerPtr, const char *data, size_t len)> onClientData;
-    std::function<void(ServerPtr)> onClientDisconnected;
-    std::function<void(int)> onError;
+    bool start(const std::string &address, uint16_t port, int backlog = 5);
+    void stop();
 
     [[nodiscard]] uint16_t port() const noexcept;
-    [[nodiscard]] std::string address() const noexcept;
+    [[nodiscard]] bool isRunning() const noexcept;
+
+    // Event callbacks
+    std::function<void(ClientPtr)> onClientConnected;
+    std::function<void(ClientPtr, const char*, size_t)> onClientMessage;
+    std::function<void(ClientPtr)> onClientDisconnected;
+    std::function<void(int)> onError;
 
 private:
-    void registerAcceptEvents();
-    void handleAccept();
-    void attachClientHandlers(ServerPtr client);
+    void acceptLoop();
 
-private:
     std::shared_ptr<threads::AsyncEventLoop> m_loop;
-    TcpSocket m_listener;
-
-    std::unordered_map<ServerPtr> m_clients;
+    std::shared_ptr<TcpSocket> m_listener;
+    std::vector<ClientPtr> m_clients;
+    std::mutex m_mutex;
     std::atomic<bool> m_running{false};
-
-    std::string m_address;
     uint16_t m_port{0};
-    std::shared_ptr<threads::AsyncEventLoop> m_loop;
 };
 
 } // namespace job::net

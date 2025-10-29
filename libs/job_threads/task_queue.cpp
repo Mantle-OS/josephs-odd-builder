@@ -40,9 +40,7 @@ std::function<void()> TaskQueue::take() {
 
 std::optional<std::function<void()>> TaskQueue::take(std::chrono::milliseconds timeout) {
     std::unique_lock lock(m_mutex);
-    if (!m_condition.wait_for(lock, timeout, [&]() {
-            return !m_queue.empty() || m_stopped.load();
-        }))
+    if (!m_condition.wait_for(lock, timeout, [&]() {return !m_queue.empty() || m_stopped.load();}))
         return std::nullopt;
 
     if (m_queue.empty())
@@ -157,8 +155,6 @@ void TaskQueue::swap(TaskQueue &other)
     m_count.store(otherCount, std::memory_order_relaxed);
     other.m_count.store(thisCount, std::memory_order_relaxed);
 }
-
-
 
 std::optional<std::function<void ()> > TaskQueue::back()
 {

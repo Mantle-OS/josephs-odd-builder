@@ -51,5 +51,28 @@ TEST_CASE("AsyncEventLoop repeating timer cancels correctly", "[event_loop]") {
     std::this_thread::sleep_for(std::chrono::milliseconds(300));
     loop.stop();
 
-    REQUIRE(afterCancel == counter.load()); // stopped incrementing
+     // stopped incrementing
+    REQUIRE(afterCancel == counter.load());
+}
+
+
+TEST_CASE("AsyncEventLoop repeating timer fires multiple times", "[event_loop][timing]") {
+    AsyncEventLoop loop;
+    loop.start();
+
+    std::atomic<int> ticks{0};
+    loop.addTimer([&]{ ticks++; }, std::chrono::milliseconds(50), true);
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(260));
+    loop.stop();
+
+    REQUIRE(ticks.load() >= 4);
+}
+
+
+TEST_CASE("AsyncEventLoop cancel non-existent timer", "[event_loop][edge]") {
+    AsyncEventLoop loop;
+    loop.start();
+    REQUIRE_FALSE(loop.cancelTimer(9999));
+    loop.stop();
 }

@@ -14,8 +14,8 @@
 
 namespace job::net {
 
-TcpSocket::TcpSocket(std::shared_ptr<threads::AsyncEventLoop> loop)
-    : m_loop(loop)
+TcpSocket::TcpSocket(std::shared_ptr<threads::AsyncEventLoop> loop) :
+    ISocketIO{loop}
 {
     int fd = ::socket(AF_INET, SOCK_STREAM, 0);
     if (fd < 0) {
@@ -150,7 +150,7 @@ void TcpSocket::disconnect()
         ::close(m_fd);
         m_fd = -1;
     }
-
+    running.store(false, std::memory_order_relaxed);
     m_state.store(SocketState::Closed, std::memory_order_relaxed);
 }
 
@@ -199,6 +199,11 @@ ISocketIO::SocketState TcpSocket::state() const noexcept
 SocketErrors::SocketErrNo TcpSocket::lastError() const noexcept
 {
     return m_errors.lastError();
+}
+
+std::string TcpSocket::lastErrorString() const noexcept
+{
+    return m_errors.lastErrorString();
 }
 
 void TcpSocket::setOption(SocketOption option, bool enable)
@@ -320,48 +325,48 @@ void TcpSocket::dumpState() const
               << std::endl;
 }
 
-int TcpSocket::fd() const noexcept
+void TcpSocket::pollEvents()
 {
-    return m_fd;
-}
+    running.store(true, std::memory_order_relaxed);
 
-void TcpSocket::registerEvents()
-{
-    auto loop = m_loop.lock();
-    if (!loop)
-        return;
+    std::thread([self = shared_from_this()]() {
+        auto socket = std::static_pointer_cast<TcpSocket>(self);
+        struct pollfd pfd{};
+        pfd.fd = socket->fd();
+        pfd.events = POLLIN | POLLOUT | POLLERR | POLLHUP;
 
-    loop->post([self = shared_from_this()] {
-        std::thread([self]() {
-            struct pollfd pfd{};
-            pfd.fd = self->m_fd;
-            pfd.events = POLLIN | POLLOUT | POLLERR | POLLHUP;
-
-            while (self->state() == SocketState::Connecting || self->state() == SocketState::Connected) {
-                int rc = ::poll(&pfd, 1, 100);
-                if (rc > 0)
-                    self->handleEvents(pfd.revents);
-            }
-        }).detach();
-    });
+        while (socket->running.load(std::memory_order_relaxed) &&
+               (socket->state() == SocketState::Connecting ||
+                socket->state() == SocketState::Connected)) {
+            int rc = ::poll(&pfd, 1, 100);
+            if (rc > 0)
+                socket->handleEvents(pfd.revents);
+        }
+        socket->running.store(false, std::memory_order_relaxed);
+    }).detach();
 }
 
 void TcpSocket::handleEvents(uint32_t events)
 {
-    if (events & POLLIN)
-        handleRead();
+    if (events & (POLLERR | POLLHUP)) {
+        SocketState prev = m_state.exchange(SocketState::Error, std::memory_order_relaxed);
+        if (prev != SocketState::Error && onDisconnect)
+            onDisconnect();
 
-    if (events & POLLOUT && m_state.load() == SocketState::Connecting) {
+        running.store(false, std::memory_order_relaxed);
+        return; // stop further processing
+    }
+
+    if ((events & POLLOUT) &&
+        m_state.load(std::memory_order_relaxed) == SocketState::Connecting) {
         m_state.store(SocketState::Connected, std::memory_order_relaxed);
         if (onConnect)
             onConnect();
+        return;
     }
 
-    if (events & (POLLERR | POLLHUP)) {
-        m_state.store(SocketState::Error, std::memory_order_relaxed);
-        if (onDisconnect)
-            onDisconnect();
-    }
+    if (events & POLLIN)
+        handleRead();
 }
 
 void TcpSocket::handleRead()
@@ -372,24 +377,22 @@ void TcpSocket::handleRead()
     if (n > 0) {
         if (onRead)
             onRead(buf, static_cast<size_t>(n));
-    } else if (n == 0) {
-        m_state.store(SocketState::Closed, std::memory_order_relaxed);
-        if (onDisconnect)
-            onDisconnect();
-    } else {
-        if (errno != EAGAIN && errno != EWOULDBLOCK) {
-            m_state.store(SocketState::Error, std::memory_order_relaxed);
-            m_errors.setError(errno);
-            if (onError)
-                onError(errno);
-        }
     }
-}
+    else if (n == 0) {
+        // graceful close by peer
+        if (m_state.exchange(SocketState::Closed, std::memory_order_relaxed) != SocketState::Closed && onDisconnect)
+            onDisconnect();
 
-void TcpSocket::postToLoop(std::function<void()> fn)
-{
-    if (auto loop = m_loop.lock())
-        loop->post(std::move(fn));
+        running.store(false, std::memory_order_relaxed);
+    }
+    else if (errno != EAGAIN && errno != EWOULDBLOCK) {
+        m_state.store(SocketState::Error, std::memory_order_relaxed);
+        m_errors.setError(errno);
+        if (onError)
+            onError(errno);
+
+        running.store(false, std::memory_order_relaxed);
+    }
 }
 
 

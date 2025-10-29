@@ -2,9 +2,10 @@
 #include "thread_pool.h"
 
 #include <chrono>
-#include <iostream>
 
+#include <job_logger.h>
 namespace job::threads {
+
 // static constexpr auto kSummaryInterval = std::chrono::seconds(5);
 
 ThreadWatcher::ThreadWatcher() = default;
@@ -25,8 +26,9 @@ void ThreadWatcher::addThread(const std::shared_ptr<JobThread> &thread,
 }
 
 void ThreadWatcher::start() {
+    // already running ?
     if (m_running.exchange(true))
-        return; // already running
+        return;
 
     JobThreadOptions opts = JobThreadOptions::normal();
     opts.name = "ThreadWatcher";
@@ -41,16 +43,16 @@ void ThreadWatcher::start() {
     case JobThread::StartResult::Started:
         break;
     case JobThread::StartResult::AlreadyRunning:
-        std::cout << "Thread is already running\n";
+        JOB_LOG_DEBUG("Thread is already running");
         break;
     case JobThread::StartResult::SchedulingFailed:
-        std::cout << "Could not set the Scheduling oif the thread\n";
+        JOB_LOG_DEBUG("Could not set the Scheduling oif the thread");
         break;
     case JobThread::StartResult::AffinityFailed:
-        std::cout << "Thread could not be pinned to the Core you tried to. If this is no realtime ignore\n";
+        JOB_LOG_DEBUG("Thread could not be pinned to the Core you tried to. If this is no realtime ignore");
         break;
     case JobThread::StartResult::ThreadError:
-        std::cout << "Could not start the Thread Generic error\n";
+        JOB_LOG_DEBUG("Could not start the Thread Generic error");
         break;
     }
 }
@@ -99,18 +101,17 @@ void ThreadWatcher::monitorLoop(std::stop_token token)
 
             const auto elapsed = std::chrono::duration_cast<core::JobTimer::Duration>(now - wt.startTime);
             if (elapsed > wt.timeout) {
-                std::cerr << "[ThreadWatcher] Thread ID " << wt.id
-                          << " exceeded timeout of " << wt.timeout.count()
-                          << " ms (elapsed: " << elapsed.count() << " ms)\n";
+                JOB_LOG_ERROR("[ThreadWatcher] Thread ID %d exceeded timeout of %d  ms (elapsed: %d ms)",
+                              wt.id, wt.timeout.count(), elapsed.count());
                 wt.thread->requestStop();
             }
         }
 
         if (auto q = m_queue.lock()) {
             if (q->stopped()) {
-                std::cerr << "[ThreadWatcher] TaskQueue stopped\n";
+                JOB_LOG_ERROR("[ThreadWatcher] TaskQueue stopped");
             } else if (q->isEmpty()) {
-                std::cerr << "[ThreadWatcher] TaskQueue empty — possible starvation detected\n";
+                JOB_LOG_DEBUG("[ThreadWatcher] TaskQueue empty — possible starvation detected");
             }
         }
 
@@ -129,10 +130,8 @@ void ThreadWatcher::monitorLoop(std::stop_token token)
                 loadAvg = m.loadAvg;
             }
 
-            std::cout << "[ThreadWatcher] Threads: " << threadCount
-                      << " | Queue size: " << queueSize
-                      << " | Load avg: " << std::fixed << std::setprecision(2)
-                      << loadAvg << '\n';
+            JOB_LOG_DEBUG("[ThreadWatcher] Threads: {} | Queue size: {} | Load avg: {:.2f}",
+                          threadCount, queueSize, loadAvg);
 
             lastSummary = now;
         }

@@ -59,8 +59,8 @@ public:
     [[nodiscard]] Scheme scheme() const noexcept;
     void setScheme(Scheme scheme);
     void setScheme(const std::string &schemeStr);
-    [[nodiscard]] static std::string schemeToString(Scheme scheme);
-    [[nodiscard]] static Scheme schemeFromString(const std::string &str);
+    [[nodiscard]] static std::string schemeToString(Scheme scheme) noexcept;
+    [[nodiscard]] static Scheme schemeFromString(const std::string &str) noexcept;
 
     [[nodiscard]] const std::string &host() const noexcept;
     void setHost(const std::string &h);

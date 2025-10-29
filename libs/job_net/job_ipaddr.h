@@ -1,5 +1,6 @@
 #pragma once
 
+#include <regex>
 #include <string>
 #include <netinet/in.h>
 #include <sys/socket.h>
@@ -17,7 +18,7 @@ public:
         Unix
     };
 
-    JobIpAddr();
+    constexpr JobIpAddr() noexcept = default;
     JobIpAddr(const std::string &addr, uint16_t port = 0);
     JobIpAddr(const JobIpAddr &other);
     JobIpAddr &operator=(const JobIpAddr &other);
@@ -41,22 +42,39 @@ public:
     [[nodiscard]] bool isBroadcast() const noexcept;
     [[nodiscard]] bool isUnixPermitted() const noexcept;
 
-    [[nodiscard]] static bool isIPv4(const std::string &ip);
-    [[nodiscard]] static bool isIPv6(const std::string &ip);
-    [[nodiscard]] static bool isUnixPath(const std::string &path);
-    [[nodiscard]] static inline bool isValidPort(int32_t port) noexcept
+    [[nodiscard]] static bool isIPv4(const std::string &ip) noexcept
     {
-        bool ret = false;
-        if(port >= 0 && port <= 65535)
-            ret = true;
-        else
-            ret = false;
-
-        return ret;
+        in_addr addr4;
+        return inet_pton(AF_INET, ip.c_str(), &addr4) == 1;
     }
-    [[nodiscard]] static std::string versionString(Family f);
+
+    [[nodiscard]] static bool isIPv6(const std::string &ip) noexcept
+    {
+        in6_addr addr6;
+        return inet_pton(AF_INET6, ip.c_str(), &addr6) == 1;
+    }
+    [[nodiscard]] static bool isUnixPath(const std::string &path);
+    [[nodiscard]] static constexpr bool isValidPort(int32_t port) noexcept
+    {
+        return port >= 0 && port <= 65535;
+    }
+
+    [[nodiscard]] static constexpr std::string_view versionString(Family f) noexcept {
+        switch (f) {
+        case Family::IPv4: return "IPv4";
+        case Family::IPv6: return "IPv6";
+        case Family::Unix: return "Unix";
+        default: return "Unknown";
+        }
+    }
 
     [[nodiscard]] bool fromSockAddr(const sockaddr *sa, socklen_t len);
+    [[nodiscard]] const std::regex &ipv4Pattern() noexcept;
+    [[nodiscard]] const std::regex &ipv6Pattern() noexcept;
+
+
+    [[nodiscard]] bool operator==(const JobIpAddr &o) const noexcept;
+    [[nodiscard]] bool operator!=(const JobIpAddr &o) const noexcept;
 
 private:
     Family m_family{Family::Unknown};

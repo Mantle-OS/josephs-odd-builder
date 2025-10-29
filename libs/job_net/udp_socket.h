@@ -11,7 +11,7 @@ namespace job::net {
 
 class UdpSocket : public ISocketIO {
 public:
-    UdpSocket();
+    UdpSocket(const std::shared_ptr<threads::AsyncEventLoop> &loop = nullptr);
     ~UdpSocket() override;
 
     bool connectToHost(const JobUrl &url) override;
@@ -31,7 +31,6 @@ public:
     ssize_t read(void *buffer, size_t size) override;
     ssize_t write(const void *buffer, size_t size) override;
 
-    // Datagram variants
     ssize_t sendTo(const void *buffer, size_t size, const JobIpAddr &dest);
     ssize_t recvFrom(void *buffer, size_t size, JobIpAddr &sender);
 
@@ -52,14 +51,12 @@ public:
 
     void dumpState() const override;
 
-    [[nodiscard]] int fd() const noexcept
-    {
-        return m_fd;
-    }
+protected:
+    void pollEvents() override;
+    void handleEvents(uint32_t events) override;
 
 private:
     void closeSocket();
-    int m_fd{-1};
     SocketErrors m_errors;
     std::atomic<SocketState> m_state{SocketState::Unconnected};
     JobIpAddr m_boundAddr;

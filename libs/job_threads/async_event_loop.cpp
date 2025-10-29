@@ -1,8 +1,11 @@
 #include "async_event_loop.h"
 
-#include <iostream>
 #include <chrono>
 #include <pthread.h>
+
+#include <job_logger.h>
+
+// FIXME new logger and e.what()
 
 namespace job::threads {
 
@@ -44,7 +47,7 @@ void AsyncEventLoop::stop()
         try {
             m_thread.join();
         } catch (const std::system_error &e) {
-            std::cerr << "[AsyncEventLoop] join() threw: " << e.what() << '\n';
+            JOB_LOG_ERROR("[AsyncEventLoop] join() threw: %s \n", e.what());
         }
     }
 }
@@ -126,9 +129,9 @@ void AsyncEventLoop::processTimers()
         try {
             cb();
         } catch (const std::exception &e) {
-            std::cerr << "[AsyncEventLoop] Timer exception: " << e.what() << '\n';
+            JOB_LOG_ERROR("[AsyncEventLoop] Timer exception: %s \n", e.what());
         } catch (...) {
-            std::cerr << "[AsyncEventLoop] Timer unknown exception\n";
+            JOB_LOG_ERROR("[AsyncEventLoop] Timer unknown exception\n");
         }
     }
 }
@@ -144,9 +147,9 @@ void AsyncEventLoop::loop(std::stop_token token)
             try {
                 taskOpt.value()();
             } catch (const std::exception &e) {
-                std::cerr << "[AsyncEventLoop] Task exception: " << e.what() << '\n';
+                JOB_LOG_ERROR("[AsyncEventLoop] Task exception: %s \n", e.what());
             } catch (...) {
-                std::cerr << "[AsyncEventLoop] Unknown task exception\n";
+                JOB_LOG_ERROR("[AsyncEventLoop] Unknown task exception\n");
             }
         }
 
@@ -162,9 +165,9 @@ void AsyncEventLoop::runOnce()
         try {
             taskOpt.value()();
         } catch (const std::exception &e) {
-            std::cerr << "[AsyncEventLoop] Unhandled exception: " << e.what() << '\n';
+            JOB_LOG_ERROR("[AsyncEventLoop] Unhandled exception: %s \n", e.what());
         } catch (...) {
-            std::cerr << "[AsyncEventLoop] Unknown exception in runOnce\n";
+            JOB_LOG_ERROR("[AsyncEventLoop] Unknown exception in runOnce\n");
         }
     }
 }

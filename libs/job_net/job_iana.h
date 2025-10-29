@@ -3,13 +3,14 @@
 #include <cstdint>
 #include <string>
 #include <unordered_map>
+#include <format>
 
 namespace job::net {
 
-class JobIana{
+class JobIana final{
 public:
-    JobIana() = default;
-    ~JobIana() = default;
+    JobIana() = delete;
+    ~JobIana() = delete;
 
     enum class IanaHeaders : uint16_t {
         AIM                                     = 0,
@@ -192,14 +193,14 @@ public:
     };
 
     static const std::unordered_map<IanaHeaders, std::string> kIanaHeaderNames;
-    static inline std::string toString(IanaHeaders header)
+    static inline std::string toString(IanaHeaders header) noexcept
     {
         auto it = kIanaHeaderNames.find(header);
         if (it != kIanaHeaderNames.end())
             return it->second;
         return "Unknown-Header";
     }
-    static inline bool tryFromString(const std::string &str, IanaHeaders &outHeader)
+    static inline bool tryFromString(const std::string &str, IanaHeaders &outHeader) noexcept
     {
         for (const auto &[key, value] : kIanaHeaderNames) {
             if (value == str) {
@@ -209,7 +210,6 @@ public:
         }
         return false;
     }
-
 };
 inline const std::unordered_map<JobIana::IanaHeaders, std::string> JobIana::kIanaHeaderNames = {
     { IanaHeaders::AIM                                     ,"AIM"                                       },
@@ -391,3 +391,10 @@ inline const std::unordered_map<JobIana::IanaHeaders, std::string> JobIana::kIan
     { IanaHeaders::ProtocolQuery                           ,"Protocol-Query"                            }
     };
 } // job::net
+
+template <>
+struct std::formatter<job::net::JobIana::IanaHeaders> : std::formatter<std::string> {
+    auto format(job::net::JobIana::IanaHeaders h, auto &ctx) const {
+        return std::formatter<std::string>::format(job::net::JobIana::toString(h), ctx);
+    }
+};

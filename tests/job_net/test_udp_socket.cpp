@@ -2,10 +2,13 @@
 #include <thread>
 #include <cstring>
 
+#include <async_event_loop.h>
+
 #include <udp_socket.h>
 #include <job_ipaddr.h>
 
 using namespace job::net;
+using namespace job::threads;
 
 ssize_t msg_ssize(const char *msg)
 {
@@ -109,3 +112,38 @@ TEST_CASE("UdpSocket handles bad reads gracefully", "[udp_socket][errors]") {
     REQUIRE(sock.read(buf, sizeof(buf)) == -1);
     REQUIRE(sock.lastError() != SocketErrors::SocketErrNo::None);
 }
+
+TEST_CASE("UdpSocket async poll event dispatch", "[udp_socket][async]") {
+    auto loop = std::make_shared<AsyncEventLoop>();
+    loop->start();
+
+    auto server = std::make_shared<UdpSocket>(loop);
+    REQUIRE(server->bind("127.0.0.1", 0));
+    server->registerEvents();
+
+    auto client = std::make_shared<UdpSocket>(loop);
+    REQUIRE(client->connectToHost(JobUrl("udp://127.0.0.1:" + std::to_string(server->localPort()))));
+
+    std::atomic<bool> ready{false};
+    std::atomic<bool> gotData{false};
+
+    server->onRead = [&](const char *data, size_t len) {
+        REQUIRE(std::string(data, len) == "Async UDP");
+        gotData.store(true);
+    };
+
+    server->onReady = [&](){
+        ready.store(true);
+    };
+
+    while (!ready.load())
+        std::this_thread::sleep_for(std::chrono::milliseconds(2));
+
+    REQUIRE(client->write("Async UDP", 9) == 9);
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    REQUIRE(gotData.load()); // Not long enough or somethihg line 138
+
+    loop->stop();
+}
+
