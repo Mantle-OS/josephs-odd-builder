@@ -1,8 +1,7 @@
 #include "job_http_header.h"
-#include <iostream>
 #include <sstream>
 
-// NOTE FOR LATER Logging with JOB_LOG_ERROR etc
+#include <job_logger.h>
 
 namespace job::net {
 
@@ -11,11 +10,12 @@ JobHttpHeader::JobHttpHeader() = default;
 JobHttpHeader::JobHttpHeader(std::string_view name, std::string_view value)
 {
     if(!append(name, value))
-        std::cerr << "Unable to append to headers\n";
+        JOB_LOG_ERROR("Unable to append to headers\n");
 }
 
-JobHttpHeader::JobHttpHeader(const JobHttpHeader &other)
-    : m_headers(other.m_headers)
+JobHttpHeader::JobHttpHeader(const JobHttpHeader &other) :
+    m_header_list(other.m_header_list),
+    m_index(other.m_index)
 {
 }
 
@@ -24,7 +24,8 @@ JobHttpHeader::~JobHttpHeader() = default;
 JobHttpHeader &JobHttpHeader::operator=(JobHttpHeader &&other)
 {
     if (this != &other) {
-        m_headers = std::move(other.m_headers);
+        m_header_list = std::move(other.m_header_list);
+        m_index = std::move(other.m_index);
     }
     return *this;
 }
@@ -32,7 +33,8 @@ JobHttpHeader &JobHttpHeader::operator=(JobHttpHeader &&other)
 JobHttpHeader &JobHttpHeader::operator=(const JobHttpHeader &other)
 {
     if (this != &other) {
-        m_headers = other.m_headers;
+        m_header_list = other.m_header_list;
+        m_index = other.m_index;
     }
     return *this;
 }
@@ -40,17 +42,17 @@ JobHttpHeader &JobHttpHeader::operator=(const JobHttpHeader &other)
 std::string JobHttpHeader::toString() const
 {
     std::ostringstream oss;
-    for (const auto &pair : m_headers) {
+    for (const auto &pair : m_header_list) {
         const auto &hv = pair.second;
         oss << hv.displayKey << ": " << hv.value << "\r\n";
     }
-    oss << "\r\n"; // terminate header section
+    oss << "\r\n";
     return oss.str();
 }
 
 bool JobHttpHeader::contains(std::string_view name) const
 {
-    return m_headers.find(normalizeKey(name)) != m_headers.end();
+    return m_index.contains(normalizeKey(name));
 }
 
 bool JobHttpHeader::contains(JobIana::IanaHeaders name) const
@@ -60,16 +62,36 @@ bool JobHttpHeader::contains(JobIana::IanaHeaders name) const
 
 bool JobHttpHeader::append(std::string_view name, std::string_view value)
 {
-    // FIXME one return statment should be here. right now it is blindly true no matter what !
-    std::string key = normalizeKey(name);
-    auto it = m_headers.find(key);
-    if (it == m_headers.end()) {
-        m_headers.emplace(std::move(key), HeaderValue{std::string(name), std::string(value)});
-        return true;
+    bool ret = false;
+
+    try {
+        std::string key = normalizeKey(name);
+        auto it = m_index.find(key);
+
+        if (it == m_index.end()) {
+            // new header, append to end
+            HeaderValue hv{std::string(name), std::string(value)};
+            m_header_list.push_back({key, std::move(hv)});
+            m_index[key] = m_header_list.size() - 1;
+            ret = true;
+        } else {
+            // existing header, append to its value
+            auto &existing = m_header_list[it->second].second.value;
+            existing += ", ";
+            existing += value;
+            ret = true;
+        }
+    } catch (const std::exception &e) {
+        JOB_LOG_ERROR("JobHttpHeader::append() exception: {}", e.what());
+        ret = false;
+    } catch (...) {
+        JOB_LOG_ERROR("JobHttpHeader::append() unknown exception");
+        ret = false;
     }
-    it->second.value += ", " + std::string(value);
-    return true;
+
+    return ret;
 }
+
 
 bool JobHttpHeader::append(JobIana::IanaHeaders name, std::string_view value)
 {
@@ -78,32 +100,70 @@ bool JobHttpHeader::append(JobIana::IanaHeaders name, std::string_view value)
 
 bool JobHttpHeader::prepend(std::string_view name, std::string_view value)
 {
-    // FIXME one return statment should be here. right now it is blindly true no matter what !
-    // bool ret = false;
-    std::string key = normalizeKey(name);
-    auto it = m_headers.find(key);
-    if (it == m_headers.end()) {
-        m_headers.emplace(std::move(key), HeaderValue{std::string(name), std::string(value)});
-        return true;
-        //JUMP
-    }
-    it->second.value = std::string(value) + ", " + it->second.value;
-    return true;
-}
+    bool ret = false;
 
+    try {
+        std::string key = normalizeKey(name);
+        auto it = m_index.find(key);
+
+        if (it == m_index.end()) {
+            // insert new header at front
+            HeaderValue hv{std::string(name), std::string(value)};
+            m_header_list.insert(m_header_list.begin(), {key, std::move(hv)});
+
+            // reindex everything
+            for (size_t i = 0; i < m_header_list.size(); ++i)
+                m_index[m_header_list[i].first] = i;
+
+            ret = true;
+        } else {
+            // header exists — prepend to existing value
+            auto &existing = m_header_list[it->second].second.value;
+            existing.insert(0, std::string(value) + ", ");
+            ret = true;
+        }
+    } catch (const std::exception &e) {
+        JOB_LOG_ERROR("JobHttpHeader::prepend() exception: {}", e.what());
+        ret = false;
+    } catch (...) {
+        JOB_LOG_ERROR("JobHttpHeader::prepend() unknown exception");
+        ret = false;
+    }
+
+    return ret;
+}
 
 bool JobHttpHeader::prepend(JobIana::IanaHeaders name, std::string_view value)
 {
     return prepend(JobIana::toString(name), value);
 }
 
-bool JobHttpHeader::insert(std::string_view name, std::string_view value, uint16_t /*pos*/)
+bool JobHttpHeader::insert(std::string_view name, std::string_view value, uint16_t pos)
 {
-    // FIXME
-    // !! HTTP headers are unordered by RFC semantics; insert acts like append. !!
-    // I know that this is the case HOWEVER we might need to retain the order for tracking
-    // Reasons later on. So because of that this function needs to be re-wrote to really use pos.
-    return append(name, value);
+    bool ret = false;
+    try {
+        std::string key = normalizeKey(name);
+        if (m_index.contains(key)) {
+            m_header_list[m_index[key]].second.value = std::string(value);
+            ret = true;
+        } else {
+            HeaderValue hv{std::string(name), std::string(value)};
+            if (pos > m_header_list.size())
+                pos = m_header_list.size();
+
+            m_header_list.insert(m_header_list.begin() + pos, {key, std::move(hv)});
+            m_index[key] = pos;
+
+            for (size_t i = pos + 1; i < m_header_list.size(); ++i)
+                m_index[m_header_list[i].first] = i;
+
+            ret = true;
+        }
+    } catch (...) {
+        JOB_LOG_ERROR("JobHttpHeader::insert() exception");
+        ret = false;
+    }
+    return ret;
 }
 
 bool JobHttpHeader::insert(JobIana::IanaHeaders name, std::string_view value, uint16_t pos)
@@ -111,20 +171,44 @@ bool JobHttpHeader::insert(JobIana::IanaHeaders name, std::string_view value, ui
     return insert(JobIana::toString(name), value, pos);
 }
 
-bool JobHttpHeader::replace(size_t /*pos*/, std::string_view name, std::string_view val)
+bool JobHttpHeader::replace(size_t pos, std::string_view name, std::string_view val)
 {
-    // Again with pos
     bool ret = false;
-    std::string key = normalizeKey(name);
-    auto it = m_headers.find(key);
-    if (it != m_headers.end()) {
-        it->second.value = std::string(val);
-        it->second.displayKey = std::string(name);
-        ret = true;
+
+    try {
+        // Validate position first
+        if (pos >= m_header_list.size()) {
+            JOB_LOG_WARN("JobHttpHeader::replace() invalid position: {}", pos);
+            return false;
+        }
+
+        std::string key = normalizeKey(name);
+        auto &entry = m_header_list[pos];
+
+        // Update existing header if the key matches
+        if (entry.first == key) {
+            entry.second.displayKey = std::string(name);
+            entry.second.value = std::string(val);
+            ret = true;
+        } else {
+            // Key mismatch: overwrite key + value and update index mapping
+            m_index.erase(entry.first);
+            entry.first = key;
+            entry.second.displayKey = std::string(name);
+            entry.second.value = std::string(val);
+            m_index[key] = pos;
+            ret = true;
+        }
+    } catch (const std::exception &e) {
+        JOB_LOG_ERROR("JobHttpHeader::replace() exception: {}", e.what());
+        ret = false;
+    } catch (...) {
+        JOB_LOG_ERROR("JobHttpHeader::replace() unknown exception");
+        ret = false;
     }
+
     return ret;
 }
-
 
 bool JobHttpHeader::replace(size_t pos, JobIana::IanaHeaders name, std::string_view val)
 {
@@ -133,17 +217,30 @@ bool JobHttpHeader::replace(size_t pos, JobIana::IanaHeaders name, std::string_v
 
 void JobHttpHeader::removeAt(uint16_t pos)
 {
-    if (pos >= m_headers.size())
+    if (pos >= m_header_list.size()) {
+        JOB_LOG_WARN("JobHttpHeader::removeAt() invalid position: {}", pos);
         return;
+    }
 
-    auto it = m_headers.begin();
-    std::advance(it, pos);
-    m_headers.erase(it);
+    const auto key = m_header_list[pos].first;
+    m_header_list.erase(m_header_list.begin() + pos);
+    m_index.erase(key);
+
+    // Reindex everything after the removed position
+    for (size_t i = pos; i < m_header_list.size(); ++i)
+        m_index[m_header_list[i].first] = i;
 }
+
 
 void JobHttpHeader::removeAll(std::string_view name)
 {
-    m_headers.erase(normalizeKey(name));
+    std::string key = normalizeKey(name);
+    auto it = m_index.find(key);
+    if (it == m_index.end())
+        return;
+
+    size_t pos = it->second;
+    removeAt(static_cast<uint16_t>(pos));
 }
 
 void JobHttpHeader::removeAll(JobIana::IanaHeaders name)
@@ -151,32 +248,38 @@ void JobHttpHeader::removeAll(JobIana::IanaHeaders name)
     removeAll(JobIana::toString(name));
 }
 
+// update
 bool JobHttpHeader::isEmpty() const noexcept
 {
-    return m_headers.empty();
+    return m_header_list.empty();
 }
 
+// Update
 size_t JobHttpHeader::size() const noexcept
 {
-    return m_headers.size();
+    return m_header_list.size();
 }
 
+// Update
 size_t JobHttpHeader::count() const noexcept
 {
-    return m_headers.size();
+    return m_header_list.size();
 }
 
 void JobHttpHeader::clear()
 {
-    m_headers.clear();
+    m_header_list.clear();
+    m_index.clear();
 }
+
 
 std::string_view JobHttpHeader::value(std::string_view name, std::string_view defaultVal) const
 {
-    auto it = m_headers.find(normalizeKey(name));
-    if (it != m_headers.end())
-        return it->second.value;
-    return defaultVal;
+    std::string key = normalizeKey(name);
+    auto it = m_index.find(key);
+    if (it == m_index.end())
+        return defaultVal;
+    return m_header_list[it->second].second.value;
 }
 
 std::string_view JobHttpHeader::value(JobIana::IanaHeaders name, std::string_view defaultVal) const
@@ -186,21 +289,22 @@ std::string_view JobHttpHeader::value(JobIana::IanaHeaders name, std::string_vie
 
 std::string_view JobHttpHeader::valueAt(size_t pos) const
 {
-    if (pos >= m_headers.size())
+    if (pos >= m_header_list.size())
         return {};
-
-    auto it = m_headers.begin();
-    std::advance(it, pos);
-    return it->second.value;
+    return m_header_list[pos].second.value;
 }
 
 std::forward_list<std::string_view> JobHttpHeader::values(std::string_view name) const
 {
     std::forward_list<std::string_view> ret;
-    auto it = m_headers.find(normalizeKey(name));
-    if (it != m_headers.end())
-        ret.push_front(it->second.value);
+    std::string key = normalizeKey(name);
+
+    for (const auto &pair : m_header_list) {
+        if (pair.first == key)
+            ret.push_front(pair.second.value);
+    }
     return ret;
 }
+
 
 } // namespace job::net

@@ -4,6 +4,8 @@
 #include <unordered_map>
 #include <algorithm>
 #include <forward_list>
+#include <vector>
+
 #include "job_iana.h"
 
 namespace job::net {
@@ -54,14 +56,41 @@ public:
     [[nodiscard]] std::string_view valueAt(size_t pos) const;
     [[nodiscard]] std::forward_list<std::string_view> values(std::string_view name) const;
 
-    JobHttpHeader &	operator=(JobHttpHeader &&other);
-    JobHttpHeader &	operator=(const JobHttpHeader &other);
+    JobHttpHeader & operator=(JobHttpHeader &&other);
+    JobHttpHeader & operator=(const JobHttpHeader &other);
+
+    [[nodiscard]] auto begin() noexcept
+    {
+        return m_header_list.begin();
+    }
+    [[nodiscard]] auto end() noexcept
+    {
+        return m_header_list.end();
+    }
+    [[nodiscard]] auto begin() const noexcept
+    {
+        return m_header_list.begin();
+    }
+    [[nodiscard]] auto end() const noexcept
+    {
+        return m_header_list.end();
+    }
+    [[nodiscard]] auto cbegin() const noexcept
+    {
+        return m_header_list.cbegin();
+    }
+    [[nodiscard]] auto cend() const noexcept
+    {
+        return m_header_list.cend();
+    }
 
 private:
     struct HeaderValue {
         std::string displayKey;
         std::string value;
     };
-    std::unordered_map<std::string, HeaderValue> m_headers;
+
+    std::vector<std::pair<std::string, HeaderValue>> m_header_list;
+    std::unordered_map<std::string, size_t> m_index;
 };
 } // job::net

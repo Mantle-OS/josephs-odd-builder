@@ -32,6 +32,9 @@ TEST_CASE("JobHttpHeader append and replace semantics", "[job_http_header][mutat
 
     REQUIRE(header.value("Accept").find("application/json") != std::string_view::npos);
 
+    REQUIRE(header.append("Accept", "text/html"));
+    REQUIRE(header.append("Accept-Language", "en-US"));
+
     REQUIRE(header.replace(0, "Accept", "text/plain"));
     REQUIRE(header.value("Accept") == "text/plain");
 
@@ -51,7 +54,8 @@ TEST_CASE("JobHttpHeader toString format output", "[job_http_header][serializati
     REQUIRE(serialized.find("Host: example.com") != std::string::npos);
     REQUIRE(serialized.find("Connection: keep-alive") != std::string::npos);
     REQUIRE(serialized.find("User-Agent: JobTest/1.0") != std::string::npos);
-    REQUIRE(serialized.ends_with("\r\n\r\n")); // header block termination
+    // header block termination
+    REQUIRE(serialized.ends_with("\r\n\r\n"));
 }
 
 TEST_CASE("JobHttpHeader copy and move semantics", "[job_http_header][copy][move]")
@@ -100,4 +104,40 @@ TEST_CASE("JobHttpHeader clear, count, and isEmpty", "[job_http_header][state]")
     header.clear();
     REQUIRE(header.isEmpty());
     REQUIRE(header.count() == 0);
+}
+
+
+TEST_CASE("JobHttpHeader positional operations", "[job_http_header][position]")
+{
+    JobHttpHeader h;
+    REQUIRE(h.append("HeaderA", "One"));
+    REQUIRE(h.append("HeaderB", "Two"));
+    REQUIRE(h.append("HeaderC", "Three"));
+    REQUIRE(h.size() == 3);
+
+    REQUIRE(h.insert("HeaderX", "Inserted", 1));
+    REQUIRE(h.size() == 4);
+    REQUIRE(h.valueAt(1) == "Inserted");
+
+    REQUIRE(h.replace(1, "HeaderX", "Updated"));
+    REQUIRE(h.valueAt(1) == "Updated");
+
+    h.removeAt(1);
+    REQUIRE(h.size() == 3);
+    REQUIRE_FALSE(h.contains("headerx"));
+
+    h.removeAt(99);
+    REQUIRE(h.size() == 3);
+}
+
+
+TEST_CASE("JobHttpHeader invalid positions are handled", "[job_http_header][bounds]")
+{
+    JobHttpHeader h;
+    // out of range
+    REQUIRE_FALSE(h.replace(10, "Header", "Nope"));
+
+    // "SHOULD" NOT CRASH
+    h.removeAt(5);
+    REQUIRE(h.size() == 0);
 }

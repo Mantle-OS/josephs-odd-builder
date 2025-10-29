@@ -3,6 +3,7 @@
 #include <mutex>
 #include <string>
 #include <atomic>
+#include <format>
 
 namespace job::core {
 
@@ -35,10 +36,45 @@ private:
     mutable std::mutex m_mutex;
 };
 
-// Macros
-#define JOB_LOG_ERROR(msg) ::job::core::JobLogger::instance().log(::job::core::LogLevel::Error, msg)
-#define JOB_LOG_WARN(msg)  ::job::core::JobLogger::instance().log(::job::core::LogLevel::Warn,  msg)
-#define JOB_LOG_INFO(msg)  ::job::core::JobLogger::instance().log(::job::core::LogLevel::Info,  msg)
-#define JOB_LOG_DEBUG(msg) ::job::core::JobLogger::instance().log(::job::core::LogLevel::Debug, msg)
-
 } // namespace job::core
+
+namespace job::core::detail {
+template <typename... Args>
+inline std::string format_log(std::string_view fmt, Args&&... args)
+{
+    if constexpr (sizeof...(args) == 0) {
+        return std::string(fmt);
+    } else {
+        auto tuple = std::make_tuple(std::forward<Args>(args)...);
+        return std::apply([&](auto&... unpacked) {
+            return std::vformat(fmt, std::make_format_args(unpacked...));
+        }, tuple);
+    }
+}
+
+// Helper macros
+#define JOB_LOG_ERROR(fmt, ...) \
+    ::job::core::JobLogger::instance().log( \
+        ::job::core::LogLevel::Error, \
+        ::job::core::detail::format_log(fmt, ##__VA_ARGS__) \
+)
+
+#define JOB_LOG_WARN(fmt, ...) \
+    ::job::core::JobLogger::instance().log( \
+        ::job::core::LogLevel::Warn, \
+        ::job::core::detail::format_log(fmt, ##__VA_ARGS__) \
+)
+
+#define JOB_LOG_INFO(fmt, ...) \
+    ::job::core::JobLogger::instance().log( \
+        ::job::core::LogLevel::Info, \
+        ::job::core::detail::format_log(fmt, ##__VA_ARGS__) \
+)
+
+#define JOB_LOG_DEBUG(fmt, ...) \
+    ::job::core::JobLogger::instance().log( \
+        ::job::core::LogLevel::Debug, \
+        ::job::core::detail::format_log(fmt, ##__VA_ARGS__) \
+)
+
+} // job::core::detail
