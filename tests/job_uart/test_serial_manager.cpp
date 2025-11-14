@@ -19,7 +19,6 @@ TEST_CASE("SerialManager initializes and scans devices", "[serial_manager][init]
     REQUIRE(after >= before);
 
     if (!devices.empty()) {
-        // Ensure all device paths begin with /dev/
         for (const auto &[path, io] : devices)
             REQUIRE(path.rfind("/dev/", 0) == 0);
     }
@@ -60,22 +59,21 @@ TEST_CASE("SerialManager can switch currentDevice", "[serial_manager][switch]") 
     }
 }
 
-TEST_CASE("SerialManager responds to rescan (udev simulated)", "[serial_manager][rescan]") {
-    SerialManager manager;
-    size_t before = manager.devices().size();
 
-    // Force a rescan (same as udev callback)
-    REQUIRE_NOTHROW(manager.scanDevices());
-    size_t after = manager.devices().size();
+TEST_CASE("SerialInfo update_serial_devices() populates device map", "[serial_info][udev]") {
+    std::map<std::string, std::unique_ptr<SerialIO>> deviceMap;
+    auto loop = std::make_shared<job::threads::JobIoAsyncThread>();
+    loop->start();
 
-    INFO("Device count changed from " << before << " to " << after);
+    REQUIRE_NOTHROW(serial_info::update_serial_devices(deviceMap, loop)); // Pass the loop
 
-    // The test should confirm the rescan does *not* lose entries
-    REQUIRE(after >= before);
-
-    // Optionally, check that pointers are still valid
-    for (const auto &[path, dev] : manager.devices()) {
-        REQUIRE(dev != nullptr);
-        REQUIRE(path.rfind("/dev/", 0) == 0);
+    INFO("Device count after udev scan: " << deviceMap.size());
+    for (const auto &[path, devPtr] : deviceMap) {
+        REQUIRE(devPtr);
+        REQUIRE(!path.empty());
+        REQUIRE(devPtr->location() == path);
     }
+
+    loop->stop(); // Clean up the loop
 }
+// CHECKPOINT: v1

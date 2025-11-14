@@ -1,0 +1,12 @@
+prefix=@prefix@
+exec_prefix=${prefix}
+libdir=@CMAKE_INSTALL_FULL_LIBDIR@
+includedir=@CMAKE_INSTALL_FULL_INCLUDEDIR@/jobserializermsgpack
+
+Name: jobserializermsgpack
+Description: MsgPack Serializer Plugin library for JOB (Joseph's Odd Builder)
+Version: @PROJECT_VERSION@
+Requires.private: jobserializer
+Requires: yaml-cpp
+Cflags: -I${includedir} @PKG_EXTRA_CFLAGS@
+Libs: -L${libdir} -ljobserializermsgpack -ljobserializer -ljobcore -ljobio -ljobthreads @PKG_EXTRA_LIBS@

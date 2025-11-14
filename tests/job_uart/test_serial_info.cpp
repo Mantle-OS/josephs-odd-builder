@@ -37,16 +37,12 @@ TEST_CASE("SerialInfo filesystem scan finds expected devices", "[serial_info][fi
 
     INFO("Found " << ports.size() << " potential serial device(s) under /dev");
 
-    // It's valid for there to be zero ports (e.g. on CI or no devices connected),
-    // but we still verify that any returned paths look correct.
     REQUIRE(std::all_of(ports.begin(), ports.end(), [](const std::string &p) {
         return p.rfind("/dev/", 0) == 0;  // all must begin with /dev/
     }));
 
-    // Optional sanity: ensure the function didn't return a ridiculous number
     REQUIRE(ports.size() < 1024);
 
-    // Print any found devices for diagnostics
     if (!ports.empty()) {
         std::cout << "[SerialInfo] Detected ports:\n";
         for (const auto &p : ports)
@@ -56,10 +52,11 @@ TEST_CASE("SerialInfo filesystem scan finds expected devices", "[serial_info][fi
     }
 }
 
-TEST_CASE("SerialInfo update_serial_devices() populates device map", "[serial_info][udev]") {
+TEST_CASE("SerialInfo update_serial_devices() populates device map one", "[serial_info][udev]") {
     std::map<std::string, std::unique_ptr<SerialIO>> deviceMap;
-
-    REQUIRE_NOTHROW(serial_info::update_serial_devices(deviceMap));
+    auto loop = std::make_shared<job::threads::JobIoAsyncThread>();
+    loop->start();
+    REQUIRE_NOTHROW(serial_info::update_serial_devices(deviceMap, loop));
 
     INFO("Device count after udev scan: " << deviceMap.size());
     for (const auto &[path, devPtr] : deviceMap) {
@@ -68,3 +65,4 @@ TEST_CASE("SerialInfo update_serial_devices() populates device map", "[serial_in
         REQUIRE(devPtr->location() == path);
     }
 }
+// CHECKPOINT: v1

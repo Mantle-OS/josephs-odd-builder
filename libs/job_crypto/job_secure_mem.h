@@ -4,7 +4,6 @@
 #include <cstring>
 #include <string>
 #include <sodium/utils.h>
-#include <vector>
 
 namespace job::crypto {
 
@@ -46,3 +45,4 @@ private:
 };
 
 } // namespace job::crypto
+// CHECKPOINT: v1

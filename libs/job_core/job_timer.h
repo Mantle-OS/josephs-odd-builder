@@ -37,9 +37,11 @@ public:
     [[nodiscard]] bool expired(const TimePoint &right_now = Clock::now()) const noexcept;
 
     [[nodiscard]] std::function<void()> callback() const;
+    void set_callback(const std::function<void ()> &newCallback);
 
     void fire() noexcept;
     void cancel() noexcept;
+
 
 private:
     void scheduleNext() noexcept;
@@ -53,3 +55,4 @@ private:
 };
 
 } // namespace job::core
+// CHECKPOINT: v1

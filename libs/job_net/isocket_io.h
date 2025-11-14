@@ -4,15 +4,18 @@
 #include <cstdint>
 #include <memory>
 
-#include "async_event_loop.h"
+#include <sys/epoll.h>
+
+#include <job_logger.h>
+
+#include <job_io_async_thread.h>
+
 #include "job_url.h"
 #include "job_ipaddr.h"
 #include "socket_error.h"
 
 namespace job::net {
-
-class ISocketIO : public std::enable_shared_from_this<ISocketIO> {
-
+class ISocketIO  {
 public:
     enum class SocketType : uint8_t {
         Unknown = 0,
@@ -27,6 +30,8 @@ public:
         Connected,
         Closing,
         Closed,
+        Listening,
+        Bound,
         Error
     };
 
@@ -38,10 +43,10 @@ public:
         Broadcast    = 1 << 4,
         NonBlocking  = 1 << 5
     };
-    explicit ISocketIO(std::shared_ptr<threads::AsyncEventLoop> loop = nullptr):
-        m_loop{loop}
-    {
-    }
+
+    explicit ISocketIO(std::shared_ptr<threads::JobIoAsyncThread> loop) :
+        m_loop(std::move(loop))
+    {}
     virtual ~ISocketIO() = default;
 
     virtual bool connectToHost(const JobUrl &url) = 0;
@@ -72,60 +77,50 @@ public:
         return m_fd;
     }
 
-    void registerEvents()
-    {
-        if (auto loop = m_loop.lock()) {
-            loop->post([self = shared_from_this()]{
-                self->pollEvents();
-            });
-        }
-    }
-    void setLoop(const std::shared_ptr<threads::AsyncEventLoop> &loop)
+    void setLoop(const std::shared_ptr<threads::JobIoAsyncThread> &loop)
     {
         m_loop = loop;
     }
-    static constexpr bool hasFlag(ISocketIO::SocketOption value, ISocketIO::SocketOption flag) noexcept {
-        using T = std::underlying_type_t<ISocketIO::SocketOption>;
-        return (static_cast<T>(value) & static_cast<T>(flag)) != 0;
-    }
 
-    // Event callbacks (common to all socket types)
     std::function<void()> onConnect;
     std::function<void(const char*, size_t)> onRead;
-    std::function<void()> onReady;
-
+    std::function<void(const char*, size_t)> onWrite; // For later
+    std::function<void()> onReady; // For UDP
     std::function<void()> onDisconnect;
     std::function<void(int)> onError;
-
-    std::atomic<bool> running{true};
+    std::function<void(std::shared_ptr<ISocketIO>)> onAccept;
 
 
 protected:
-    virtual void pollEvents() = 0;
-    virtual void handleEvents(uint32_t events) = 0;
-
-    std::weak_ptr<threads::AsyncEventLoop> m_loop;
+    virtual void onEvents(uint32_t events) = 0;
+    virtual void registerEvents(uint32_t events)
+    {
+        if (m_fd < 0) {
+            JOB_LOG_ERROR("[ISocketIO] registerEvents called on invalid fd");
+            return;
+        }
+        if (auto loop = m_loop.lock()) {
+            if (!loop->registerFD(m_fd, events, [this](uint32_t e) { onEvents(e); }))
+                JOB_LOG_ERROR("[ISocketIO] Failed to register FD {}", m_fd);
+        } else {
+            JOB_LOG_ERROR("[ISocketIO] Failed to register FD {}: Event loop is null", m_fd);
+        }
+    }
+    std::weak_ptr<threads::JobIoAsyncThread> m_loop;
     int m_fd{-1};
 };
 
-constexpr ISocketIO::SocketOption operator|(
-    ISocketIO::SocketOption a,
-    ISocketIO::SocketOption b) noexcept
+constexpr ISocketIO::SocketOption operator|(ISocketIO::SocketOption a, ISocketIO::SocketOption b) noexcept
 {
     using T = std::underlying_type_t<ISocketIO::SocketOption>;
-    return static_cast<ISocketIO::SocketOption>(
-        static_cast<T>(a) | static_cast<T>(b)
-        );
+    return static_cast<ISocketIO::SocketOption>(static_cast<T>(a) | static_cast<T>(b));
 }
 
-constexpr ISocketIO::SocketOption operator&(
-    ISocketIO::SocketOption a,
-    ISocketIO::SocketOption b) noexcept
+constexpr ISocketIO::SocketOption operator&( ISocketIO::SocketOption a, ISocketIO::SocketOption b) noexcept
 {
     using T = std::underlying_type_t<ISocketIO::SocketOption>;
-    return static_cast<ISocketIO::SocketOption>(
-        static_cast<T>(a) & static_cast<T>(b)
-        );
+    return static_cast<ISocketIO::SocketOption>(static_cast<T>(a) & static_cast<T>(b));
 }
 
 } // namespace job::net
+// CHECKPOINT: v2.1

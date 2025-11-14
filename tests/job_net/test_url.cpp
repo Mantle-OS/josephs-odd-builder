@@ -123,3 +123,4 @@ TEST_CASE("JobUrl invalid URL handling", "[job_url][invalid]") {
     url.setPasswdMode(JobUrl::PasswdMode::Strict);
     REQUIRE_THROWS_AS(url.parse("bad://no//authority"), std::invalid_argument);
 }
+// CHECKPOINT: v1

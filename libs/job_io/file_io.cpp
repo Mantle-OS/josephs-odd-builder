@@ -3,7 +3,7 @@
 
 namespace job::io {
 
-FileIO::FileIO(const std::string &path, FileMode mode, bool writeMode) :
+FileIO::FileIO(const std::filesystem::path &path, FileMode mode, bool writeMode) :
     m_filePath{path},
     m_mode{mode},
     m_writeMode{writeMode}
@@ -31,10 +31,10 @@ bool FileIO::openDevice()
     switch (m_mode) {
     case FileMode::RegularFile:
         if (m_writeMode) {
-            m_output.open(m_filePath, std::ios::out | std::ios::binary | std::ios::trunc);
+            m_output.open(m_filePath.string(), std::ios::out | std::ios::binary | std::ios::trunc);
             m_open = m_output.is_open();
         } else {
-            m_input.open(m_filePath, std::ios::in | std::ios::binary);
+            m_input.open(m_filePath.string(), std::ios::in | std::ios::binary);
             m_open = m_input.is_open();
         }
         break;
@@ -122,13 +122,12 @@ ssize_t FileIO::read(char *buffer, size_t size)
         return -1;
 
     std::lock_guard<std::mutex> lock(m_ioMutex);
-
     switch (m_mode) {
     case FileMode::RegularFile:
         if (m_input.read(buffer, size))
             return m_input.gcount();
         else
-            return m_input.gcount(); // could be 0 at EOF
+            return m_input.gcount();
     case FileMode::StdIn:
         m_stdIn->read(buffer, size);
         return m_stdIn->gcount();
@@ -151,7 +150,6 @@ ssize_t FileIO::write(const char *data, size_t size)
         } else {
             return -1;
         }
-
     case FileMode::StdOut:
     case FileMode::StdErr:
         m_stdOut->write(data, size);
@@ -168,10 +166,95 @@ bool FileIO::isOpen() const
     return m_open;
 }
 
-std::string FileIO::path() const
+std::filesystem::path FileIO::path() const
 {
     return m_filePath;
 }
+
+std::string FileIO::pathString() const
+{
+    return m_filePath.string();
+}
+
+void FileIO::setPath(const std::filesystem::path &path, OpenType openType) noexcept
+{
+    if (m_open)
+        closeDevice();
+
+    m_filePath = path;
+    m_writeMode = (openType != OpenType::ReadOnly);
+
+    if (openType != OpenType::ReadOnly && !std::filesystem::exists(path)) {
+        std::ofstream(path.string()); // Create
+        JOB_LOG_INFO("[FileIO] Created file: {}", path.string());
+    }
+
+    switch (openType) {
+    case OpenType::Truncate:
+        m_output.open(path, std::ios::out | std::ios::binary | std::ios::trunc);
+        m_open = m_output.is_open();
+        break;
+    case OpenType::Append:
+        m_output.open(path, std::ios::out | std::ios::binary | std::ios::app);
+        m_open = m_output.is_open();
+        break;
+    case OpenType::ReadOnly:
+        m_input.open(path, std::ios::in | std::ios::binary);
+        m_open = m_input.is_open();
+        break;
+    }
+
+    if (!m_open) {
+        JOB_LOG_ERROR("[FileIO] Failed to open file: {}", pathString());
+    }
+}
+
+void FileIO::setPath(const std::string &path, OpenType openType) noexcept
+{
+    setPath(std::filesystem::path(path), openType);
+}
+
+std::string FileIO::readAll() noexcept
+{
+    if (!m_open) {
+        setPath(m_filePath, OpenType::ReadOnly);
+        if (!m_open) {
+            JOB_LOG_ERROR("[FileIO] Failed to open file for readAll: {}", pathString());
+            return "";
+        }
+    }
+
+    if (m_writeMode) {
+        JOB_LOG_ERROR("[FileIO] Cannot readAll from a file in write-only mode: {}", pathString());
+        return "";
+    }
+    std::ostringstream ss;
+    char buffer[4096];
+    ssize_t bytesRead = 0;
+
+    m_input.clear();
+    m_input.seekg(0);
+
+    while ((bytesRead = read(buffer, sizeof(buffer))) > 0)
+        ss.write(buffer, bytesRead);
+
+    if (bytesRead < 0) {
+        JOB_LOG_ERROR("[FileIO] Error during readAll: {}", pathString());
+        return "";
+    }
+    return ss.str();
+}
+
+bool FileIO::readAll(std::vector<uint8_t> &out_buf) noexcept
+{
+    std::string content = readAll();
+    if (content.empty() && !isOpen())
+        return false;
+
+    out_buf.assign(content.begin(), content.end());
+    return true;
+}
+
 int FileIO::fd() const {
     int ret = -1;
     switch (m_mode) {
@@ -218,3 +301,4 @@ void FileIO::setReadCallback(ReadCallback cb) {
 
 } // job::io
 
+// CHECKPOINT: v1

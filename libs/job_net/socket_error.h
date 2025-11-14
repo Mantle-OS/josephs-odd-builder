@@ -1,9 +1,9 @@
 #pragma once
 
+#include <cstring>
 #include <string>
 #include <functional>
 #include <cerrno>
-#include <cstring>
 
 namespace job::net {
 
@@ -149,6 +149,7 @@ public:
     void setError(int err)
     {
         recordError(err);
+
     }
 
     void inline recordError(int err) noexcept
@@ -192,3 +193,4 @@ private:
 };
 
 } // namespace job::net
+// CHECKPOINT: v1

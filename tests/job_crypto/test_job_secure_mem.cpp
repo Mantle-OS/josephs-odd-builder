@@ -82,3 +82,4 @@ TEST_CASE("JobSecureMem prevents data aliasing", "[job_crypto][secure_mem][safet
     REQUIRE(first.toBase64() == second.toBase64());
     REQUIRE(first.data() != second.data()); // distinct memory regions
 }
+// CHECKPOINT: v1

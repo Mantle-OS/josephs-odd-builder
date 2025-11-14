@@ -6,79 +6,87 @@
 namespace job::uart {
 
 UdevMonitorThread::UdevMonitorThread()
-    : m_udev(udev_new())
 {
+    m_udev = udev_new();
+    if (!m_udev)
+        JOB_LOG_ERROR("[UdevMonitor] Failed to create udev context.");
 }
 
 UdevMonitorThread::~UdevMonitorThread()
 {
     stop();
+
     if (m_monitor)
         udev_monitor_unref(m_monitor);
     if (m_udev)
         udev_unref(m_udev);
 }
 
-void UdevMonitorThread::start(const Callback &onDeviceChange)
+bool UdevMonitorThread::start(std::shared_ptr<threads::JobIoAsyncThread> loop, const Callback &onDeviceChange)
 {
-    if (m_running.exchange(true))
-        return;
-
-    m_callback = onDeviceChange;
-
-    threads::JobThreadOptions opts = threads::JobThreadOptions::normal();
-    opts.name = "UdevMonitor";
-
-    m_thread = std::make_shared<threads::JobThread>(opts);
-    m_thread->setRunFunction([this](std::stop_token token) {
-        this->monitorLoop(token);
-    });
-
-    const auto result = m_thread->start();
-    if (result != threads::JobThread::StartResult::Started)
-        m_running = false;
-}
-
-void UdevMonitorThread::stop()
-{
-    if (!m_running.exchange(false))
-        return;
-
-    if (m_thread) {
-        m_thread->requestStop();
-        m_thread->join();
-        m_thread.reset();
+    if (!m_udev) return false;
+    if (!loop || !loop->isRunning()) {
+        JOB_LOG_ERROR("[UdevMonitor] Event loop is not valid or not running.");
+        return false;
     }
-}
 
-void UdevMonitorThread::monitorLoop(std::stop_token token)
-{
     m_monitor = udev_monitor_new_from_netlink(m_udev, "udev");
-    if (!m_monitor)
-        return;
+    if (!m_monitor) {
+        JOB_LOG_ERROR("[UdevMonitor] Failed to create udev monitor.");
+        return false;
+    }
 
     udev_monitor_filter_add_match_subsystem_devtype(m_monitor, "tty", nullptr);
     udev_monitor_enable_receiving(m_monitor);
 
-    const int fd = udev_monitor_get_fd(m_monitor);
-    struct pollfd fds { fd, POLLIN, 0 };
+    m_udevFd = udev_monitor_get_fd(m_monitor);
+    if (m_udevFd < 0) {
+        JOB_LOG_ERROR("[UdevMonitor] Failed to get udev monitor FD.");
+        return false;
+    }
 
-    while (!token.stop_requested()) {
-        const int ret = ::poll(&fds, 1, 1000); // 1s timeout
-        if (ret <= 0)
-            continue;
+    m_loop = loop; // Store weak_ptr
+    m_callback = onDeviceChange;
 
-        if (fds.revents & POLLIN) {
-            if (struct udev_device *dev = udev_monitor_receive_device(m_monitor)) {
-                const char *action = udev_device_get_action(dev);
-                if (action && (strcmp(action, "add") == 0 || strcmp(action, "remove") == 0)) {
-                    if (m_callback)
-                        m_callback();
-                }
-                udev_device_unref(dev);
-            }
+    if (!loop->registerFD(m_udevFd, EPOLLIN, [this](uint32_t e) { onEvents(e); })) {
+        JOB_LOG_ERROR("[UdevMonitor] Failed to register FD with event loop!");
+        m_udevFd = -1;
+        return false;
+    }
+
+    return true;
+}
+
+void UdevMonitorThread::stop()
+{
+    if (auto loop = m_loop.lock()) {
+        if (m_udevFd != -1) {
+            loop->unregisterFD(m_udevFd);
+            m_udevFd = -1;
         }
+    }
+    m_callback = nullptr;
+}
+
+void UdevMonitorThread::onEvents(uint32_t events)
+{
+    if (events & POLLIN) {
+        if (struct udev_device *dev = udev_monitor_receive_device(m_monitor)) {
+            const char *action = udev_device_get_action(dev);
+
+            if (action && (strcmp(action, "add") == 0 || strcmp(action, "remove") == 0))
+                if (m_callback)
+                    m_callback();
+
+            udev_device_unref(dev);
+        }
+    }
+
+    if (events & (POLLERR | POLLHUP)) {
+        JOB_LOG_ERROR("[UdevMonitor] Error on udev FD, attempting to stop and restart listener.");
+        stop();
     }
 }
 
 } // namespace job::uart
+// CHECKPOINT: v2.0

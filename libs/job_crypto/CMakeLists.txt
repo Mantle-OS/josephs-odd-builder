@@ -4,20 +4,6 @@ project(JosephsOddBuilder_Crypto
     LANGUAGES CXX
 )
 
-set(CMAKE_CXX_STANDARD 23)
-set(CMAKE_INCLUDE_CURRENT_DIR ON)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-if(POLICY CMP0135)
-    cmake_policy(SET CMP0135 NEW) # for reproducible timestamps
-endif()
-add_compile_options(-Wall -Wextra -Wpedantic -Werror)
-
-include(GNUInstallDirs)
-find_package(PkgConfig REQUIRED)
-find_package(Threads REQUIRED)
-pkg_check_modules(LibSodium REQUIRED libsodium)
-
 set(JOBCRYPTO_HEADERS
     job_crypto_init.h
     job_secure_mem.h
@@ -80,3 +66,4 @@ install(EXPORT JosephsOddBuilderCryptoTargets
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/JosephsOddBuilder_Crypto
 )
 
+# CHECKPOINT: v1

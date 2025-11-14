@@ -1,0 +1,27 @@
+{
+  "tag": "ExampleTx",
+  "version": 1,
+  "unit": "example",
+  "base": "BaseStruct",
+  "c_struct": "ExampleTx_t",
+  "include_prefix": "job_example",
+  "out_base": "example_tx",
+  "fields": [
+    {
+      "key": 1,
+      "name": "from_addr",
+      "type": "bin[32]",
+      "comment": "A 32-byte hash"
+    },
+    {
+      "key": 2,
+      "name": "to_addr",
+      "type": "bin[32]"
+    },
+    {
+      "key": 3,
+      "name": "amount",
+      "type": "u64"
+    }
+  ]
+}

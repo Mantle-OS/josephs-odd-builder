@@ -4,17 +4,13 @@ project(JosephOddBuild_Net
     LANGUAGES CXX
 )
 
-set(CMAKE_CXX_STANDARD 23)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-
 set(JOBNET_SOURCES
     job_url.cpp
     job_ipaddr.cpp
     job_http_header.cpp
+    isocket_io.cpp
     #tcp
     tcp_socket.cpp
-    tcp_client.cpp
-    tcp_server.cpp
     #udp
     udp_socket.cpp
     # unix
@@ -32,8 +28,6 @@ set(JOBNET_HEADERS
     isocket_io.h
     #tcp
     tcp_socket.h
-    tcp_client.h
-    tcp_server.h
     #udp
     udp_socket.h
     # unix
@@ -44,9 +38,34 @@ set(JOBNET_HEADERS
     ssl/ssl_socket.h
 )
 
+set(JOBNET_SERVERS_HEADERS
+    servers/tcp_server.h
+    servers/udp_server.h
+    servers/unix_socket_server.h
+)
+
+set(JOBNET_SERVERS_SOURCES
+    servers/tcp_server.cpp
+    servers/udp_server.cpp
+    servers/unix_socket_server.cpp
+)
+
+set(JOBNET_CLIENTS_HEADERS
+    clients/tcp_client.h
+    clients/udp_client.h
+    clients/unix_socket_client.h
+)
+
+set(JOBNET_CLIENTS_SOURCES
+    clients/tcp_client.cpp
+    clients/udp_client.cpp
+    clients/unix_socket_client.cpp
+)
+
 add_library(JosephsOddBuilder_Net SHARED
-    ${JOBNET_HEADERS}
-    ${JOBNET_SOURCES}
+    ${JOBNET_HEADERS} ${JOBNET_SOURCES}
+    ${JOBNET_SERVERS_HEADERS} ${JOBNET_SERVERS_SOURCES}
+    ${JOBNET_CLIENTS_HEADERS} ${JOBNET_CLIENTS_SOURCES}
 )
 
 set_target_properties(JosephsOddBuilder_Net PROPERTIES
@@ -80,6 +99,15 @@ install(FILES ${JOBNET_HEADERS}
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobnet
 )
 
+
+install(FILES ${JOBNET_SERVERS_HEADERS}
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobnet/servers
+)
+
+install(FILES ${JOBNET_CLIENTS_HEADERS}
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobnet/clients
+)
+
 set(PKGCONFIG_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/pkgconfig")
 set(PKGCONFIG_FILE "${CMAKE_CURRENT_BINARY_DIR}/jobnet.pc")
 
@@ -95,5 +123,4 @@ install(EXPORT JosephsOddBuilderNetTargets
     NAMESPACE JOB::
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/JosephsOddBuilderNet
 )
-
-
+# CHECKPOINT: v1.1

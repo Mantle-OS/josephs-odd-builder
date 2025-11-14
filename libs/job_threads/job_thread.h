@@ -1,22 +1,25 @@
 #pragma once
 
-#include <memory>
 #include <atomic>
 #include <functional>
-#include <thread>
+#include <stop_token>
 #include <unistd.h>
+#include <mutex>
+#include <memory>
+
+#include <pthread.h>
 #include <sched.h>
 #include <sys/mman.h>
-#include <pthread.h>
 
-#include "thread_options.h"
+#include "job_thread_options.h"
 
 namespace job::threads {
 
-// NOTES noexcept and other (moderen c++ 23)bits that could be added for compiler fun
-
-class JobThread : public std::enable_shared_from_this<JobThread> {
+class JobThread  {
 public:
+    using RunFunction = std::function<void(std::stop_token)>;
+    using Ptr = std::shared_ptr<JobThread>;
+
     enum class StartResult : uint8_t {
         Started,
         AlreadyRunning,
@@ -24,32 +27,35 @@ public:
         AffinityFailed,
         ThreadError
     };
-    using RunFunction = std::function<void(std::stop_token)>;
+    JobThread() noexcept = default;
+    explicit JobThread(const JobThreadOptions &options) noexcept;
+    virtual ~JobThread() noexcept;
 
-    JobThread() = default;
-    explicit JobThread(const JobThreadOptions &options);
-    virtual ~JobThread();
-
-    void setOptions(const JobThreadOptions &options);
+    void setOptions(const JobThreadOptions &options) noexcept;
     void setRunFunction(RunFunction fn);
 
     [[nodiscard]] StartResult start();
-    void requestStop();
+    void requestStop() noexcept;
 
-    void join();
-
-    [[nodiscard]] bool isRunning() const;
+    [[nodiscard]] bool join() noexcept;
+    [[nodiscard]] bool isRunning() const noexcept;
 
 protected:
-    virtual void run(std::stop_token token);
-    [[nodiscard]] bool applyScheduling();
-    [[nodiscard]] bool applyAffinity();
+    virtual void run(std::stop_token token) noexcept;
+    [[nodiscard]] int applyScheduling() noexcept;
+    [[nodiscard]] int applyAffinity() noexcept;
 
 private:
+    static void* threadEntry(void* arg);
+
+    mutable std::mutex  m_mutex;
     JobThreadOptions    m_options;
-    std::jthread        m_thread;
     std::atomic<bool>   m_running{false};
     RunFunction         m_runFunc;
+    pthread_t           m_pthread{};
+    std::stop_source    m_stopSource;
+    bool                m_joinable{false};
 };
 
 } // namespace job::threads
+// CHECKPOINT: v1.6

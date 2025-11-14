@@ -30,6 +30,7 @@ pkg_check_modules(LibCrypto  REQUIRED libcrypto)  # libssl-dev
 pkg_check_modules(LibZstd    REQUIRED libzstd)    # libzstd-dev
 pkg_check_modules(LibZ       REQUIRED zlib)       # zlib1g-dev
 pkg_check_modules(LibSodium  REQUIRED libsodium)  # libsodium-dev
+
 # snappy
 
 
@@ -38,9 +39,9 @@ pkg_check_modules(LibUdev REQUIRED libudev) # libudev-dev
 
 ## TRANSLATIONS
 
-
 ## DATA fun
 # pkg_check_modules(Flatbuffers REQUIRED flatbuffers)    # libflatbuffers-dev flatbuffers-compiler
+# pkg_check_modules(LibMsgPackC  REQUIRED msgpack-c)       # libmsgpack-c-dev | keep at ansi C and not CXX to keep boost out of the stack
 pkg_check_modules(NlohmannJson REQUIRED nlohmann_json)   # nlohmann-json3-dev
 pkg_check_modules(YAMLCpp      REQUIRED yaml-cpp)        # libyaml-cpp-dev
 
@@ -48,13 +49,14 @@ pkg_check_modules(YAMLCpp      REQUIRED yaml-cpp)        # libyaml-cpp-dev
 ##############################
 # sub dirs
 ##############################
-# Core libs
+# Core libs (where the job_msgpack lib will go for emitters/FS etc)
 add_subdirectory(libs)
 
 # Later
-#add_subdirectory(apps)
+add_subdirectory(apps)
 
 ## TESTS
 enable_testing()
 pkg_check_modules(CatchTwo REQUIRED catch2-with-main)   # libcatch2-dev
 add_subdirectory(tests)
+# CHECKPOINT: v1

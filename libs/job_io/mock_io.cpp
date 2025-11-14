@@ -1,7 +1,7 @@
 #include "mock_io.h"
 
 #include <algorithm>
-
+// FIXME this was all wrote before we had a threading lib
 namespace job::io {
 
 MockIO::MockIO() = default;
@@ -97,3 +97,4 @@ std::string MockIO::peekWriteBuffer() const
 }
 
 } // namespace job::io
+// CHECKPOINT: v1

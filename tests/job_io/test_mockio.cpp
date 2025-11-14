@@ -28,3 +28,4 @@ TEST_CASE("MockIO takeWriteBuffer clears data", "[mockio]") {
     REQUIRE(io.takeWriteBuffer() == "hello");
     REQUIRE(io.peekWriteBuffer().empty());
 }
+// CHECKPOINT: v1

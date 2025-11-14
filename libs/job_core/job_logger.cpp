@@ -71,3 +71,4 @@ std::string JobLogger::timestamp() const
 }
 
 } // namespace job::core
+// CHECKPOINT: v1

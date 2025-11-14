@@ -335,3 +335,4 @@ bool JobIpAddr::operator!=(const JobIpAddr &o) const noexcept
 
 
 } // namespace job::net
+// CHECKPOINT: v1

@@ -88,3 +88,4 @@ TEST_CASE("PtyIO double close is safe", "[pty]") {
     pty.closeDevice();
     REQUIRE_NOTHROW(pty.closeDevice());
 }
+// CHECKPOINT: v1

@@ -1,13 +1,11 @@
-
-
 #pragma once
 
 #include "isocket_io.h"
 #include "tcp_socket.h"
 #include "ssl_error.h"
 
-
-
+// Very very broken just boiler plate. There are other files that being developed
+// JobSslCert etc This file is not used at all
 namespace job::net::ssl {
 
 class SSLSocket : public ISocketIO {
@@ -65,3 +63,4 @@ private:
 };
 
 } // namespace job::net::ssl
+// CHECKPOINT: v1

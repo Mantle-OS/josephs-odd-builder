@@ -1,78 +1,152 @@
 #include <catch2/catch_test_macros.hpp>
-#include "async_event_loop.h"
+
+#include <atomic>
+#include <thread>
+
+#include <job_async_event_loop.h>
 
 using namespace job::threads;
+using namespace std::chrono_literals;
 
-TEST_CASE("AsyncEventLoop executes posted tasks", "[event_loop]") {
+TEST_CASE("AsyncEventLoop post and stop", "[threading][async_loop]")
+{
     AsyncEventLoop loop;
+    std::atomic<bool> task_ran{false};
+
     loop.start();
+    REQUIRE(loop.isRunning());
 
-    std::atomic<bool> ran{false};
-    loop.post([&]{ ran = true; });
+    loop.post([&] {
+        task_ran.store(true);
+    });
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
-    loop.stop();
+    int retries = 0;
+    while (!task_ran.load() && retries < 100) {
+        std::this_thread::sleep_for(1ms);
+        retries++;
+    }
 
-    REQUIRE(ran.load());
+    REQUIRE(task_ran.load() == true);
+    loop.stop(); // PRAY THIS DOES NOT dead locking
+    REQUIRE_FALSE(loop.isRunning());
 }
 
-TEST_CASE("AsyncEventLoop delayed execution", "[event_loop]") {
+TEST_CASE("AsyncEventLoop postDelayed", "[threading][async_loop]")
+{
     AsyncEventLoop loop;
+    std::atomic<bool> task_ran{false};
+    auto start_time = std::chrono::steady_clock::now();
+
     loop.start();
+    loop.postDelayed([&] {
+        task_ran.store(true);
+    }, 50ms);
 
-    std::atomic<bool> ran{false};
-    auto start = std::chrono::steady_clock::now();
+    REQUIRE_FALSE(task_ran.load());
+    std::this_thread::sleep_for(25ms);
+    REQUIRE_FALSE(task_ran.load());
 
-    loop.postDelayed([&]{
-        ran = true;
-    }, std::chrono::milliseconds(200));
+    int retries = 0;
+    while (!task_ran.load() && retries < 100) {
+        std::this_thread::sleep_for(1ms);
+        retries++;
+    }
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(300));
+    auto end_time = std::chrono::steady_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
+
+    REQUIRE(task_ran.load() == true); //Fails
+    REQUIRE(duration.count() >= 50);
+
     loop.stop();
-
-    auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
-        std::chrono::steady_clock::now() - start);
-
-    REQUIRE(ran.load());
-    REQUIRE(elapsed.count() >= 200);
 }
 
-TEST_CASE("AsyncEventLoop repeating timer cancels correctly", "[event_loop]") {
+TEST_CASE("AsyncEventLoop repeating timer", "[threading][async_loop]")
+{
     AsyncEventLoop loop;
-    loop.start();
-
     std::atomic<int> counter{0};
-    auto id = loop.addTimer([&]{ counter++; }, std::chrono::milliseconds(100), true);
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(350));
-    loop.cancelTimer(id);
-    auto afterCancel = counter.load();
-
-    std::this_thread::sleep_for(std::chrono::milliseconds(300));
-    loop.stop();
-
-     // stopped incrementing
-    REQUIRE(afterCancel == counter.load());
-}
-
-
-TEST_CASE("AsyncEventLoop repeating timer fires multiple times", "[event_loop][timing]") {
-    AsyncEventLoop loop;
     loop.start();
 
-    std::atomic<int> ticks{0};
-    loop.addTimer([&]{ ticks++; }, std::chrono::milliseconds(50), true);
+    uint64_t timer_id = loop.addTimer([&] {
+        counter++;
+    }, 20ms, true);
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(260));
+    REQUIRE(timer_id > 0);
+
+    std::this_thread::sleep_for(50ms);
+
+    REQUIRE(counter.load() >= 2); //fails
+    REQUIRE(counter.load() <= 3);
+
     loop.stop();
-
-    REQUIRE(ticks.load() >= 4);
 }
 
-
-TEST_CASE("AsyncEventLoop cancel non-existent timer", "[event_loop][edge]") {
+TEST_CASE("AsyncEventLoop cancelTimer", "[threading][async_loop]")
+{
     AsyncEventLoop loop;
+    std::atomic<int> counter{0};
+
     loop.start();
-    REQUIRE_FALSE(loop.cancelTimer(9999));
+
+    uint64_t timer_id = loop.addTimer([&] {
+        counter++;
+    }, 20ms, true);
+
+    std::this_thread::sleep_for(50ms);
+
+    bool canceled = loop.cancelTimer(timer_id);
+    REQUIRE(canceled == true);
+
+    int count_after_cancel = counter.load();
+    REQUIRE(count_after_cancel >= 2);
+
+    std::this_thread::sleep_for(50ms);
+
+    REQUIRE(counter.load() == count_after_cancel);
+
+    bool canceled_again = loop.cancelTimer(timer_id);
+    REQUIRE(canceled_again == false);
+
     loop.stop();
 }
+
+TEST_CASE("AsyncEventLoop globalLoop", "[threading][async_loop]")
+{
+    auto &loop = AsyncEventLoop::globalLoop();
+    REQUIRE(loop.isRunning());
+
+    std::atomic<bool> task_ran{false};
+    loop.post([&] { task_ran.store(true); });
+
+    int retries = 0;
+    while (!task_ran.load() && retries < 100) {
+        std::this_thread::sleep_for(1ms);
+        retries++;
+    }
+
+    REQUIRE(task_ran.load() == true);
+    // We don't stop the global loop Because well ....... it's global
+}
+
+TEST_CASE("AsyncEventLoop handles re-entrancy (post from a timer)", "[threading][async_loop][reentrancy]")
+{
+    AsyncEventLoop loop;
+    std::atomic<bool> task_from_timer_ran{false};
+    loop.start();
+    loop.postDelayed([&] {
+        loop.post([&] {
+            task_from_timer_ran.store(true);
+        });
+    }, 10ms);
+
+    int retries = 0;
+    while (!task_from_timer_ran.load() && retries < 100) {
+        std::this_thread::sleep_for(2ms);
+        retries++;
+    }
+
+    REQUIRE(task_from_timer_ran.load() == true); //fails
+    loop.stop();
+}
+// CHECKPOINT: v1.2

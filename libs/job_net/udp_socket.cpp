@@ -1,22 +1,26 @@
 #include "udp_socket.h"
 
-#include <sys/poll.h>
 #include <unistd.h>
 #include <fcntl.h>
-#include <iostream>
+
 #include <cstring>
+
+#include <sys/poll.h>
+#include <sys/epoll.h>
+#include <sys/socket.h>
 
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
-#include <sys/socket.h>
+#include <job_logger.h>
+
+#include <job_io_async_thread.h>
 
 namespace job::net {
 
-UdpSocket::UdpSocket(const std::shared_ptr<threads::AsyncEventLoop> &loop):
-    ISocketIO{loop}
+UdpSocket::UdpSocket(std::shared_ptr<threads::JobIoAsyncThread> loop):
+    ISocketIO(std::move(loop))
 {
-
     m_state.store(SocketState::Unconnected);
 }
 
@@ -27,11 +31,24 @@ UdpSocket::~UdpSocket()
 
 void UdpSocket::closeSocket()
 {
-    if (m_fd >= 0) {
-        ::close(m_fd);
-        m_fd = -1;
-    }
+    // FIX: Always set state to Closed
     m_state.store(SocketState::Closed);
+    if (m_fd < 0)
+        return;
+
+    if (auto loop = m_loop.lock())
+        loop->unregisterFD(m_fd);
+
+    ::close(m_fd);
+    m_fd = -1;
+}
+
+void UdpSocket::updateLocalInfo() {
+    sockaddr_storage sa{};
+    socklen_t len = sizeof(sa);
+    if (m_fd != -1 && ::getsockname(m_fd, reinterpret_cast<sockaddr*>(&sa), &len) == 0)
+        if(!m_boundAddr.fromSockAddr(reinterpret_cast<sockaddr*>(&sa), len))
+            JOB_LOG_WARN("[UdpSocket] updateLocalInfo: Failed to parse local address.");
 }
 
 bool UdpSocket::connectToHost(const JobUrl &url)
@@ -46,8 +63,10 @@ bool UdpSocket::connectToHost(const JobUrl &url)
         return false;
     }
 
-    m_fd = ::socket(addr.family() == JobIpAddr::Family::IPv6 ? AF_INET6 : AF_INET,
-                    SOCK_DGRAM, 0);
+    // Reset state to Unconnected if we're reusing a closed socket
+    m_state.store(SocketState::Unconnected);
+
+    m_fd = ::socket(addr.family() == JobIpAddr::Family::IPv6 ? AF_INET6 : AF_INET, SOCK_DGRAM | SOCK_NONBLOCK, 0);
     if (m_fd < 0) {
         m_errors.setError(errno);
         m_state.store(SocketState::Error);
@@ -62,6 +81,9 @@ bool UdpSocket::connectToHost(const JobUrl &url)
 
     m_peerAddr = addr;
     m_state.store(SocketState::Connected);
+    updateLocalInfo();
+
+    registerEvents(EPOLLIN | EPOLLERR | EPOLLHUP | EPOLLET);
     return true;
 }
 
@@ -70,39 +92,28 @@ bool UdpSocket::bind(const JobIpAddr &addr)
     if (m_fd >= 0)
         closeSocket();
 
-    m_fd = ::socket(addr.family() == JobIpAddr::Family::IPv6 ? AF_INET6 : AF_INET,
-                    SOCK_DGRAM, 0);
-    if (m_fd < 0)
-    {
+    // Reset state to Unconnected if we're reusing a closed socket
+    m_state.store(SocketState::Unconnected);
+
+    m_fd = ::socket(addr.family() == JobIpAddr::Family::IPv6 ? AF_INET6 : AF_INET, SOCK_DGRAM | SOCK_NONBLOCK, 0);
+    if (m_fd < 0) {
         m_errors.setError(errno);
         m_state.store(SocketState::Error);
         return false;
     }
 
-    if (::bind(m_fd, addr.sockAddr(), addr.sockAddrLen()) < 0)
-    {
+    setOption(SocketOption::ReuseAddress, true);
+
+    if (::bind(m_fd, addr.sockAddr(), addr.sockAddrLen()) < 0) {
         m_errors.setError(errno);
         closeSocket();
         return false;
     }
 
-    // Retrieve actual bound address from kernel (for ephemeral ports, etc.)
-    sockaddr_storage sa{};
-    socklen_t len = sizeof(sa);
-    if (::getsockname(m_fd, reinterpret_cast<sockaddr*>(&sa), &len) == 0)
-    {
-        JobIpAddr resolved;
-        if (resolved.fromSockAddr(reinterpret_cast<sockaddr*>(&sa), len))
-            m_boundAddr = resolved;
-        else
-            m_boundAddr = addr; // fallback
-    }
-    else
-    {
-        m_boundAddr = addr; // fallback on failure
-    }
+    updateLocalInfo(); // Get kernel-assigned port
+    m_state.store(SocketState::Connected); // A bound UDP socket is "connected"
 
-    m_state.store(SocketState::Connected);
+    registerEvents(EPOLLIN | EPOLLERR | EPOLLHUP | EPOLLET);
     return true;
 }
 
@@ -112,14 +123,30 @@ bool UdpSocket::bind(const std::string &address, uint16_t port)
     return bind(addr);
 }
 
+bool UdpSocket::listen([[maybe_unused]]int backlog)
+{
+    // Not supported for UDP
+    m_errors.setError(EOPNOTSUPP);
+    return false;
+}
+
+std::shared_ptr<ISocketIO> UdpSocket::accept()
+{
+    // Not supported for UDP
+    m_errors.setError(EOPNOTSUPP);
+    return nullptr;
+}
+
 void UdpSocket::disconnect()
 {
-    if (m_fd >= 0) {
-        ::shutdown(m_fd, SHUT_RDWR);
+    if (m_fd >= 0)
         closeSocket();
-    }
+
     m_peerAddr.clear();
-    m_state.store(SocketState::Closed);
+    m_state.store(SocketState::Closed); // This is already handled by closeSocket
+
+    if(onDisconnect)
+        onDisconnect();
 }
 
 ssize_t UdpSocket::read(void *buffer, size_t size)
@@ -129,10 +156,12 @@ ssize_t UdpSocket::read(void *buffer, size_t size)
 
     ssize_t ret = ::recv(m_fd, buffer, size, 0);
     if (ret < 0) {
+        if (errno == EAGAIN || errno == EWOULDBLOCK)
+            return 0; // Not an error, just no data
+
         m_errors.setError(errno);
         return -1;
     }
-
     return ret;
 }
 
@@ -141,12 +170,14 @@ ssize_t UdpSocket::write(const void *buffer, size_t size)
     if (m_fd < 0)
         return -1;
 
-    ssize_t ret = ::send(m_fd, buffer, size, 0);
+    ssize_t ret = ::send(m_fd, buffer, size, MSG_NOSIGNAL);
     if (ret < 0) {
+        if (errno == EAGAIN || errno == EWOULDBLOCK)
+            return 0; // Not an error, buffer is full
+
         m_errors.setError(errno);
         return -1;
     }
-
     return ret;
 }
 
@@ -159,11 +190,14 @@ ssize_t UdpSocket::sendTo(const void *buffer, size_t size, const JobIpAddr &dest
 
     ssize_t sent = ::sendto(m_fd, buffer, size, 0,
                             dest.sockAddr(), dest.sockAddrLen());
+
     if (sent < 0) {
+        if (errno == EAGAIN || errno == EWOULDBLOCK)
+            return 0; // Not an error
+
         m_errors.setError(errno);
         return -1;
     }
-
     return sent;
 }
 
@@ -176,20 +210,20 @@ ssize_t UdpSocket::recvFrom(void *buffer, size_t size, JobIpAddr &sender)
 
     sockaddr_storage srcAddr{};
     socklen_t addrLen = sizeof(srcAddr);
+
     ssize_t received = ::recvfrom(m_fd, buffer, size, 0,
                                   reinterpret_cast<sockaddr *>(&srcAddr),
                                   &addrLen);
     if (received < 0){
+        if (errno == EAGAIN || errno == EWOULDBLOCK)
+            return 0; // Not an error
+
         m_errors.setError(errno);
         return -1;
     }
 
-
-    if(!sender.fromSockAddr(reinterpret_cast<sockaddr*>(&srcAddr), addrLen)) {
-        m_errors.setError(EINVAL);
-        return -1;
-    }
-        // LOG
+    if(!sender.fromSockAddr(reinterpret_cast<sockaddr*>(&srcAddr), addrLen))
+        JOB_LOG_WARN("[UdpSocket] recvFrom: Failed to parse sender address.");
 
     return received;
 }
@@ -197,6 +231,11 @@ ssize_t UdpSocket::recvFrom(void *buffer, size_t size, JobIpAddr &sender)
 SocketErrors::SocketErrNo UdpSocket::lastError() const noexcept
 {
     return m_errors.lastError();
+}
+
+ISocketIO::SocketType UdpSocket::type() const noexcept
+{
+    return SocketType::Udp;
 }
 
 ISocketIO::SocketState UdpSocket::state() const noexcept
@@ -210,23 +249,28 @@ void UdpSocket::setOption(SocketOption option, bool enable)
         return;
 
     int value = enable ? 1 : 0;
+    int ret = 0;
 
     switch (option) {
     case SocketOption::ReuseAddress:
-        ::setsockopt(m_fd, SOL_SOCKET, SO_REUSEADDR, &value, sizeof(value));
+        ret = ::setsockopt(m_fd, SOL_SOCKET, SO_REUSEADDR, &value, sizeof(value));
         break;
     case SocketOption::Broadcast:
-        ::setsockopt(m_fd, SOL_SOCKET, SO_BROADCAST, &value, sizeof(value));
+        ret = ::setsockopt(m_fd, SOL_SOCKET, SO_BROADCAST, &value, sizeof(value));
         break;
     case SocketOption::NonBlocking: {
         int flags = fcntl(m_fd, F_GETFL, 0);
         if (flags >= 0)
-            fcntl(m_fd, F_SETFL, enable ? (flags | O_NONBLOCK) : (flags & ~O_NONBLOCK));
+            ret = fcntl(m_fd, F_SETFL, enable ? (flags | O_NONBLOCK) : (flags & ~O_NONBLOCK));
         break;
     }
     default:
+        // Other TCP-specific options are ignored
         break;
     }
+
+    if (ret < 0)
+        m_errors.setError(errno);
 }
 
 bool UdpSocket::option(SocketOption option) const
@@ -240,10 +284,14 @@ bool UdpSocket::option(SocketOption option) const
     switch (option) {
     case SocketOption::ReuseAddress:
         ::getsockopt(m_fd, SOL_SOCKET, SO_REUSEADDR, &value, &len);
-        return value;
+        return value != 0;
     case SocketOption::Broadcast:
         ::getsockopt(m_fd, SOL_SOCKET, SO_BROADCAST, &value, &len);
-        return value;
+        return value != 0;
+    case SocketOption::NonBlocking: {
+        int flags = fcntl(m_fd, F_GETFL, 0);
+        return (flags & O_NONBLOCK) != 0;
+    }
     default:
         return false;
     }
@@ -266,56 +314,50 @@ std::string UdpSocket::localAddress() const
 
 uint16_t UdpSocket::localPort() const
 {
+    if (m_boundAddr.port() == 0 && m_fd != -1)
+        const_cast<UdpSocket*>(this)->updateLocalInfo();
+
     return m_boundAddr.port();
 }
 
 void UdpSocket::dumpState() const
 {
-    std::cout << "[UdpSocket] fd=" << m_fd
-              << " state=" << static_cast<int>(m_state.load())
-              << " bound=" << m_boundAddr.toString(true)
-              << " peer=" << m_peerAddr.toString(true)
-              << " lastError=" << SocketErrors::toString(m_errors.lastError())
-              << std::endl;
+    JOB_LOG_DEBUG("[UdpSocket] fd={} state={} bound={}:{} peer={}:{}",
+                  m_fd, (int)m_state.load(),
+                  localAddress(), localPort(),
+                  peerAddress(), peerPort()
+                  );
 }
 
-void UdpSocket::pollEvents()
+bool UdpSocket::isOpen() const noexcept
 {
-    running.store(true, std::memory_order_relaxed);
-
-    std::thread([self = shared_from_this()]() {
-        auto socket = std::static_pointer_cast<UdpSocket>(self);
-        struct pollfd pfd{};
-        pfd.fd = socket->m_fd;
-        pfd.events = POLLIN | POLLERR | POLLHUP;
-
-        if (socket->onReady)
-            socket->onReady();
-
-        while (socket->running.load(std::memory_order_relaxed) &&
-               socket->state() == SocketState::Connected) {
-            int rc = ::poll(&pfd, 1, 100);
-            if (rc > 0)
-                socket->handleEvents(pfd.revents);
-        }
-    }).detach();
+    const auto current_state = m_state.load();
+    return (current_state == ISocketIO::SocketState::Connected ||
+            current_state == ISocketIO::SocketState::Listening ||
+            current_state == ISocketIO::SocketState::Bound);
 }
 
-void UdpSocket::handleEvents(uint32_t events)
+void UdpSocket::onEvents(uint32_t events)
 {
     if (events & (POLLERR | POLLHUP)) {
+        int error = 0;
+        socklen_t len = sizeof(error);
+        ::getsockopt(m_fd, SOL_SOCKET, SO_ERROR, &error, &len);
+        m_errors.setError(error ? error : EIO);
+
         if (onError)
-            onError(errno);
+            onError(error ? error : EIO);
+
+        if (events & POLLHUP)
+            disconnect(); // HUP is more serious
+
         return;
     }
 
-    if (events & POLLIN) {
-        char buf[4096];
-        JobIpAddr sender;
-        ssize_t n = recvFrom(buf, sizeof(buf), sender);
-        if (n > 0 && onRead)
-            onRead(buf, static_cast<size_t>(n));
-    }
+    if (events & EPOLLIN)
+        if (onRead)
+            onRead(nullptr, 0); // Signal that data is ready
 }
 
 } // namespace job::net
+// CHECKPOINT: v2.1

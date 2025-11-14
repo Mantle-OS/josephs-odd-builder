@@ -1,0 +1,19 @@
+tag: "ExampleUser"
+version: 1
+unit: "example"
+base: "BaseStruct"
+c_struct: "ExampleUser_t"
+include_prefix: "job_example"
+out_base: "example_user"
+fields:
+  - name: "user_id"
+    type: "i32"
+    required: true
+  - name: "username"
+    type: "str"
+    required: true
+  - name: "request"
+    type: "struct"
+    comment: "This will test the nested struct logic."
+    ref_include: "example_req.hpp"
+    ref_sym: "ExampleReq_t"

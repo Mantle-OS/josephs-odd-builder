@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
 #include <functional>
 #include <string>
 #include <unistd.h>
@@ -17,6 +18,7 @@ public:
     [[nodiscard]] virtual bool openDevice() = 0;
     virtual void closeDevice() = 0;
 
+    // FIXME add a new read and write that is apart of our schema that we design
     [[nodiscard]] virtual ssize_t read(char *buffer, size_t maxlen) = 0;
     [[nodiscard]] virtual ssize_t write(const char *data, size_t len) = 0;
 
@@ -45,6 +47,20 @@ protected:
         output.resize(bytesRead);
         return bytesRead;
     }
+
+    [[nodiscard]] ssize_t readToString(std::vector<uint8_t> &output, size_t maxlen)
+    {
+        output.resize(maxlen);
+        ssize_t bytesRead = read(reinterpret_cast<char*>(output.data()), maxlen);
+        if (bytesRead < 0) {
+            output.clear();
+            return -1;
+        }
+        output.resize(bytesRead);
+        return bytesRead;
+    }
+
 };
 
 } // namespace job::core
+// CHECKPOINT: v1

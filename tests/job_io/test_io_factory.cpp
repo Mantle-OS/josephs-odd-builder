@@ -28,3 +28,4 @@ TEST_CASE("IOFactory rejects bad URIs", "[iofactory][invalid]") {
     REQUIRE_THROWS_AS(IOFactory::createFromURI("invaliduri"), std::invalid_argument);
     REQUIRE_THROWS_AS(IOFactory::createFromURI("foo:bar"), std::runtime_error);
 }
+// CHECKPOINT: v1

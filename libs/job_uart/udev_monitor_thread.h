@@ -1,9 +1,11 @@
 #pragma once
 
-#include <atomic>
 #include <functional>
+#include <memory>
 #include <libudev.h>
-#include "job_thread.h"
+
+#include <job_io_async_thread.h>
+#include <job_logger.h>
 
 namespace job::uart {
 
@@ -14,18 +16,18 @@ public:
     UdevMonitorThread();
     ~UdevMonitorThread();
 
-    void start(const Callback &onDeviceChange);
+    bool start(std::shared_ptr<threads::JobIoAsyncThread> loop, const Callback &onDeviceChange);
     void stop();
 
 private:
-    void monitorLoop(std::stop_token token);
-
-    std::shared_ptr<threads::JobThread> m_thread;
-    std::atomic<bool> m_running{false};
+    void onEvents(uint32_t events);
     Callback m_callback;
+    std::weak_ptr<threads::JobIoAsyncThread> m_loop; // Store a weak_ptr
 
     struct udev *m_udev = nullptr;
     struct udev_monitor *m_monitor = nullptr;
+    int m_udevFd = -1;
 };
 
 } // namespace job::uart
+// CHECKPOINT: v2.0

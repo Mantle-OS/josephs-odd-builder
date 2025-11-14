@@ -6,15 +6,6 @@ add_executable(test_job_io
     test_fileio.cpp
     test_mockio.cpp
     test_io_factory.cpp
-
-    # test_serial_settings.cpp
-    # test_serial_info.cpp
-    # test_serial_manager.cpp
-    # test_url.cpp
-    # test_ipaddr.cpp
-    # test_http_header.cpp
-    # test_tcp_socket.cpp
-    # test_udp_socket.cpp
 )
 
 target_link_libraries(test_job_io PRIVATE
@@ -27,3 +18,4 @@ target_link_libraries(test_job_io PRIVATE
 target_include_directories(test_job_io PRIVATE
     ${CatchTwo_INCLUDE_DIRS}
 )
+# CHECKPOINT: v1

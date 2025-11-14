@@ -53,3 +53,4 @@ TEST_CASE("JobTimer cancel prevents firing", "[timer]") {
     REQUIRE(fired == false);
     REQUIRE(timer.isActive() == false);
 }
+// CHECKPOINT: v1

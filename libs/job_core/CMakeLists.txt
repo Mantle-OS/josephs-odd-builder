@@ -16,6 +16,7 @@ set(JOBCORE_HEADERS
     io_base.h
     job_timer.h
     job_logger.h
+    spdx_helper.h
 )
 
 add_library(JosephsOddBuilder_Core SHARED
@@ -63,3 +64,4 @@ install(EXPORT JosephsOddBuilderCoreTargets
 )
 
 
+# CHECKPOINT: v1

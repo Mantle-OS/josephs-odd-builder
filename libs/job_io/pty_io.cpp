@@ -1,12 +1,15 @@
 #include "pty_io.h"
 
-#include <fcntl.h>
 #include <errno.h>
 #include <cstring>
+#include <utility>
+
+#include <fcntl.h>
 
 #include <sys/wait.h>
 #include <poll.h>
 
+#include <job_logger.h>
 namespace job::io {
 
 PtyIO::PtyIO()
@@ -24,7 +27,7 @@ bool PtyIO::openDevice()
     if (m_state != State::Closed)
         return false;
 
-    m_state = State::Opening;
+    m_state.store(State::Opening);
 
     m_masterFd = ::posix_openpt(O_RDWR | O_NOCTTY);
     if (m_masterFd == -1) {
@@ -64,14 +67,38 @@ bool PtyIO::openDevice()
         return false;
     }
 
-    // Set default terminal settings
     ::tcsetattr(m_slaveFd, TCSANOW, &m_termios);
     ::ioctl(m_masterFd, TIOCSWINSZ, &m_winsize);
 
-    if (m_nonBlocking)
-        ::fcntl(m_masterFd, F_SETFL, O_NONBLOCK);
+    setNonBlocking(true);
 
-    m_state = State::Open;
+    // Look mama the events are happening
+    try {
+        m_loop = std::make_shared<threads::JobIoAsyncThread>();
+    } catch (const std::exception& e) {
+        JOB_LOG_ERROR("[PtyIO] Failed to create JobIoAsyncThread: {}", e.what());
+        setError(Error::LoopError);
+        ::close(m_masterFd);
+        ::close(m_slaveFd);
+        m_masterFd = -1;
+        m_slaveFd = -1;
+        return false;
+    }
+
+    // if (!m_loop->registerFD(m_masterFd, EPOLLIN, [this](uint32_t e) { onEvents(e); })) {
+    if (!m_loop->registerFD(m_masterFd, EPOLLIN | EPOLLERR | EPOLLHUP | EPOLLET, [this](uint32_t e) { onEvents(e); })) {
+
+        JOB_LOG_ERROR("[PtyIO] Failed to register FD with event loop!");
+        setError(Error::LoopError);
+        ::close(m_masterFd);
+        ::close(m_slaveFd);
+        m_masterFd = -1;
+        m_slaveFd = -1;
+        return false;
+    }
+    m_loop->start();
+
+    m_state.store(State::Open);
     return true;
 }
 
@@ -80,9 +107,14 @@ void PtyIO::closeDevice()
     if (m_state == State::Closed)
         return;
 
-    m_state = State::Closing;
+    m_state.store(State::Closing);
 
-    stopReaderThread();
+    if (m_loop) {
+        if (m_masterFd != -1)
+            m_loop->unregisterFD(m_masterFd);
+        m_loop->stop();
+        m_loop.reset();
+    }
 
     if (m_masterFd != -1) {
         ::close(m_masterFd);
@@ -96,7 +128,7 @@ void PtyIO::closeDevice()
 
     m_slaveName.clear();
     m_childPid = -1;
-    m_state = State::Closed;
+    m_state.store(State::Closed);
 }
 
 
@@ -104,7 +136,14 @@ ssize_t PtyIO::read(char *buffer, size_t maxlen)
 {
     if (m_masterFd == -1)
         return -1;
-    return ::read(m_masterFd, buffer, maxlen);
+
+    ssize_t n = ::read(m_masterFd, buffer, maxlen);
+
+    // "Dude where's my data"
+    if (n < 0 && (errno == EAGAIN || errno == EWOULDBLOCK))
+        return 0;
+
+    return n;
 }
 
 ssize_t PtyIO::write(const char *data, size_t len)
@@ -115,9 +154,6 @@ ssize_t PtyIO::write(const char *data, size_t len)
     ssize_t written = ::write(m_masterFd, data, len);
     if (written == -1)
         setError(Error::WriteError);
-
-    if (m_localecho && m_readCallback)
-        m_readCallback(data, len);
 
     return written;
 }
@@ -155,6 +191,8 @@ bool PtyIO::startShell(const std::string &shellPath)
         close(m_slaveFd);
         close(m_masterFd);
 
+        m_loop->stop();
+
         setenv("TERM", "xterm-256color", 1);
         execlp(shellPath.c_str(), shellPath.c_str(), "--login", "-i", nullptr);
         _exit(1);
@@ -163,9 +201,9 @@ bool PtyIO::startShell(const std::string &shellPath)
     close(m_slaveFd);
     m_slaveFd = -1;
     m_childPid = pid;
-    m_state = State::Running;
+    m_state.store(State::Running);
 
-    startReaderThread();
+    m_loop->start();
     return true;
 }
 
@@ -183,12 +221,12 @@ void PtyIO::setWindowSize(int rows, int cols)
 
 void PtyIO::setLocalecho(bool enabled)
 {
-    m_localecho = enabled;
+    m_localecho.store(enabled);
 }
 
 void PtyIO::setNonBlocking(bool enabled)
 {
-    m_nonBlocking = enabled;
+    m_nonBlocking.store(enabled); // Store our state
     if (m_masterFd != -1) {
         int flags = ::fcntl(m_masterFd, F_GETFL);
         if (enabled)
@@ -200,11 +238,13 @@ void PtyIO::setNonBlocking(bool enabled)
 
 void PtyIO::setReadCallback(ReadCallback cb)
 {
+    std::scoped_lock lock(m_cbMutex);
     m_readCallback = std::move(cb);
 }
 
 void PtyIO::setExitCallback(ExitCallback cb)
 {
+    std::scoped_lock lock(m_cbMutex);
     m_exitCallback = std::move(cb);
 }
 
@@ -220,18 +260,20 @@ pid_t PtyIO::childPid() const
 
 PtyIO::State PtyIO::state() const
 {
-    return m_state;
+    return m_state.load();
 }
 
 PtyIO::Error PtyIO::error() const
 {
-    return m_error;
+    return m_error.load();
 }
 
+
+// Note: m_errorString is not thread-safe, but setError is.
 const std::string &PtyIO::errorString() const
 {
     return m_errorString;
-}
+        }
 
 std::string_view PtyIO::errorToString(Error err)
 {
@@ -256,6 +298,8 @@ std::string_view PtyIO::errorToString(Error err)
             return "Read from PTY failed";
         case Error::IoctlError:
             return "ioctl() failed";
+        case Error::LoopError:
+            return "Event loop error";
         default:
             return "Unknown error";
     }
@@ -263,96 +307,63 @@ std::string_view PtyIO::errorToString(Error err)
 
 void PtyIO::setError(Error err)
 {
-    m_error = err;
+    m_error.store(err);
     m_errorString = std::string(errorToString(err));
+    if (err != Error::None)
+        JOB_LOG_ERROR("[PtyIO] Error set: {}", m_errorString);
 }
 
-void PtyIO::startReaderThread()
+
+void PtyIO::onEvents(uint32_t events)
 {
-    job::threads::JobThreadOptions opts = job::threads::JobThreadOptions::normal();
-    opts.name = "PTY Reader";
-
-    m_readerThread = std::make_shared<job::threads::JobThread>(opts);
-
-    m_readerThread->setRunFunction([this](std::stop_token token) {
-        this->readerLoop(token);
-    });
-
-    auto ret = m_readerThread->start();
-    if (ret != job::threads::JobThread::StartResult::Started) {
-        setError(Error::OpenFailed);
-    }
-}
-
-void PtyIO::stopReaderThread()
-{
-    if (!m_readerThread)
+    if (events & (POLLERR | POLLNVAL)) {
+        setError(Error::ReadError);
+        closeDevice(); // Fatal error, shut down
         return;
-
-    m_readerThread->requestStop();
-    m_readerThread->join();
-    m_readerThread.reset();
-}
-
-void PtyIO::readerLoop(std::stop_token token)
-{
-    constexpr int kPollTimeoutMs = 100;
-    char buffer[1024];
-    struct pollfd pfd;
-    pfd.fd = m_masterFd;
-    pfd.events = POLLIN;
-    pfd.revents = 0;
-
-    while (!token.stop_requested()) {
-        if (m_masterFd < 0)
-            break;
-
-        pfd.revents = 0;
-        int pret = ::poll(&pfd, 1, kPollTimeoutMs);
-
-        if (pret < 0) {
-            if (errno == EINTR)
-                continue;
-            setError(Error::ReadError);
-            break;
-        }
-
-        if (pret == 0)
-            continue; // timeout → check m_running again
-
-        if (pfd.revents & (POLLERR | POLLNVAL)) {
-            setError(Error::ReadError);
-            break;
-        }
-        if (pfd.revents & POLLHUP)
-            break; // graceful EOF
-
-        if (pfd.revents & POLLIN) {
+    }
+    if (events & POLLHUP) {
+        closeDevice();
+        return;
+    }
+    if (events & POLLIN) {
+        char buffer[4096];
+        while(true) {
             ssize_t n = ::read(m_masterFd, buffer, sizeof(buffer));
-
             if (n > 0) {
+                std::scoped_lock lock(m_cbMutex);
                 if (m_readCallback)
                     m_readCallback(buffer, static_cast<size_t>(n));
             } else if (n == 0) {
-                break; // EOF — slave closed
-            } else if (errno != EAGAIN && errno != EINTR) {
+                closeDevice();
+                break;
+            } else if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                // No more data to read
+                break;
+            } else if (errno != EINTR) {
                 setError(Error::ReadError);
+                closeDevice();
                 break;
             }
         }
+    }
 
-        // Read our own child only
-        if (m_childPid > 0) {
-            int status = 0;
-            pid_t result = ::waitpid(m_childPid, &status, WNOHANG);
-            if (result == m_childPid) {
-                m_childPid = -1;
+    // kids are always a PITA
+    if (m_childPid > 0) {
+        int status = 0;
+
+        pid_t result = ::waitpid(m_childPid, &status, WNOHANG);
+        if (result == m_childPid) {
+            m_childPid = -1;
+            {
+                std::scoped_lock lock(m_cbMutex);
                 if (m_exitCallback)
                     m_exitCallback(status);
-                break;
             }
+            closeDevice();
         }
+
     }
 }
 
 } // job::io
+// CHECKPOINT: v1.1

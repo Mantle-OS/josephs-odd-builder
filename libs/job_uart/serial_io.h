@@ -4,14 +4,16 @@
 #include "serial_settings.h"
 
 #include <fcntl.h>
+
+#include <memory>
 #include <filesystem>
 #include <fstream>
-#include <stop_token>
 #include <string>
 #include <atomic>
 #include <mutex>
 
-#include <job_thread.h>
+#include <job_io_async_thread.h>
+#include <job_logger.h>
 
 namespace job::uart {
 
@@ -26,6 +28,7 @@ public:
         PermissionError,
         NotFound,
         Timeout,
+        LoopError,
         Unknown
     };
 
@@ -35,7 +38,7 @@ public:
         Busy
     };
 
-    SerialIO();
+    explicit SerialIO(std::shared_ptr<threads::JobIoAsyncThread> loop);
     ~SerialIO();
 
     bool openDevice() override;
@@ -49,9 +52,6 @@ public:
 
     [[nodiscard]] bool write(const std::string &data);
     [[nodiscard]] bool writeRawFile(const std::filesystem::path &filePath);
-
-    void startReading();
-    void stopReading();
 
     [[nodiscard]] State state() const;
     [[nodiscard]] Error error() const;
@@ -102,25 +102,27 @@ public:
     [[nodiscard]] bool setRecording(bool enabled, const std::filesystem::path &filePath);
 
 private:
-    void readerLoop(std::stop_token token);
+    void onEvents(uint32_t events);
+
     bool startRecording(const std::filesystem::path &filePath);
     void stopRecordingInternal();
 
     void updateState(State newState);
     void updateError(Error newError);
+    static std::string_view errorToString(Error err); // <-- Made static
 
     std::atomic<bool> m_isOpen{false};
     std::atomic<bool> m_isRecording{false};
     std::atomic<bool> m_isBusy{false};
 
-    State m_state{State::Disconnected};
-    Error m_error{Error::None};
+    std::atomic<State> m_state{State::Disconnected};
+    std::atomic<Error> m_error{Error::None};
     std::string m_errorString{"No Error"};
 
     int m_fd{-1};
 
-    std::shared_ptr<threads::JobThread> m_readerThread;
-    std::mutex m_readMutex;
+    std::shared_ptr<threads::JobIoAsyncThread> m_loop;
+    mutable std::mutex m_cbMutex;
 
     std::ofstream m_logStream;
     std::filesystem::path m_logFile;
@@ -143,3 +145,4 @@ private:
 };
 
 } // job::uart
+// CHECKPOINT: v2.0

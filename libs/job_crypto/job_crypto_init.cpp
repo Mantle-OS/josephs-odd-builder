@@ -24,3 +24,4 @@ bool JobCryptoInit::isInitialized() noexcept
 }
 
 } // namespace job::crypto
+// CHECKPOINT: v1

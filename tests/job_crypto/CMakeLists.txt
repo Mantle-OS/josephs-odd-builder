@@ -16,3 +16,4 @@ target_link_libraries(test_job_crypto PRIVATE
 target_include_directories(test_job_crypto PRIVATE
     ${CatchTwo_INCLUDE_DIRS}
 )
+# CHECKPOINT: v1

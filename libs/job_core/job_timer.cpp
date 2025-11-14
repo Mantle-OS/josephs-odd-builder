@@ -104,5 +104,10 @@ void JobTimer::scheduleNext() noexcept
     m_nextFire = Clock::now() + m_interval;
 }
 
+void JobTimer::set_callback(const std::function<void ()> &callback)
+{
+    m_callback = callback;
+}
 
 } // job::core
+// CHECKPOINT: v1

@@ -1,45 +1,90 @@
 #include "tcp_socket.h"
 
 #include <unistd.h>
-#include <cstring>
-#include <iostream>
-
 #include <fcntl.h>
 
-#include <arpa/inet.h>
+#include <cstring>
+
 #include <netinet/tcp.h>
+#include <arpa/inet.h>
+
 #include <netdb.h>
 
-#include <poll.h>
+#include <sys/socket.h>
+#include <sys/epoll.h>
+
+#include <job_logger.h>
+
+#include <job_io_async_thread.h>
 
 namespace job::net {
 
-TcpSocket::TcpSocket(std::shared_ptr<threads::AsyncEventLoop> loop) :
-    ISocketIO{loop}
+TcpSocket::TcpSocket(std::shared_ptr<threads::JobIoAsyncThread> loop) :
+    ISocketIO(std::move(loop))
 {
-    int fd = ::socket(AF_INET, SOCK_STREAM, 0);
-    if (fd < 0) {
-        m_errors.setError(errno);
-        m_state.store(SocketState::Error, std::memory_order_relaxed);
-        return;
-    }
-
-    m_fd = fd;
-    setOption(SocketOption::NonBlocking, true);
-    m_state.store(SocketState::Unconnected, std::memory_order_relaxed);
+    m_state.store(SocketState::Unconnected);
 }
+
+TcpSocket::TcpSocket(std::shared_ptr<threads::JobIoAsyncThread> loop, int existing_fd, const JobIpAddr& peerAddr) :
+    ISocketIO(std::move(loop)),
+    m_peerAddr(peerAddr)
+{
+    m_fd = existing_fd;
+    m_state.store(SocketState::Connected);
+    setOption(SocketOption::NonBlocking, true);
+    updateLocalInfo();
+}
+
 
 TcpSocket::~TcpSocket()
 {
     disconnect();
 }
 
+void TcpSocket::closeSocket()
+{
+    // FIX: Always set state to Closed, even if fd is invalid
+    m_state.store(SocketState::Closed);
+    if (m_fd < 0)
+        return;
+
+    if (auto loop = m_loop.lock())
+        loop->unregisterFD(m_fd);
+
+    ::close(m_fd);
+    m_fd = -1;
+}
+
+void TcpSocket::disconnect()
+{
+    auto expected = SocketState::Connected;
+    // Also check for Listening state
+    if (m_state.compare_exchange_strong(expected, SocketState::Closing) ||
+        m_state.load() == SocketState::Listening)
+    {
+        closeSocket();
+        if (onDisconnect)
+            onDisconnect();
+    } else {
+        // Already closing, unconnected, etc. Just ensure it's fully closed.
+        closeSocket();
+    }
+}
+
 bool TcpSocket::connectToHost(const JobUrl &url)
 {
-    bool ret = false;
+    if (m_fd >= 0)
+        closeSocket();
 
-    if (m_fd < 0)
-        return ret;
+    if (m_state.load() != SocketState::Unconnected) {
+        // If state is Closed, reset to Unconnected to allow reuse
+        if (m_state.load() == SocketState::Closed) {
+            m_state.store(SocketState::Unconnected);
+        } else {
+            JOB_LOG_WARN("[TcpSocket] connectToHost called in invalid state: {}", (int)m_state.load());
+            return false;
+        }
+    }
 
     const std::string host = url.host();
     const uint16_t port = url.port();
@@ -52,148 +97,177 @@ bool TcpSocket::connectToHost(const JobUrl &url)
 
     int err = ::getaddrinfo(host.c_str(), std::to_string(port).c_str(), &hints, &res);
     if (err != 0) {
-        m_errors.setError(errno);
-        return ret;
+        m_errors.setError(EAI_FAIL);
+        return false;
     }
 
+    bool connected = false;
     for (auto *p = res; p != nullptr; p = p->ai_next) {
-        if (::connect(m_fd, p->ai_addr, p->ai_addrlen) == 0 || errno == EINPROGRESS) {
-            m_peerAddr = host;
-            m_peerPort = port;
-            m_state.store(SocketState::Connecting, std::memory_order_relaxed);
-            registerEvents();
-            ret = true;
+        m_fd = ::socket(p->ai_family, p->ai_socktype | SOCK_NONBLOCK, p->ai_protocol);
+        if (m_fd < 0)
+            continue;
+
+        if (::connect(m_fd, p->ai_addr, p->ai_addrlen) == 0) {
+            // Connected immediately
+            m_state.store(SocketState::Connected);
+            if (!m_peerAddr.fromSockAddr(p->ai_addr, p->ai_addrlen))
+                JOB_LOG_WARN("[TcpSocket] connectToHost: Failed to parse peer address.");
+            registerEvents(EPOLLIN | EPOLLERR | EPOLLHUP | EPOLLET); // Register for reading
+            connected = true;
             break;
         }
+
+        if (errno == EINPROGRESS) {
+            m_state.store(SocketState::Connecting);
+
+            if (!m_peerAddr.fromSockAddr(p->ai_addr, p->ai_addrlen))
+                JOB_LOG_WARN("[TcpSocket] connectToHost: Failed to parse peer address.");
+
+            registerEvents(EPOLLOUT | EPOLLIN | EPOLLERR | EPOLLHUP | EPOLLET);
+            connected = true;
+            break;
+        }
+
+        ::close(m_fd);
+        m_fd = -1;
     }
 
     ::freeaddrinfo(res);
-    return ret;
+
+    if (!connected)
+        m_errors.setError(errno);
+
+    return connected;
 }
 
 bool TcpSocket::bind(const JobIpAddr &addr)
 {
-    bool ret = false;
+    if (m_fd >= 0)
+        closeSocket();
 
-    if (m_fd < 0)
-        return ret;
-
-    const sockaddr *sa = addr.sockAddr();
-    socklen_t len = addr.sockAddrLen();
-
-    if (!sa || len == 0)
-        return ret;
-
-    if (::bind(m_fd, sa, len) == 0)
-        ret = true;
-    else
+    m_fd = ::socket(addr.family() == JobIpAddr::Family::IPv6 ?
+                        AF_INET6 : AF_INET,
+                    SOCK_STREAM | SOCK_NONBLOCK, 0
+                    );
+    if (m_fd < 0) {
         m_errors.setError(errno);
+        return false;
+    }
 
-    return ret;
+    setOption(SocketOption::ReuseAddress, true);
+
+    if (::bind(m_fd, addr.sockAddr(), addr.sockAddrLen()) != 0) {
+        m_errors.setError(errno);
+        ::close(m_fd);
+        m_fd = -1;
+        return false;
+    }
+
+    if(!m_localAddr.fromSockAddr(addr.sockAddr(), addr.sockAddrLen()))
+        JOB_LOG_WARN("[TcpSocket] bind: Failed to copy local address.");
+
+    return true;
 }
+
 bool TcpSocket::bind(const std::string &address, uint16_t port)
 {
     JobIpAddr addr(address, port);
-    bool ret = bind(addr);
-    return ret;
+    return bind(addr);
 }
 
 bool TcpSocket::listen(int backlog)
 {
-    bool ret = false;
-
-    if (m_fd < 0)
-        return ret;
-
-    if (::listen(m_fd, backlog) == 0) {
-        m_state.store(SocketState::Connected, std::memory_order_relaxed);
-        ret = true;
-    } else {
-        m_errors.setError(errno);
-        m_state.store(SocketState::Error, std::memory_order_relaxed);
+    if (m_fd < 0) {
+        m_errors.setError(EBADF);
+        return false;
     }
 
-    return ret;
+    if (::listen(m_fd, backlog) != 0) {
+        m_errors.setError(errno);
+        return false;
+    }
+
+    m_state.store(SocketState::Listening);
+    registerEvents(EPOLLIN | EPOLLERR | EPOLLHUP | EPOLLET);
+
+    updateLocalInfo();
+    return true;
 }
 
 std::shared_ptr<ISocketIO> TcpSocket::accept()
 {
-    std::shared_ptr<ISocketIO> ret;
+    if (m_fd < 0 || m_state.load() != SocketState::Listening)
+        return nullptr;
 
-    if (m_fd < 0)
-        return ret;
 
-    struct sockaddr_in client{};
-    socklen_t len = sizeof(client);
+    sockaddr_storage client_addr{};
+    socklen_t len = sizeof(client_addr);
 
-    int clientFd = ::accept(m_fd, reinterpret_cast<sockaddr *>(&client), &len);
+    int clientFd = ::accept4(m_fd, reinterpret_cast<sockaddr *>(&client_addr), &len, SOCK_NONBLOCK);
+
     if (clientFd < 0) {
-        m_errors.setError(errno);
-        return ret;
+        if (errno != EAGAIN && errno != EWOULDBLOCK)
+            m_errors.setError(errno);
+
+        return nullptr;
     }
 
-    auto sock = std::make_shared<TcpSocket>(m_loop.lock());
-    sock->m_fd = clientFd;
-    sock->m_state.store(SocketState::Connected, std::memory_order_relaxed);
-    sock->m_peerAddr = inet_ntoa(client.sin_addr);
-    sock->m_peerPort = ntohs(client.sin_port);
-    sock->setOption(SocketOption::NonBlocking, true);
-    sock->registerEvents();
+    JobIpAddr peerAddr;
+    if(!peerAddr.fromSockAddr(reinterpret_cast<sockaddr *>(&client_addr), len))
+        JOB_LOG_WARN("[TcpSocket] accept: Failed to parse peer address.");
 
-    ret = std::move(sock);
-    return ret;
-}
-
-void TcpSocket::disconnect()
-{
-    if (m_fd >= 0) {
-        ::close(m_fd);
-        m_fd = -1;
+    auto loop = m_loop.lock();
+    if (!loop) {
+        ::close(clientFd);
+        return nullptr;
     }
-    running.store(false, std::memory_order_relaxed);
-    m_state.store(SocketState::Closed, std::memory_order_relaxed);
+
+    auto sock = std::make_shared<TcpSocket>(loop, clientFd, peerAddr);
+    sock->registerEvents(EPOLLIN | EPOLLERR | EPOLLHUP | EPOLLET);
+
+    return sock;
 }
 
 ssize_t TcpSocket::read(void *buffer, size_t size)
 {
-    ssize_t ret = -1;
-
     if (m_fd < 0)
-        return ret;
+        return -1;
 
-    ret = ::recv(m_fd, buffer, size, 0);
-    if (ret <= 0) {
-        if (ret == 0)
-            m_state.store(SocketState::Closed, std::memory_order_relaxed);
-        else
-            m_errors.setError(errno);
+    ssize_t n = ::recv(m_fd, buffer, size, 0);
+
+    if (n < 0) {
+        if (errno == EAGAIN || errno == EWOULDBLOCK)
+            return 0; // Not an error
+
+        m_errors.setError(errno);
+        return -1;
     }
-
-    return ret;
+    if (n == 0) {
+        // Peer closed connection
+        disconnect();
+        return 0;
+    }
+    return n;
 }
 
 ssize_t TcpSocket::write(const void *buffer, size_t size)
 {
-    ssize_t ret = -1;
+    if (m_fd < 0) return -1;
 
-    if (m_fd < 0)
-        return ret;
+    std::lock_guard<std::mutex> lock(m_writeMutex);
+    ssize_t n = ::send(m_fd, buffer, size, MSG_NOSIGNAL);
 
-    ret = ::send(m_fd, buffer, size, MSG_NOSIGNAL);
-    if (ret < 0)
+    if (n < 0) {
+        if (errno == EAGAIN || errno == EWOULDBLOCK) return 0; // Not an error
         m_errors.setError(errno);
-
-    return ret;
-}
-
-ISocketIO::SocketType TcpSocket::type() const noexcept
-{
-    return SocketType::Tcp;
+        return -1;
+    }
+    return n;
 }
 
 ISocketIO::SocketState TcpSocket::state() const noexcept
 {
-    return m_state.load(std::memory_order_relaxed);
+    return m_state.load();
 }
 
 SocketErrors::SocketErrNo TcpSocket::lastError() const noexcept
@@ -206,35 +280,31 @@ std::string TcpSocket::lastErrorString() const noexcept
     return m_errors.lastErrorString();
 }
 
+ISocketIO::SocketType TcpSocket::type() const noexcept
+{
+    return SocketType::Tcp;
+}
+
 void TcpSocket::setOption(SocketOption option, bool enable)
 {
-    if (m_fd < 0)
-        return;
-
+    if (m_fd < 0) return;
     int ret = -1;
+    int val = enable ? 1 : 0;
+
     switch (option) {
-    case SocketOption::ReuseAddress: {
-        int val = enable ? 1 : 0;
+    case SocketOption::ReuseAddress:
         ret = ::setsockopt(m_fd, SOL_SOCKET, SO_REUSEADDR, &val, sizeof(val));
         break;
-    }
-    case SocketOption::KeepAlive: {
-        int val = enable ? 1 : 0;
+    case SocketOption::KeepAlive:
         ret = ::setsockopt(m_fd, SOL_SOCKET, SO_KEEPALIVE, &val, sizeof(val));
         break;
-    }
-    case SocketOption::TcpNoDelay: {
-        int val = enable ? 1 : 0;
+    case SocketOption::TcpNoDelay:
         ret = ::setsockopt(m_fd, IPPROTO_TCP, TCP_NODELAY, &val, sizeof(val));
         break;
-    }
     case SocketOption::NonBlocking: {
         int flags = ::fcntl(m_fd, F_GETFL, 0);
         if (flags >= 0) {
-            if (enable)
-                flags |= O_NONBLOCK;
-            else
-                flags &= ~O_NONBLOCK;
+            flags = enable ? (flags | O_NONBLOCK) : (flags & ~O_NONBLOCK);
             ret = ::fcntl(m_fd, F_SETFL, flags);
         }
         break;
@@ -242,18 +312,12 @@ void TcpSocket::setOption(SocketOption option, bool enable)
     default:
         break;
     }
-
-    if (ret < 0)
-        m_errors.setError(errno);
+    if (ret < 0) m_errors.setError(errno);
 }
 
 bool TcpSocket::option(SocketOption option) const
 {
-    bool ret = false;
-
-    if (m_fd < 0)
-        return ret;
-
+    if (m_fd < 0) return false;
     int val = 0;
     socklen_t len = sizeof(val);
 
@@ -267,133 +331,112 @@ bool TcpSocket::option(SocketOption option) const
     case SocketOption::TcpNoDelay:
         ::getsockopt(m_fd, IPPROTO_TCP, TCP_NODELAY, &val, &len);
         break;
-    default:
-        return ret;
+    case SocketOption::NonBlocking: {
+        int flags = ::fcntl(m_fd, F_GETFL, 0);
+        return (flags & O_NONBLOCK) != 0;
     }
-
-    ret = (val != 0);
-    return ret;
+    default:
+        return false;
+    }
+    return (val != 0);
 }
 
 std::string TcpSocket::peerAddress() const
 {
-    return m_peerAddr;
+    return m_peerAddr.toString(false);
 }
-
 uint16_t TcpSocket::peerPort() const
 {
-    return m_peerPort;
+    return m_peerAddr.port();
 }
-
 std::string TcpSocket::localAddress() const
 {
-    std::string ret;
-
-    if (m_fd < 0)
-        return ret;
-
-    struct sockaddr_in sa{};
-    socklen_t len = sizeof(sa);
-
-    if (::getsockname(m_fd, reinterpret_cast<sockaddr *>(&sa), &len) == 0)
-        ret = inet_ntoa(sa.sin_addr);
-
-    return ret;
+    return m_localAddr.toString(false);
 }
-
 uint16_t TcpSocket::localPort() const
 {
-    uint16_t ret = 0;
-
-    if (m_fd < 0)
-        return ret;
-
-    struct sockaddr_in sa{};
-    socklen_t len = sizeof(sa);
-
-    if (::getsockname(m_fd, reinterpret_cast<sockaddr *>(&sa), &len) == 0)
-        ret = ntohs(sa.sin_port);
-
-    return ret;
+    if (m_localAddr.port() == 0 && m_fd != -1) {
+        // const_cast is ugly, but this is a good place to lazily update
+        const_cast<TcpSocket*>(this)->updateLocalInfo();
+    }
+    return m_localAddr.port();
 }
 
 void TcpSocket::dumpState() const
 {
-    std::cout << "[TcpSocket] fd=" << m_fd
-              << " state=" << static_cast<int>(m_state.load())
-              << " peer=" << m_peerAddr << ":" << m_peerPort
-              << std::endl;
+    JOB_LOG_DEBUG("[TcpSocket] fd={} state={} peer={}:{} local={}:{}",
+                  m_fd, (int)m_state.load(),
+                  peerAddress(), peerPort(),
+                  localAddress(), localPort()
+                  );
 }
 
-void TcpSocket::pollEvents()
+bool TcpSocket::isOpen() const noexcept
 {
-    running.store(true, std::memory_order_relaxed);
-
-    std::thread([self = shared_from_this()]() {
-        auto socket = std::static_pointer_cast<TcpSocket>(self);
-        struct pollfd pfd{};
-        pfd.fd = socket->fd();
-        pfd.events = POLLIN | POLLOUT | POLLERR | POLLHUP;
-
-        while (socket->running.load(std::memory_order_relaxed) &&
-               (socket->state() == SocketState::Connecting ||
-                socket->state() == SocketState::Connected)) {
-            int rc = ::poll(&pfd, 1, 100);
-            if (rc > 0)
-                socket->handleEvents(pfd.revents);
-        }
-        socket->running.store(false, std::memory_order_relaxed);
-    }).detach();
+    const auto current_state = m_state.load();
+    return (current_state == ISocketIO::SocketState::Connected ||
+            current_state == ISocketIO::SocketState::Listening);
 }
 
-void TcpSocket::handleEvents(uint32_t events)
+void TcpSocket::updateLocalInfo() {
+    sockaddr_storage sa{};
+    socklen_t len = sizeof(sa);
+    if (m_fd != -1 && ::getsockname(m_fd, reinterpret_cast<sockaddr*>(&sa), &len) == 0)
+        if(!m_localAddr.fromSockAddr(reinterpret_cast<sockaddr*>(&sa), len))
+            JOB_LOG_WARN("[TcpSocket] updateLocalInfo: Failed to parse local address.");
+
+}
+
+void TcpSocket::updatePeerInfo() {
+    sockaddr_storage sa{};
+    socklen_t len = sizeof(sa);
+    if (m_fd != -1 && ::getpeername(m_fd, reinterpret_cast<sockaddr*>(&sa), &len) == 0)
+        if(!m_peerAddr.fromSockAddr(reinterpret_cast<sockaddr*>(&sa), len))
+            JOB_LOG_WARN("[TcpSocket] updatePeerInfo: Failed to parse peer address.");
+}
+
+
+void TcpSocket::onEvents(uint32_t events)
 {
-    if (events & (POLLERR | POLLHUP)) {
-        SocketState prev = m_state.exchange(SocketState::Error, std::memory_order_relaxed);
-        if (prev != SocketState::Error && onDisconnect)
-            onDisconnect();
-
-        running.store(false, std::memory_order_relaxed);
-        return; // stop further processing
-    }
-
-    if ((events & POLLOUT) &&
-        m_state.load(std::memory_order_relaxed) == SocketState::Connecting) {
-        m_state.store(SocketState::Connected, std::memory_order_relaxed);
-        if (onConnect)
-            onConnect();
+    if ((events & EPOLLERR) || (events & EPOLLHUP)) {
+        int error = 0;
+        socklen_t len = sizeof(error);
+        ::getsockopt(m_fd, SOL_SOCKET, SO_ERROR, &error, &len);
+        m_errors.setError(error ? error : EIO); // Use EIO if error is 0
+        if (onError)
+            onError(error ? error : EIO);
+        disconnect();
         return;
     }
 
-    if (events & POLLIN)
-        handleRead();
+    if ((events & EPOLLOUT) && m_state.load() == SocketState::Connecting) {
+        int error = 0;
+        socklen_t len = sizeof(error);
+        if (::getsockopt(m_fd, SOL_SOCKET, SO_ERROR, &error, &len) == 0 && error == 0) {
+            m_state.store(SocketState::Connected);
+            updateLocalInfo();
+            updatePeerInfo();
+            if (onConnect)
+                onConnect();
+        } else {
+            m_errors.setError(error ? error : EIO);
+            if (onError)
+                onError(error ? error : EIO);
+            disconnect();
+        }
+        return;
+    }
+
+    if (events & EPOLLIN) {
+        if (m_state.load() == SocketState::Connected){
+            if (onRead)
+                onRead(nullptr, 0);
+        }else if (m_state.load() == SocketState::Listening) {
+            if (onConnect)
+                onConnect();
+        }
+    }
 }
-
-void TcpSocket::handleRead()
-{
-    char buf[4096];
-    ssize_t n = ::recv(m_fd, buf, sizeof(buf), 0);
-
-    if (n > 0) {
-        if (onRead)
-            onRead(buf, static_cast<size_t>(n));
-    }
-    else if (n == 0) {
-        // graceful close by peer
-        if (m_state.exchange(SocketState::Closed, std::memory_order_relaxed) != SocketState::Closed && onDisconnect)
-            onDisconnect();
-
-        running.store(false, std::memory_order_relaxed);
-    }
-    else if (errno != EAGAIN && errno != EWOULDBLOCK) {
-        m_state.store(SocketState::Error, std::memory_order_relaxed);
-        m_errors.setError(errno);
-        if (onError)
-            onError(errno);
-
-        running.store(false, std::memory_order_relaxed);
-    }
-}
-
 
 } // namespace job::net
+// CHECKPOINT: v2.3

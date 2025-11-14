@@ -20,3 +20,4 @@ TEST_CASE("JobCryptoInit initializes libsodium exactly once", "[crypto][init]")
         REQUIRE(JobCryptoInit::isInitialized());
     }
 }
+// CHECKPOINT: v1

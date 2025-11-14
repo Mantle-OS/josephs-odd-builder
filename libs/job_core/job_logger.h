@@ -38,6 +38,9 @@ private:
 
 } // namespace job::core
 
+// FIXME we should have a bit of better messaging. example adding categories
+// Also build time checking is not working. changing this would be something that is
+// needed
 namespace job::core::detail {
 template <typename... Args>
 inline std::string format_log(std::string_view fmt, Args&&... args)
@@ -78,3 +81,4 @@ inline std::string format_log(std::string_view fmt, Args&&... args)
 )
 
 } // job::core::detail
+// CHECKPOINT: v1

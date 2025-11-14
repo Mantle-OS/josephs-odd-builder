@@ -1,15 +1,15 @@
 #include "serial_io.h"
 
-#include <fcntl.h>
+#include <cstring>
+
 #include <unistd.h>
 #include <termios.h>
-#include <cstring>
-#include <iostream>
 #include <poll.h>
 
 namespace job::uart {
 
-SerialIO::SerialIO()
+SerialIO::SerialIO(std::shared_ptr<threads::JobIoAsyncThread> loop) :
+    m_loop{loop}
 {
 }
 
@@ -22,7 +22,7 @@ bool SerialIO::openDevice()
 {
     closeDevice();
 
-    if (!std::filesystem::exists(m_portName)) {
+    if (m_portName.empty() || !std::filesystem::exists(m_portName)) {
         updateError(Error::NotFound);
         return false;
     }
@@ -41,6 +41,8 @@ bool SerialIO::openDevice()
     struct termios tty {};
     if (tcgetattr(m_fd, &tty) != 0) {
         updateError(Error::OpenError);
+        ::close(m_fd);
+        m_fd = -1;
         return false;
     }
 
@@ -53,10 +55,38 @@ bool SerialIO::openDevice()
     tty.c_cflag |= toStopBits(stopBits);
     toFlowControl(flowControl, tty);
 
+    tty.c_lflag &= ~(ICANON | ECHO | ECHOE | ISIG);
+    tty.c_oflag &= ~OPOST;
+    tty.c_cc[VMIN]  = 0;
+    tty.c_cc[VTIME] = 0;
+
     if (tcsetattr(m_fd, TCSANOW, &tty) != 0) {
         updateError(Error::OpenError);
+        ::close(m_fd);
+        m_fd = -1;
         return false;
     }
+
+    try {
+        m_loop = std::make_shared<threads::JobIoAsyncThread>();
+    } catch (const std::exception& e) {
+        JOB_LOG_ERROR("[SerialIO] Failed to create JobIoAsyncThread: {}", e.what());
+        updateError(Error::LoopError);
+        ::close(m_fd);
+        m_fd = -1;
+        return false;
+    }
+
+    if (!m_loop->registerFD(m_fd, EPOLLIN | EPOLLERR | EPOLLHUP | EPOLLET, [this](uint32_t e) { onEvents(e); })) {
+        JOB_LOG_ERROR("[SerialIO] Failed to register FD with event loop!");
+        updateError(Error::LoopError);
+        m_loop->stop();
+        m_loop.reset();
+        ::close(m_fd);
+        m_fd = -1;
+        return false;
+    }
+    m_loop->start();
 
     m_isOpen = true;
     updateState(State::Connected);
@@ -65,17 +95,24 @@ bool SerialIO::openDevice()
 
 void SerialIO::closeDevice()
 {
-    stopReading();
+    if (m_fd != -1 && m_loop) {
+        m_loop->unregisterFD(m_fd);
+    }
+
+    if (m_loop) {
+        m_loop->stop();
+        m_loop.reset();
+    }
 
     if (m_isRecording)
         stopRecordingInternal();
 
-    if (m_fd != -1)
+    if (m_fd != -1) {
         ::close(m_fd);
+        m_fd = -1;
+    }
 
-    m_fd = -1;
     m_isOpen = false;
-
     updateState(State::Disconnected);
 }
 
@@ -83,14 +120,32 @@ ssize_t SerialIO::read(char *buffer, size_t maxlen)
 {
     if (!m_isOpen || m_fd == -1)
         return -1;
-    return ::read(m_fd, buffer, maxlen);
+
+    ssize_t n = ::read(m_fd, buffer, maxlen);
+    if (n < 0 && (errno == EAGAIN || errno == EWOULDBLOCK))
+        return 0; // Not an error, just no data
+    if (n < 0)
+        updateError(Error::ReadError);
+
+    return n;
 }
 
 ssize_t SerialIO::write(const char *data, size_t len)
 {
     if (!m_isOpen || m_fd == -1)
         return -1;
-    return ::write(m_fd, data, len);
+
+    ssize_t n = ::write(m_fd, data, len);
+    if (n < 0)
+        updateError(Error::WriteError);
+
+    if (m_localEcho) {
+        std::scoped_lock lock(m_cbMutex);
+        if (m_readCallback)
+            m_readCallback(data, n > 0 ? n : 0); // Echo back what was written
+    }
+
+    return n;
 }
 
 int SerialIO::fd() const
@@ -113,13 +168,14 @@ void SerialIO::setNonBlocking(bool enabled)
 
 void SerialIO::setReadCallback(ReadCallback cb)
 {
-    std::lock_guard<std::mutex> lock(m_readMutex); // FIXME
+    std::lock_guard<std::mutex> lock(m_cbMutex);
     m_readCallback = std::move(cb);
 }
 
 bool SerialIO::write(const std::string &data)
 {
-    return write(data.c_str(), data.size()) == static_cast<ssize_t>(data.size());
+    ssize_t written = write(data.c_str(), data.size());
+    return written == static_cast<ssize_t>(data.size());
 }
 
 bool SerialIO::writeRawFile(const std::filesystem::path &filePath)
@@ -153,55 +209,41 @@ bool SerialIO::writeRawFile(const std::filesystem::path &filePath)
     return totalSent == totalSize;
 }
 
-void SerialIO::startReading()
+void SerialIO::onEvents(uint32_t events)
 {
-    if (!m_isOpen || m_readerThread)
+    if (events & (POLLERR | POLLNVAL)) {
+        updateError(Error::ReadError);
+        closeDevice(); // Fatal error
         return;
+    }
 
-    threads::JobThreadOptions opts = threads::JobThreadOptions::normal();
-    opts.name = "Serial Reader";
-
-    m_readerThread = std::make_shared<threads::JobThread>(opts);
-    m_readerThread->setRunFunction([this](std::stop_token token) { this->readerLoop(token); });
-
-    auto ret = m_readerThread->start();
-    if (ret != threads::JobThread::StartResult::Started)
-        updateError(Error::Unknown);
-}
-
-void SerialIO::stopReading()
-{
-    if (!m_readerThread)
+    if (events & POLLHUP) {
+        closeDevice();
         return;
+    }
 
-    m_readerThread->requestStop();
-    m_readerThread->join();
-    m_readerThread.reset();
-}
-
-void SerialIO::readerLoop(std::stop_token token)
-{
-    char buf[1024];
-    struct pollfd pfd { m_fd, POLLIN, 0 };
-
-    while (!token.stop_requested()) {
-        int ret = ::poll(&pfd, 1, 250);
-        if (ret <= 0)
-            continue;
-
-        if (pfd.revents & POLLIN) {
+    if (events & POLLIN) {
+        char buf[1024];
+        while (true) {
             ssize_t n = ::read(m_fd, buf, sizeof(buf));
+
             if (n > 0) {
-                std::lock_guard<std::mutex> lock(m_readMutex);
+                std::lock_guard<std::mutex> lock(m_cbMutex);
 
                 if (m_isRecording && m_logStream.is_open())
                     m_logStream.write(buf, n);
 
                 if (m_readCallback)
                     m_readCallback(buf, n);
-            } else if (n < 0 && errno != EAGAIN && errno != EINTR) {
+            } else if (n == 0) {
+                closeDevice();
+                break; // Exit loop
+            } else if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                break; // Exit loop
+            } else if (errno != EINTR) {
                 updateError(Error::ReadError);
-                break;
+                closeDevice();
+                break; // Exit loop
             }
         }
     }
@@ -209,11 +251,11 @@ void SerialIO::readerLoop(std::stop_token token)
 
 SerialIO::State SerialIO::state() const
 {
-    return m_state;
+    return m_state.load();
 }
 SerialIO::Error SerialIO::error() const
 {
-    return m_error;
+    return m_error.load();
 }
 const std::string &SerialIO::errorString() const
 {
@@ -364,7 +406,7 @@ int SerialIO::uploadPercent() const
 
 bool SerialIO::setRecording(bool enabled, const std::filesystem::path &filePath)
 {
-    std::lock_guard lock(m_readMutex);
+    std::lock_guard lock(m_cbMutex); // Protects logStream
     if (enabled) {
         m_logFile = filePath;
         m_logStream.open(m_logFile, std::ios::binary | std::ios::trunc);
@@ -378,42 +420,37 @@ bool SerialIO::setRecording(bool enabled, const std::filesystem::path &filePath)
 
 void SerialIO::updateState(State newState)
 {
-    m_state = newState;
+    m_state.store(newState);
 }
 
 void SerialIO::updateError(Error newError)
 {
-    m_error = newError;
-    switch (newError) {
-        case Error::None:
-            m_errorString = "No Error";
-            break;
-        case Error::OpenError:
-            m_errorString = "Failed to open device";
-            break;
-        case Error::ReadError:
-            m_errorString = "Failed to read from device";
-            break;
-        case Error::WriteError:
-            m_errorString = "Failed to write to device";
-            break;
-        case Error::PermissionError:
-            m_errorString = "Permission denied";
-            break;
-        case Error::NotFound:
-            m_errorString = "Device not found";
-            break;
-        case Error::Timeout:
-            m_errorString = "Operation timed out";
-            break;
-        case Error::Unknown:
-            m_errorString = "Unknown error";
-            break;
+    m_error.store(newError);
+    m_errorString = std::string(errorToString(newError));
+    if (newError != Error::None) {
+        JOB_LOG_ERROR("[SerialIO] Error set: {}", m_errorString);
+    }
+}
+
+std::string_view SerialIO::errorToString(Error err)
+{
+    switch (err) {
+    case Error::None: return "No Error";
+    case Error::OpenError: return "Failed to open device";
+    case Error::ReadError: return "Failed to read from device";
+    case Error::WriteError: return "Failed to write to device";
+    case Error::PermissionError: return "Permission denied";
+    case Error::NotFound: return "Device not found";
+    case Error::Timeout: return "Operation timed out";
+    case Error::LoopError: return "Event loop error";
+    case Error::Unknown: return "Unknown error";
+    default: return "Unknown error";
     }
 }
 
 bool SerialIO::startRecording(const std::filesystem::path &filePath)
 {
+    std::lock_guard lock(m_cbMutex); // Protects logStream
     m_logFile = filePath;
     m_logStream.open(m_logFile, std::ios::binary | std::ios::trunc);
     m_isRecording = m_logStream.is_open();
@@ -422,6 +459,7 @@ bool SerialIO::startRecording(const std::filesystem::path &filePath)
 
 void SerialIO::stopRecordingInternal()
 {
+    // Assumes m_cbMutex is already held or not needed
     if (m_logStream.is_open()) {
         m_logStream.flush();
         m_logStream.close();
@@ -430,3 +468,4 @@ void SerialIO::stopRecordingInternal()
 }
 
 } // job::uart
+// CHECKPOINT: v2.0

@@ -16,8 +16,8 @@ const std::regex kSerialPattern(
 
 [[nodiscard]] bool matchesSerialPattern(const std::string &name)
 {
-    return std::regex_match(name, kSerialPattern);
-}
+    std::string base_name = std::filesystem::path(name).filename().string();
+    return std::regex_match(base_name, kSerialPattern);}
 }
 
 std::vector<std::string> scanSerialPortsFromFilesystem()
@@ -31,11 +31,13 @@ std::vector<std::string> scanSerialPortsFromFilesystem()
     return ports;
 }
 
-void update_serial_devices(std::map<std::string, std::unique_ptr<SerialIO>> &deviceMap)
+void update_serial_devices(
+    std::map<std::string, std::unique_ptr<SerialIO>> &deviceMap,
+    std::shared_ptr<threads::JobIoAsyncThread> loop)
 {
     struct udev *udev = ::udev_new();
     if (!udev) {
-        std::cerr << "[serial_info] Failed to create udev context.\n";
+        JOB_LOG_ERROR("[serial_info] Failed to create udev context.");
         return;
     }
 
@@ -70,15 +72,20 @@ void update_serial_devices(std::map<std::string, std::unique_ptr<SerialIO>> &dev
             continue;
         }
 
-        // Create or update SerialIO
         auto &portPtr = deviceMap[path];
         if (!portPtr)
-            portPtr = std::make_unique<SerialIO>();
+            portPtr = std::make_unique<SerialIO>(loop);
 
         portPtr->setLocation(path);
-        portPtr->setDescription(::udev_device_get_property_value(dev, "ID_MODEL"));
-        portPtr->setManufacturer(::udev_device_get_property_value(dev, "ID_VENDOR"));
-        portPtr->setSerialNumber(::udev_device_get_property_value(dev, "ID_SERIAL_SHORT"));
+
+        auto set_prop = [&](const char* key, auto setter) {
+            const char* val = ::udev_device_get_property_value(dev, key);
+            if (val) setter(val);
+        };
+
+        set_prop("ID_MODEL", [&](const char* v){ portPtr->setDescription(v); });
+        set_prop("ID_VENDOR", [&](const char* v){ portPtr->setManufacturer(v); });
+        set_prop("ID_SERIAL_SHORT", [&](const char* v){ portPtr->setSerialNumber(v); });
 
         if (const char *vendorId = ::udev_device_get_property_value(dev, "ID_VENDOR_ID"))
             portPtr->setVendorId(static_cast<uint16_t>(std::strtol(vendorId, nullptr, 16)));
@@ -94,3 +101,4 @@ void update_serial_devices(std::map<std::string, std::unique_ptr<SerialIO>> &dev
 }
 
 } // namespace job::io::serial_info
+// CHECKPOINT: v1

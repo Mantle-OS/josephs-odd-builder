@@ -1,0 +1,15 @@
+# This is our "header" or "request" struct
+tag: "ExampleReq"
+version: 1
+unit: "example"
+base: "BaseStruct"
+c_struct: "ExampleReq_t"
+include_prefix: "job_example"
+out_base: "example_req"
+fields:
+  - name: "request_id"
+    type: "u64"
+    required: true
+  - name: "payload"
+    type: "bin"
+    comment: "A variable-length binary payload."

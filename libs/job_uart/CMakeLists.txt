@@ -3,12 +3,6 @@ project(JosephsOddBuilder_Uart
     DESCRIPTION "Uart abstraction layer for Joseph's Odd Builder"
     LANGUAGES CXX
 )
-set(CMAKE_CXX_STANDARD 23)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
-
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(LibUdev REQUIRED libudev) # libudev-dev
 
 set(JOBUART_SOURCES
     serial_info.cpp
@@ -80,3 +74,4 @@ install(EXPORT JosephsOddBuilderUartTargets
 )
 
 
+# CHECKPOINT: v1

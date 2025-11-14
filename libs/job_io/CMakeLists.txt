@@ -3,9 +3,6 @@ project(JosephOddBuild_IO
     DESCRIPTION "I/O abstraction layer for Joseph's Odd Builder"
     LANGUAGES CXX
 )
-set(CMAKE_CXX_STANDARD 23)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
 
 set(JOBIO_SOURCES
     pty_io.cpp
@@ -70,3 +67,4 @@ install(EXPORT JosephsOddBuilderIOTargets
 )
 
 
+# CHECKPOINT: v1

@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 #include <map>
+#include <job_io_async_thread.h>
 
 namespace job::uart {
 
@@ -28,7 +29,8 @@ inline constexpr const char *kCandidatePrefixes[] = {
 
 
 [[nodiscard]] std::vector<std::string> scanSerialPortsFromFilesystem();
-void update_serial_devices(std::map<std::string, std::unique_ptr<SerialIO>> &deviceMap);
+void update_serial_devices(std::map<std::string, std::unique_ptr<SerialIO>> &deviceMap, std::shared_ptr<threads::JobIoAsyncThread> loop);
 
 }
 }
+// CHECKPOINT: v1

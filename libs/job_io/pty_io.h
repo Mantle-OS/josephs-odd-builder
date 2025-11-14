@@ -1,16 +1,17 @@
 #pragma once
 
 #include <string>
+#include <string_view>
 #include <atomic>
 #include <functional>
+
 #include <termios.h>
-#include <sys/ioctl.h>
 #include <unistd.h>
-#include <string_view>
+#include <sys/ioctl.h>
 
 #include <io_base.h>
 
-#include <job_thread.h>
+#include <job_io_async_thread.h>
 
 namespace job::io {
 
@@ -34,7 +35,8 @@ public:
         ExecFailed,
         WriteError,
         ReadError,
-        IoctlError
+        IoctlError,
+        LoopError
     };
 
     using ReadCallback = IODevice::ReadCallback;
@@ -75,7 +77,8 @@ private:
     std::string m_slaveName = {};
     pid_t m_childPid = -1;
 
-    std::shared_ptr<threads::JobThread> m_readerThread;
+    std::shared_ptr<threads::JobIoAsyncThread> m_loop;
+    void onEvents(uint32_t events);
 
     std::atomic<bool> m_localecho = false;
     std::atomic<bool> m_nonBlocking = false;
@@ -83,9 +86,12 @@ private:
     ReadCallback m_readCallback = nullptr;
     ExitCallback m_exitCallback = nullptr;
 
-    State m_state = State::Closed;
-    Error m_error = Error::None;
+    std::atomic<State> m_state{State::Closed};
+    std::atomic<Error> m_error{Error::None};
+
     std::string m_errorString = "No error";
+
+    mutable std::mutex m_cbMutex;
 
     struct termios m_termios;
     inline struct termios makeDefaultTermios()
@@ -123,10 +129,7 @@ private:
 
     void setError(Error err);
     static std::string_view errorToString(Error err);
-
-    void startReaderThread();
-    void stopReaderThread();
-    void readerLoop(std::stop_token token);
 };
 
 } // namespace job::io
+// CHECKPOINT: v1

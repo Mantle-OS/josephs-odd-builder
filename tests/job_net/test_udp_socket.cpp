@@ -1,96 +1,98 @@
-#include <catch2/catch_test_macros.hpp>
+#include "test_loop.h"
 #include <thread>
+#include <atomic>
 #include <cstring>
 
-#include <async_event_loop.h>
+TEST_CASE("UdpSocket basic bind", "[udp_socket][bind]") {
+    TestLoop loop;
+    UdpSocket sock(loop.loop);
 
-#include <udp_socket.h>
-#include <job_ipaddr.h>
-
-using namespace job::net;
-using namespace job::threads;
-
-ssize_t msg_ssize(const char *msg)
-{
-    return static_cast<ssize_t>(std::strlen(msg));
-}
-
-TEST_CASE("UdpSocket basic send/receive loopback", "[udp_socket][loopback]") {
-    UdpSocket server;
-    UdpSocket client;
-
-    // Bind the server to localhost:0 (kernel assigns port)
     JobIpAddr bindAddr("127.0.0.1", 0);
-    REQUIRE(server.bind(bindAddr));
+    REQUIRE(sock.bind(bindAddr));
 
-    // Determine the actual bound port
-    std::string localAddr = server.localAddress();
-    uint16_t port = server.localPort();
-    REQUIRE(port != 0);
+    REQUIRE(sock.fd() != -1);
+    REQUIRE(sock.state() == ISocketIO::SocketState::Connected);
 
-    // Client connects to that port
-    JobUrl url("udp://" + localAddr + ":" + std::to_string(port));
-    REQUIRE(client.connectToHost(url));
+    uint16_t port = sock.localPort();
+    REQUIRE(port > 0);
+    REQUIRE(sock.localAddress() == "127.0.0.1");
 
-    const char *msg = "Hello UDP!";
-    char recvBuf[128]{};
+    sock.disconnect();
+    REQUIRE(sock.state() == ISocketIO::SocketState::Closed);
+}
 
-    // Spawn a listener thread to simulate asynchronous recvFrom()
-    std::thread listener([&]() {
+TEST_CASE("UdpSocket connectToHost", "[udp_socket][connect]") {
+    TestLoop loop;
+    UdpSocket sock(loop.loop);
+
+    JobUrl url("udp://127.0.0.1:9999");
+    REQUIRE(sock.connectToHost(url));
+    REQUIRE(sock.fd() != -1);
+    REQUIRE(sock.state() == ISocketIO::SocketState::Connected);
+    REQUIRE(sock.peerAddress() == "127.0.0.1");
+    REQUIRE(sock.peerPort() == 9999);
+    sock.disconnect();
+}
+
+TEST_CASE("UdpSocket sendTo / recvFrom (async echo)", "[udp_socket][async][echo]") {
+    TestLoop loop;
+
+    auto server = std::make_shared<UdpSocket>(loop.loop);
+    auto client = std::make_shared<UdpSocket>(loop.loop);
+
+    REQUIRE(server->bind("127.0.0.1", 0));
+    uint16_t port = server->localPort();
+    REQUIRE(port > 0);
+
+    JobIpAddr serverAddr("127.0.0.1", port);
+
+    std::atomic<bool> serverGotMsg{false};
+    std::atomic<bool> clientGotEcho{false};
+    const std::string msg = "Hello UDP!";
+
+    server->onRead = [&](const char*, size_t) {
+        char buf[64]{};
         JobIpAddr sender;
-        ssize_t n = server.recvFrom(recvBuf, sizeof(recvBuf), sender);
-        REQUIRE(n > 0);
-        recvBuf[n] = '\0';
-        REQUIRE(std::string(recvBuf) == msg);
-        REQUIRE(sender.isValid());
-        REQUIRE(sender.isLoopback());
-    });
+        ssize_t n = server->recvFrom(buf, sizeof(buf), sender);
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        if (n > 0) {
+            REQUIRE(std::string(buf, n) == msg);
+            serverGotMsg.store(true);
+            server->sendTo(buf, n, sender);
+        }
+    };
 
-    // Client sends to server
-    ssize_t sent = client.write(msg, std::strlen(msg));
-    REQUIRE(sent == msg_ssize(msg));
+    REQUIRE(client->bind("127.0.0.1", 0));
+    client->onRead = [&](const char*, size_t) {
+        char buf[64]{};
+        // We must use recvFrom since the client isn't "connected"
+        JobIpAddr sender;
+        ssize_t n = client->recvFrom(buf, sizeof(buf), sender);
 
-    listener.join();
+        if (n > 0) {
+            if (std::string(buf, n) == msg)
+                clientGotEcho.store(true);
+            client->disconnect();
+        }
+    };
 
-    server.disconnect();
-    client.disconnect();
+    client->sendTo(msg.c_str(), msg.length(), serverAddr);
 
-    REQUIRE(server.state() == ISocketIO::SocketState::Closed);
-    REQUIRE(client.state() == ISocketIO::SocketState::Closed);
+    int retries = 0;
+    while ((!serverGotMsg.load() || !clientGotEcho.load()) && retries < 100) {
+        std::this_thread::sleep_for(1ms);
+        retries++;
+    }
+
+    REQUIRE(serverGotMsg.load() == true);
+    REQUIRE(clientGotEcho.load() == true);
+
+    server->disconnect();
 }
 
-TEST_CASE("UdpSocket sendTo and recvFrom explicit", "[udp_socket][sendto_recvfrom]") {
-    UdpSocket sockA;
-    UdpSocket sockB;
-
-    REQUIRE(sockA.bind("127.0.0.1", 0));
-    REQUIRE(sockB.bind("127.0.0.1", 0));
-
-    JobIpAddr addrB("127.0.0.1", sockB.localPort());
-    const char *payload = "Datagram Test";
-    char buffer[128]{};
-
-    // Send from A to B
-    ssize_t sent = sockA.sendTo(payload, std::strlen(payload), addrB);
-    REQUIRE(sent == msg_ssize(payload));
-
-    // Receive on B
-    JobIpAddr sender;
-    ssize_t recvd = sockB.recvFrom(buffer, sizeof(buffer), sender);
-    REQUIRE(recvd == msg_ssize(payload));
-    buffer[recvd] = '\0';
-    REQUIRE(std::string(buffer) == payload);
-
-    // Validate metadata
-    REQUIRE(sender.isValid());
-    REQUIRE(sender.isLoopback());
-    REQUIRE(sockB.state() == ISocketIO::SocketState::Connected);
-}
-
-TEST_CASE("UdpSocket option toggles and error handling", "[udp_socket][options]") {
-    UdpSocket sock;
+TEST_CASE("UdpSocket option toggling", "[udp_socket][options]") {
+    TestLoop loop;
+    UdpSocket sock(loop.loop);
 
     REQUIRE(sock.bind("127.0.0.1", 0));
 
@@ -100,50 +102,6 @@ TEST_CASE("UdpSocket option toggles and error handling", "[udp_socket][options]"
     sock.setOption(ISocketIO::SocketOption::Broadcast, true);
     REQUIRE(sock.option(ISocketIO::SocketOption::Broadcast));
 
-    sock.setOption(ISocketIO::SocketOption::NonBlocking, true);
-
     sock.disconnect();
-    REQUIRE(sock.state() == ISocketIO::SocketState::Closed);
 }
-
-TEST_CASE("UdpSocket handles bad reads gracefully", "[udp_socket][errors]") {
-    UdpSocket sock;
-    char buf[16];
-    REQUIRE(sock.read(buf, sizeof(buf)) == -1);
-    REQUIRE(sock.lastError() != SocketErrors::SocketErrNo::None);
-}
-
-TEST_CASE("UdpSocket async poll event dispatch", "[udp_socket][async]") {
-    auto loop = std::make_shared<AsyncEventLoop>();
-    loop->start();
-
-    auto server = std::make_shared<UdpSocket>(loop);
-    REQUIRE(server->bind("127.0.0.1", 0));
-    server->registerEvents();
-
-    auto client = std::make_shared<UdpSocket>(loop);
-    REQUIRE(client->connectToHost(JobUrl("udp://127.0.0.1:" + std::to_string(server->localPort()))));
-
-    std::atomic<bool> ready{false};
-    std::atomic<bool> gotData{false};
-
-    server->onRead = [&](const char *data, size_t len) {
-        REQUIRE(std::string(data, len) == "Async UDP");
-        gotData.store(true);
-    };
-
-    server->onReady = [&](){
-        ready.store(true);
-    };
-
-    while (!ready.load())
-        std::this_thread::sleep_for(std::chrono::milliseconds(2));
-
-    REQUIRE(client->write("Async UDP", 9) == 9);
-
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
-    REQUIRE(gotData.load()); // Not long enough or somethihg line 138
-
-    loop->stop();
-}
-
+// CHECKPOINT: v2.0

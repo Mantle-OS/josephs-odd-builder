@@ -1,30 +1,30 @@
 #pragma once
 
 #include <atomic>
+#include <memory>
 
+#include <job_io_async_thread.h>
+
+#include "socket_error.h"
 #include "isocket_io.h"
 #include "job_url.h"
 #include "job_ipaddr.h"
-#include "socket_error.h"
 
 namespace job::net {
 
 class UdpSocket : public ISocketIO {
+
 public:
-    UdpSocket(const std::shared_ptr<threads::AsyncEventLoop> &loop = nullptr);
+    using UdpSocketPtr = std::shared_ptr<UdpSocket>;
+    explicit UdpSocket(std::shared_ptr<threads::JobIoAsyncThread> loop);
     ~UdpSocket() override;
 
     bool connectToHost(const JobUrl &url) override;
     bool bind(const JobIpAddr &addr) override;
     bool bind(const std::string &address, uint16_t port) override;
-    bool listen([[maybe_unused]]int backlog = 0) override
-    {
-        return false;
-    }
-    std::shared_ptr<ISocketIO> accept() override
-    {
-        return nullptr;
-    }
+
+    bool listen([[maybe_unused]]int backlog = 0) override;
+    std::shared_ptr<ISocketIO> accept() override;
 
     void disconnect() override;
 
@@ -34,12 +34,13 @@ public:
     ssize_t sendTo(const void *buffer, size_t size, const JobIpAddr &dest);
     ssize_t recvFrom(void *buffer, size_t size, JobIpAddr &sender);
 
-    SocketState state() const noexcept override;
+    ISocketIO::SocketState state() const noexcept override;
     SocketErrors::SocketErrNo lastError() const noexcept override;
-    SocketType type() const noexcept override
+    std::string lastErrorString() const noexcept
     {
-        return SocketType::Udp;
+        return m_errors.lastErrorString();
     }
+    ISocketIO::SocketType type() const noexcept override;
 
     void setOption(SocketOption option, bool enable) override;
     bool option(SocketOption option) const override;
@@ -50,13 +51,15 @@ public:
     uint16_t localPort() const override;
 
     void dumpState() const override;
+    [[nodiscard]] bool isOpen() const noexcept;
 
 protected:
-    void pollEvents() override;
-    void handleEvents(uint32_t events) override;
+    void onEvents(uint32_t events) override;
 
 private:
     void closeSocket();
+    void updateLocalInfo();
+
     SocketErrors m_errors;
     std::atomic<SocketState> m_state{SocketState::Unconnected};
     JobIpAddr m_boundAddr;
@@ -64,3 +67,4 @@ private:
 };
 
 } // namespace job::net
+// CHECKPOINT: v2.1

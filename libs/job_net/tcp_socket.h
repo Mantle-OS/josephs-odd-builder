@@ -2,19 +2,24 @@
 
 #include <memory>
 #include <atomic>
-
-#include <async_event_loop.h>
+#include <mutex>
 
 #include "isocket_io.h"
+#include "socket_error.h"
+
+#include <io/job_io_async_thread.h>
 
 namespace job::net {
 
-class TcpSocket : public ISocketIO
-{
-public:
-    using Ptr = std::shared_ptr<TcpSocket>;
+class TcpSocket;
+using TcpSocketPtr = std::shared_ptr<TcpSocket>;
 
-    explicit TcpSocket(std::shared_ptr<threads::AsyncEventLoop> loop = nullptr);
+class TcpSocket : public ISocketIO {
+public:
+    explicit TcpSocket(std::shared_ptr<threads::JobIoAsyncThread> loop);
+
+    TcpSocket(std::shared_ptr<threads::JobIoAsyncThread> loop, int existing_fd, const JobIpAddr& peerAddr);
+
     ~TcpSocket() override;
 
     bool connectToHost(const JobUrl &url) override;
@@ -27,41 +32,39 @@ public:
     ssize_t read(void *buffer, size_t size) override;
     ssize_t write(const void *buffer, size_t size) override;
 
-    [[nodiscard]] SocketState state() const noexcept override;
-    [[nodiscard]] SocketErrors::SocketErrNo lastError() const noexcept override;
-    [[nodiscard]] std::string lastErrorString() const noexcept;
-
-    [[nodiscard]] SocketType type() const noexcept override;
+    ISocketIO::SocketState state() const noexcept override;
+    SocketErrors::SocketErrNo lastError() const noexcept override;
+    std::string lastErrorString() const noexcept;
+    ISocketIO::SocketType type() const noexcept override;
 
     void setOption(SocketOption option, bool enable) override;
-    [[nodiscard]] bool option(SocketOption option) const override;
+    bool option(SocketOption option) const override;
 
-    [[nodiscard]] std::string peerAddress() const override;
-    [[nodiscard]] uint16_t peerPort() const override;
-    [[nodiscard]] std::string localAddress() const override;
-    [[nodiscard]] uint16_t localPort() const override;
+    std::string peerAddress() const override;
+    uint16_t peerPort() const override;
+    std::string localAddress() const override;
+    uint16_t localPort() const override;
 
     void dumpState() const override;
 
-    void registerEvents()
-    {
-        // spawns the thread
-        pollEvents();
-    }
+    [[nodiscard]] bool isOpen() const noexcept;
+
 protected:
-    void pollEvents() override;
-    void handleEvents(uint32_t events) override;
-    SocketErrors m_errors;
+    void onEvents(uint32_t events) override;
 
 private:
-    void handleRead();
-    void handleWrite();
+    void closeSocket();
+    void updatePeerInfo();
+    void updateLocalInfo();
 
+    SocketErrors m_errors;
     std::atomic<SocketState> m_state{SocketState::Unconnected};
-    std::atomic<bool> m_nonBlocking{true};
 
-    std::string m_peerAddr;
-    uint16_t m_peerPort{0};
+    JobIpAddr m_peerAddr;
+    JobIpAddr m_localAddr;
+
+    std::mutex m_writeMutex;
 };
 
 } // namespace job::net
+// CHECKPOINT: v2.3

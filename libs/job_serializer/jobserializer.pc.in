@@ -1,0 +1,11 @@
+prefix=@CMAKE_INSTALL_PREFIX@
+exec_prefix=${prefix}
+libdir=@CMAKE_INSTALL_FULL_LIBDIR@
+includedir=@CMAKE_INSTALL_FULL_INCLUDEDIR@/jobserializer
+
+Name: jobserializer
+Description: Serializer library for JOB (Joseph's Odd Builder)
+Version: @PROJECT_VERSION@
+Requires: yaml-cpp
+Libs: -L${libdir} -ljobserializer -ljobcore -ljobio -ljobthreads
+Cflags: -I${includedir}
