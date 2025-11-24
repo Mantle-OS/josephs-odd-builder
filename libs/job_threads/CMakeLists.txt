@@ -33,6 +33,22 @@ set(JOBTHREADS_UTILS_HEADERS
     utils/job_thread_node.h
     utils/job_thread_graph.h
     utils/job_thread_actor.h
+    utils/job_verlet_concepts.h
+    utils/job_verlet_adapters.h
+    utils/job_verlet_integrator.h
+    utils/job_barnes_hut_tree.h
+    utils/job_barnes_hut_calculator.h
+    utils/job_stencil_boundary.h
+    utils/job_stencil_grid_2D.h
+    utils/job_stencil_grid_3D.h
+    utils/job_pipeline_sink.h
+    utils/job_pipeline_stage.h
+    utils/job_pipeline.h
+    utils/job_rk4_integrator.h
+    utils/job_euler_integrator.h
+    utils/job_parallel_bfs.h
+    utils/job_parallel_dijkstra.h
+    utils/job_branch_and_bound.h
 )
 
 set(JOBTHREADS_UTILS_SOURCES
@@ -58,9 +74,15 @@ set(JOBTHREADS_QUEUE_SOURCES
 set(JOBTHREADS_SCHED_HEADERS
     sched/job_isched_policy.h
     sched/job_fifo_scheduler.h
+    sched/job_round_robin_scheduler.h
+    sched/job_work_stealing_scheduler.h
+    sched/job_sporadic_scheduler.h
 )
 set(JOBTHREADS_SCHED_SOURCES
     sched/job_fifo_scheduler.cpp
+    sched/job_round_robin_scheduler.cpp
+    sched/job_work_stealing_scheduler.cpp
+    sched/job_sporadic_scheduler.cpp
 )
 
 #########################
@@ -70,6 +92,7 @@ set(JOBTHREADS_SCHED_SOURCES
 set(JOBTHREADS_DESCR_HEADERS
     descr/job_idescriptor.h
     descr/job_task_descriptor.h
+    descr/job_sporadic_descriptor.h
 )
 
 set(JOBTHREADS_DESCR_SOURCES
@@ -110,17 +133,18 @@ target_link_libraries(JosephsOddBuilder_Threads PUBLIC
 )
 target_include_directories(JosephsOddBuilder_Threads PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/>
-    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/>
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/>/utils
-    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/>/utils
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/>/queue
-    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/>/queue
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/>/sched
-    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/>/sched
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/>/descr
-    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/>/descr
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/>/io
-    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/>/io
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/utils>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/queue>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/sched>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/descr>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/io>
+    ## install paths
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobthreads>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobthreads/utils>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobthreads/queue>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobthreads/sched>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobthreads/descr>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobthreads/io>
 )
 
 install(TARGETS JosephsOddBuilder_Threads
@@ -171,4 +195,4 @@ install(EXPORT JosephsOddBuilderThreadsTargets
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/JosephsOddBuilderThreads
 )
 
-# CHECKPOINT: v1.3
+# CHECKPOINT: v1.5

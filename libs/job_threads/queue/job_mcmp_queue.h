@@ -4,7 +4,6 @@
 #include <deque>
 #include <mutex>
 
-// "modeled" Moodycamel's Concurrent Queue via Vyukov's algo.
 namespace job::threads {
 
 template <typename T>
@@ -14,12 +13,15 @@ public:
 
     explicit JobBoundedMPMCQueue(std::size_t cap):
         m_cap(cap)
-    {}
+    {
+
+    }
 
     ////////////////////////////////////////
     // blocking:
     ////////////////////////////////////////
-    [[nodiscard]] bool pop(T &out) {
+    [[nodiscard]] bool pop(T &out)
+    {
         Lock lock(m_mutex);
         m_not_empty.wait(lock, [&]{
             return m_closed || !m_deque.empty();
@@ -34,7 +36,8 @@ public:
         return true;
     }
 
-    [[nodiscard]] bool push(T value) {
+    [[nodiscard]] bool push(T value)
+    {
         Lock lock(m_mutex);
         m_not_full.wait(lock, [&]{
             return m_closed || m_deque.size() < m_cap;
@@ -52,7 +55,8 @@ public:
     ////////////////////////////////////////
     // !blocking:
     ////////////////////////////////////////
-    [[nodiscard]] bool tryPop(T &out) {
+    [[nodiscard]] bool tryPop(T &out)
+    {
         Lock lock(m_mutex);
         if (m_deque.empty())
             return false;
@@ -63,7 +67,8 @@ public:
         m_not_full.notify_one();
         return true;
     }
-    [[nodiscard]] bool tryPush(T value) {
+    [[nodiscard]] bool tryPush(T value)
+    {
         Lock lock(m_mutex);
         if (m_closed || m_deque.size() >= m_cap)
             return false;
@@ -74,17 +79,26 @@ public:
     }
 
     // no pushes | wake up waiters. pops will drain remaining.
-    void close() {
+    void close()
+    {
         Lock lock(m_mutex);
         m_closed = true;
         m_not_empty.notify_all();
         m_not_full.notify_all();
     }
 
-    [[nodiscard]] bool closed() const {
+    [[nodiscard]] bool closed() const noexcept
+    {
         Lock lock(m_mutex);
         return m_closed;
     }
+
+    [[nodiscard]] bool isEmpty() const noexcept
+    {
+        Lock lock(m_mutex);
+        return m_deque.empty();
+    }
+
 
 private:
     const std::size_t           m_cap;
@@ -96,4 +110,12 @@ private:
 };
 
 } // namespace job::threads
-// CHECKPOINT: v1.0
+
+// CHECKPOINT: v1.2
+
+
+
+// Minor polish that could be worth in a future pass:
+// If this is truly “general utility”, you might want [[nodiscard]] on tryPush/tryPop as well, to scream when someone ignores the bool.
+
+

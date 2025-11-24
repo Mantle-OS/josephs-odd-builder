@@ -99,16 +99,15 @@ TEST_CASE("JobThread real-time options failure (as non-root)", "[threading][opti
     bool correctFailure = (result == JobThread::StartResult::SchedulingFailed ||
                            result == JobThread::StartResult::AffinityFailed);
 
-    // If the test *is* run as root, StartResult::Started is also a valid outcome.
+
     if (result == JobThread::StartResult::Started) {
-        JOB_LOG_WARN("JobThread real-time test is not running as root. Skipping failure check.");
         thread.requestStop();
+        REQUIRE(thread.join() == true);
     } else {
         REQUIRE(correctFailure);
         REQUIRE_FALSE(thread.isRunning());
+        REQUIRE(thread.join() == false);
     }
-
-    REQUIRE(thread.join() == true);
 }
 
 TEST_CASE("JobThread data race stress test (proves mutex fix)", "[threading][bench][race]")

@@ -15,6 +15,7 @@ public:
 
     virtual JobIDescriptor::Ptr createDescriptor(uint64_t id, int priority) = 0;
 
+
     // Called when a task is created or its metadata changes.
     virtual void enqueue(JobIDescriptor::Ptr desc) = 0;
 
@@ -53,4 +54,4 @@ protected:
 };
 
 } // namespace job::threads
-// CHECKPOINT: v1.0
+// CHECKPOINT: v1.1

@@ -63,5 +63,4 @@ install(EXPORT JosephsOddBuilderCoreTargets
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/JosephsOddBuilderCore
 )
 
-
-# CHECKPOINT: v1
+# CHECKPOINT: v1.0

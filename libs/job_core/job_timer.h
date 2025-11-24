@@ -45,14 +45,14 @@ public:
 
 private:
     void scheduleNext() noexcept;
-    // members
-    uint64_t m_id{0};
-    TimePoint m_nextFire{};
-    Duration m_interval{0};
-    bool m_repeat{false};
-    bool m_active{true};
-    std::function<void()> m_callback{};
+
+    uint64_t                m_id{0};
+    TimePoint               m_nextFire{};
+    Duration                m_interval{0};
+    bool                    m_repeat{false};
+    bool                    m_active{true};
+    std::function<void()>   m_callback{};
 };
 
 } // namespace job::core
-// CHECKPOINT: v1
+// CHECKPOINT: v1.0

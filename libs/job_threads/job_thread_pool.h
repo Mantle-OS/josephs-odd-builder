@@ -25,8 +25,8 @@ public:
     using TaskFunction = std::function<void()>;
 
     static Ptr create(ISchedPolicy::Ptr scheduler,
-        size_t threadCount = std::thread::hardware_concurrency(),
-        const JobThreadOptions &options = JobThreadOptions::normal());
+                      size_t threadCount = std::thread::hardware_concurrency(),
+                      const JobThreadOptions &options = JobThreadOptions::normal());
 
 
     ~ThreadPool();
@@ -40,7 +40,7 @@ public:
     void shutdown();
 
     template <typename Func, typename... Args>
-    auto submit(int priority, Func &&f, Args &&...args) -> std::future<std::invoke_result_t<Func, Args...>>
+    auto submit(JobIDescriptor::Ptr desc, Func &&f, Args &&...args) -> std::future<std::invoke_result_t<Func, Args...>>
     {
         using ReturnType = std::invoke_result_t<Func, Args...>;
 
@@ -49,21 +49,45 @@ public:
             return {};
         }
 
+        if (!m_scheduler->admit(m_workers.size(), *desc)) {
+            JOB_LOG_WARN("[ThreadPool] Scheduler rejected task ID {}", desc->id());
+            // invalid future to signal rejection/BAD
+            return {};
+        }
         auto task = std::make_shared<std::packaged_task<ReturnType()>>(
             std::bind(std::forward<Func>(f), std::forward<Args>(args)...)
             );
         std::future<ReturnType> result = task->get_future();
 
-        uint64_t id = m_nextTaskId.fetch_add(1, std::memory_order_relaxed);
-        auto desc = m_scheduler->createDescriptor(id, priority);
+        uint64_t id = desc->id();
+
         {
             std::lock_guard<std::mutex> lock(m_storageMutex);
             m_taskStorage[id] = [task](){ (*task)(); };
         }
+
         m_scheduler->enqueue(std::move(desc));
         m_workerCondition.notify_one();
 
         return result;
+    }
+
+    template <typename Func, typename... Args>
+    auto submit(int priority, Func &&f, Args &&...args) -> std::future<std::invoke_result_t<Func, Args...>>
+    {
+        if (m_stopping.load() || !m_scheduler) {
+            JOB_LOG_ERROR("[ThreadPool] Stopping or no scheduler, cannot submit new tasks");
+            return {};
+        }
+
+        uint64_t id = m_nextTaskId.fetch_add(1, std::memory_order_relaxed);
+        auto desc = m_scheduler->createDescriptor(id, priority);
+        if (!desc) {
+            JOB_LOG_ERROR("[ThreadPool] Scheduler failed to create a descriptor for task {}", id);
+            return {};
+        }
+
+        return submit(std::move(desc), std::forward<Func>(f), std::forward<Args>(args)...);
     }
 
     template <typename Func, typename... Args>
@@ -103,3 +127,13 @@ private:
 
 } // job::threads
 // CHECKPOINT: v1.3
+
+
+
+// backlog cleanup:
+// Add a separate std::atomic<double> m_loadAvg{0.0};
+// Make updateLoadAverage read some “instantaneous load” (queue size, active workers, etc.) and update m_loadAvg.
+// Have snapshotMetrics() fill metrics.loadAvg from that.
+
+
+

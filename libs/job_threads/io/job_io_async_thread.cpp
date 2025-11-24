@@ -7,6 +7,7 @@
 #include <sys/eventfd.h>
 
 #include <job_logger.h>
+
 namespace job::threads {
 
 constexpr int kDefaultEpollEvents = 64;
@@ -44,12 +45,13 @@ JobIoAsyncThread::JobIoAsyncThread()
 
 JobIoAsyncThread::~JobIoAsyncThread() noexcept
 {
-    if (m_epollFd != -1) {
+    stop();
+
+    if (m_epollFd != -1)
         ::close(m_epollFd);
-    }
-    if (m_eventFd != -1) {
+
+    if (m_eventFd != -1)
         ::close(m_eventFd);
-    }
 }
 
 void JobIoAsyncThread::stop()
@@ -64,6 +66,7 @@ void JobIoAsyncThread::stop()
         std::scoped_lock lock(m_timerMutex);
         m_timers.clear();
     }
+
     {
         std::scoped_lock lock(m_ioMutex);
         m_fdCallbacks.clear();
@@ -100,6 +103,7 @@ bool JobIoAsyncThread::registerFD(int fd, uint32_t events, IOEventCallback callb
 {
     if (fd < 0 || m_epollFd == -1)
         return false;
+
     epoll_event ev{};
     ev.events = events;
     ev.data.fd = fd;
@@ -111,7 +115,9 @@ bool JobIoAsyncThread::registerFD(int fd, uint32_t events, IOEventCallback callb
         std::scoped_lock lock(m_ioMutex);
         m_fdCallbacks[fd] = std::move(callback);
     }
-    post([]{});
+    post([]{
+
+    });
     return true;
 }
 
@@ -125,11 +131,15 @@ bool JobIoAsyncThread::unregisterFD(int fd)
             JOB_LOG_WARN("[JobIoAsyncThread] epoll_ctl DEL failed for fd {}: {}", fd, strerror(errno));
         }
     }
+
     {
         std::scoped_lock lock(m_ioMutex);
         m_fdCallbacks.erase(fd);
     }
-    post([]{});
+
+    post([]{
+
+    });
     return true;
 }
 
@@ -146,7 +156,7 @@ void JobIoAsyncThread::processIOEvents(int event_count)
             if (fd == m_eventFd) {
                 for (;;) {
                     uint64_t val;
-                    ssize_t s = read(m_eventFd, &val, sizeof(val));
+                    ssize_t s = read(m_eventFd, &val, sizeof(val)); // non-blocking . . . .
                     if (s == -1 && errno == EAGAIN)
                         break; // Drained
 
@@ -170,7 +180,9 @@ void JobIoAsyncThread::processIOEvents(int event_count)
     }
 
     for (auto& [callback, events] : callbacksToRun) {
-        post([=]() { callback(events); });
+        post([=]() {
+            callback(events);
+        });
     }
 }
 
@@ -201,7 +213,8 @@ void JobIoAsyncThread::loop(std::stop_token token, [[maybe_unused]] std::chrono:
             break;
 
         if (event_count < 0) {
-            if (errno == EINTR) continue;
+            if (errno == EINTR)
+                continue;
             JOB_LOG_ERROR("[JobIoAsyncThread] epoll_wait error: {}", strerror(errno));
             continue;
         }

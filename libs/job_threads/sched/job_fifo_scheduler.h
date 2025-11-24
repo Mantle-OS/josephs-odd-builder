@@ -21,7 +21,6 @@ public:
         return std::make_shared<JobTaskDescriptor>(id, priority);
     }
 
-    // We want to pass in the TASK Descriptor not the interface ?
     void enqueue(JobIDescriptor::Ptr desc) override;
     [[nodiscard]] std::optional<uint64_t> next(uint32_t wid) override;
     void complete(uint64_t tid, bool ok) override;
@@ -30,11 +29,9 @@ public:
     void stop() override;
 
 private:
-    mutable std::mutex m_mutex;
-
-    // The que
-    std::queue<JobTaskDescriptor::Ptr> m_queue;
-    std::condition_variable m_condition;
+    mutable std::mutex                      m_mutex;
+    std::queue<JobTaskDescriptor::Ptr>      m_queue;
+    std::condition_variable                 m_condition;
 };
 
 } // namespace job::threads

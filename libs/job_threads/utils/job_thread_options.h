@@ -54,7 +54,7 @@ struct JobThreadOptions final {
         return opts;
     }
 
-    [[nodiscard]] constexpr bool valid() const
+    [[nodiscard]] constexpr bool valid() const noexcept
     {
         bool ret = true;
         if (realtime && policy == SchedulingPolicy::Other)

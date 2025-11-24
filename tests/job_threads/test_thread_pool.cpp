@@ -4,7 +4,7 @@
 #include <string>
 #include <thread>
 #include <vector>
-#include <mutex> // For priority test
+#include <mutex>
 
 #include <job_thread_pool.h>
 #include <sched/job_fifo_scheduler.h>
@@ -18,9 +18,7 @@ TEST_CASE("ThreadPool create and shutdown", "[threading][thread_pool]")
     auto pool = ThreadPool::create(scheduler, 2);
     REQUIRE(pool != nullptr);
 
-
-    pool->shutdown(); // dead lock
-
+    pool->shutdown();
     REQUIRE(scheduler->size() == 0);
 }
 
@@ -94,59 +92,8 @@ TEST_CASE("ThreadPool submit after shutdown", "[threading][thread_pool]")
     REQUIRE_FALSE(future3.valid());
 }
 
-// NOTE: This test is now invalid for a simple FifoScheduler.
-// A FifoScheduler *ignores* priority.
-// We will test priority schedulers separately.
-// TEST_CASE("ThreadPool submit with priority", "[threading][thread_pool]")
-// {
-//     auto scheduler = std::make_shared<FifoScheduler>();
-//     auto pool = ThreadPool::create(scheduler, 1);
-//     std::atomic<int> result = 0;
-
-//     pool->submit(10, [&]{ result.store(1); });
-//     pool->submit(1, [&]{ result.store(2); });
-
-//     pool->waitForIdle(1ms);
-//     // A FIFO queue will run these in order: 1, then 2.
-//     REQUIRE(result.load() == 2);
-
-//     pool->shutdown();
-// }
-
-// --- THIS TEST IS NOW INVALID, as the pool doesn't see priority ---
-// TEST_CASE("ThreadPool metrics snapshot with priority", "[threading][thread_pool]")
-// {
-//     auto scheduler = std::make_shared<FifoScheduler>();
-//     auto pool = ThreadPool::create(scheduler, 2);
-
-//     pool->submit(1, []{ std::this_thread::sleep_for(10ms); });
-//     pool->submit(1, []{ std::this_thread::sleep_for(10ms); });
-//     pool->submit(3, []{ std::this_thread::sleep_for(10ms); });
-
-//     std::this_thread::sleep_for(5ms);
-
-//     auto metrics = pool->snapshotMetrics();
-//     // REQUIRE(metrics.byPriority.size() >= 4); // This logic is gone
-//     REQUIRE(metrics.total == 1);
-//     REQUIRE(metrics.loadAvg == 2.0);
-//     // REQUIRE(metrics.byPriority[3] == 1); // This logic is gone
-//     // REQUIRE(metrics.byPriority[1] == 0); // This logic is gone
-
-//     pool->waitForIdle(1ms);
-//     metrics = pool->snapshotMetrics();
-//     REQUIRE(metrics.total == 0);
-//     REQUIRE(metrics.loadAvg == 0.0);
-
-//     pool->shutdown();
-// }
-
-
 TEST_CASE("ThreadPool priority is strictly ordered", "[threading][thread_pool][priority]")
 {
-    // --- THIS TEST MUST BE RE-WRITTEN ---
-    // We must create a "PriorityScheduler" to test this.
-    // For now, we'll test that FIFO is FIFO.
-
     auto scheduler = std::make_shared<FifoScheduler>();
     auto pool = ThreadPool::create(scheduler, 1);
     std::vector<int> execution_order;

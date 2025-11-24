@@ -110,4 +110,4 @@ void JobTimer::set_callback(const std::function<void ()> &callback)
 }
 
 } // job::core
-// CHECKPOINT: v1
+// CHECKPOINT: v1.0

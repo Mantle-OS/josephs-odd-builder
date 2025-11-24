@@ -11,7 +11,7 @@
 namespace job::threads {
 
 template <typename It, typename T, typename MapFn, typename ReduceFn>
-T parallel_reduce(ThreadPool& pool, It first, It last, T init,
+T parallel_reduce(ThreadPool &pool, It first, It last, T init,
                   MapFn map_fn, ReduceFn reduce_fn,
                   int priority = 0, std::size_t grain = 0)
 {
@@ -35,7 +35,9 @@ T parallel_reduce(ThreadPool& pool, It first, It last, T init,
             // Note: Obv... T must be default constructible
             T acc{};
             for (auto cur = it; cur != it_end; ++cur)
-                acc = (cur == it) ? map_fn(*cur) : reduce_fn(acc, map_fn(*cur));
+                acc = (cur == it) ?
+                          map_fn(*cur) :
+                          reduce_fn(acc, map_fn(*cur));
 
             return acc;
         }));
@@ -43,7 +45,7 @@ T parallel_reduce(ThreadPool& pool, It first, It last, T init,
     }
 
     T result = init;
-    for (auto& fu : partials)
+    for (auto &fu : partials)
         result = reduce_fn(result, fu.get());
 
     return result;

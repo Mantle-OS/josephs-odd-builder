@@ -10,7 +10,7 @@
 namespace job::threads {
 
 template <typename Index, typename Func>
-void parallel_for(ThreadPool& pool, Index first, Index last, Func f,
+void parallel_for(ThreadPool &pool, Index first, Index last, Func f,
                   int priority = 0, std::size_t grain = 0)
 {
     if (last <= first)
@@ -35,7 +35,7 @@ void parallel_for(ThreadPool& pool, Index first, Index last, Func f,
         i = chunk_end;
     }
 
-    for (auto& fu : futs)
+    for (auto &fu : futs)
         fu.get();
 }
 

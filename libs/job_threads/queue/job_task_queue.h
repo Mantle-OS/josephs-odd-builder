@@ -1,5 +1,6 @@
 #pragma once
-
+// This class is deperciated and should not be used now that there are better options.
+// This is left around just in case someone wants to use this or we need a one off Queue
 #include <optional>
 #include <chrono>
 #include <vector>

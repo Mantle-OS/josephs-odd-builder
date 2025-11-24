@@ -30,7 +30,7 @@ TEST_CASE("JobIoAsyncThread processes tasks, timers, and I/O events", "[threadin
     std::atomic<bool> task_from_io_fired{false};
     std::atomic<bool> timer_fired{false};
 
-    // Read + Edge-Triggered
+    // Read and Edge-Triggered
     ioLoop->registerFD(read_fd, EPOLLIN | EPOLLET,
                        [&](uint32_t events) {
                            INFO("I/O Event Fired!");
@@ -73,9 +73,12 @@ TEST_CASE("JobIoAsyncThread processes tasks, timers, and I/O events", "[threadin
     REQUIRE(task_from_io_fired.load() == true);
     REQUIRE(timer_fired.load() == true);
 
-    ioLoop->stop(); // LOCKS UP
+    ioLoop->stop();
     REQUIRE_FALSE(ioLoop->isRunning());
     close(read_fd);
     close(write_fd);
 }
+
+// this is great and all but there could be more to this. However there is already such a large set of tests for the IO stuff that use all this
+
 // CHECKPOINT: v1.0

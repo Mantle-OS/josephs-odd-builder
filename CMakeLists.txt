@@ -14,8 +14,19 @@ if(POLICY CMP0135)
     cmake_policy(SET CMP0135 NEW) # for reproducible timestamps
 endif()
 
-add_compile_options(-Wall -Wextra -Wpedantic -Werror)
 
+## LATER after stable
+# include(CheckIPOSupported)
+# check_ipo_supported(RESULT result OUTPUT output)
+
+# if(result)
+#     message(STATUS "IPO/LTO is supported: enabling globally")
+#     set(CMAKE_INTERPROCEDURAL_OPTIMIZATION ON)
+# else()
+#     message(WARNING "IPO/LTO is not supported: ${output}")
+# endif()
+
+add_compile_options(-Wall -Wextra -Wpedantic -Werror)
 
 ##############################
 # DEPS
@@ -41,7 +52,6 @@ pkg_check_modules(LibUdev REQUIRED libudev) # libudev-dev
 
 ## DATA fun
 # pkg_check_modules(Flatbuffers REQUIRED flatbuffers)    # libflatbuffers-dev flatbuffers-compiler
-# pkg_check_modules(LibMsgPackC  REQUIRED msgpack-c)       # libmsgpack-c-dev | keep at ansi C and not CXX to keep boost out of the stack
 pkg_check_modules(NlohmannJson REQUIRED nlohmann_json)   # nlohmann-json3-dev
 pkg_check_modules(YAMLCpp      REQUIRED yaml-cpp)        # libyaml-cpp-dev
 
@@ -49,7 +59,6 @@ pkg_check_modules(YAMLCpp      REQUIRED yaml-cpp)        # libyaml-cpp-dev
 ##############################
 # sub dirs
 ##############################
-# Core libs (where the job_msgpack lib will go for emitters/FS etc)
 add_subdirectory(libs)
 
 # Later

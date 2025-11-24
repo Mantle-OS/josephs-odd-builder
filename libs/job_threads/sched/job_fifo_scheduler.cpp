@@ -1,17 +1,23 @@
 #include "job_fifo_scheduler.h"
 #include <job_logger.h>
-namespace job::threads {
 
+namespace job::threads {
 FifoScheduler::~FifoScheduler()
 {
     stop();
 }
-// This should really be a JobTaskDescriptor
+
 void FifoScheduler::enqueue(JobIDescriptor::Ptr desc)
 {
     if (m_stopped.load())
         return;
-    auto taskDesc = std::static_pointer_cast<JobTaskDescriptor>(desc);
+
+    auto taskDesc = std::dynamic_pointer_cast<JobTaskDescriptor>(desc);
+    if (!taskDesc){
+        JOB_LOG_WARN("[FifoScheduler] Non task descriptor enqueued to fifo scheduler; dropping (id={}).",
+                     desc ? desc->id() : 0);
+        return;
+    }
 
     if(!taskDesc){
         JOB_LOG_ERROR("[FifoScheduler] faild to cast the base type from JobIDescriptor to a JobTaskDescriptor");
@@ -46,8 +52,7 @@ std::optional<uint64_t> FifoScheduler::next(uint32_t /*wid*/)
 
 void FifoScheduler::complete(uint64_t /*tid*/, bool /*ok*/)
 {
-    // No-op for a simple FIFO scheduler.
-    // A TaskGraph scheduler would use this to unlock dependents.
+    // No-op for a simple FIFO scheduler. A TaskGraph scheduler would use this to unlock dependents.
 }
 
 size_t FifoScheduler::size() const noexcept

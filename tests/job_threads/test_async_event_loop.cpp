@@ -27,7 +27,7 @@ TEST_CASE("AsyncEventLoop post and stop", "[threading][async_loop]")
     }
 
     REQUIRE(task_ran.load() == true);
-    loop.stop(); // PRAY THIS DOES NOT dead locking
+    loop.stop();
     REQUIRE_FALSE(loop.isRunning());
 }
 
@@ -55,7 +55,7 @@ TEST_CASE("AsyncEventLoop postDelayed", "[threading][async_loop]")
     auto end_time = std::chrono::steady_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
 
-    REQUIRE(task_ran.load() == true); //Fails
+    REQUIRE(task_ran.load() == true);
     REQUIRE(duration.count() >= 50);
 
     loop.stop();
@@ -76,7 +76,7 @@ TEST_CASE("AsyncEventLoop repeating timer", "[threading][async_loop]")
 
     std::this_thread::sleep_for(50ms);
 
-    REQUIRE(counter.load() >= 2); //fails
+    REQUIRE(counter.load() >= 2);
     REQUIRE(counter.load() <= 3);
 
     loop.stop();
@@ -141,12 +141,13 @@ TEST_CASE("AsyncEventLoop handles re-entrancy (post from a timer)", "[threading]
     }, 10ms);
 
     int retries = 0;
+    // this needs to go somewhere else . . .
     while (!task_from_timer_ran.load() && retries < 100) {
         std::this_thread::sleep_for(2ms);
         retries++;
     }
 
-    REQUIRE(task_from_timer_ran.load() == true); //fails
+    REQUIRE(task_from_timer_ran.load() == true);
     loop.stop();
 }
 // CHECKPOINT: v1.2

@@ -29,7 +29,6 @@ TEST_CASE("ThreadWatcher detects and stops a stuck thread", "[threading][thread_
     auto scheduler = std::make_shared<FifoScheduler>();
     auto watcher = std::make_shared<ThreadWatcher>();
     auto pool = ThreadPool::create(scheduler, 2);
-    auto queue = std::make_shared<TaskQueue>();
 
     watcher->attachPool(pool);
     watcher->attachScheduler(scheduler);

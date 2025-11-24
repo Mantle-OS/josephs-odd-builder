@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <memory>
 
-// This is meant to be a interface !!
+// This is meant to be a inhherited(always) !!
 
 namespace job::threads  {
 class JobIDescriptor {
@@ -11,23 +11,23 @@ public:
     using Ptr = std::shared_ptr<JobIDescriptor>;
     virtual ~JobIDescriptor() = default;
 
-    uint64_t id() const;
-    void setId(uint64_t id);
+    [[nodiscard]] uint64_t id() const noexcept;
+    void setId(uint64_t id) noexcept;
 
-    int priority() const;
-    void setPriority(int priority);
+    [[nodiscard]] int priority() const noexcept;
+    void setPriority(int priority) noexcept;
 
-    uint64_t size() const;
-    void setSize(uint64_t size);
+    [[nodiscard]] uint64_t size() const noexcept;
+    void setSize(uint64_t size) noexcept;
 
-    uint32_t hash() const;
-    void setHash(uint32_t hash);
+    [[nodiscard]] uint32_t hash() const noexcept;
+    void setHash(uint32_t hash) noexcept;
 
-    double latency() const;
-    void setLatency(double latency);
+    [[nodiscard]] double latency() const noexcept;
+    void setLatency(double latency) noexcept;
 
-    double bps() const;
-    void setBps(double bps);
+    [[nodiscard]] double bps() const noexcept;
+    void setBps(double bps) noexcept;
 
 protected:
     JobIDescriptor() = default;
@@ -40,6 +40,6 @@ private:
     double      m_latency{0.0};
     double      m_bps{0.0};
 };
-} // namespace job::threads
 
-// CHECKPOINT: v1.1
+} // namespace job::threads
+// CHECKPOINT: v1.2
