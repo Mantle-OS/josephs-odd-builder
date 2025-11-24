@@ -46,18 +46,17 @@ Current layout of the threading zoo: more incoming
 
 ```text
 job/libs/job_threads
-├── CMakeLists.txt
 ├── descr
-│   ├── job_idescriptor.cpp
-│   ├── job_idescriptor.h
-│   ├── job_round_robin_descriptor.h
-│   ├── job_sporadic_descriptor.h
-│   └── job_task_descriptor.h
+│   ├── job_idescriptor.cpp
+│   ├── job_idescriptor.h
+│   ├── job_round_robin_descriptor.h
+│   ├── job_sporadic_descriptor.h
+│   └── job_task_descriptor.h
 ├── io
-│   ├── job_async_event_loop.cpp
-│   ├── job_async_event_loop.h
-│   ├── job_io_async_thread.cpp
-│   └── job_io_async_thread.h
+│   ├── job_async_event_loop.cpp
+│   ├── job_async_event_loop.h
+│   ├── job_io_async_thread.cpp
+│   └── job_io_async_thread.h
 ├── job_thread.cpp
 ├── job_thread.h
 ├── job_thread_pool.cpp
@@ -66,27 +65,32 @@ job/libs/job_threads
 ├── job_thread_watcher.cpp
 ├── job_thread_watcher.h
 ├── queue
-│   ├── job_mcmp_queue.h
-│   ├── job_task_queue.cpp
-│   └── job_task_queue.h
+│   ├── job_mcmp_queue.h
+│   ├── job_task_queue.cpp
+│   └── job_task_queue.h
 ├── sched
-│   ├── job_fifo_scheduler.cpp
-│   ├── job_fifo_scheduler.h
-│   ├── job_isched_policy.h
-│   ├── job_round_robin_scheduler.cpp
-│   ├── job_round_robin_scheduler.h
-│   ├── job_sporadic_scheduler.cpp
-│   ├── job_sporadic_scheduler.h
-│   ├── job_work_stealing_scheduler.cpp
-│   └── job_work_stealing_scheduler.h
+│   ├── job_fifo_scheduler.cpp
+│   ├── job_fifo_scheduler.h
+│   ├── job_isched_policy.h
+│   ├── job_round_robin_scheduler.cpp
+│   ├── job_round_robin_scheduler.h
+│   ├── job_sporadic_scheduler.cpp
+│   ├── job_sporadic_scheduler.h
+│   ├── job_work_stealing_scheduler.cpp
+│   └── job_work_stealing_scheduler.h
 └── utils
     ├── job_barnes_hut_calculator.h
     ├── job_barnes_hut_tree.h
+    ├── job_branch_and_bound.h
+    ├── job_euler_integrator.h
+    ├── job_parallel_bfs.h
+    ├── job_parallel_dijkstra.h
     ├── job_parallel_for.h
     ├── job_parallel_reduce.h
     ├── job_pipeline.h
     ├── job_pipeline_sink.h
     ├── job_pipeline_stage.h
+    ├── job_rk4_integrator.h
     ├── job_stencil_boundary.h
     ├── job_stencil_grid_2D.h
     ├── job_stencil_grid_3D.h
