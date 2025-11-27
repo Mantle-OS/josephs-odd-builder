@@ -2,6 +2,8 @@
 #include <functional>
 #include <exception>
 
+#include <job_logger.h>
+
 #include "job_thread_pool.h"
 #include "utils/job_thread_actor.h"
 

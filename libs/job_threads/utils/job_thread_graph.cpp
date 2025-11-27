@@ -110,7 +110,7 @@ std::future<bool> JobThreadGraph::run()
                     it->second.depsLeft.fetch_add(1, std::memory_order_relaxed);
             }
         }
-    } // unlock m_mutex
+    } // unlock my heart !
 
     if (tasks == 0) {
         promise->set_value(true);
@@ -169,7 +169,7 @@ std::future<bool> JobThreadGraph::run()
     return future;
 }
 
-
+// And the Captian screams  !!!!!!!!!!!! Kahn !!!!!!!!!!!!! (Kahn's topological sort)
 void JobThreadGraph::onTaskFinished(const std::string &node_name,
                                     std::shared_ptr<std::promise<bool>> promise,
                                     std::shared_ptr<std::atomic<int>> cnt,

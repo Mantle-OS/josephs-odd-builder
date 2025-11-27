@@ -103,3 +103,4 @@ TEST_CASE("JobRoundRobinScheduler handles empty priority queues", "[threading][s
     REQUIRE(execution_order[2] == "P0-TaskB");
     REQUIRE(execution_order[3] == "P2-TaskB");
 }
+// CHECKPOINT v1.0

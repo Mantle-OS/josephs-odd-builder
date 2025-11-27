@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.16)
+cmake_minimum_required(VERSION 3.23)
 project(JosephsOddBuilderThreads
     VERSION 0.1
     LANGUAGES CXX
@@ -47,8 +47,9 @@ set(JOBTHREADS_UTILS_HEADERS
     utils/job_rk4_integrator.h
     utils/job_euler_integrator.h
     utils/job_parallel_bfs.h
-    utils/job_parallel_dijkstra.h
+    # utils/job_parallel_dijkstra.h # TOY
     utils/job_branch_and_bound.h
+    utils/job_fmm_tree.h # TOY
 )
 
 set(JOBTHREADS_UTILS_SOURCES

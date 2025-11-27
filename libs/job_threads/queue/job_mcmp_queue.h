@@ -112,10 +112,3 @@ private:
 } // namespace job::threads
 
 // CHECKPOINT: v1.2
-
-
-
-// Minor polish that could be worth in a future pass:
-// If this is truly “general utility”, you might want [[nodiscard]] on tryPush/tryPop as well, to scream when someone ignores the bool.
-
-

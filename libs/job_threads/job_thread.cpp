@@ -31,7 +31,7 @@ void JobThread::setRunFunction(RunFunction fn)
 
 JobThread::StartResult JobThread::start()
 {
-    if (m_running.load())
+    if (m_running.load(std::memory_order_acquire) || m_starting.test_and_set(std::memory_order_acq_rel))
         return StartResult::AlreadyRunning;
 
     auto promise = std::make_shared<std::promise<StartResult>>();
@@ -42,18 +42,23 @@ JobThread::StartResult JobThread::start()
         m_stopSource.get_token()
     };
 
-    if (!args)
+    if (!args){
+        m_starting.clear(std::memory_order_release);
         return StartResult::ThreadError;
+    }
 
     int create_result = pthread_create(&m_pthread,
                                        nullptr,
                                        &JobThread::threadEntry,
                                        args);
 
+
+
     if (create_result != 0) {
         delete args;
         m_joinable = false;
         promise->set_value(StartResult::ThreadError);
+        m_starting.clear(std::memory_order_release);
     } else {
         m_joinable = true;
     }
@@ -61,31 +66,32 @@ JobThread::StartResult JobThread::start()
     return future.get();
 }
 
-void *JobThread::threadEntry(void* arg)
+void *JobThread::threadEntry(void *arg)
 {
     std::unique_ptr<JobThreadArgs> args(static_cast<JobThreadArgs*>(arg));
-
-    auto self    = args->self;
+    auto self = args->self;
     auto promise = args->promise;
-    auto token   = args->token;
+    auto token = args->token;
 
     StartResult ret = StartResult::Started;
     {
-        std::lock_guard<std::mutex> lock(self->m_mutex);
-        int ok_sched = self->applyScheduling();
-        int ok_aff   = self->applyAffinity();
-        if (ok_sched != 0)
-            ret = StartResult::SchedulingFailed;
-        else if (ok_aff != 0)
-            ret = StartResult::AffinityFailed;
-        else
-            ret = StartResult::Started;
+        if(self->m_options.realtime){
+            std::lock_guard<std::mutex> lock(self->m_mutex);
+            int ok_sched = self->applyScheduling();
+            int ok_aff   = self->applyAffinity();
+            if (ok_sched != 0)
+                ret = StartResult::SchedulingFailed;
+            else if (ok_aff != 0)
+                ret = StartResult::AffinityFailed;
+        }
     }
 
     promise->set_value(ret);
 
-    if (ret == StartResult::Started) {
+    if (ret == StartResult::Started) {        
         self->m_running.store(true);
+        self->m_starting.clear(std::memory_order_release);
+
         // Set thread name
         {
             std::lock_guard<std::mutex> lock(self->m_mutex);
@@ -102,7 +108,7 @@ void *JobThread::threadEntry(void* arg)
         if (func_to_run)
             func_to_run(token);
         else
-            self->run(token); // run() must also be thread-safe
+            self->run(token);
 
         self->m_running.store(false);
 
@@ -189,4 +195,4 @@ int JobThread::applyAffinity() noexcept
 
 } // job::threads
 
-// CHECKPOINT: v1.6
+// CHECKPOINT: v1.7

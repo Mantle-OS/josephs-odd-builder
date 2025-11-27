@@ -79,6 +79,6 @@ TEST_CASE("JobIoAsyncThread processes tasks, timers, and I/O events", "[threadin
     close(write_fd);
 }
 
-// this is great and all but there could be more to this. However there is already such a large set of tests for the IO stuff that use all this
-
+// IMPORTANT
+// this is great and all but there could be more to this. However there is already such a LARGE set of tests for the IO/NET stuff that use all this
 // CHECKPOINT: v1.0

@@ -3,7 +3,7 @@
 #include <atomic>
 #include <memory>
 
-#include "job_mcmp_queue.h"
+#include "queue/job_mcmp_queue.h"
 #include "job_thread_pool.h"
 
 namespace job::threads {
@@ -23,15 +23,16 @@ public:
         stop();
     }
 
-    void post(Msg msg, int priority = 0)
+    [[nodiscard]] bool post(Msg msg, int priority = 0)
     {
         if(!m_pool)
-            return;
+            return false;
 
         if (!m_inbox.push(std::move(msg)))
-            return;
+            return false;
 
         schedule(priority);
+        return true;
     }
 
     void stop()
@@ -39,12 +40,24 @@ public:
         m_inbox.close();
     }
 
+    [[nodiscard]] bool isAlive() const
+    {
+        if (!m_pool)
+            return false;
+
+        if (!m_inbox.isEmpty())
+            return true;
+
+        return m_isScheduled.load(std::memory_order_acquire);
+    }
+
+
 protected:
     virtual void onMessage(Msg &&msg) = 0;
 
 private:
     void schedule(int priority) {
-        if (!m_isScheduled.test_and_set(std::memory_order_acquire)) {
+        if (!m_isScheduled.exchange(true, std::memory_order_acquire)) {
             auto self = this->shared_from_this();
             m_pool->submit(priority, [this, self, priority]() {
                 this->processBatch(priority);
@@ -62,9 +75,9 @@ private:
                 onMessage(std::move(m));
                 count++;
             } else {
-                m_isScheduled.clear(std::memory_order_release);
+                m_isScheduled.store(false, std::memory_order_release);
                 if (!m_inbox.isEmpty()) {
-                    if (!m_isScheduled.test_and_set(std::memory_order_acquire)) {
+                    if (!m_isScheduled.exchange(true, std::memory_order_acquire)) {
                         count = 0;
                         continue;
                     }
@@ -80,8 +93,8 @@ private:
 
     ThreadPool::Ptr              m_pool;
     JobBoundedMPMCQueue<Msg>     m_inbox;
-    std::atomic_flag             m_isScheduled{0};
+    std::atomic<bool>            m_isScheduled{false};
 };
 
 } // namespace job::threads
-// CHECKPOINT: v1.1
+// CHECKPOINT: v1.3

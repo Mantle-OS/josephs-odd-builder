@@ -1,41 +1,40 @@
 #include <catch2/catch_test_macros.hpp>
-#include <thread>
-
 #include <job_timer.h>
+
+#include "../test_spin_till.h"
 
 using namespace job::core;
 using namespace std::chrono_literals;
 
-TEST_CASE("JobTimer basic one-shot behavior", "[timer]") {
+TEST_CASE("JobTimer basic one-shot behavior", "[timer]")
+{
     bool fired = false;
     JobTimer timer(1, JobTimer::Clock::now(), 50ms, false, true, [&]() {
         fired = true;
     });
-
-    // Wait slightly longer than interval
-    std::this_thread::sleep_for(60ms);
-
-    if (timer.expired(JobTimer::Clock::now()))
-        timer.fire();
-
-    REQUIRE(fired == true);
-    REQUIRE(timer.isActive() == false);
+    REQUIRE(spin_until([&]{
+        if (timer.expired(JobTimer::Clock::now())) timer.fire();
+        return fired;
+    }, 200ms));
+    REQUIRE_FALSE(timer.isActive());
 }
 
-TEST_CASE("JobTimer repeating behavior", "[timer]") {
+TEST_CASE("JobTimer repeating behavior", "[timer]")
+{
     int counter = 0;
     JobTimer timer(2, JobTimer::Clock::now(), 20ms, true, true, [&]() {
         counter++;
     });
 
-    for (int i = 0; i < 3; ++i) {
-        std::this_thread::sleep_for(25ms);
+    REQUIRE(spin_until([&]{
         if (timer.expired(JobTimer::Clock::now()))
             timer.fire();
-    }
 
-    REQUIRE(counter >= 3);
-    REQUIRE(timer.isActive() == true);
+        return counter >= 3;
+    }, 250ms));
+
+    REQUIRE(timer.isActive());
+
 }
 
 TEST_CASE("JobTimer cancel prevents firing", "[timer]") {
@@ -45,12 +44,13 @@ TEST_CASE("JobTimer cancel prevents firing", "[timer]") {
     });
 
     timer.cancel();
-    std::this_thread::sleep_for(20ms);
+    bool seen = spin_until([&]{
+        if (timer.expired(JobTimer::Clock::now()))
+            timer.fire();
+        return fired;
+    }, 50ms);
 
-    if (timer.expired(JobTimer::Clock::now()))
-        timer.fire();
-
-    REQUIRE(fired == false);
-    REQUIRE(timer.isActive() == false);
+    REQUIRE_FALSE(seen);
+    REQUIRE_FALSE(timer.isActive());
 }
-// CHECKPOINT: v1
+// CHECKPOINT: v1.1

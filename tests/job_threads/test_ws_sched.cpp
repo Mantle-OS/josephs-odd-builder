@@ -117,3 +117,4 @@ TEST_CASE("JobWorkStealingScheduler handles workerCount = 0", "[threading][sched
     REQUIRE(counter.load() == 1);
     pool->shutdown();
 }
+// CHECKPOINT v1.0

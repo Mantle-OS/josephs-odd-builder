@@ -5,6 +5,7 @@
 #include <limits>
 #include <cmath>
 
+
 #include <sched/job_fifo_scheduler.h>
 #include <job_thread_pool.h>
 #include <utils/job_branch_and_bound.h>

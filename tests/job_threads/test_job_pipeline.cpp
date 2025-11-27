@@ -13,10 +13,6 @@
 using namespace job::threads;
 using namespace std::chrono_literals;
 
-
-using namespace job::threads;
-using namespace std::chrono_literals;
-
 TEST_CASE("JobPipeline connects stages linearly", "[threading][pipeline][linear]")
 {
     auto sched = std::make_shared<FifoScheduler>();
@@ -40,7 +36,7 @@ TEST_CASE("JobPipeline connects stages linearly", "[threading][pipeline][linear]
 
     // connector
     JobPipeline::connect(input, to_string_stage, sink);
-    input->post(42);
+    REQUIRE(input->post(42));
 
     // this again . . . . I will fix this soon lol
     int retries = 0;
@@ -78,7 +74,7 @@ TEST_CASE("JobPipeline handles Fan-Out", "[threading][pipeline][fanout]")
     // Fan-Out ? try at least
     JobPipeline::connectFanOut(source, std::vector{sinkA, sinkB});
 
-    source->post(10);
+    REQUIRE(source->post(10));
 
     // 10 + 10 = 20
     int retries = 0;
@@ -114,10 +110,10 @@ TEST_CASE("JobPipeline stage can filter messages with std::nullopt", "[threading
 
     JobPipeline::connect(input, evens, sink);
 
-    input->post(1);
-    input->post(2);
-    input->post(3);
-    input->post(4);
+    REQUIRE(input->post(1));
+    REQUIRE(input->post(2));
+    REQUIRE(input->post(3));
+    REQUIRE(input->post(4));
 
     int retries = 0;
     while (sum.load(std::memory_order_relaxed) < 6 && retries < 100) {
@@ -160,9 +156,9 @@ TEST_CASE("JobPipeline stage invokes error handler on exception", "[threading][p
 
     JobPipeline::connect(input, parse, sink);
 
-    input->post("10");
-    input->post("boom");  // throws
-    input->post("32");
+    REQUIRE(input->post("10"));
+    REQUIRE(input->post("boom"));  // throws
+    REQUIRE(input->post("32"));
 
     int retries = 0;
     while (sum.load() < 42 && retries < 200) {
@@ -203,7 +199,7 @@ TEST_CASE("JobPipeline processes many messages end-to-end", "[threading][pipelin
 
     constexpr int N = 1000;
     for (int i = 0; i < N; ++i)
-        input->post(i);
+        REQUIRE(input->post(i));
 
     // sum of squares: 0^2 + ... + (N-1)^2 = (N-1)N(2N-1)/6
     long long expected = static_cast<long long>(N - 1) * N * (2LL * N - 1) / 6;
@@ -216,14 +212,11 @@ TEST_CASE("JobPipeline processes many messages end-to-end", "[threading][pipelin
 
     REQUIRE(sum.load() == expected);
 
-    // Also check metrics
+    // might as well and check the metrics
     REQUIRE(square->getProcessedCount() == static_cast<size_t>(N));
     REQUIRE(square->getErrorCount() == 0);
 
     pool->shutdown();
 }
-
-
-
 
 // CHECKPOINT: v1.0

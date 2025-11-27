@@ -31,7 +31,7 @@ TEST_CASE("Euler Integrator: SHO(Simple harmonic oscillator) stays bounded and r
     particles[0].velocity     = {0.0f, 0.0f, 0.0f};
     particles[0].acceleration = {0.0f, 0.0f, 0.0f};
 
-    auto accel_calc = make_force_to_accel_adapter<Particle, Vec3f>(springForce,
+    auto accel_calc = makeForceToAccelAdapter<Particle, Vec3f>(springForce,
                                                                    [](const Particle &p) {
                                                                        return p.mass;
                                                                    },
@@ -92,7 +92,7 @@ TEST_CASE("Euler Integrator: Damped oscillator: energy should go down, not up", 
     particles[0].velocity     = {0.0f, 0.0f, 0.0f};
     particles[0].acceleration = {0.0f, 0.0f, 0.0f};
 
-    auto accel_calc = make_force_to_accel_adapter<Particle, Vec3f>(dampedSpringForce,
+    auto accel_calc = makeForceToAccelAdapter<Particle, Vec3f>(dampedSpringForce,
                                                                    [](const Particle &p) {
                                                                        return p.mass;
                                                                    },
@@ -252,7 +252,7 @@ TEST_CASE("Euler Integrator: 1st-order convergence", "[threading][science][euler
         ps[0].position = {1.0f, 0.0f, 0.0f};
         ps[0].velocity = {0.0f, 0.0f, 0.0f};
 
-        auto accel_calc = make_force_to_accel_adapter<Particle, Vec3f>( springForce,
+        auto accel_calc = makeForceToAccelAdapter<Particle, Vec3f>( springForce,
                                                                        [](const Particle &p) {
                                                                            return p.mass;
                                                                        },
@@ -336,7 +336,7 @@ TEST_CASE("Euler Integrator: handles many particles", "[threading][science][eule
         ps[i].velocity = {0.0f, 0.0f, 0.0f};
     }
 
-    auto accel_calc = make_force_to_accel_adapter<Particle, Vec3f>( springForce,
+    auto accel_calc = makeForceToAccelAdapter<Particle, Vec3f>( springForce,
                                                                    [](const Particle &p) {
                                                                        return p.mass;
                                                                    },

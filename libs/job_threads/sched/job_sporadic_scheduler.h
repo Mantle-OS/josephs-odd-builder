@@ -32,37 +32,33 @@ public:
 
 private:
     using SporadicDescPtr = JobSporadicDescriptor::Ptr;
-
     struct DeadlineComparator {
         bool operator()(const SporadicDescPtr& a, const SporadicDescPtr& b) const {
             return a->deadline() > b->deadline(); // earliest deadline at top
         }
     };
 
-    // admission check for ready jobs under EDF on 1 CPU. (Supply scales by m_capacity; for m>1 it's a safe—necessary—condition.)
-    bool canAdmitUnlocked(std::chrono::steady_clock::time_point now,
-                          std::chrono::steady_clock::time_point new_deadline,
-                          std::chrono::microseconds new_wcet) const;
-
-    // EDF queue of pending jobs
-    std::priority_queue<SporadicDescPtr, std::vector<SporadicDescPtr>, DeadlineComparator> m_queue;
-
-    // Jobs handed out by next() and not yet completed
-    std::unordered_map<uint64_t, SporadicDescPtr> m_inflight;
-
     // Reservations created by admit() and consumed by enqueue()
     struct Reservation {
         std::chrono::steady_clock::time_point   deadline;
         std::chrono::microseconds               wcet;
     };
-    std::unordered_map<uint64_t, Reservation> m_reserved;
 
-    unsigned m_capacity{1};
+    // admission check for ready jobs under EDF on 1 CPU. (Supply scales by m_capacity; for m > 1 it's a safe—necessary—condition.)
+    bool canAdmitUnlocked(std::chrono::steady_clock::time_point now,
+                          std::chrono::steady_clock::time_point new_deadline,
+                          std::chrono::microseconds new_wcet) const;
 
-    mutable std::mutex m_mutex;
-    std::condition_variable m_condition;
+    // EDF queue of pending jobs
+    std::priority_queue<SporadicDescPtr, std::vector<SporadicDescPtr>, DeadlineComparator> m_queue;    
+    // Jobs handed out by next() AKA and not yet completed
+    std::unordered_map<uint64_t, SporadicDescPtr>   m_inflight;
+    std::unordered_map<uint64_t, Reservation>       m_reserved;
+    unsigned                                        m_capacity{1};
+    mutable std::mutex                              m_mutex;
+    std::condition_variable                         m_condition;
 
 };
 
 } // namespace job::threads
-// CHECKLPOINT v1.1
+// CHECKPOINT v1.1

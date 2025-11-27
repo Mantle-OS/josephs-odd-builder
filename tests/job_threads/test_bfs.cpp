@@ -4,8 +4,9 @@
 #include <set>
 #include <mutex>
 
-#include <sched/job_fifo_scheduler.h>
 #include <job_thread_pool.h>
+#include <sched/job_fifo_scheduler.h>
+
 #include <utils/job_parallel_bfs.h>
 
 using namespace job::threads;
@@ -14,13 +15,7 @@ using namespace std::chrono_literals;
 TEST_CASE("parallel_bfs visits all reachable nodes level by level", "[threading][bfs][graph][basic]")
 {
     // Graph:
-    //
-    //  0 -> 1,2
-    //  1 -> 3
-    //  2 -> 3,4
-    //  3 -> (none)
-    //  4 -> 5
-    //  5 -> (none)
+    //  0 -> 1,2 | 1 -> 3 | 2 -> 3,4 | 3 -> (none) | 4 -> 5 | 5 -> (none)
     //
     // Levels from 0:
     //  depth 0: {0}
@@ -75,12 +70,8 @@ TEST_CASE("parallel_bfs visits all reachable nodes level by level", "[threading]
 TEST_CASE("parallel_bfs does not cross disconnected components", "[threading][bfs][graph][components]")
 {
     // Two components:
-    //
-    //  0 -> 1
-    //  1 -> (none)
-    //
-    //  2 -> 3
-    //  3 -> (none)
+    // 1)  0 -> 1 | 1 -> (none)
+    // 2)  2 -> 3 | 3 -> (none)
     std::vector<std::vector<std::size_t>> adj = {
         {1},  // 0
         {},   // 1
@@ -154,9 +145,7 @@ TEST_CASE("parallel_bfs returns correct depth and parent arrays", "[threading][b
 
 TEST_CASE("parallel_bfs returns correct depths and parents", "[threading][bfs][graph][meta]")
 {
-    // 0 -> 1,2
-    // 1 -> 3
-    // 2 -> 3
+    // 0 -> 1,2 | 1 -> 3 | 2 -> 3
     std::vector<std::vector<std::size_t>> adj = {
         {1, 2}, // 0
         {3},    // 1
@@ -187,12 +176,7 @@ TEST_CASE("parallel_bfs returns correct depths and parents", "[threading][bfs][g
 TEST_CASE("parallel_bfs visits each node at most once", "[threading][bfs][graph][uniq]")
 {
     // Graph with overlapping paths:
-    //
-    //  0 -> 1,2
-    //  1 -> 3
-    //  2 -> 3
-    //  3 -> 4
-    //  4 -> (none)
+    //  0 -> 1,2 | 1 -> 3 | 2 -> 3 | 3 -> 4 | 4 -> (none)
     //
     // Node 3 has two parents; we must still visit it only once.
 
@@ -288,12 +272,13 @@ TEST_CASE("parallel_bfs handles edge cases safely", "[threading][bfs][graph][edg
 TEST_CASE("parallel_bfs handles large graphs efficiently", "[threading][bfs][graph][stress]")
 {
     auto sched = std::make_shared<FifoScheduler>();
-    // I hope that there is 8  .....
+    // 8 threads
     auto pool  = ThreadPool::create(sched, 8);
 
     // BinTree 10 -> ~1024 nodes
     constexpr std::size_t kDepth = 10;
-    constexpr std::size_t kNodes = (1 << (kDepth + 1)) - 1;  // 2^11 - 1 = 2047 .... I think
+    constexpr std::size_t kNodes = (std::size_t{1} << (kDepth + 1)) - 1; // 2^11 - 1 = 2047
+
 
     std::vector<std::vector<std::size_t>> adj(kNodes);
     for (std::size_t i = 0; i < kNodes; ++i) {
@@ -317,3 +302,5 @@ TEST_CASE("parallel_bfs handles large graphs efficiently", "[threading][bfs][gra
     // We have been everywhere !
     REQUIRE(visitedCount == kNodes);
 }
+
+// CHECKPOINT v1.0

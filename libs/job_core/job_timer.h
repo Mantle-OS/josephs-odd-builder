@@ -20,19 +20,19 @@ public:
              std::function<void()> callback = nullptr) noexcept;
 
     [[nodiscard]] uint64_t id() const noexcept;
-    void set_id(uint64_t id);
+    void set_id(uint64_t id) noexcept;
 
     [[nodiscard]] bool repeat() const noexcept;
-    void set_repeat(bool repeat);
+    void set_repeat(bool repeat) noexcept;
 
     [[nodiscard]] bool isActive() const noexcept;
-    void set_isActive(bool isActive);
+    void set_isActive(bool isActive) noexcept;
 
     [[nodiscard]] TimePoint next() const noexcept;
-    void set_next(const TimePoint &next);
+    void set_next(const TimePoint &next) noexcept;
 
     [[nodiscard]] Duration interval() const noexcept;
-    void set_interval(const Duration &interval);
+    void set_interval(const Duration &interval) noexcept;
 
     [[nodiscard]] bool expired(const TimePoint &right_now = Clock::now()) const noexcept;
 

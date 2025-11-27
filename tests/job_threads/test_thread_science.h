@@ -100,6 +100,7 @@ struct Vec3f final {
     float x{0.0f};
     float y{0.0f};
     float z{0.0f};
+
     [[nodiscard]] constexpr Vec3f operator+(const Vec3f &o) const noexcept
     {
         return {x + o.x, y + o.y, z + o.z};
@@ -115,7 +116,8 @@ struct Vec3f final {
         return {x * s, y * s, z * s};
     }
 
-    [[nodiscard]] constexpr float length() const noexcept
+    // c++26 . . . . constexpr, noexcept
+    [[nodiscard]] float length() const
     {
         return std::sqrt(x * x + y * y + z * z);
     }
@@ -125,31 +127,14 @@ struct Vec3f final {
         return x * x + y * y + z * z;
     }
 
-    [[nodiscard]] constexpr Vec3f normalize() const noexcept
+    // c++26 . . . . constexpr, noexcept
+    [[nodiscard]] Vec3f normalize() const
     {
         const float len = length();
         if (len == static_cast<float>(0.0f))
             return *this;
         return {x / len, y / len, z / len};
     }
-
-    // [[nodiscard]] constexpr Vec3f vec_add(const Vec3f& a, const Vec3f& b)
-    // {
-    //     return a + b;
-    // }
-
-    // [[nodiscard]]  constexpr Vec3f vec_sub(const Vec3f& a, const Vec3f& b)
-    // {
-    //     return a - b;
-    // }
-    // [[nodiscard]]  constexpr Vec3f vec_mul(const Vec3f& v, float s)
-    // {
-    //     return v * s;
-    // }
-    // [[nodiscard]] constexpr float vec_len_sq(const Vec3f& v)
-    // {
-    //     return v.lengthSq();
-    // }
 
 };
 #pragma pack(pop)
@@ -202,8 +187,27 @@ inline void dampedSpringForce(const std::vector<Particle> &particles,
 }
 
 
+// Calculate Total Energy (E = K + U) for simple spring (U = 0.5 * k * x^2)
+inline double calculateTotalEnergy(const std::vector<Particle> &particles, float k_spring)
+{
+    double total_E = 0.0;
+    for (const auto &p : particles) {
+        // Kinetic Energy: K = 0.5 * m * v^2
+        double v_sq = p.velocity.lengthSq();
+        double K = 0.5 * p.mass * v_sq;
 
+        // Potential Energy (Spring): U = 0.5 * k * x^2 (assuming origin is equilibrium)
+        // Note: position is Vec3f, so x^2 is lengthSq()
+        double dist_sq = p.position.lengthSq();
+        double U = 0.5 * k_spring * dist_sq;
+
+        total_E += (K + U);
+    }
+    return total_E;
+}
 
 
 
 } // namespace job::threads
+
+// CHECKPOINT v1.2

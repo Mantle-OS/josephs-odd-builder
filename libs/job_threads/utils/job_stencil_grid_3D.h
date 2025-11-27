@@ -95,17 +95,17 @@ public:
         return m_buffers[m_front].data();
     }
 
-    [[nodiscard]] int width() const
+    [[nodiscard]] int width() const noexcept
     {
         return m_width;
     }
 
-    [[nodiscard]] int height() const
+    [[nodiscard]] int height() const noexcept
     {
         return m_height;
     }
 
-    [[nodiscard]] int depth() const
+    [[nodiscard]] int depth() const noexcept
     {
         return m_depth;
     }

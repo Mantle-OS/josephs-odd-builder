@@ -1,5 +1,5 @@
 add_subdirectory(job_core)
-add_subdirectory(job_threads)  ## what we will be injesting.
+add_subdirectory(job_threads)
 add_subdirectory(job_crypto)
 add_subdirectory(job_io)
 add_subdirectory(job_uart)

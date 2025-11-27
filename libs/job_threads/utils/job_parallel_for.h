@@ -27,7 +27,7 @@ void parallel_for(ThreadPool &pool, Index first, Index last, Func f,
 
     for (Index i = first; i < last; ) {
         Index chunk_end = static_cast<Index>(std::min<std::size_t>(i + g, last));
-                futs.emplace_back(pool.submit(priority, [i, chunk_end, f]{
+        futs.emplace_back(pool.submit(priority, [i, chunk_end, f]{
 
             for (Index j = i; j < chunk_end; ++j)
                 f(j);

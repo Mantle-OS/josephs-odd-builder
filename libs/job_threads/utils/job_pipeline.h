@@ -66,7 +66,6 @@ public:
             connect(next, rest...);
     }
 
-
     template <typename Head, typename Next>
     static void connectFanOut(std::shared_ptr<Head> head, const std::vector<std::shared_ptr<Next>>& nexts)
     {
@@ -85,7 +84,6 @@ public:
             }
         }
     }
-
 
     void clear()
     {

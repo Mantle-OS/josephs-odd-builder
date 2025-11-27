@@ -31,8 +31,8 @@ TEST_CASE("RK4 Integrator: Simple Harmonic Oscillator (Accuracy Check)", "[threa
     particles[0].velocity = {0.0f, 0.0f, 0.0f};
     particles[0].acceleration = {0.0f, 0.0f, 0.0f};
 
-    // Force -> Accel ???
-    auto accel_calc = make_force_to_accel_adapter<Particle, Vec3f>(springForce,
+    // Force -> Accel
+    auto accel_calc = makeForceToAccelAdapter<Particle, Vec3f>(springForce,
                                                                    [](const Particle &p) {
                                                                        return p.mass;
                                                                    },
@@ -54,7 +54,7 @@ TEST_CASE("RK4 Integrator: Simple Harmonic Oscillator (Accuracy Check)", "[threa
                                                         accel_calc
                                                         );
 
-    // Analytical solution: x(t) = A * cos(sqrt(k/m) * t) | k=1, m=1 -> omega = 1. Period = 2*PI. ?? I THINK ???
+    // Analytical solution: x(t) = A * cos(sqrt(k/m) * t) | k=1, m=1 -> omega = 1. Period = 2*PI.
     const float dt = 0.01f;
     const float target_time = 2.0f * std::numbers::pi_v<float>;
     const int steps = static_cast<int>(std::ceil(target_time / dt));
@@ -84,7 +84,7 @@ TEST_CASE("RK4 Integrator: Damped Oscillator (Velocity Dependent estimates)", "[
     particles[0].position = {1.0f, 0.0f, 0.0f};
     particles[0].velocity = {0.0f, 0.0f, 0.0f};
 
-    auto accel_calc = make_force_to_accel_adapter<Particle, Vec3f>(dampedSpringForce,
+    auto accel_calc = makeForceToAccelAdapter<Particle, Vec3f>(dampedSpringForce,
                                                                    [](const Particle &p) {
                                                                        return p.mass;
                                                                    },
@@ -122,7 +122,7 @@ TEST_CASE("RK4 Integrator: Damped Oscillator (Velocity Dependent estimates)", "[
     // Start was 1.0. End should be significantly less, but oscillating
     REQUIRE(std::abs(p.position.x) < 0.9f);
 
-    // Energy check: Kinetic + Potential should strictly decrease ???
+    // Energy check: Kinetic + Potential should strictly decrease
     float energy = 0.5f * p.velocity.lengthSq() + 0.5f * p.position.lengthSq();
 
     // Started with 0.5J (0.5 * k * x/\2)
@@ -138,8 +138,6 @@ TEST_CASE("RK4 Integrator: error shrinks with timestep (convergence)", "[threadi
     // Culprit: “finite precision, long time, and a slightly overconfident assertion”.
     // Cause of Death: Mistaken identity—victim is alive and well!
     // Culprit: Detective's paranoia (me) and initial timestep choices
-
-
     auto make_sim = [&](float dt) {
         auto sched = std::make_shared<FifoScheduler>();
         auto pool  = ThreadPool::create(sched, 4);
@@ -149,7 +147,7 @@ TEST_CASE("RK4 Integrator: error shrinks with timestep (convergence)", "[threadi
         ps[0].position = {1.0f, 0.0f, 0.0f};
         ps[0].velocity = {0.0f, 0.0f, 0.0f};
 
-        auto accel_calc = make_force_to_accel_adapter<Particle, Vec3f>(springForce,
+        auto accel_calc = makeForceToAccelAdapter<Particle, Vec3f>(springForce,
                                                                        [](const Particle &p) {
                                                                            return p.mass;
                                                                        },
@@ -276,7 +274,7 @@ TEST_CASE("RK4 Integrator: handles many particles", "[threading][science][rk4][s
         ps[i].velocity  = {0.0f, 0.0f, 0.0f};
     }
 
-    auto accel_calc = make_force_to_accel_adapter<Particle, Vec3f>(springForce,
+    auto accel_calc = makeForceToAccelAdapter<Particle, Vec3f>(springForce,
                                                                    [](const Particle &p) {
                                                                        return p.mass;
                                                                    },

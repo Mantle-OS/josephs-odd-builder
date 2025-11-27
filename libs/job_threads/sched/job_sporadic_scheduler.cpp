@@ -197,4 +197,4 @@ bool JobSporadicScheduler::canAdmitUnlocked(std::chrono::steady_clock::time_poin
 }
 
 } // namespace job::threads
-// CHECKLPOINT v1.1
+// CHECKPOINT v1.1

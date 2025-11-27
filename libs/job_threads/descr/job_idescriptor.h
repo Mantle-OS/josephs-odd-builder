@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <memory>
 
-// This is meant to be a inhherited(always) !!
+// This is meant to be a inhherited(always) Not a real interface!!
 
 namespace job::threads  {
 class JobIDescriptor {

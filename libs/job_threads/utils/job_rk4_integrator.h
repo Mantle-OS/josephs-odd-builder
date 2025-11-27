@@ -5,6 +5,7 @@
 // #include <type_traits>
 
 #include <job_logger.h>
+
 #include "job_thread_pool.h"
 #include "utils/job_parallel_for.h"
 #include "utils/job_verlet_concepts.h"
@@ -23,12 +24,7 @@ public:
     using AccessorFunc    = std::function<T_Vec&(T_Particle&)>;
     using AccelCalculator = std::function<void(std::vector<T_Particle>&)>;
 
-    JobRK4Integrator(ThreadPool::Ptr pool,
-                     std::vector<T_Particle> *particles,
-                     AccessorFunc getPos,
-                     AccessorFunc getVel,
-                     AccessorFunc getAcc,
-                     AccelCalculator accelCalc) :
+    JobRK4Integrator(ThreadPool::Ptr pool, std::vector<T_Particle> *particles, AccessorFunc getPos, AccessorFunc getVel, AccessorFunc getAcc, AccelCalculator accelCalc) :
         m_pool(std::move(pool)),
         m_particles(particles),
         m_getPos(std::move(getPos)),
@@ -37,10 +33,11 @@ public:
         m_accelCalc(std::move(accelCalc))
     {
 
-        if (!m_pool || !m_particles || m_particles->empty()){
+        if (!m_pool)
             JOB_LOG_WARN("[JobRK4Integrator] ThreadPool is null!");
-            return;
-        }
+
+        if (!m_particles)
+            JOB_LOG_WARN("[JobRK4Integrator] particles pointer is null (step() will no-op).");
         //NOTE: in c++26 we can check reflections to make sure that there are infact the needed memebers. CAN NOT WAIT !!!!
     }
 
@@ -48,6 +45,11 @@ public:
     {
         if (!m_particles || m_particles->empty())
             return;
+
+        if (!(dt > T_Scalar(0))) {
+            JOB_LOG_WARN("[JobRK4Integrator] Non-positive dt: {}", dt);
+            return;
+        }
 
         const std::size_t N = m_particles->size();
         resizeScratch(N);

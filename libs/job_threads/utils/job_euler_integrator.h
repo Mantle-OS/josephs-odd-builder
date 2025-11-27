@@ -33,12 +33,7 @@ public:
     using AccessorFunc    = std::function<T_Vec &(T_Particle &)>;
     using AccelCalculator = std::function<void(std::vector<T_Particle> &)>;
 
-    JobEulerIntegrator(ThreadPool::Ptr pool,
-                       std::vector<T_Particle> *particles,
-                       AccessorFunc getPos,
-                       AccessorFunc getVel,
-                       AccessorFunc getAcc,
-                       AccelCalculator accelCalc) :
+    JobEulerIntegrator(ThreadPool::Ptr pool, std::vector<T_Particle> *particles, AccessorFunc getPos, AccessorFunc getVel, AccessorFunc getAcc, AccelCalculator accelCalc) :
         m_pool(std::move(pool)),
         m_particles(particles),
         m_getPos(std::move(getPos)),
@@ -55,13 +50,21 @@ public:
         if (!m_particles || m_particles->empty())
             return;
 
+        if (!(dt > T_Scalar(0))) {
+            JOB_LOG_WARN("[JobEulerIntegrator] Non-positive dt: {}", dt);
+            return;
+        }
+
         if (!m_pool) {
             stepSerial(dt);
             return;
         }
 
         // F = m a → refresh acceleration for this frame
-        m_accelCalc(*m_particles);
+        if (m_accelCalc)
+            m_accelCalc(*m_particles);
+        else
+            JOB_LOG_WARN("[JobEulerIntegrator] AccelCalculator is null; skipping step.");
 
         auto &ps = *m_particles;
         const std::size_t N = ps.size();

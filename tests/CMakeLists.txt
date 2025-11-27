@@ -1,3 +1,4 @@
+set(TEST_SPIN_TILL test_spin_till.h )
 add_subdirectory(job_core)
 add_subdirectory(job_threads)
 add_subdirectory(job_crypto)

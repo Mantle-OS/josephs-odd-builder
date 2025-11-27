@@ -129,11 +129,5 @@ private:
 // CHECKPOINT: v1.3
 
 
-
-// backlog cleanup:
-// Add a separate std::atomic<double> m_loadAvg{0.0};
-// Make updateLoadAverage read some “instantaneous load” (queue size, active workers, etc.) and update m_loadAvg.
-// Have snapshotMetrics() fill metrics.loadAvg from that.
-
-
-
+// While the m_storageMutex protects the m_taskStorage, it's clear this lock contention, with every task needing multiple acquisitions, presents a bottleneck. For v1, this is acceptable, but I acknowledge that it is a future optimization.
+// The Fix (Later): Sharded maps. m_taskStorage[id % 16] with 16 mutexes.

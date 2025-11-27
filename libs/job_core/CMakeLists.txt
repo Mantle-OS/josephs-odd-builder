@@ -3,10 +3,6 @@ project(JosephOddBuild_Core
     DESCRIPTION "Core Lib for Joseph's Odd Builder"
     LANGUAGES CXX
 )
-set(CMAKE_CXX_STANDARD 23)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
-
 
 set(JOBCORE_SOURCES
     job_timer.cpp
@@ -32,7 +28,7 @@ set_target_properties(JosephsOddBuilder_Core PROPERTIES
 
 target_include_directories(JosephsOddBuilder_Core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/>
-    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobcore/>
 )
 
 install(TARGETS JosephsOddBuilder_Core

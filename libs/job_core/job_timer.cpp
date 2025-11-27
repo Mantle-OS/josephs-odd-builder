@@ -22,7 +22,7 @@ uint64_t JobTimer::id() const noexcept
     return m_id;
 }
 
-void JobTimer::set_id(uint64_t id)
+void JobTimer::set_id(uint64_t id) noexcept
 {
     m_id = id;
 }
@@ -32,7 +32,7 @@ bool JobTimer::repeat() const noexcept
     return m_repeat;
 }
 
-void JobTimer::set_repeat(bool repeat)
+void JobTimer::set_repeat(bool repeat) noexcept
 {
     m_repeat = repeat;
 }
@@ -42,16 +42,16 @@ bool JobTimer::isActive() const noexcept
     return m_active;
 }
 
-void JobTimer::set_isActive(bool isActive){
+void JobTimer::set_isActive(bool isActive) noexcept {
     m_active = isActive;
 }
 
-void JobTimer::set_next(const TimePoint &next)
+void JobTimer::set_next(const TimePoint &next) noexcept
 {
     m_nextFire = next;
 }
 
-void JobTimer::set_interval(const Duration &interval)
+void JobTimer::set_interval(const Duration &interval) noexcept
 {
     m_interval = interval;
 }

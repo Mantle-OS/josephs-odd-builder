@@ -186,6 +186,12 @@ TEST_CASE("reconstruct_path returns empty for unreachable vertex", "[threading][
     REQUIRE(path.empty());
 }
 
+
+
+
+
+// RE-write
+
 TEST_CASE("parallel_dijkstra handles edge cases safely", "[threading][graph][dijkstra][edge]")
 {
     auto sched = std::make_shared<FifoScheduler>();
@@ -219,7 +225,7 @@ TEST_CASE("parallel_dijkstra handles edge cases safely", "[threading][graph][dij
                                                 ++calls;
                                             });
 
-        REQUIRE(res.distance.size() == 2);
+        REQUIRE(res.distance.size() == 2); // regression
         REQUIRE(res.parent.size()   == 2);
 
         // All distances remain +inf, parents remain SIZE_MAX hopefully
@@ -233,7 +239,7 @@ TEST_CASE("parallel_dijkstra handles edge cases safely", "[threading][graph][dij
 
     pool->shutdown();
 }
-
+// RE-write
 TEST_CASE("parallel_dijkstra scales on a larger tree-shaped graph", "[threading][graph][dijkstra][stress]")
 {
     auto sched = std::make_shared<FifoScheduler>();

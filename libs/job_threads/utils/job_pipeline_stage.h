@@ -17,13 +17,14 @@ class JobPipelineStage : public JobThreadActor<In> {
 public:
     using ProcessFunc = std::function<std::optional<Out>(In&&)>;
     using ErrorFunc   = std::function<void(const std::exception&, const In&)>;
-    using NextBase   = JobThreadActor<Out>;
+    using NextBase    = JobThreadActor<Out>;
     using NextPtr     = std::shared_ptr<NextBase>;
     using InputType   = In;
     using OutputType  = Out;
 
 
-    JobPipelineStage(ThreadPool::Ptr pool, ProcessFunc process, size_t mailboxCap = 1024) : JobThreadActor<In>(std::move(pool), mailboxCap), m_process(std::move(process))
+    JobPipelineStage(ThreadPool::Ptr pool, ProcessFunc process, size_t mailboxCap = 1024) :
+        JobThreadActor<In>(std::move(pool), mailboxCap), m_process(std::move(process))
     {
 
     }
@@ -70,9 +71,14 @@ protected:
             if (!out.has_value())
                 return;
 
-            for (const auto &weakNext : m_next)
-                if (auto next = weakNext.lock())
-                    next->post(*out, 0);
+            for (const auto &weakNext : m_next) {
+                if (auto next = weakNext.lock()) {
+                    if (!next->post(*out, 0)) {
+                        JOB_LOG_WARN("[JobPipelineStage] Downstream actor rejected message (mailbox closed or full?).");
+                        // TODO track this. .
+                    }
+                }
+            }
 
         } catch (const std::exception &e) {
             m_errorCount.fetch_add(1, std::memory_order_relaxed);

@@ -132,7 +132,7 @@ TEST_CASE("JobSporadicScheduler Stop wakes next() when queue is empty", "[sporad
     std::atomic<bool> awakened{false};
 
     std::thread waiter([&]{
-         // block until stop()
+        // block until stop()
         auto id = sched.next(0);
         REQUIRE_FALSE(id.has_value());
         awakened.store(true);
@@ -203,3 +203,5 @@ TEST_CASE("JobSporadicScheduler admits tasks based on m_capacity > 1", "[threadi
     REQUIRE(sched->admit(2, *descD_pass) == true);
     INFO("Correctly admitted Task D with earlier deadline");
 }
+
+// CHECKPOINT v1.0

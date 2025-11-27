@@ -25,9 +25,8 @@ static float vec_rel_error(const Vec3f &a, const Vec3f &b)
     return num / denom;
 }
 
-// Direct N/\2 gravitational force on particle i (softened)
-static Vec3f direct_force_on(const std::vector<Particle> &ps,
-                             std::size_t i, float G, float eps2)
+// Direct N^2 gravitational force on particle i (softened)
+static Vec3f direct_force_on(const std::vector<Particle> &ps, std::size_t i, float G, float eps2)
 {
     const Particle &pi = ps[i];
     Vec3f F{0.0f, 0.0f, 0.0f};
@@ -52,25 +51,29 @@ static Vec3f direct_force_on(const std::vector<Particle> &ps,
 TEST_CASE("Barnes-Hut matches direct force for 2-body with tiny theta", "[barnes_hut][gravity]")
 {
     auto sched = std::make_shared<JobSporadicScheduler>();
-    auto pool  = ThreadPool::create(sched, 1, JobThreadOptions::normal());
+    auto pool  = ThreadPool::create(sched, 1);
     REQUIRE(pool != nullptr);
 
     std::vector<Particle> ps(2);
 
     ps[0].id        = 1;
-    ps[0].position  = Vec3f{-1.0f, 0.0f, 0.0f};
+    ps[0].position  = Vec3f{ -1.0f, 0.0f, 0.0f };
     ps[0].mass      = 1.0f;
     // Particle 2
     ps[1].id        = 2;
-    ps[1].position  = Vec3f{ 1.0f, 0.0f, 0.0f};
+    ps[1].position  = Vec3f{ 1.0f, 0.0f, 0.0f };
     ps[1].mass      = 2.0f;
 
-    auto get_pos = [](const Particle &p) -> const Vec3f& { return p.position; };
-    auto get_mass = [](const Particle &p) -> float { return p.mass; };
+    auto get_pos = [](const Particle &p) -> const Vec3f& {
+        return p.position;
+    };
+    auto get_mass = [](const Particle &p) -> float {
+        return p.mass;
+    };
 
     const float G = 1.0f;
     const float eps2 = 1e-6f;
-    const float theta = 1e-6f;  // so small
+    const float theta = 1e-6f;  // Look at this tiny little fella (small)
 
     BarnesHutForceCalculator<Particle, Vec3f, float> bh(pool, get_pos, get_mass, theta, G, eps2);
 
@@ -92,11 +95,10 @@ TEST_CASE("Barnes-Hut matches direct force for 2-body with tiny theta", "[barnes
     REQUIRE(sum_norm < 1e-4f * std::max(1.0f, scale));
 }
 
-TEST_CASE("Barnes-Hut approximates direct forces for small cluster", "[barnes_hut][gravity]")
+TEST_CASE("Barnes-Hut approximates direct forces for small cluster two threads", "[barnes_hut][gravity]")
 {
     auto sched = std::make_shared<JobSporadicScheduler>();
-    auto pool  = ThreadPool::create(sched, /*threadCount=*/2,
-                                   JobThreadOptions::normal());
+    auto pool  = ThreadPool::create(sched, 2);
     REQUIRE(pool != nullptr);
 
     std::vector<Particle> ps;
@@ -133,8 +135,12 @@ TEST_CASE("Barnes-Hut approximates direct forces for small cluster", "[barnes_hu
         .mass = 3.0f
     });
 
-    auto get_pos = [](const Particle &p) -> const Vec3f& { return p.position; };
-    auto get_mass = [](const Particle &p) -> float{ return p.mass; };
+    auto get_pos = [](const Particle &p) -> const Vec3f& {
+        return p.position;
+    };
+    auto get_mass = [](const Particle &p) -> float {
+        return p.mass;
+    };
 
     const float G     = 1.0f;
     const float eps2  = 1e-4f;
@@ -161,11 +167,15 @@ TEST_CASE("Barnes-Hut approximates direct forces for small cluster", "[barnes_hu
 TEST_CASE("Barnes-Hut: empty and single-particle are safe", "[barnes_hut][edge]")
 {
     auto sched = std::make_shared<JobSporadicScheduler>();
-    auto pool  = ThreadPool::create(sched, 1, JobThreadOptions::normal());
+    auto pool  = ThreadPool::create(sched, 1);
     REQUIRE(pool != nullptr);
 
-    auto get_pos = [](const Particle &p) -> const Vec3f& { return p.position; };
-    auto get_mass = [](const Particle &p) -> float { return p.mass; };
+    auto get_pos = [](const Particle &p) -> const Vec3f& {
+        return p.position;
+    };
+    auto get_mass = [](const Particle &p) -> float {
+        return p.mass;
+    };
 
     BarnesHutForceCalculator<Particle, Vec3f, float> bh(pool, get_pos, get_mass, 0.5f, 1.0f, 1e-4f);
 
@@ -174,17 +184,84 @@ TEST_CASE("Barnes-Hut: empty and single-particle are safe", "[barnes_hut][edge]"
     bh.calculate_forces(ps, F);
     REQUIRE(F.empty());
 
-    ps.push_back(Particle{ .id=1, .position=Vec3f{0.0f,0.0f,0.0f}, .radius=1.0f, .mass=1.0f });
+    ps.push_back(Particle{
+        .id=1,
+        .position=Vec3f{0.0f,0.0f,0.0f},
+        .radius=1.0f,
+        .mass=1.0f
+    });
     bh.calculate_forces(ps, F);
     REQUIRE(F.size() == 1);
     REQUIRE(F[0].lengthSq() == Catch::Approx(0.0f).margin(1e-8f));
 }
 
-TEST_CASE("Barnes-Hut approximates direct forces for small cluster", "[barnes_hut][gravity][momentum]")
+TEST_CASE("Barnes-Hut handles many particles at identical positions (no kablamo)", "[barnes_hut][degenerate]")
 {
     auto sched = std::make_shared<JobSporadicScheduler>();
-    auto pool  = ThreadPool::create(sched, /*threadCount=*/2,
-                                   JobThreadOptions::normal());
+    auto pool  = ThreadPool::create(sched, 2);
+    REQUIRE(pool != nullptr);
+
+    // N particles, all at exactly the same position
+    std::vector<Particle> ps;
+    const std::size_t N = 16;
+    ps.reserve(N);
+
+    for (std::size_t i = 0; i < N; ++i) {
+        Particle p{};
+        p.id       = static_cast<uint64_t>(i + 1);
+        p.position = Vec3f{0.0f, 0.0f, 0.0f};
+        p.radius   = 1.0f;
+        p.mass     = 1.0f + static_cast<float>(i) * 0.1f; // slightly different masses
+        ps.push_back(p);
+    }
+
+    auto get_pos = [](const Particle &p) -> const Vec3f& {
+        return p.position;
+    };
+    auto get_mass = [](const Particle &p) -> float {
+        return p.mass;
+    };
+
+    const float G     = 1.0f;
+    const float eps2  = 1e-4f;
+    const float theta = 0.5f;   // normal-ish theta; we care about robustness, not strict accuracy here
+
+    BarnesHutForceCalculator<Particle, Vec3f, float> bh(pool, get_pos, get_mass, theta, G, eps2);
+
+    std::vector<Vec3f> F_bh;
+    bh.calculate_forces(ps, F_bh);
+    pool->shutdown();
+
+    REQUIRE(F_bh.size() == ps.size());
+
+    // Compare to direct softened forces. In this perfect “all at same spot” case,
+    // both Barnes–Hut and direct should produce ~zero force for every particle.
+    for (std::size_t i = 0; i < ps.size(); ++i) {
+        Vec3f F_direct = direct_force_on(ps, i, G, eps2);
+
+        // Sanity checks: no NaNs / inf
+        REQUIRE(std::isfinite(F_bh[i].x));
+        REQUIRE(std::isfinite(F_bh[i].y));
+        REQUIRE(std::isfinite(F_bh[i].z));
+
+        float err = vec_rel_error(F_bh[i], F_direct);
+        INFO("i=" << i
+                  << " |F_bh|=" << std::sqrt(F_bh[i].lengthSq())
+                  << " |F_direct|=" << std::sqrt(F_direct.lengthSq())
+                  << " rel_error=" << err);
+
+        REQUIRE(err < 1e-5f);
+
+        // And both should be essentially zero in magnitude
+        REQUIRE(F_bh[i].lengthSq()     == Catch::Approx(0.0f).margin(1e-6f));
+        REQUIRE(F_direct.lengthSq()    == Catch::Approx(0.0f).margin(1e-6f));
+    }
+}
+
+TEST_CASE("Barnes-Hut approximates direct forces for small cluster two threads", "[barnes_hut][gravity][momentum]")
+{
+    auto sched = std::make_shared<JobSporadicScheduler>();
+    auto pool  = ThreadPool::create(sched, 2);
     REQUIRE(pool != nullptr);
 
     std::vector<Particle> ps;
@@ -222,15 +299,18 @@ TEST_CASE("Barnes-Hut approximates direct forces for small cluster", "[barnes_hu
         .mass = 3.0f
     });
 
-    auto get_pos  = [](const Particle& p) -> const Vec3f& { return p.position; };
-    auto get_mass = [](const Particle& p) -> float       { return p.mass; };
+    auto get_pos  = [](const Particle &p) -> const Vec3f& {
+        return p.position;
+    };
+    auto get_mass = [](const Particle &p) -> float {
+        return p.mass;
+    };
 
     const float G     = 1.0f;
     const float eps2  = 1e-4f;
     const float theta = 0.5f;
 
-    BarnesHutForceCalculator<Particle, Vec3f, float> bh(pool, get_pos, get_mass,
-                                                        theta, G, eps2);
+    BarnesHutForceCalculator<Particle, Vec3f, float> bh(pool, get_pos, get_mass, theta, G, eps2);
 
     std::vector<Vec3f> F_bh;
     bh.calculate_forces(ps, F_bh);
@@ -261,3 +341,6 @@ TEST_CASE("Barnes-Hut approximates direct forces for small cluster", "[barnes_hu
     REQUIRE(sum_direct.length() < 1e-4f * std::max(1.0f, force_scale));
     REQUIRE(vec_rel_error(sum_bh, sum_direct) < 1e-2f);
 }
+
+
+// CHECKPOINT v1.2

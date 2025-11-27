@@ -55,6 +55,7 @@ private:
     pthread_t           m_pthread{};
     std::stop_source    m_stopSource;
     bool                m_joinable{false};
+    std::atomic_flag    m_starting{false};
 };
 
 } // namespace job::threads

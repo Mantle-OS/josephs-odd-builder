@@ -2,6 +2,7 @@
 #include <iomanip>
 #include <iostream>
 #include <iosfwd>
+#include <sstream>
 
 namespace job::core {
 
@@ -71,4 +72,4 @@ std::string JobLogger::timestamp() const
 }
 
 } // namespace job::core
-// CHECKPOINT: v1
+// CHECKPOINT: v1.0

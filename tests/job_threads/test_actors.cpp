@@ -13,6 +13,7 @@
 using namespace job::threads;
 using namespace std::chrono_literals;
 
+// Classes
 class EchoActor : public JobThreadActor<std::string> {
 public:
     using JobThreadActor::JobThreadActor;
@@ -48,6 +49,29 @@ protected:
     }
 };
 
+
+class LifecycleActor : public JobThreadActor<int> {
+public:
+    LifecycleActor(ThreadPool::Ptr pool, std::shared_ptr<std::atomic<bool>> flag) :
+        JobThreadActor(std::move(pool)),
+        m_flag(std::move(flag))
+    {
+    }
+
+protected:
+    void onMessage(int &&) override
+    {
+        std::this_thread::sleep_for(10ms);
+        m_flag->store(true);
+    }
+
+private:
+    std::shared_ptr<std::atomic<bool>> m_flag;
+};
+
+// End Classes
+
+
 TEST_CASE("Actor processes basic messages", "[threading][actor][basic]")
 {
     auto sched = std::make_shared<FifoScheduler>();
@@ -58,7 +82,7 @@ TEST_CASE("Actor processes basic messages", "[threading][actor][basic]")
 
     auto future = actor->getNextMessage();
 
-    actor->post("Hello World");
+    REQUIRE(actor->post("Hello World"));
 
     REQUIRE(future.wait_for(100ms) == std::future_status::ready);
     REQUIRE(future.get() == "Hello World");
@@ -69,14 +93,14 @@ TEST_CASE("Actor processes basic messages", "[threading][actor][basic]")
 TEST_CASE("Actor handles high volume (Testing Batching)", "[threading][actor][load]")
 {
     auto sched = std::make_shared<FifoScheduler>();
-    auto pool = ThreadPool::create(sched, 4); // 4 threads
+    auto pool = ThreadPool::create(sched, 4);
 
     auto actor = std::make_shared<CounterActor>(pool);
 
     constexpr int kTotalMessages = 10000;
 
     for (int i = 0; i < kTotalMessages; ++i)
-        actor->post(1);
+        REQUIRE(actor->post(1));
 
     int retries = 0;
     while (actor->counter.load() < kTotalMessages && retries < 100) {
@@ -96,27 +120,8 @@ TEST_CASE("Actor stays alive to process pending messages", "[threading][actor][l
     auto message_processed = std::make_shared<std::atomic<bool>>(false);
 
     {
-        class LifecycleActor : public JobThreadActor<int> {
-        public:
-            LifecycleActor(ThreadPool::Ptr pool, std::shared_ptr<std::atomic<bool>> flag)
-                : JobThreadActor(std::move(pool))
-                , m_flag(std::move(flag))
-            {
-            }
-
-        protected:
-            void onMessage(int &&) override
-            {
-                std::this_thread::sleep_for(10ms);
-                m_flag->store(true);
-            }
-
-        private:
-            std::shared_ptr<std::atomic<bool>> m_flag;
-        };
-
         auto actor = std::make_shared<LifecycleActor>(pool, message_processed);
-        actor->post(1);
+        REQUIRE(actor->post(1));
     }
 
     int retries = 0;
@@ -139,7 +144,7 @@ TEST_CASE("Actor yields thread after batch limit", "[threading][actor][cooperati
     std::atomic<bool> otherTaskRan{false};
 
     for(int i=0; i<50; ++i)
-        busyActor->post(1);
+        REQUIRE(busyActor->post(1));
 
     pool->submit([&]() {
         otherTaskRan.store(true);
@@ -161,4 +166,4 @@ TEST_CASE("Actor yields thread after batch limit", "[threading][actor][cooperati
     pool->shutdown();
 }
 
-// CHECKPOINT: v1.0
+// CHECKPOINT: v1.1

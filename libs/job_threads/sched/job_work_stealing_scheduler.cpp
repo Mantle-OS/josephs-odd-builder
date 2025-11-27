@@ -1,6 +1,8 @@
 #include "job_work_stealing_scheduler.h"
 #include <memory>
+
 #include <job_logger.h>
+
 namespace job::threads {
 
 JobWorkStealingScheduler::JobWorkStealingScheduler(std::size_t workerCount, std::size_t cap)

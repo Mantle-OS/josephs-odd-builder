@@ -38,6 +38,7 @@ struct BranchAndBoundResult {
 
 namespace detail {
 
+#if 0
 // Not used ATM maybe later
 // Helper to atomic-min a float/double/int
 template <typename T>
@@ -48,7 +49,7 @@ void atomicUpdateMin(std::atomic<T> &atom, T val)
         // Spin until we win the race or realize we lost this game
     }
 }
-
+#endif
 template <typename State, typename Cost>
 struct BnbContext {
     std::atomic<Cost>                           bestCost;

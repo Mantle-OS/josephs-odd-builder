@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.16)
 
 add_executable(test_job_core
+    ../test_spin_till.h
     main.cpp
     test_timer.cpp
     test_logger.cpp

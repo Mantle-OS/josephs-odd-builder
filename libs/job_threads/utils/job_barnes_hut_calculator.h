@@ -41,10 +41,20 @@ public:
 
     void calculate_forces(const std::vector<T_Particle>& particles, std::vector<T_Vec>& out_forces)
     {
-        if (particles.empty())
+        if (particles.empty()) {
+            out_forces.clear();
             return;
+        }
+
+        if (!m_pool) {
+            JOB_LOG_ERROR("[BarnesHutForceCalculator] ThreadPool is null; returning zero forces.");
+            out_forces.assign(particles.size(), T_Vec{});
+            return;
+        }
 
         out_forces.resize(particles.size());
+
+
         auto bounds = findBoundingBox(particles);
         auto tree = std::make_unique<Tree>(bounds.min, bounds.max, m_get_pos, m_get_mass);
         for (const auto& p : particles)

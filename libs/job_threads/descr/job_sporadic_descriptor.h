@@ -10,27 +10,25 @@ using namespace std::chrono_literals;
 class JobSporadicDescriptor : public JobTaskDescriptor {
 public:
     using Ptr = std::shared_ptr<JobSporadicDescriptor>;
-    using TimePoint = std::chrono::steady_clock::time_point;
-    using Duration = std::chrono::microseconds;
-    JobSporadicDescriptor( uint64_t id, int priority, TimePoint deadline, Duration wcet) :
+    JobSporadicDescriptor( uint64_t id, int priority, std::chrono::steady_clock::time_point deadline, std::chrono::microseconds wcet) :
         JobTaskDescriptor(id, priority),
         m_deadline(deadline),
         m_wcet(wcet)
     {
     }
 
-    [[nodiscard]] TimePoint deadline() const noexcept
+    [[nodiscard]] std::chrono::steady_clock::time_point deadline() const noexcept
     {
         return m_deadline;
     }
-    [[nodiscard]] Duration wcet() const noexcept
+    [[nodiscard]] std::chrono::microseconds wcet() const noexcept
     {
             return m_wcet;
     }
 
     [[nodiscard]] double utilization() const noexcept
     {
-        auto relativeDeadline = std::chrono::duration_cast<Duration>(
+        auto relativeDeadline = std::chrono::duration_cast<std::chrono::microseconds>(
             m_deadline - std::chrono::steady_clock::now()
             );
 
@@ -42,8 +40,8 @@ public:
     }
 
 private:
-    TimePoint m_deadline;
-    Duration  m_wcet; // worst case elipsed time
+    std::chrono::steady_clock::time_point   m_deadline;
+    std::chrono::microseconds               m_wcet; // worst case elipsed time
 };
 
 } // namespace job::threads

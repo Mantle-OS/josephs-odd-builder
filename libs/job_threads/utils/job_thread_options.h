@@ -28,7 +28,7 @@ struct JobThreadOptions final {
     // ms interval
     uint16_t heartbeat{50};
 
-    std::array<char, 32> name{};
+    std::array<char, 32> name{'\0'};
 
     static constexpr uint8_t  kDefaultPriority      = 20;
     static constexpr uint8_t  kDefaultRtPriority    = 50;
@@ -68,4 +68,4 @@ struct JobThreadOptions final {
 };
 
 } // namespace job::threads
-// CHECKPOINT: v1
+// CHECKPOINT: v1.0
