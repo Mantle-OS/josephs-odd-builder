@@ -2,7 +2,7 @@
 
 #include <cstdint>
 
-#include "data/real_type.h"
+#include <real_type.h>
 
 namespace job::science::data {
 
@@ -21,15 +21,15 @@ enum class MaterialType : uint8_t {
 struct Composition final {
     MaterialType type{MaterialType::Mixed};
     // Mass fractions (sum ≈ 1.0)
-    real_t silicate{real_t(0.0)};      // Fractional silicate content (e.g. olivine, pyroxene, feldspar).
-    real_t metal{real_t(0.0)};         // Fractional metallic content (e.g. Fe–Ni alloy).
-    real_t ice{real_t(0.0)};           // Fractional volatile/ice content (H₂O, NH₃, CH₄ ices).
-    real_t carbon{real_t(0.0)};        // Fractional carbonaceous content (soot, graphite, organics).
+    core::real_t silicate{core::real_t(0.0)};      // Fractional silicate content (e.g. olivine, pyroxene, feldspar).
+    core::real_t metal{core::real_t(0.0)};         // Fractional metallic content (e.g. Fe–Ni alloy).
+    core::real_t ice{core::real_t(0.0)};           // Fractional volatile/ice content (H₂O, NH₃, CH₄ ices).
+    core::real_t carbon{core::real_t(0.0)};        // Fractional carbonaceous content (soot, graphite, organics).
     // Derived or characteristic properties
-    real_t density{real_t(0.0)};       // kg/m³
-    real_t heatCapacity{real_t(0.0)};  // J/kg·K
-    real_t emissivity{real_t(0.0)};    // dimensionless (0–1)
-    real_t absorptivity{real_t(0.0)};  // dimensionless (0–1)
+    core::real_t density{core::real_t(0.0)};       // kg/m³
+    core::real_t heatCapacity{core::real_t(0.0)};  // J/kg·K
+    core::real_t emissivity{core::real_t(0.0)};    // dimensionless (0–1)
+    core::real_t absorptivity{core::real_t(0.0)};  // dimensionless (0–1)
 
 };
 #pragma pack(pop)
@@ -37,30 +37,30 @@ struct Composition final {
 struct CompositionUtil final {
     [[nodiscard]] static constexpr bool isValid(const Composition &c) noexcept
     {
-        const real_t sum = totalFraction(c);
+        const core::real_t sum = totalFraction(c);
 
-        if (sum <= real_t(0))
+        if (sum <= core::real_t(0))
             return false;
 
         if (c.silicate < 0 || c.metal < 0 || c.ice < 0 || c.carbon < 0)
             return false;
 
-        return sum > real_t(0.99) && sum < real_t(1.01);
+        return sum > core::real_t(0.99) && sum < core::real_t(1.01);
     }
-    [[nodiscard]] static constexpr real_t totalFraction(const Composition &c) noexcept
+    [[nodiscard]] static constexpr core::real_t totalFraction(const Composition &c) noexcept
     {
         return c.silicate + c.metal + c.ice + c.carbon;
     }
 
-    [[nodiscard]] static constexpr real_t reflectivity(const Composition &c) noexcept
+    [[nodiscard]] static constexpr core::real_t reflectivity(const Composition &c) noexcept
     {
-        return real_t(1.0) - c.absorptivity;
+        return core::real_t(1.0) - c.absorptivity;
     }
 
     static constexpr void normalize(Composition &c) noexcept
     {
-        const real_t sum = totalFraction(c);
-        if (sum > static_cast<real_t>(0.0f)) {
+        const core::real_t sum = totalFraction(c);
+        if (sum > static_cast<core::real_t>(0.0f)) {
             c.silicate /= sum;
             c.metal    /= sum;
             c.ice      /= sum;
@@ -76,70 +76,70 @@ namespace SciencePresets {
 constexpr Composition rocky() noexcept {
     return Composition{
         .type       = MaterialType::Silicate,
-        .silicate       = real_t(0.9),
-        .metal          = real_t(0.1),
-        .ice            = real_t(0.0),
-        .carbon         = real_t(0.0),
-        .density        = real_t(3300.0),
-        .heatCapacity   = real_t(800.0),
-        .emissivity     = real_t(0.9),
-        .absorptivity   = real_t(0.7)
+        .silicate       = core::real_t(0.9),
+        .metal          = core::real_t(0.1),
+        .ice            = core::real_t(0.0),
+        .carbon         = core::real_t(0.0),
+        .density        = core::real_t(3300.0),
+        .heatCapacity   = core::real_t(800.0),
+        .emissivity     = core::real_t(0.9),
+        .absorptivity   = core::real_t(0.7)
     };
 }
 
 constexpr Composition metallic() noexcept {
     return Composition{
         .type           = MaterialType::Metallic,
-        .silicate       = real_t(0.1),
-        .metal          = real_t(0.9),
-        .ice            = real_t(0.0),
-        .carbon         = real_t(0.0),
-        .density        = real_t(7800.0),
-        .heatCapacity   = real_t(450.0),
-        .emissivity     = real_t(0.3),
-        .absorptivity   = real_t(0.6)
+        .silicate       = core::real_t(0.1),
+        .metal          = core::real_t(0.9),
+        .ice            = core::real_t(0.0),
+        .carbon         = core::real_t(0.0),
+        .density        = core::real_t(7800.0),
+        .heatCapacity   = core::real_t(450.0),
+        .emissivity     = core::real_t(0.3),
+        .absorptivity   = core::real_t(0.6)
     };
 }
 
 constexpr Composition icy() noexcept {
     return Composition{
         .type           = MaterialType::Icy,
-        .silicate       = real_t(0.2),
-        .metal          = real_t(0.0),
-        .ice            = real_t(0.8),
-        .carbon         = real_t(0.0),
-        .density        = real_t(1200.0),
-        .heatCapacity   = real_t(2100.0),
-        .emissivity     = real_t(0.95),
-        .absorptivity   = real_t(0.5)
+        .silicate       = core::real_t(0.2),
+        .metal          = core::real_t(0.0),
+        .ice            = core::real_t(0.8),
+        .carbon         = core::real_t(0.0),
+        .density        = core::real_t(1200.0),
+        .heatCapacity   = core::real_t(2100.0),
+        .emissivity     = core::real_t(0.95),
+        .absorptivity   = core::real_t(0.5)
     };
 }
 
 constexpr Composition carbonaceous() noexcept {
     return Composition{
         .type           = MaterialType::Carbonaceous,
-        .silicate       = real_t(0.3),
-        .metal          = real_t(0.1),
-        .ice            = real_t(0.0),
-        .carbon         = real_t(0.6),
-        .density        = real_t(2000.0),
-        .heatCapacity   = real_t(950.0),
-        .emissivity     = real_t(0.8),
-        .absorptivity   = real_t(0.7)
+        .silicate       = core::real_t(0.3),
+        .metal          = core::real_t(0.1),
+        .ice            = core::real_t(0.0),
+        .carbon         = core::real_t(0.6),
+        .density        = core::real_t(2000.0),
+        .heatCapacity   = core::real_t(950.0),
+        .emissivity     = core::real_t(0.8),
+        .absorptivity   = core::real_t(0.7)
     };
 }
 
 constexpr Composition sulfidic() noexcept {
     return Composition{
         .type           = MaterialType::Sulfidic,
-        .silicate       = real_t(0.4),
-        .metal          = real_t(0.3),
-        .ice            = real_t(0.0),
-        .carbon         = real_t(0.3),
-        .density        = real_t(4500.0),
-        .heatCapacity   = real_t(650.0),
-        .emissivity     = real_t(0.7),
-        .absorptivity   = real_t(0.6)
+        .silicate       = core::real_t(0.4),
+        .metal          = core::real_t(0.3),
+        .ice            = core::real_t(0.0),
+        .carbon         = core::real_t(0.3),
+        .density        = core::real_t(4500.0),
+        .heatCapacity   = core::real_t(650.0),
+        .emissivity     = core::real_t(0.7),
+        .absorptivity   = core::real_t(0.6)
     };
 }
 }

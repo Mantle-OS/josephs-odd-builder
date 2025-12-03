@@ -5,6 +5,6 @@ add_subdirectory(job_io)
 add_subdirectory(job_uart)
 add_subdirectory(job_net)
 add_subdirectory(job_serializer)
-# add_subdirectory(job_science)
+add_subdirectory(job_science)
 add_subdirectory(job_ai)
 # CHECKPOINT: v1.0

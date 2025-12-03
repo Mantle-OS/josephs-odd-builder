@@ -4,6 +4,7 @@ project(JosephsOddBuilderAi
     LANGUAGES CXX
 )
 
+add_compile_options(-mavx -mavx2 -mfma)
 ############################
 # Base
 ############################
@@ -15,8 +16,10 @@ set(JOBAI_BASE_HEADERS
     base/rrelu_config.h
     base/gdn_params.h
     base/genome.h
-    base/activation.h
-
+    base/activation.h           # needed
+    base/gemm.h
+    base/mlp.h
+    base/flash_attention.h
     base/tensor_shape.h
     base/tensor_rank.h
     base/tensor_iter.h
@@ -27,16 +30,16 @@ set(JOBAI_BASE_HEADERS
     base/tensor_4d.h
 )
 set(JOBAI_BASE_SOURCES
-    base/genome.cpp
+    base/genome.cpp             # dead
 )
 
 #######################
 # Coach
 ########################
 set(JOBAI_COACH_HEADERS
-    coach/es_trainer.h
-    coach/genetic_trainer.h
-    coach/icoach.h
+    coach/es_trainer.h          # needed
+    coach/genetic_trainer.h     # needed
+    coach/icoach.h              # needed
 )
 set(JOBAI_COACH_SOURCES
 
@@ -46,10 +49,10 @@ set(JOBAI_COACH_SOURCES
 # Evo
 ########################
 set(JOBAI_EVO_HEADERS
-    evo/crossover.h
-    evo/mutator.h
-    evo/population.h
-    evo/species.h
+    evo/crossover.h  # needed
+    evo/mutator.h    # needed
+    evo/population.h # needed
+    evo/species.h    # needed
 )
 set(JOBAI_EVO_SOURCES
 
@@ -59,19 +62,19 @@ set(JOBAI_EVO_SOURCES
 # Infer
 ########################
 set(JOBAI_INFER_HEADERS
-    infer/runner.h
+    infer/runner.h          # needed
 )
 set(JOBAI_INFER_SOURCES
-    infer/runner.cpp
+    infer/runner.cpp        # needed
 )
 
 #######################
 # Machine
 #######################
 set(JOBAI_MACHINE_HEADERS
-    machine/dense.h
-    machine/ilayer.h
-    machine/sparse_moe.h
+    machine/dense.h         # needed
+    machine/ilayer.h        # needed
+    machine/sparse_moe.h    # needed
 )
 set(JOBAI_MACHINE_SOURCES
 
@@ -81,8 +84,8 @@ set(JOBAI_MACHINE_SOURCES
 # Att
 #######################
 set(JOBAI_ATT_HEADERS
-    machine/att/fmm_adapter.h
-    machine/att/kv_cache.h
+    machine/att/fmm_adapter.h   # needed
+    machine/att/kv_cache.h      # needed
 )
 set(JOBAI_ATT_SOURCES
 
@@ -95,6 +98,10 @@ add_library(JosephsOddBuilder_Ai SHARED
     ${JOBAI_INFER_HEADERS}      ${JOBAI_INFER_SOURCES}
     ${JOBAI_MACHINE_HEADERS}    ${JOBAI_MCHINE_SOURCES}
     ${JOBAI_ATT_HEADERS}        ${JOBAI_ATT_SOURCES}
+)
+
+target_compile_options(JosephsOddBuilder_Ai PRIVATE
+    -mavx -mavx2 -mfma -Wpsabi
 )
 
 set_target_properties(JosephsOddBuilder_Ai PROPERTIES
@@ -110,6 +117,7 @@ target_link_libraries(JosephsOddBuilder_Ai PUBLIC
     JosephsOddBuilder_Threads
     JosephsOddBuilder_Crypto
     JosephsOddBuilder_Net
+    JosephsOddBuilder_Science
 )
 
 target_include_directories(JosephsOddBuilder_Ai PUBLIC

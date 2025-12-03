@@ -6,20 +6,21 @@
 #include <functional>
 #include <filesystem>
 
+#include <real_type.h>
+
 #include <job_thread_pool.h>
 
 #include <sched/job_scheduler_types.h> //      Fifo, RoundRobin, WorkStealing, Sporadic
 
 
-#include <data/particle.h>
-#include <data/disk.h>
-#include <data/zones.h>
-#include <data/composition.h>
-#include <data/real_type.h>
-#include <data/vec3f.h>
+#include "data/particle.h"
+#include "data/disk.h"
+#include "data/zones.h"
+#include "data/composition.h"
+#include "data/vec3f.h"
 
-#include <frames/frame_serializer.h>
-#include <frames/frame_deserializer.h>
+#include "frames/frame_serializer.h"
+#include "frames/frame_deserializer.h"
 
 
 
@@ -106,8 +107,8 @@ public:
 
     [[nodiscard]] bool pause() noexcept;
     [[nodiscard]] bool play() noexcept;
-    [[nodiscard]] bool ffwd(real_t multiplier) noexcept;
-    [[nodiscard]] bool rwd(real_t multiplier) noexcept;
+    [[nodiscard]] bool ffwd(core::real_t multiplier) noexcept;
+    [[nodiscard]] bool rwd(core::real_t multiplier) noexcept;
 
     [[nodiscard]] FrameSerializer::Ptr writer() const noexcept;
     [[nodiscard]] FrameDeserializer::Ptr reader() const noexcept;
@@ -123,10 +124,10 @@ public:
     void setDiskCallback(EngineCallback cb);
     void setZonesCallback(EngineCallback cb);
 
-    [[nodiscard]] real_t timeStep() const noexcept;
-    void setTimeStep(real_t dt_s) noexcept;
+    [[nodiscard]] core::real_t timeStep() const noexcept;
+    void setTimeStep(core::real_t dt_s) noexcept;
 
-    void step(real_t dt_s);
+    void step(core::real_t dt_s);
 private:
     void calculateForces(Particle &p);
     void runLoop();
@@ -141,7 +142,7 @@ private:
     Zones                   m_zones;
     std::atomic<bool>       m_running{false};
     std::atomic<bool>       m_paused{false};
-    real_t                  m_dt{1.0f}; // Timestep
+    core::real_t            m_dt{core::real_t(1.0)}; // Timestep
     ParticleCallback        m_particleCallback;
     EngineCallback          m_diskCallback;
     EngineCallback          m_zonesCallback;

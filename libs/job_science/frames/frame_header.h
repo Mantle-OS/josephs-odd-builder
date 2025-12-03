@@ -4,7 +4,7 @@
 #include <cstdint>
 #include <cstring>
 
-#include "frames/endian_utils.h"
+#include <endian_utils.h>
 
 namespace job::science::frames {
 

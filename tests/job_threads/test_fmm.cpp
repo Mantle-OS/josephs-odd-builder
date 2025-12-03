@@ -130,7 +130,6 @@ TEST_CASE("FMM Kernel Integrity (P=3 Octupole)", "[fmm][kernel][math]")
     REQUIRE_THAT(relError, Catch::Matchers::WithinAbs(0.0f, 0.0001f)); // bad now that I tried to make into Particle
 }
 
-// Should really use Particle
 TEST_CASE("FMM Kernel Integrity (P2M -> M2L)", "[fmm][kernel]")
 {
     using Kernel = FmmKernels<Vec3f, float>;
@@ -205,7 +204,6 @@ TEST_CASE("FMM Quadrupole Accuracy (Regresion 0.7%)", "[fmm][math][quadrupole]")
 
 TEST_CASE("FMM translation invariance (P=3)", "[fmm][invariance]")
 {
-
     auto sched = std::make_shared<JobWorkStealingScheduler>(4);
     auto pool  = ThreadPool::create(sched, 4);
 
@@ -221,15 +219,11 @@ TEST_CASE("FMM translation invariance (P=3)", "[fmm][invariance]")
         { .position{-1.0f,-2.0f,  0.0f}, .mass = 1.2f }
     };
 
-    // Copy & translate everything
-    // should be a setter in the engine(T_Vec m_shift) ?
-    // when we set it it runs
-    // FROM TILL
     Vec3f shift{10.0f, -3.5f, 2.0f};
     std::vector<Particle> shifted = orig;
     for (auto &p : shifted)
         p.position = p.position + shift;
-    // TO HERE  ?
+
 
     FMMEngine engine(pool, params);
 
