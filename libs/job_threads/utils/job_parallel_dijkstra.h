@@ -268,8 +268,6 @@ template <Weight W, typename Visitor>
                     // "light" vs "heavy" by new_dist vs bucket_limit, not strictly
                     // by edge weight. Correctness is preserved (monotone relaxations until
                     // convergence), but the schedule differs from the textbook delta-stepping.
-                    //
-                    // SHIT !!!! loop could theoretically spin forever if another thread keeps winning with worse distances (unlikely but possible).
                     while (new_dist < old_node.dist) {
 
                         // Parent is U ...I think

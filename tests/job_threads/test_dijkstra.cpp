@@ -1,3 +1,4 @@
+#include <catch2/benchmark/catch_benchmark.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/catch_approx.hpp>
 
@@ -29,11 +30,7 @@ DijkstraResult<float> sequentialDijkstra(const WeightedAdjList<float> &adj,
         return res;
 
     using Node = std::pair<float, std::size_t>; // (dist, v)
-    std::priority_queue<
-        Node,
-        std::vector<Node>,
-        std::greater<Node>
-        > pq;
+    std::priority_queue< Node, std::vector<Node>, std::greater<Node> > pq;
 
     res.distance[start] = 0.0f;
     pq.emplace(0.0f, start);
@@ -457,3 +454,81 @@ TEST_CASE("parallelDijkstra easy API is consistent with explicit delta", "[threa
     for (std::size_t i = 0; i < n; ++i)
         REQUIRE(resEasy.distance[i] == Catch::Approx(resExplicit.distance[i]));
 }
+
+
+
+
+TEST_CASE("parallelDijkstra: performance on random sparse graph",
+          "[threading][graph][dijkstra][bench]")
+{
+    // Pick something non-trivial but not “melt my laptop”.
+    constexpr std::size_t   kNodes   = 20'000;
+    constexpr std::size_t   kMaxOut  = 8;
+    constexpr std::uint32_t kSeed    = 0x2EC1920C; // whatever, just fixed
+
+    // Build a reproducible random graph once, *outside* the benchmark loops.
+    auto adj = makeRandomGraph(kNodes, kMaxOut, kSeed);
+
+    // Count edges for later napkin math.
+    std::size_t edgeCount = 0;
+    for (const auto &nbrs : adj)
+        edgeCount += nbrs.size();
+    INFO("Graph has " << kNodes << " nodes and ~" << edgeCount << " directed edges");
+
+    const std::size_t start = 0;
+
+    // Sequential reference benchmark (single-thread, exact).
+    BENCHMARK("sequentialDijkstra (single-thread)") {
+        auto res = sequentialDijkstra(adj, start);
+        // Make sure result is “used” so the compiler can't dead-code it away.
+        return res.distance[(kNodes - 1) / 2];
+    };
+
+    //  parallelDijkstra with a 1-thread pool (isolates algorithm overhead
+    //    from “true” speedup).
+    {
+        auto sched1 = std::make_shared<FifoScheduler>();
+        auto pool1  = ThreadPool::create(sched1, 1);
+
+        BENCHMARK("parallelDijkstra (ThreadPool, 1 worker)") {
+            auto res = parallelDijkstra<float>(*pool1, adj, start,
+                                               [](std::size_t, float) {});
+            return res.distance[(kNodes - 1) / 2];
+        };
+
+        pool1->shutdown();
+    }
+
+    // parallelDijkstra with 4 workers.
+    {
+        auto sched4 = std::make_shared<FifoScheduler>();
+        auto pool4  = ThreadPool::create(sched4, 4);
+
+        BENCHMARK("parallelDijkstra (ThreadPool, 4 workers)") {
+            auto res = parallelDijkstra<float>(*pool4, adj, start,
+                                               [](std::size_t, float) {});
+            return res.distance[(kNodes - 1) / 2];
+        };
+
+        pool4->shutdown();
+    }
+
+    // parallelDijkstra with 8 workers.
+    {
+        auto sched8 = std::make_shared<FifoScheduler>();
+        auto pool8  = ThreadPool::create(sched8, 8);
+
+        BENCHMARK("parallelDijkstra (ThreadPool, 8 workers)") {
+            auto res = parallelDijkstra<float>(*pool8, adj, start,
+                                               [](std::size_t, float) {});
+            return res.distance[(kNodes - 1) / 2];
+        };
+
+        pool8->shutdown();
+    }
+}
+
+
+
+
+

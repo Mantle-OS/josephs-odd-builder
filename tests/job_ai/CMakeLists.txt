@@ -7,6 +7,7 @@ add_executable(test_job_ai
     test_aligned_allocator.cpp
     test_tensor_view.cpp
     test_ai_shm_integration.cpp
+    test_unix_genome.cpp
 )
 
 target_link_libraries(test_job_ai PRIVATE

@@ -1,3 +1,4 @@
+#include <catch2/benchmark/catch_benchmark.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 #include <catch2/catch_approx.hpp>
@@ -258,3 +259,50 @@ TEST_CASE("GDN performs cross-channel normalization", "[activation][gdn]")
         REQUIRE(y[i] == approx(expected));
     }
 }
+
+
+
+
+
+TEST_CASE("Activation performance: bulk ReLU", "[activation][bench]") {
+    constexpr std::size_t N = 1'000'000;
+    std::vector<core::real_t> data(N);
+    std::vector<core::real_t> out(N);
+
+    // Fill with some garbage
+    for (std::size_t i = 0; i < N; ++i)
+        data[i] = (i % 2 == 0) ? core::real_t(i * 0.001) : core::real_t(-i * 0.001);
+
+    BENCHMARK("ReLU loop (direct)") {
+        for (std::size_t i = 0; i < N; ++i)
+            out[i] = relu(data[i]);
+        return out[123]; // keep compiler honest
+    };
+}
+
+
+TEST_CASE("GDN performance: small vs medium channels", "[activation][gdn][bench]") {
+    constexpr std::size_t C_small = 16;
+    // constexpr std::size_t C_med   = 128; << unused
+
+    GDNParams p_small;
+    p_small.beta.assign(C_small, core::real_t(1));
+    p_small.gamma.assign(C_small, std::vector<core::real_t>(C_small, core::real_t(0.0)));
+    for (std::size_t i = 0; i < C_small; ++i)
+        p_small.gamma[i][i] = core::real_t(0.5);
+
+    std::vector<core::real_t> x_small(C_small, core::real_t(1.0));
+
+    BENCHMARK("GDN C=16") {
+        auto y = gdn(x_small, p_small);
+        return y[0];
+    };
+
+    // Same pattern for C=128 if you want
+}
+
+
+
+
+
+
