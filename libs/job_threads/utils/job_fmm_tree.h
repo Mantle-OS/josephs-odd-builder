@@ -190,7 +190,7 @@ public:
         // For every node, gather influence from "well-separated" colleagues I should do this parallel by level or just all nodes.
         parallel_for(*m_pool, size_t{0}, m_nodes.size(), [&](size_t i) {
             // interact(static_cast<int>(i));
-            P2P(0, static_cast<int>(i)); // I NEVER GET HERE WITH Dipole with BREAKPOINTS !!!!!!
+            P2P(0, static_cast<int>(i));
         });
 
         for (int d = 1; d < static_cast<int>(m_levels.size()); ++d) {
@@ -595,7 +595,7 @@ private:
         // True FMM L2L does a little Taylor magic to re-expand the local expansion around the child center (using gradients, etc). That’s the real “math dragon” part.
         child.local.field = child.local.field + parent.local.field;
 
-        // FOR LATER IF even needed should not be.
+        // FOR LATER (gardiant.....)IF even needed should not be.
         // if(m_params.expansionOrder == ExpansionOrder::Dipole || m_params.expansionOrder == ExpansionOrder::Monopole){
         // }else{
         //     // FIXME

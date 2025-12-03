@@ -16,17 +16,25 @@ endif()
 
 
 ## LATER after stable
-# include(CheckIPOSupported)
-# check_ipo_supported(RESULT result OUTPUT output)
+include(CheckIPOSupported)
+check_ipo_supported(RESULT result OUTPUT output)
 
-# if(result)
-#     message(STATUS "IPO/LTO is supported: enabling globally")
-#     set(CMAKE_INTERPROCEDURAL_OPTIMIZATION ON)
-# else()
-#     message(WARNING "IPO/LTO is not supported: ${output}")
-# endif()
+if(result)
+    message(STATUS "IPO/LTO is supported: enabling globally")
+    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION ON)
+else()
+    message(WARNING "IPO/LTO is not supported: ${output}")
+endif()
 
+##############################
+# Options
+##############################
 add_compile_options(-Wall -Wextra -Wpedantic -Werror)
+option(JOB_CORE_USE_DOUBLE "Use double precision" OFF)
+if(JOB_CORE_USE_DOUBLE)
+    add_compile_definitions(JOB_CORE_USE_DOUBLE)
+endif()
+
 
 ##############################
 # DEPS
@@ -42,19 +50,15 @@ pkg_check_modules(LibZstd    REQUIRED libzstd)    # libzstd-dev
 pkg_check_modules(LibZ       REQUIRED zlib)       # zlib1g-dev
 pkg_check_modules(LibSodium  REQUIRED libsodium)  # libsodium-dev
 
-# snappy
-
-
 ## UART
 pkg_check_modules(LibUdev REQUIRED libudev) # libudev-dev
 
-## TRANSLATIONS
+## TRANSLATIONS Fuck Translations
 
 ## DATA fun
-# pkg_check_modules(Flatbuffers REQUIRED flatbuffers)    # libflatbuffers-dev flatbuffers-compiler
+pkg_check_modules(Flatbuffers REQUIRED flatbuffers)    # libflatbuffers-dev flatbuffers-compiler
 pkg_check_modules(NlohmannJson REQUIRED nlohmann_json)   # nlohmann-json3-dev
 pkg_check_modules(YAMLCpp      REQUIRED yaml-cpp)        # libyaml-cpp-dev
-
 
 ##############################
 # sub dirs

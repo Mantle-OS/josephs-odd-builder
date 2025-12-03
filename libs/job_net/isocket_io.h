@@ -21,7 +21,8 @@ public:
         Unknown = 0,
         Tcp,
         Udp,
-        Unix
+        Unix,
+        SSL
     };
 
     enum class SocketState : uint8_t {

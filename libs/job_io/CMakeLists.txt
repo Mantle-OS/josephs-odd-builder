@@ -9,12 +9,15 @@ set(JOBIO_SOURCES
     file_io.cpp
     mock_io.cpp
     io_factory.cpp
+    job_shared_memory.cpp
 )
 set(JOBIO_HEADERS
     pty_io.h
     file_io.h
     mock_io.h
     io_factory.h
+    job_shared_memory_header.h
+    job_shared_memory.h
 )
 
 add_library(JosephsOddBuilder_IO SHARED

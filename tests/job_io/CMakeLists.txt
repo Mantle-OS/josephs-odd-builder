@@ -6,6 +6,7 @@ add_executable(test_job_io
     test_fileio.cpp
     test_mockio.cpp
     test_io_factory.cpp
+    test_job_shared_memory.cpp
 )
 
 target_link_libraries(test_job_io PRIVATE

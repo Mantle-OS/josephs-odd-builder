@@ -2,7 +2,6 @@
 
 #include <functional>
 #include <vector>
-// #include <type_traits>
 
 #include <job_logger.h>
 
@@ -10,7 +9,8 @@
 #include "utils/job_parallel_for.h"
 #include "utils/job_verlet_concepts.h"
 
-// Confused ? .... me too lol. Here is a doc's/video that I was using to help understand this.
+// Confused me too you're not the one with the drunk cousin
+// Here is a doc's/video that I was using to help understand this.
 // * https://en.wikipedia.org/wiki/Runge%E2%80%93Kutta_methods
 // * https://aquaulb.github.io/book_solving_pde_mooc/solving_pde_mooc/notebooks/02_TimeIntegration/02_02_RungeKutta.html stupid python . . . .
 // * https://www.youtube.com/watch?v=kUcc8vAgoQ0

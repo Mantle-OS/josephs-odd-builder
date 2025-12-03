@@ -116,7 +116,7 @@ struct Vec3f final {
         return {x * s, y * s, z * s};
     }
 
-    // c++26 . . . . constexpr, noexcept
+    // c++26 . . . . constexpr, noexcept FIXME when the day comes
     [[nodiscard]] float length() const
     {
         return std::sqrt(x * x + y * y + z * z);
@@ -158,7 +158,7 @@ struct Particle final {
 #pragma pack(pop)
 
 
-
+// Inflatable bounce castle with blower
 inline void springForce(const std::vector<Particle> &particles,
                         std::vector<Vec3f> &out_forces)
 {
@@ -170,7 +170,7 @@ inline void springForce(const std::vector<Particle> &particles,
         out_forces[i] = particles[i].position * -k;
 }
 
-// Damped spring: F = -k x - c v
+// Its wet here ... Damped spring: F = -k x - c v
 inline void dampedSpringForce(const std::vector<Particle> &particles,
                               std::vector<Vec3f> &out_forces)
 {
@@ -185,7 +185,6 @@ inline void dampedSpringForce(const std::vector<Particle> &particles,
         out_forces[i] = spring + drag;
     }
 }
-
 
 // Calculate Total Energy (E = K + U) for simple spring (U = 0.5 * k * x^2)
 inline double calculateTotalEnergy(const std::vector<Particle> &particles, float k_spring)

@@ -129,5 +129,6 @@ private:
 // CHECKPOINT: v1.3
 
 
-// While the m_storageMutex protects the m_taskStorage, it's clear this lock contention, with every task needing multiple acquisitions, presents a bottleneck. For v1, this is acceptable, but I acknowledge that it is a future optimization.
+// While the m_storageMutex protects the m_taskStorage, it's clear this lock contention, with every task needing multiple acquisitions,
+// presents a bottleneck. For v1, this is acceptable, but I acknowledge that it is a future optimization.
 // The Fix (Later): Sharded maps. m_taskStorage[id % 16] with 16 mutexes.

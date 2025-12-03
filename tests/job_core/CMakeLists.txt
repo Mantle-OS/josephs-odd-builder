@@ -5,6 +5,7 @@ add_executable(test_job_core
     main.cpp
     test_timer.cpp
     test_logger.cpp
+    test_permissions.cpp
 )
 
 target_link_libraries(test_job_core PRIVATE

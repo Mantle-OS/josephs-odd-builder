@@ -28,6 +28,7 @@ set(JOBSER_SOURCES
 
 
 set(JOBSER_HEADERS
+    spdx_helper.h
     job_serializer_utils.h
     job_field.h
     schema.h

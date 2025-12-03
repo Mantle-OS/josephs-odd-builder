@@ -4,7 +4,6 @@
 #include <mutex>
 #include <string>
 #include <iostream>
-#include <fstream>
 #include <filesystem>
 
 #include <io_base.h>
@@ -34,7 +33,7 @@ public:
 
     [[nodiscard]] bool openDevice() override;
     void closeDevice() override;
-    bool flush();
+    bool flush() override;
 
     ssize_t read(char *buffer, size_t size) override;
     ssize_t write(const char *data, size_t size) override;
@@ -74,4 +73,4 @@ private:
 };
 
 } // job::io
-// CHECKPOINT: v1
+// CHECKPOINT: v1.0

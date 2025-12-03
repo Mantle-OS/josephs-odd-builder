@@ -21,13 +21,14 @@ concept VecOps = requires(V v, V u, S s)
     { v.y } -> std::same_as<std::remove_reference_t<decltype(v.y)>&>;
     { v.z } -> std::same_as<std::remove_reference_t<decltype(v.z)>&>;
 
-    // !!!!!!MUST!!!!!! be convertible to the scalar type This is also used for barnsNhut . . .why it is here.
+    // !!!!!!MUST!!!!!! be convertible to the scalar type This is also used for barns N hut . . .why it is here.
     { v.x } -> std::convertible_to<S>;
     { v.y } -> std::convertible_to<S>;
     { v.z } -> std::convertible_to<S>;
 
 };
 
+// Help I dont know what you are !!!
 // Scalar !!!!!MUST!!!!!! be floating point (good for time steps, masses etc.)
 template <class S>
 concept FloatScalar = std::floating_point<S>;

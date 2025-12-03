@@ -55,10 +55,6 @@ protected:
     std::vector<core::JobTimer>     m_timers;
     std::atomic<bool>               m_running{false};
     std::atomic<uint64_t>           m_nextTimerId{1};
-
-private:
-
 };
-
 } // job::threads
 // CHECKPOINT: v1.1

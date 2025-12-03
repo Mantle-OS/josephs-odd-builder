@@ -44,9 +44,9 @@ public:
 
 
     [[nodiscard]] bool isEncrypted() const;
-    void setLocalCertificate(const JobSslCert &certificate)
+    void setCertificate(const JobSslCert &certificate)
     void setLocalCertificate(const std::filesystem::path &path, CertType::EncodingFormat format = CertType::Pem)
-    void setLocalCertificateChain(const std::forward_list<JobSslCert> &chain)
+    void setCertificateChain(const std::forward_list<JobSslCert> &chain)
 
 private:
     bool initContext();

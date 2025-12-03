@@ -6,19 +6,21 @@
 #include <string>
 #include <unistd.h>
 
+#include "job_permissions.h"
+
 namespace job::core {
 
 class IODevice {
 
 public:
-    using ReadCallback = std::function<void(const char *, size_t)>;
+    using ReadCallback          = std::function<void(const char *data, size_t size)>;
+    using PermissionsCallback   = std::function<void(IOPermissions perms)>;
 
     virtual ~IODevice() = default;
 
     [[nodiscard]] virtual bool openDevice() = 0;
     virtual void closeDevice() = 0;
 
-    // FIXME add a new read and write that is apart of our schema that we design
     [[nodiscard]] virtual ssize_t read(char *buffer, size_t maxlen) = 0;
     [[nodiscard]] virtual ssize_t write(const char *data, size_t len) = 0;
 
@@ -32,8 +34,37 @@ public:
 
     virtual void setNonBlocking(bool enabled) = 0;
 
-    // Async callback registration
+    // Async callback registration not needed for shared memory
     virtual void setReadCallback(ReadCallback cb) = 0;
+
+    virtual bool flush(){ return true;}
+
+    [[nodiscard]] virtual IOPermissions permissions() const
+    {
+        return m_permissions;
+    }
+
+    virtual void setPermissions(IOPermissions perms)
+    {
+        m_permissions = perms;
+        if (m_permissionsCallback) {
+            (*m_permissionsCallback)(m_permissions);
+        }
+
+    }
+
+    [[nodiscard]] virtual PermissionsCallback *permissionsCallback() const
+    {
+        if (m_permissionsCallback)
+            return m_permissionsCallback;
+        return nullptr;
+    }
+
+    virtual void setPermissionsCallback(PermissionsCallback *cb)
+    {
+        if(cb)
+            m_permissionsCallback = std::move(cb);
+    }
 
 protected:
     [[nodiscard]] ssize_t readToString(std::string &output, size_t maxlen)
@@ -48,7 +79,7 @@ protected:
         return bytesRead;
     }
 
-    [[nodiscard]] ssize_t readToString(std::vector<uint8_t> &output, size_t maxlen)
+    [[nodiscard]] ssize_t readToVector(std::vector<uint8_t> &output, size_t maxlen)
     {
         output.resize(maxlen);
         ssize_t bytesRead = read(reinterpret_cast<char*>(output.data()), maxlen);
@@ -60,7 +91,9 @@ protected:
         return bytesRead;
     }
 
+    IOPermissions       m_permissions{IOPermissions::DefaultFile};
+    PermissionsCallback *m_permissionsCallback{};
 };
 
 } // namespace job::core
-// CHECKPOINT: v1
+// CHECKPOINT: v1.1

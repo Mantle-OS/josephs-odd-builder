@@ -5,14 +5,18 @@ project(JosephOddBuild_Core
 )
 
 set(JOBCORE_SOURCES
-    job_timer.cpp
+    crc32.cpp
     job_logger.cpp
+    job_timer.cpp
 )
 set(JOBCORE_HEADERS
-    io_base.h
+    crc32.h          ## polynomial crc32
+    endian_utils.h   ## [from,to]LE16, [from,to]LE32 
+    real_type.h      ## static and what the compiler sets as real_t
+    io_base.h        ## the base of IO not net IO
+    job_logger.h     ## logger clas
     job_timer.h
-    job_logger.h
-    spdx_helper.h
+    job_permissions.h
 )
 
 add_library(JosephsOddBuilder_Core SHARED

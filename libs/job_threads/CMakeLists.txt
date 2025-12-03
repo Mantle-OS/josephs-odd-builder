@@ -12,6 +12,7 @@ set(JOBTHREADS_HEADERS
     job_thread.h
     job_thread_pool.h
     job_thread_watcher.h
+    job_semaphore.h
 )
 
 set(JOBTHREADS_SOURCES
@@ -47,9 +48,15 @@ set(JOBTHREADS_UTILS_HEADERS
     utils/job_rk4_integrator.h
     utils/job_euler_integrator.h
     utils/job_parallel_bfs.h
-    # utils/job_parallel_dijkstra.h # TOY
+    utils/job_parallel_dijkstra.h
     utils/job_branch_and_bound.h
-    utils/job_fmm_tree.h # TOY
+    #
+    utils/job_fmm_utils.h #new
+    utils/job_fmm_concepts.h # new
+    utils/job_fmm_kernel.h # new
+    utils/job_fmm_integrator.h # new
+
+    # utils/job_fmm_tree.h # old going away
 )
 
 set(JOBTHREADS_UTILS_SOURCES
@@ -78,6 +85,7 @@ set(JOBTHREADS_SCHED_HEADERS
     sched/job_round_robin_scheduler.h
     sched/job_work_stealing_scheduler.h
     sched/job_sporadic_scheduler.h
+    sched/job_scheduler_types.h
 )
 set(JOBTHREADS_SCHED_SOURCES
     sched/job_fifo_scheduler.cpp
@@ -113,6 +121,18 @@ set(JOBTHREADS_IO_SOURCES
     io/job_io_async_thread.cpp
 )
 
+set(JOBTHREADS_CTX_HEADERS
+    ctx/job_fifo_ctx.h
+    ctx/job_rr_ctx.h
+    ctx/job_sporadic_ctx.h
+    ctx/job_stealing_ctx.h
+)
+
+set(JOBTHREADS_CTX_SOURCES
+
+)
+
+
 add_library(JosephsOddBuilder_Threads SHARED
     ${JOBTHREADS_HEADERS}       ${JOBTHREADS_SOURCES}
     ${JOBTHREADS_UTILS_HEADERS} ${JOBTHREADS_UTILS_SOURCES}
@@ -120,6 +140,7 @@ add_library(JosephsOddBuilder_Threads SHARED
     ${JOBTHREADS_SCHED_HEADERS} ${JOBTHREADS_SCHED_SOURCES}
     ${JOBTHREADS_DESCR_HEADERS} ${JOBTHREADS_DESCR_SOURCES}
     ${JOBTHREADS_IO_HEADERS}    ${JOBTHREADS_IO_SOURCES}
+    ${JOBTHREADS_CTX_HEADERS}   ${JOBTHREADS_CTX_SOURCES}
 )
 
 set_target_properties(JosephsOddBuilder_Threads PROPERTIES
@@ -130,6 +151,7 @@ set_target_properties(JosephsOddBuilder_Threads PROPERTIES
 
 target_link_libraries(JosephsOddBuilder_Threads PUBLIC
     Threads::Threads
+    atomic
     JosephsOddBuilder_Core
 )
 target_include_directories(JosephsOddBuilder_Threads PUBLIC
@@ -139,6 +161,7 @@ target_include_directories(JosephsOddBuilder_Threads PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/sched>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/descr>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/io>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/ctx>
     ## install paths
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobthreads>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobthreads/utils>
@@ -146,6 +169,7 @@ target_include_directories(JosephsOddBuilder_Threads PUBLIC
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobthreads/sched>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobthreads/descr>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobthreads/io>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobthreads/ctx>
 )
 
 install(TARGETS JosephsOddBuilder_Threads
@@ -179,6 +203,11 @@ install(FILES ${JOBTHREADS_DESCR_HEADERS}
 install(FILES ${JOBTHREADS_IO_HEADERS}
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobthreads/io
 )
+
+install(FILES ${JOBTHREADS_CTX_HEADERS}
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobthreads/ctx
+)
+
 
 set(PKGCONFIG_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/pkgconfig")
 set(PKGCONFIG_FILE "${CMAKE_CURRENT_BINARY_DIR}/jobthreads.pc")

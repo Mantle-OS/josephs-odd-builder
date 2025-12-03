@@ -43,13 +43,13 @@ TEST_CASE("VerletIntegrator runs KDK and DKD with generic (POD) structs", "[thre
     particles_dkd.push_back(p);
 
     ///////////////////////////////////////////////////////////////////////////
-    // This is the magic. We adapt our SimpleSpringForce function
-    // into the AccelCalculator the integrator expects.
+    // Look its the magic(slight of hand).
+    // We adapt our springForce function into the AccelCalculator the integrator expects.
     ///////////////////////////////////////////////////////////////////////////
     auto accel_calc = makeForceToAccelAdapter<Particle, Vec3f>(springForce,
                                                                [](const Particle &p) {
                                                                    return p.mass;
-                                                               },         // GetMass
+                                                               },// GetMass
                                                                [](Particle &p) -> Vec3f& {
                                                                    return p.acceleration;
                                                                } // GetAcc
@@ -169,7 +169,7 @@ TEST_CASE("VerletIntegrator conserves energy (Symplectic) for Simple Harmonic Os
 
     JOB_LOG_INFO("[Verlet Energy] Initial: {}, Final: {}", initial_energy, final_energy);
 
-    // Symplectic integrators should keep energy bounded. It will oscillate slightly but shouldn't drift significantly like Euler.
+    // Symplectic integrators should keep energy bounded. It will oscillate slightly but shouldn't drift significantly like Bueler ... Bueler .... Euler.
     // We allow a small epsilon for floating point accumulation over 5000 steps.
     REQUIRE_THAT(final_energy, Catch::Matchers::WithinRel(initial_energy, 0.001)); // 0.1% tolerance
 
@@ -257,11 +257,11 @@ TEST_CASE("VerletIntegrator Determinism: Single Thread vs Thread Pool", "[thread
     }
 
     for(size_t i=0; i < particle_count; ++i) {
-        // pos should be identical
+        // what a POS ...  should be identical
         REQUIRE_THAT(particles_serial[i].position.x, Catch::Matchers::WithinRel(particles_parallel[i].position.x, 0.0001f));
         REQUIRE_THAT(particles_serial[i].position.y, Catch::Matchers::WithinRel(particles_parallel[i].position.y, 0.0001f));
 
-        // Velocities should be identical
+        // More twins. Velocities should be identical
         REQUIRE_THAT(particles_serial[i].velocity.x, Catch::Matchers::WithinRel(particles_parallel[i].velocity.x, 0.0001f));
     }
 }
@@ -274,7 +274,7 @@ TEST_CASE("VerletIntegrator handles Damped Forces (Energy Decay)", "[threading][
     std::vector<Particle> particles;
     Particle p;
     p.id = 1;
-    // Stretched spring
+    // Stretch(armstrong)ed spring
     p.position = {10.0f, 0.0f, 0.0f};
     p.velocity = {0.0f, 0.0f, 0.0f};
     p.mass = 1.0f;
@@ -318,6 +318,7 @@ TEST_CASE("VerletIntegrator handles Damped Forces (Energy Decay)", "[threading][
 
     REQUIRE(E_final < E_initial);
 
+    // Your a HERO and a ZERO
     // Should be close to zero after 500 steps with c=0.5 damping
     REQUIRE_THAT(E_final, Catch::Matchers::WithinAbs(0.0, 0.5));
 

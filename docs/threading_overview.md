@@ -8,7 +8,7 @@ This file is the “big map” of the threading library:
 
 ---
 
-## Implementation Status: What We Have vs. What We Need
+## Implementation Status: What We Have vs. What We "Need" Okay need....
 
 | # | Algorithm/Pattern | Current Status (What I Have) | What's Missing (Backlog Item) |
 |---|-------------------|-------------------------------|-------------------------------|
@@ -22,9 +22,9 @@ This file is the “big map” of the threading library:
 | 8 | Futures & Promises | **DONE** | Native usage in `ThreadPool::submit`. |
 | 9 | Asynchronous I/O (`epoll`) | **DONE** | `JobIoAsyncThread` and `JobAsyncEventLoop` implemented. |
 | 10 | Barnes-Hut (N-Body) | **DONE** | `BarnesHutTree` and `BarnesHutForceCalculator` implemented. |
-| 11 | Fast Multipole Method (FMM) | **HAVE** (Executor): ThreadPool | **NEEDS** (Application): The (very complex) FMM math logic(here be dragons). Library is ready to host it. |
+| 11 | Fast Multipole Method (FMM) | DONE (v1.0: P=3, Octupole, Unified Pass)| FmmCoefficients, FmmKernels (P2M, M2M, M2L, L2L, L2P with monopole/dipole/quadrupole/octupole), FmmTopology + FmmTreeBuilder, and JobFmmEngine with unified traversal (M2L + P2P + L2P). Kernel integrity tests (P=3 dumbbell) and end-to-end “shape test” regression passing with controlled θ and leaf size. Backlog: error control knobs (θ adaptivity, tunable expansion order), vectorization/SIMD path, periodic BC / domain tiling, and more evil test geometries. Here still be dragons, but they now report to you. |
 | 12 | Graph Traversal (BFS) | **DONE** | `parallel_bfs(ThreadPool&, const AdjacencyList&, start, visitor)` helper implemented with level-synchronous frontiers, atomic visited flags, and optional depth-aware visitor. Returns `BfsResult { depth, parent }` for introspection. |
-| 13 | Graph Traversal (Dijkstra's) | **DONE (sequential core)** | `parallel_dijkstra` over a weighted adjacency list + `DijkstraResult` + `reconstruct_path`. Currently single-threaded internally; API is ready for future parallel PQ/delta-stepping tricks. |
+| 13 | Graph Traversal (Dijkstra's / SSSP) | **DONE (parallel delta-stepping)** | `parallelDijkstra(ThreadPool&, const WeightedAdjList<W>&, std::size_t start[, Visitor][, W delta])` over a non-negative weighted adjacency list. Uses an atomic per-vertex `DijkstraNode<W>` and bucketed, delta-stepping-style relaxation with sharded frontiers. Supports three flavors of visitor (none, `v`, or `v, dist`), auto-chooses `delta` via `detail::suggestDelta(adj)` when omitted, and returns `DijkstraResult<W> { distance, parent }` plus `reconstructPath(result, target)` for path recovery. |
 | 14 | Branch and Bound | **DONE** | `parallel_branch_and_bound` helper built on `ThreadPool`, with generic `State`/`Cost`, bound-based pruning, objective/isSolution callbacks, optional timeout, and metrics (expanded/pruned/elapsed). |
 | 15 | Monte Carlo Tree Search (MCTS) | **HAVE** (Executor): ThreadPool | **NEEDS** (API): Tree expansion, simulation, backpropagation. |
 | 16 | Stencil / Grid | **DONE** | `JobStencilGrid2D` / `JobStencilGrid3D` using double-buffering + `parallel_for`. Synchronization is via the `parallel_for` future (no explicit `std::barrier`). |
@@ -45,7 +45,12 @@ This file is the “big map” of the threading library:
 Current layout of the threading zoo: more incoming
 
 ```text
-job/libs/job_threads
+job_threads/
+├── ctx
+│   ├── job_fifo_ctx.h
+│   ├── job_rr_ctx.h
+│   ├── job_sporadic_ctx.h
+│   └── job_stealing_ctx.h
 ├── descr
 │   ├── job_idescriptor.cpp
 │   ├── job_idescriptor.h
@@ -74,6 +79,7 @@ job/libs/job_threads
 │   ├── job_isched_policy.h
 │   ├── job_round_robin_scheduler.cpp
 │   ├── job_round_robin_scheduler.h
+│   ├── job_scheduler_types.h
 │   ├── job_sporadic_scheduler.cpp
 │   ├── job_sporadic_scheduler.h
 │   ├── job_work_stealing_scheduler.cpp
@@ -83,6 +89,11 @@ job/libs/job_threads
     ├── job_barnes_hut_tree.h
     ├── job_branch_and_bound.h
     ├── job_euler_integrator.h
+    ├── job_fmm_concepts.h
+    ├── job_fmm_integrator.h
+    ├── job_fmm_kernel.h
+    ├── job_fmm_tree.h
+    ├── job_fmm_utils.h
     ├── job_parallel_bfs.h
     ├── job_parallel_dijkstra.h
     ├── job_parallel_for.h
@@ -105,6 +116,7 @@ job/libs/job_threads
     ├── job_verlet_adapters.h
     ├── job_verlet_concepts.h
     └── job_verlet_integrator.h
+
 ```
 
 ## The rough mental model:

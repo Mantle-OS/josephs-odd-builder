@@ -18,9 +18,10 @@ template <class...> struct always_false : std::false_type {};
 
 template <typename T_Particle, typename T_Vec, typename ForceFn, typename GetMass, typename GetAcc>
 
-auto makeForceToAccelAdapter(ForceFn&& force_fn, GetMass&& get_mass, GetAcc&& get_acc)
+auto makeForceToAccelAdapter(ForceFn &&force_fn, GetMass &&get_mass, GetAcc &&get_acc)
 {
-    return [force = std::forward<ForceFn>(force_fn), gm = std::forward<GetMass>(get_mass), ga = std::forward<GetAcc>(get_acc)](std::vector<T_Particle>& ps) mutable
+    return [force = std::forward<ForceFn>(force_fn), gm = std::forward<GetMass>(get_mass),
+            ga = std::forward<GetAcc>(get_acc)](std::vector<T_Particle> &ps) mutable
     {
         std::vector<T_Vec> F;
         if constexpr (std::is_invocable_r_v<std::vector<T_Vec>, ForceFn,

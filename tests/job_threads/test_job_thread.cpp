@@ -110,7 +110,7 @@ TEST_CASE("JobThread real-time options failure (as non-root)", "[threading][opti
     }
 }
 
-TEST_CASE("JobThread data race stress test (proves mutex fix)", "[threading][bench][race]")
+TEST_CASE("JobThread data race stress test (proves mutex)", "[threading][bench][race]")
 {
     job::core::JobLogger::instance().setLevel(job::core::LogLevel::Info);
     constexpr int kNumHammerThreads = 4;

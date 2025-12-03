@@ -7,6 +7,7 @@ project(JosephsOddBuilder_Crypto
 set(JOBCRYPTO_HEADERS
     job_crypto_init.h
     job_secure_mem.h
+    job_random.h
 )
 
 set(JOBCRYPTO_SOURCES
@@ -27,7 +28,9 @@ set_target_properties(JosephsOddBuilder_Crypto PROPERTIES
 
 target_link_libraries(JosephsOddBuilder_Crypto PUBLIC
     Threads::Threads
+    atomic
     ${LibSodium_LIBRARIES}
+    JosephsOddBuilder_Core
 )
 
 target_include_directories(JosephsOddBuilder_Crypto PRIVATE

@@ -10,8 +10,9 @@
 
 namespace job::threads {
 
-// Euler is the slightly drunk cousin of RK4: less accurate, but incredibly handy when you just want to see “are my forces even pointing the right way?”.
-// Semi-Implicit Euler (also called Symplectic Euler or Euler-Cromer):
+// Euler is the slightly drunk cousin of RK4(please use this ): less accurate,
+// but incredibly "handy" when you just want to see “are my forces even pointing the right way? ”.
+// "Semi-Implicit" Euler (also called Symplectic Euler or Euler-Cromer or Stupid):
 // 1. v_{n+1} = v_n + a(x_n) * dt
 // 2. x_{n+1} = x_n + v_{n+1} * dt
 //
@@ -24,7 +25,10 @@ namespace job::threads {
 // Use this when:
 // - Prototyping physics (forces pointing the right way?)
 // - Stable-ish simulation is more important than accuracy
-// - You're too lazy to implement RK4
+// - You're too lazy to implement RK4 ....
+// - You hate life and would like to break your PC
+// - You reading this comment instead of relizing there is a P=3 FMM
+// - you just finished college and have no clue what you are doing.
 
 template <typename T_Particle, typename T_Vec, FloatScalar T_Scalar>
     requires VecOps<T_Vec, T_Scalar>
@@ -33,7 +37,8 @@ public:
     using AccessorFunc    = std::function<T_Vec &(T_Particle &)>;
     using AccelCalculator = std::function<void(std::vector<T_Particle> &)>;
 
-    JobEulerIntegrator(ThreadPool::Ptr pool, std::vector<T_Particle> *particles, AccessorFunc getPos, AccessorFunc getVel, AccessorFunc getAcc, AccelCalculator accelCalc) :
+    JobEulerIntegrator(ThreadPool::Ptr pool, std::vector<T_Particle> *particles, AccessorFunc getPos, AccessorFunc getVel,
+                       AccessorFunc getAcc, AccelCalculator accelCalc) :
         m_pool(std::move(pool)),
         m_particles(particles),
         m_getPos(std::move(getPos)),
@@ -42,7 +47,7 @@ public:
         m_accelCalc(std::move(accelCalc))
     {
         if (!m_pool)
-            JOB_LOG_WARN("[JobEulerIntegrator] ThreadPool is null That is not Good !");
+            JOB_LOG_WARN("[JobEulerIntegrator] ThreadPool is null You must be doing something right with your life.");
     }
 
     void step(T_Scalar dt)
@@ -60,6 +65,7 @@ public:
             return;
         }
 
+        // f5 f5 the damn screen won't refresh .....
         // F = m a → refresh acceleration for this frame
         if (m_accelCalc)
             m_accelCalc(*m_particles);
@@ -75,7 +81,7 @@ public:
             auto &x = m_getPos(p);
             auto &v = m_getVel(p);
             auto &a = m_getAcc(p);
-
+            // This seeems .......
             v = v + a * dt;
             x = x + v * dt;
         });
@@ -99,7 +105,7 @@ private:
             auto &x = m_getPos(p);
             auto &v = m_getVel(p);
             auto &a = m_getAcc(p);
-
+            // you again ... I mean again again again  again  again
             v = v + a * dt;
             x = x + v * dt;
         }
