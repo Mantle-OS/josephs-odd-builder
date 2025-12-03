@@ -6,6 +6,7 @@ add_executable(test_job_ai
     test_activation_math.cpp
     test_aligned_allocator.cpp
     test_tensor_view.cpp
+    test_ai_shm_integration.cpp
 )
 
 target_link_libraries(test_job_ai PRIVATE
@@ -14,6 +15,7 @@ target_link_libraries(test_job_ai PRIVATE
     atomic
     JosephsOddBuilder_Core
     JosephsOddBuilder_Threads
+    JosephsOddBuilder_IO
     JosephsOddBuilder_Crypto
     JosephsOddBuilder_Net
     JosephsOddBuilder_Ai

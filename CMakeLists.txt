@@ -4,6 +4,10 @@ project(JosephsOddBuilder
     LANGUAGES CXX
 )
 
+
+##############################
+# Compiler flags
+##############################
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
@@ -14,11 +18,8 @@ if(POLICY CMP0135)
     cmake_policy(SET CMP0135 NEW) # for reproducible timestamps
 endif()
 
-
-## LATER after stable
 include(CheckIPOSupported)
 check_ipo_supported(RESULT result OUTPUT output)
-
 if(result)
     message(STATUS "IPO/LTO is supported: enabling globally")
     set(CMAKE_INTERPROCEDURAL_OPTIMIZATION ON)
@@ -26,15 +27,34 @@ else()
     message(WARNING "IPO/LTO is not supported: ${output}")
 endif()
 
+include(CheckCXXCompilerFlag)
+check_cxx_compiler_flag("-march=native" COMPILER_SUPPORTS_MARCH_NATIVE)
+if(COMPILER_SUPPORTS_MARCH_NATIVE)
+    add_compile_options($<$<CONFIG:Release>:-march=native>)
+    add_compile_options($<$<CONFIG:RelWithDebInfo>:-march=native>)
+    message(STATUS "Enabling host architecture tuning (-march=native)")
+endif()
+
+add_compile_options(
+    $<$<CONFIG:Release>:-O3>
+    $<$<CONFIG:Release>:-funroll-loops>
+    $<$<CONFIG:Release>:-fno-omit-frame-pointer>
+)
+
+add_compile_options(-Wall -Wextra -Wpedantic -Werror)
+
 ##############################
 # Options
 ##############################
-add_compile_options(-Wall -Wextra -Wpedantic -Werror)
 option(JOB_CORE_USE_DOUBLE "Use double precision" OFF)
 if(JOB_CORE_USE_DOUBLE)
     add_compile_definitions(JOB_CORE_USE_DOUBLE)
 endif()
 
+option(JOB_USE_FAST_MATH "Fast Math" OFF)
+if(JOB_USE_FAST_MATH)
+    add_compile_options($<$<CONFIG:Release>:-ffast-math>)
+endif()
 
 ##############################
 # DEPS
@@ -59,6 +79,8 @@ pkg_check_modules(LibUdev REQUIRED libudev) # libudev-dev
 pkg_check_modules(Flatbuffers REQUIRED flatbuffers)    # libflatbuffers-dev flatbuffers-compiler
 pkg_check_modules(NlohmannJson REQUIRED nlohmann_json)   # nlohmann-json3-dev
 pkg_check_modules(YAMLCpp      REQUIRED yaml-cpp)        # libyaml-cpp-dev
+
+# sudo apt install libssl-dev libzstd-dev pkgconf libpkgconf-dev zlib1g-dev libsodium-dev libflatbuffers-dev flatbuffers-compiler nlohmann-json3-dev libyaml-cpp-dev
 
 ##############################
 # sub dirs

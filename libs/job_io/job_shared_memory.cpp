@@ -179,8 +179,14 @@ bool JobSharedMemory::attach()
             totalMappingSize = static_cast<size_t>(sb.st_size);
     }
 
-    // talk to the cartographer they have the maps
-    m_mapped_ptr = ::mmap(nullptr, totalMappingSize, mmap_prot, MAP_SHARED, m_shm_fd, 0);
+    // talk to the cartographer they have the maps (try MAP_HUGETLB 1st)
+    m_mapped_ptr = ::mmap(nullptr, totalMappingSize, mmap_prot, MAP_SHARED | MAP_HUGETLB, m_shm_fd, 0);
+    if (m_mapped_ptr == MAP_FAILED) {
+        // Fallback: Standard 4KB Pages
+        // This handles cases where the OS hasn't allocated huge pages
+        m_mapped_ptr = ::mmap(nullptr, totalMappingSize, mmap_prot, MAP_SHARED, m_shm_fd, 0);
+    }
+
     if (m_mapped_ptr == MAP_FAILED) {
         JOB_LOG_ERROR("[JobSharedMemory] mmap failed {}", std::strerror(errno));
         ::close(m_shm_fd);

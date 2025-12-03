@@ -9,6 +9,11 @@
 #include <job_semaphore.h>
 #include <job_shared_memory_header.h>
 
+#ifndef MAP_HUGETLB
+#define MAP_HUGETLB 0x40000
+#endif
+
+
 namespace job::io {
 
 enum class SharedMemoryErrors : uint8_t {
