@@ -56,6 +56,18 @@ if(JOB_USE_FAST_MATH)
     add_compile_options($<$<CONFIG:Release>:-ffast-math>)
 endif()
 
+option(JOB_TEST_BENCHMARKS "If def the benchhmarks" OFF)
+if(JOB_TEST_BENCHMARKS)
+    add_compile_options(JOB_TEST_BENCHMARKS)
+endif()
+
+# option(JOB_AMD_BUILD "AMD Build" ON)
+# if(JOB_AMD_BUILD)
+#     add_compile_options(JOB_AMD_BUILD)
+# endif()
+
+
+
 ##############################
 # DEPS
 ##############################

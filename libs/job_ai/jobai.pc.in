@@ -6,5 +6,5 @@ includedir=@CMAKE_INSTALL_FULL_INCLUDEDIR@/jobai
 Name: jobai
 Description: AI library for JOB (Joseph's Odd Builder)
 Version: @PROJECT_VERSION@
-Libs: -L${libdir} -lpthread -latomic -ljobcore -ljobthreads -lpthread -latomic -ljobcrypto -ljobnet
+Libs: -L${libdir} -lpthread -latomic -ljobcore -ljobthreads -ljobcrypto -ljobnet -ljobscience
 Cflags: -I${includedir}

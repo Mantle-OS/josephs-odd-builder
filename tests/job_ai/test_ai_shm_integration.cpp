@@ -11,7 +11,9 @@
 #include <aligned_allocator.h>
 #include <genome.h>
 using namespace job::io;
-using namespace job::ai::base;
+using namespace job::ai::comp;
+using namespace job::ai::evo;
+using namespace job::ai::layers;
 
 class GenomeSerializer {
 public:

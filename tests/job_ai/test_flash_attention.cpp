@@ -10,7 +10,7 @@
 #include <job_thread_pool.h>
 #include <flash_attention.h>
 
-using namespace job::ai::base;
+using namespace job::ai::comp;
 using namespace job::threads;
 
 void naiveAttention(int N, int d,

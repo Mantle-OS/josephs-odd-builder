@@ -14,7 +14,8 @@
 #include <genome.h>
 
 using namespace job::net;
-using namespace job::ai::base;
+using namespace job::ai::evo;
+using namespace job::ai::layers;
 namespace fs = std::filesystem;
 
 class RawGenomeSerializer {

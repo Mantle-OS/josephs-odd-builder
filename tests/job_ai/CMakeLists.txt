@@ -12,6 +12,7 @@ add_executable(test_job_ai
     test_gemm.cpp
     test_flash_attention.cpp
     test_mlp.cpp
+    test_coach.cpp
 )
 
 target_link_libraries(test_job_ai PRIVATE

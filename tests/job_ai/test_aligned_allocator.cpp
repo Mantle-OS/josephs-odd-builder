@@ -9,7 +9,7 @@
 
 using Catch::Approx;
 using namespace job::core;
-using namespace job::ai::base;
+using namespace job::ai::cords;
 
 TEST_CASE("AiWeights data is 64-byte aligned", "[allocator][alignment]")
 {

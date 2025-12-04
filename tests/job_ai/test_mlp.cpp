@@ -16,7 +16,7 @@
 #include <mlp.h>
 
 using Catch::Approx;
-using namespace job::ai::base;
+using namespace job::ai::comp;
 using namespace job::threads;
 
 void mlpNaive(int B, int d_in, int d_hid,

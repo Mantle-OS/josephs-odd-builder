@@ -4,16 +4,16 @@
 #include <vector>
 
 #include <real_type.h>
-#include "tensor_shape.h"
-#include "tensor_view.h"
-#include "tensor_1d.h"
-#include "tensor_2d.h"
-#include "tensor_3d.h"
-#include "tensor_4d.h"
-#include "tensor_rank.h"
+#include <extents.h>
+#include <view.h>
+#include <fiber.h>
+#include <matrix.h>
+#include <volume.h>
+#include <batch.h>
+#include <rank.h>
 
 using job::core::real_t;
-using namespace job::ai::base;
+using namespace job::ai::cords;
 
 // Tiny helper to fill with pattern: val = base + linear_index
 static void fillLinear(real_t *data, std::size_t n, real_t base)
@@ -22,27 +22,27 @@ static void fillLinear(real_t *data, std::size_t n, real_t base)
         data[i] = base + static_cast<real_t>(i);
 }
 
-TEST_CASE("TensorShape basic construction", "[tensor][shape]")
+TEST_CASE("Extents basic construction", "[cords][extents]")
 {
-    TensorShape<4> s1{2u, 3u};
+    Extents<4> s1{2u, 3u};
     REQUIRE(s1.size() == 2);
     REQUIRE(s1[0] == 2u);
     REQUIRE(s1[1] == 3u);
 
     std::array<std::uint32_t, 3> dims{4u, 5u, 6u};
-    TensorShape<4> s2(dims.begin(), dims.end());
+    Extents<4> s2(dims.begin(), dims.end());
     REQUIRE(s2.size() == 3);
     REQUIRE(s2[0] == 4u);
     REQUIRE(s2[1] == 5u);
     REQUIRE(s2[2] == 6u);
 }
 
-TEST_CASE("TensorView 1D indexing", "[tensor][view][1d]")
+TEST_CASE("View 1D indexing", "[cords][view][1d]")
 {
     std::vector<real_t> storage(5);
     fillLinear(storage.data(), storage.size(), real_t(10)); // 10,11,12,13,14
 
-    TensorViewR v(storage.data(), TensorViewR::Shape{5u});
+    ViewR v(storage.data(), ViewR::Extent{5u});
     REQUIRE(v.rank() == 1);
     REQUIRE(v.size() == 5);
 
@@ -52,13 +52,13 @@ TEST_CASE("TensorView 1D indexing", "[tensor][view][1d]")
     }
 }
 
-TEST_CASE("TensorView reshape preserves layout", "[tensor][view][reshape]")
+TEST_CASE("View reshape preserves layout", "[cords][view][reshape]")
 {
     std::vector<real_t> storage(6);
     fillLinear(storage.data(), storage.size(), real_t(0)); // 0..5
 
-    TensorViewR v1(storage.data(), TensorViewR::Shape{6u});
-    auto        v2 = v1.reshape(TensorViewR::Shape{2u, 3u});
+    ViewR v1(storage.data(), ViewR::Extent{6u});
+    auto v2 = v1.reshape(ViewR::Extent{2u, 3u});
 
     REQUIRE(v2.rank() == 2);
     REQUIRE(v2.size() == 6);
@@ -72,7 +72,7 @@ TEST_CASE("TensorView reshape preserves layout", "[tensor][view][reshape]")
     REQUIRE(v2(1, 2) == storage[5]);
 }
 
-TEST_CASE("TensorView slice drops first dimension", "[tensor][view][slice]")
+TEST_CASE("View slice drops first dimension", "[cords][view][slice]")
 {
     const std::uint32_t B = 3;
     const std::uint32_t C = 2;
@@ -80,7 +80,7 @@ TEST_CASE("TensorView slice drops first dimension", "[tensor][view][slice]")
     std::vector<real_t> storage(B * C);
     fillLinear(storage.data(), storage.size(), real_t(100)); // 100..105
 
-    TensorViewR v(storage.data(), TensorViewR::Shape{B, C});
+    ViewR v(storage.data(), ViewR::Extent{B, C});
     REQUIRE(v.rank() == 2);
 
     // slice(b) should give shape [C]
@@ -97,7 +97,7 @@ TEST_CASE("TensorView slice drops first dimension", "[tensor][view][slice]")
     }
 }
 
-TEST_CASE("Tensor2D at() matches operator()", "[tensor][2d]")
+TEST_CASE("Matrix at() matches operator()", "[cords][matrix]")
 {
     const std::uint32_t rows = 3;
     const std::uint32_t cols = 4;
@@ -105,7 +105,7 @@ TEST_CASE("Tensor2D at() matches operator()", "[tensor][2d]")
     std::vector<real_t> storage(rows * cols);
     fillLinear(storage.data(), storage.size(), real_t(0));
 
-    Tensor2D mat(storage.data(), rows, cols);
+    Matrix mat(storage.data(), rows, cols);
     REQUIRE(mat.rank() == 2);
     REQUIRE(mat.rows() == rows);
     REQUIRE(mat.cols() == cols);
@@ -116,7 +116,7 @@ TEST_CASE("Tensor2D at() matches operator()", "[tensor][2d]")
         }
 }
 
-TEST_CASE("Tensor3D and Tensor4D basic layout", "[tensor][3d][4d]")
+TEST_CASE("Volume and Batch basic layout", "[cords][volume][batch]")
 {
     // 3D: [D0, D1, D2]
     {
@@ -124,7 +124,7 @@ TEST_CASE("Tensor3D and Tensor4D basic layout", "[tensor][3d][4d]")
         std::vector<real_t> storage(d0 * d1 * d2);
         fillLinear(storage.data(), storage.size(), real_t(0));
 
-        Tensor3D t3(storage.data(), d0, d1, d2);
+        Volume t3(storage.data(), d0, d1, d2);
         REQUIRE(t3.rank() == 3);
 
         std::size_t idx = 0;
@@ -140,7 +140,7 @@ TEST_CASE("Tensor3D and Tensor4D basic layout", "[tensor][3d][4d]")
         std::vector<real_t> storage(B * C * H * W);
         fillLinear(storage.data(), storage.size(), real_t(5));
 
-        Tensor4D t4(storage.data(), B, C, H, W);
+        Batch t4(storage.data(), B, C, H, W);
         REQUIRE(t4.rank() == 4);
 
         std::size_t idx = 0;
@@ -152,26 +152,25 @@ TEST_CASE("Tensor3D and Tensor4D basic layout", "[tensor][3d][4d]")
     }
 }
 
-TEST_CASE("TensorRank matches TensorView indexing", "[tensor][rank]")
+TEST_CASE("Rank matches View indexing", "[cords][rank]")
 {
     const std::uint32_t d0 = 2, d1 = 2, d2 = 3;
     std::vector<real_t> storage(d0 * d1 * d2);
     fillLinear(storage.data(), storage.size(), real_t(7));
 
-    std::array<std::uint32_t, 3> dims{d0, d1, d2};
-    TensorRank3D                  tr(storage.data(), dims);
-    TensorViewR                   v(storage.data(), TensorViewR::Shape{d0, d1, d2});
+    // std::array<std::uint32_t, 3> dims{d0, d1, d2};
+    Volume tr(storage.data(), d0, d1, d2);
+    ViewR v(storage.data(), ViewR::Extent{d0, d1, d2});
 
     for (std::uint32_t i = 0; i < d0; ++i)
         for (std::uint32_t j = 0; j < d1; ++j)
             for (std::uint32_t k = 0; k < d2; ++k) {
-                std::array<std::uint32_t, 3> idx{i, j, k};
-                REQUIRE(tr.at(idx) == v(i, j, k));
+                REQUIRE(tr.at(i, j, k) == v(i, j, k));
             }
 }
 
 
-TEST_CASE("TensorIter slices 2D along first dimension", "[tensor][iter][2d]")
+TEST_CASE("ViewIter slices 2D along first dimension", "[cords][iter][2d]")
 {
     const std::uint32_t B = 3;
     const std::uint32_t C = 4;
@@ -179,14 +178,14 @@ TEST_CASE("TensorIter slices 2D along first dimension", "[tensor][iter][2d]")
     std::vector<real_t> storage(B * C);
     fillLinear(storage.data(), storage.size(), real_t(10)); // 10..21
 
-    TensorViewR v(storage.data(), TensorViewR::Shape{B, C});
+    ViewR v(storage.data(), ViewR::Extent{B, C});
     REQUIRE(v.rank() == 2);
-    REQUIRE(v.shape()[0] == B);
-    REQUIRE(v.shape()[1] == C);
+    REQUIRE(v.extent()[0] == B);
+    REQUIRE(v.extent()[1] == C);
 
     std::uint32_t b = 0;
     for (auto it = beginSlices(v); it != endSlices(v); ++it, ++b) {
-        auto row = *it; // TensorViewR with shape [C]
+        auto row = *it; // ViewR with shape [C]
         REQUIRE(row.rank() == 1);
         REQUIRE(row.size() == C);
 
@@ -200,8 +199,8 @@ TEST_CASE("TensorIter slices 2D along first dimension", "[tensor][iter][2d]")
 }
 
 
-TEST_CASE("TensorIter member begin/end and free beginSlices/endSlices agree on 2D",
-          "[tensor][iter][2d][api]")
+TEST_CASE("ViewIter member begin/end and free beginSlices/endSlices agree on 2D",
+          "[cords][iter][2d][api]")
 {
     const std::uint32_t B = 3;
     const std::uint32_t C = 4;
@@ -209,7 +208,7 @@ TEST_CASE("TensorIter member begin/end and free beginSlices/endSlices agree on 2
     std::vector<real_t> storage(B * C);
     fillLinear(storage.data(), storage.size(), real_t(10)); // 10..21
 
-    TensorViewR v(storage.data(), TensorViewR::Shape{B, C});
+    ViewR v(storage.data(), ViewR::Extent{B, C});
     REQUIRE(v.rank() == 2);
 
     // Member begin()/end()
@@ -245,10 +244,8 @@ TEST_CASE("TensorIter member begin/end and free beginSlices/endSlices agree on 2
     }
 }
 
-
-
-TEST_CASE("TensorIter member and free APIs agree on 3D batch slices",
-          "[tensor][iter][3d][api]")
+TEST_CASE("ViewIter member and free APIs agree on 3D batch slices",
+          "[cords][iter][3d][api]")
 {
     const std::uint32_t B = 2;
     const std::uint32_t C = 3;
@@ -257,7 +254,7 @@ TEST_CASE("TensorIter member and free APIs agree on 3D batch slices",
     std::vector<real_t> storage(B * C * H);
     fillLinear(storage.data(), storage.size(), real_t(0)); // 0..23
 
-    TensorViewR v(storage.data(), TensorViewR::Shape{B, C, H});
+    ViewR v(storage.data(), ViewR::Extent{B, C, H});
     REQUIRE(v.rank() == 3);
 
     auto checkSlices = [&](auto beginFn, auto endFn) {
@@ -265,8 +262,8 @@ TEST_CASE("TensorIter member and free APIs agree on 3D batch slices",
         for (auto it = beginFn(v); it != endFn(v); ++it, ++b) {
             auto slice = *it; // [C, H]
             REQUIRE(slice.rank() == 2);
-            REQUIRE(slice.shape()[0] == C);
-            REQUIRE(slice.shape()[1] == H);
+            REQUIRE(slice.extent()[0] == C);
+            REQUIRE(slice.extent()[1] == H);
 
             for (std::uint32_t c = 0; c < C; ++c)
                 for (std::uint32_t h = 0; h < H; ++h) {
@@ -279,17 +276,17 @@ TEST_CASE("TensorIter member and free APIs agree on 3D batch slices",
 
     // Member begin/end
     checkSlices(
-        [](const TensorViewR &tv) { return tv.begin(); },
-        [](const TensorViewR &tv) { return tv.end(); });
+        [](const ViewR &tv) { return tv.begin(); },
+        [](const ViewR &tv) { return tv.end(); });
 
     // Free beginSlices/endSlices
     checkSlices(
-        [](const TensorViewR &tv) { return beginSlices(tv); },
-        [](const TensorViewR &tv) { return endSlices(tv); });
+        [](const ViewR &tv) { return beginSlices(tv); },
+        [](const ViewR &tv) { return endSlices(tv); });
 }
 
 
-TEST_CASE("TensorIter works with const TensorView", "[tensor][iter][const]")
+TEST_CASE("ViewIter works with const View", "[cords][iter][const]")
 {
     const std::uint32_t B = 2;
     const std::uint32_t C = 2;
@@ -297,7 +294,7 @@ TEST_CASE("TensorIter works with const TensorView", "[tensor][iter][const]")
     std::vector<real_t> storage(B * C);
     fillLinear(storage.data(), storage.size(), real_t(1));
 
-    const TensorViewR v(storage.data(), TensorViewR::Shape{B, C});
+    const ViewR v(storage.data(), ViewR::Extent{B, C});
 
     // member
     {
@@ -315,5 +312,3 @@ TEST_CASE("TensorIter works with const TensorView", "[tensor][iter][const]")
         REQUIRE(count == B);
     }
 }
-
-

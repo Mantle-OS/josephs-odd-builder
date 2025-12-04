@@ -109,7 +109,7 @@ void ThreadWatcher::monitorLoop(std::stop_token token, std::chrono::milliseconds
         }
 
         if (auto s = m_scheduler.lock()){
-            if (s->stopped()) // JOSPEH ISchedPolicy needs a stopped() method
+            if (s->stopped())
                 JOB_LOG_ERROR("[ThreadWatcher] Scheduler stopped unexpectedly");
         }
         if (now - lastSummary >= m_summaryInterval) {

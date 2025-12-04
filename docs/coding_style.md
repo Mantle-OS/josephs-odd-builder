@@ -168,7 +168,14 @@ JobThread        *thread;
 auto             &ref = something;
 ```
 
-Avoid `T& name` / `T *name` mixed with `auto&`/`auto *` on the same project; keep the `&` / `*` visually near the type.
+Avoid `T& name` / `T* name` mixed with `auto&`/`auto *` on the same project; keep the `&` / `*` visually near the type.
+
+
+Good
+```cpp
+for (cosnt auto &str : strList)
+    doSomething(str);
+```
 
 ### 5.2 const
 
@@ -308,6 +315,8 @@ Log messages should be:
 ---
 
 ## 10. Tests
+
+We use Catch2 (version 3) for tests
 
 Tests serve as both verification and documentation. 
 

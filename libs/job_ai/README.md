@@ -4,9 +4,9 @@ Joseph drinks a bunch of coffee and then speak's.....
 
 A place where past time has not meaning as it is never traveled. We do propagate back there..... 
 
-I want AI, but I reject the "GPU Tax" (High VRAM, CUDA lock-in) and the "Algorithm Tax" Backpropagation, which requires storing the entire activation graph in memory (no constrants at all lol).
+I want AI, but I reject the "GPU Tax" (High VRAM, CUDA lock-in) and the "Algorithm Tax" Backpropagation(when needed), which requires storing the entire activation graph in memory (no constrants at all lol).
 
-If we are going to do this ....shit ...  we have to look at how biology & composition & physics do it.
+If I are going to do this ....shit ...  I have to look at how biology & composition & physics do it.
 
 * Biology doesn't do Backpropagation. Neurons don't send error signals backward up the axon. 
 * Physics doesn't do Backpropagation time flows one way. Try and observe that.
@@ -19,9 +19,11 @@ I don't need PyTorch nor do I want it.
 
 I need population based training and sparse intelligence.
 
-1. The Death of Backprop: "Forward-Only" Evolution
+1. The Hybrid of Biology in Backprop: "Forward-Only"  Evolution unless abousoulty needed
 
-Since job already has a highly parallel simulator (job_threads) and a cluster (job_net), the most efficient way to train is neuro evolution(Genetic Algorithms) ... I think lol 
+Since job already has a highly parallel simulator (job_threads) and a cluster (job_net), Ipc(job_io), etc etc   
+
+The most "efficient" way to train is neuro evolution(Genetic Algorithms) ... I think lol 
 
 
 The Concept: Instead of calculating the gradient $\nabla$ (which is expensive), I generate 100 "mutants".
@@ -37,13 +39,8 @@ The Concept: Instead of calculating the gradient $\nabla$ (which is expensive), 
 * Every thread runs independently.
 * No synchronization
 * Topology Search" (NEAT - NeuroEvolution of Augmenting Topologies)
+* I dont have to buy hardware that I dont need for my builder network (Mantle Os)
 
-
-NEED MORE 
-**Cons**
-*  
-* 
-* 
 
 ---
 
@@ -69,34 +66,135 @@ The Router: Instead of a learned gating network(which needs backprop), we could 
 * Input velocity > threshold? -> Route to Expert B.
 
 
-## GNC
+Rules: three deep before I go crazy. 
 
-```text
-├── base
-│   ├── activation          // The vanishing problem (ReLU, Tanh, Swish)
-│   ├── genome              // CATGACGTC ... The God Thread
-│   └── tensor_view         // Non-owning view of memory (mmap friendly).
-├── coach
-│   ├── es_trainer          // (CMA-ES)
-│   ├── genetic_trainer     // The sticky fingers(the thief) .... :P 
-│   └── icoach              // the purest virtual form of motivational
-├── evo
-│   ├── crossover           // look there are more of you.... 
-│   ├── mutator             // Its loud here in the radiation of gaussian doing flips 
-│   ├── population          // what a bunch or weirdo mutants
-│   └── species             // The genus type of kind category... NEAT !
-├── infer
-│   └── runner              // run forest run right to the engine room
-├── machine
-│   ├── att
-│   │   ├── fmm_adapter     // Math dragons
-│   │   ├── bh_adapter      // Joshua sits in his Hut thinking of basking in the direct sum light  
-│   │   └── kv_cache        // The what just happend. 
-│   ├── dense               // The perceptron of moving forward
-│   ├── ilayer              // a pure form of inference of interface's to layers
-│   └── sparse_moe          // The geological router
+
+## Name spacing 
+```
+|-------------------|---------------|----------------------------------------------------------|---------------------------------------|-------------------------------|
+|   namespace       |  desc         |        technical terms (what actually lives here)        |          mapping / notes              |      subsystem                |
+|-------------------|---------------|----------------------------------------------------------|---------------------------------------|-------------------------------|
+|                   |               |                                                          |                                       |                               |
+|                   |               |                                                          |                                       |                               |
+|   adapters::      |  algorithms   |      FMM, Barnes–Hut, N-body, Velocity Verlet,           |    bridges core kernels <-> models    |         TRUE                  |
+|                   |               |    / bridges treecodes, low-rank attention,              |                                       |                               |
+|                   |               |         graph adapters, kernelized attention             |                                       |                               |
+|-------------------|---------------|----------------------------------------------------------|---------------------------------------|-------------------------------|
+|                   |               |                                                          |                                       |                               |
+|                   |               |                                                          |  Question is this in job_core already |                               |
+|     base::        |  utils/core   |            small math constants,                         |    ML semantics here;                 |         FALSE                 |
+|                   |               |       type traits, RAII helpers, error codes             |    ultra-generic utilities only       |                               |
+|                   |               |                                                          |                                       |                               |
+|-------------------|---------------|----------------------------------------------------------|---------------------------------------|-------------------------------|
+|                   |               |                                                          |                                       |                               |
+|                   |               |                     Trainer                              |                                       |                               |
+|    coach::        |  motivation   |        ES / CMA-ES, genetic algorithms, population       |    training loops, schedulers,        |         TRUE                  |
+|                   |               |          sampling, fitness functions, curriculum         |    “optimizers” in the broad sense    |                               |
+|                   |               |                                                          |                                       |                               |
+|                   |               |                                                          |                                       |                               |
+|-------------------|---------------|----------------------------------------------------------|---------------------------------------|-------------------------------|
+|                   |               |                                                          |                                       |                               |
+|                   |               |                                                          |                                       |                               |
+|     cords::       |  places       |        tensor shapes, strides, layouts, views,           |    all the tensor_* stuff,            |         TRUE                  |
+|                   |               |          broadcasting, slicing, memory mapping           |    memory ownership & layout          |                               |
+|                   |               |                                                          |                                       |                               |
+|-------------------|---------------|----------------------------------------------------------|---------------------------------------|-------------------------------|
+|                   |               |                                                          |                                       |                               |
+|                   |               |                                                          |                                       |                               |
+|     comp::        |  math         |       BLAS-y kernels (GEMM, batched GEMM),               |    hot math: SIMD kernels,            |         FALSE                 |
+|                   |               |        activation kernels, reductions,                   |    reductions, norms, layernorm,      |                               |
+|                   |               |        normalizations (LayerNorm/RMSNorm),               |    softmax, small convs, etc.         |                               |
+|                   |               |        dot products, softmax, small conv windows         |                                       |                               |
+|                   |               |                                                          |                                       |                               |
+|-------------------|---------------|----------------------------------------------------------|---------------------------------------|-------------------------------|
+|                   |               |                                                          |                                       |                               |
+|                   |               |                                                          |                                       |                               |                                                                                                                                                                
+|      evo::        |  directions   |         mutation operators, crossover, selection         |    runtime helpers for evolution:     |         FALSE                 |
+|                   |               |          speciation / NEAT-like structures,              |    how to generate / combine genomes  |                               |
+|                   |               |          genome encodings, schedule policies             |    but not the trainers themselves    |                               |
+|                   |               |                                                          |                                       |                               |
+|-------------------|---------------|----------------------------------------------------------|---------------------------------------|-------------------------------|
+|                   |               |                                                          |                                       |                               |
+|                   |               |                                                          |                                       |                               |
+|      infer::      |  inference    |      runtime drivers: forward pass orchestration,        |    “serving” side: runners,           |         FALSE                 |
+|                   |               |      sampling (top-k, nucleus), beam search,             |    batching, token loops, sched glue  |                               |
+|                   |               |        streaming, KV-cache plumbling, runners            |                                       |                               |
+|                   |               |                                                          |                                       |                               |
+|-------------------|---------------|----------------------------------------------------------|---------------------------------------|-------------------------------|
+|                   |               |                                                          |                                       |                               |
+|                   |               |                                                          |                                       |                               |
+|       kv::        |  key/values   |          KV-cache, associative buffers, eviction         |    attention KV cache,                |          FALSE                |
+|                   |               |             policies (LRU/LFU/custom),                   |    other (key → state) maps,          |                               |
+|                   |               |           segmenting by head/layer                       |    on-CPU cache layout                |                               |
+|                   |               |                                                          |                                       |                               |
+|-------------------|---------------|----------------------------------------------------------|---------------------------------------|-------------------------------|
+|                   |               |                                                          |                                       |                               |
+|                   |               |                                                          |                                       |                               |
+|     layers::      |    layers     |           Linear, MLP, Attention, Embedding,             |     higher-level building blocks      |         TRUE                  |
+|                   |               |          LayerNorm/RMSNorm, Conv (if any),               |                                       |                               |
+|                   |               |          positional encodings, residual blocks           |                                       |                               |
+|                   |               |                                                          |                                       |                               |
+|                   |               |                                                          |                                       |                               |
+|-------------------|---------------|----------------------------------------------------------|---------------------------------------|-------------------------------|                                                                       
+|                   |               |                                                          |                                       |                               |
+|                   |               |                                                          |                                       |                               |
+|      moe::        |   experts     |       experts, routers, gating, top-k routing,           |     sparse MoE: Expert interface,     |         TRUE                  |
+|                   |               |          load-balancing, capacity management,            |     router, dispatcher, expert        |                               |
+|                   |               |          sparsity patterns                               |             configs                   |                               |
+|-------------------|---------------|----------------------------------------------------------|-----------------------------------------------------------------------|                                                                                      
 ```
 
-## The math fun
 
+                                      
+### base
+```c++
+job::ai::
+```
+
+
+### namespace types
+There are two types of namespace's 
+1. helpers / utils runtime one offs
+2. modules 
+ 
+### helpers
+| namespace  |      desc          |            technial terms             |       mapping / notes       |   module   |
+| base::     |    utils           | core                                  |                             |    FALSE   |
+| comp::     |    math            | kernels & math                        |                             |    FALSE   |
+| evo::      |    directions      | directions                            |    runtime helper           |    FALSE   |
+| infer::    |    inference       | runtime helpers                       |                             |    FALSE   |
+| kv::       |    key vales       | cache and other bits)                 |                             |    FALSE   |
+
+
+### subsystems
+
+Each module has the following mandatory or optional area's
+
+|module interface| modules have interfaces to what there core function are |mandatory  |
+|types           |  all modules have a enum of types                       |mandatory  |
+|configs         |  what makes this uniq                                   |optional   |
+|presets         |  types plus configs pus interface  presets              |optional   |
+
+### subsystem's
+
+| namespace  |      desc          |            technial terms             |       mapping / notes       |   module   |
+| adapters:: |    algorithms      | used in directions (FMM, BH, VV etc)  |  [virtual, types, configs]  |    TRUE    |
+| coach::    |    motivation      | trainer's                             |  [virtual, types, configs]  |    TRUE    |
+| cords::    |    places          | tensor's                              |  [virtual, types, configs]  |    TRUE    |
+| layers::   |    layers          | hidden, input, output layers etc      |  [virtual, types, configs]  |    TRUE    |
+| moe::      |    experts         | mixure of experts  & router's         |  [virtual, types, configs]  |    TRUE    |
+
+
+### all
+| namespace  |      desc          |            technial terms             |       mapping / notes       |   subsystem |
+| adapters:: |    algorithms      | used in directions (FMM, BH, VV etc)  |  [virtual, types, configs]  |    TRUE     |
+| base::     |    utils           | core                                  |                             |    FALSE    |
+| coach::    |    motivation      | trainer's                             |  [virtual, types, configs]  |    TRUE     |
+| cords::    |    places          | tensor's                              |  [virtual, types, configs]  |    TRUE     |
+| comp::     |    math            | kernels & math                        |                             |    FALSE    |
+| evo::      |    directions      | directions                            |    runtime helper           |    FALSE    |
+| infer::    |    inference       | runtime helpers                       |                             |    FALSE    |
+| kv::       |    key vales       | cache and other bits)                 |                             |    FALSE    |
+| layers::   |    layers          | hidden, input, output layers etc      | [virtual, types, configs]   |    TRUE     |
+| moe::      |    experts         | mixure of experts  & router's         | [virtual, types, configs]   |    TRUE     |
 
