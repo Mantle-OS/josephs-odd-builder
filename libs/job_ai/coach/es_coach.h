@@ -65,9 +65,6 @@ public:
         return m_bestFitness;
     }
 
-    // -------------------------------------------------------------------------
-    // The Main Loop Step
-    // -------------------------------------------------------------------------
     evo::Genome step(const evo::Genome &parent, Evaluator eval) override
     {
         m_generation++;

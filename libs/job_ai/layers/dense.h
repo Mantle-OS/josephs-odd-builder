@@ -1,10 +1,10 @@
 #pragma once
 
 #include "ilayer.h"
-#include "cords/matrix.h"
-#include "cords/aligned_allocator.h"
-#include "comp/gemm.h"
-#include "comp/activation_math.h"
+#include "matrix.h"
+#include "aligned_allocator.h"
+#include "gemm.h"
+#include "activation_math.h"
 namespace job::ai::layers {
 
 class Dense : public ILayer {
@@ -66,8 +66,6 @@ public:
     // Return flattened view of ALL parameters (Weights + Biases)
     // Used by the Mutator to perturb the layer in one go.
     [[nodiscard]] cords::ViewR parameters() override {
-        // FIX: Explicitly construct Extents to resolve ambiguity
-        // We return a 1D view (Fiber) of the whole storage blob
         using Ext = cords::ViewR::Extent;
         return cords::ViewR(m_storage.data(), Ext(static_cast<uint32_t>(m_storage.size())));
     }

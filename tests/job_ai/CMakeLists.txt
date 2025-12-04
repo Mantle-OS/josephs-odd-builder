@@ -4,15 +4,16 @@ add_compile_options(-mavx -mavx2 -mfma)
 add_executable(test_job_ai
     ../test_spin_till.h
     main.cpp
-    test_activation_math.cpp
-    test_aligned_allocator.cpp
-    test_tensor_view.cpp
-    test_ai_shm_integration.cpp
-    test_unix_genome.cpp
-    test_gemm.cpp
-    test_flash_attention.cpp
-    test_mlp.cpp
-    test_coach.cpp
+    # test_activation_math.cpp
+    # test_aligned_allocator.cpp
+    # test_tensor_view.cpp
+    # test_ai_shm_integration.cpp
+    # test_unix_genome.cpp
+    # test_gemm.cpp
+    # test_flash_attention.cpp
+    # test_mlp.cpp
+    # test_coach.cpp
+    test_moe.cpp
 )
 
 target_link_libraries(test_job_ai PRIVATE

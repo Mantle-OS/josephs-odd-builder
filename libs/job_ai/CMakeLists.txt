@@ -12,66 +12,63 @@ project(JosephsOddBuilderAi
 
 # adapters
 set(JOBAI_ADAPTERS_HEADERS
-    adapters/iadapter.h
-    adapters/adapter_types.h
-    adapters/fmm_adapter.h
+    adapters/iadapter.h         # done'sh
+    adapters/adapter_types.h    # done'sh
+    adapters/fmm_adapter.h      # batter up
     # adapters/bh_adapter.h a bunch more
 )
 set(JOBAI_ADAPTERS_SOURCES)
 
 # coach's
 set(JOBAI_COACH_HEADERS
-    coach/icoach.h
-    coach/coach_types.h     ## make list opf the types I want to support and then add them even if the decl is empty
-    coach/coach_config.h
-    coach/genetic_coach.h   ## after contract
-    coach/es_coach.h        ## after contract
+    coach/icoach.h              # done needs love
+    coach/coach_types.h         # done'ish
+    coach/coach_config.h        # started and looks nice
+    coach/genetic_coach.h       ## after contract
+    coach/es_coach.h            ## working example needs perf
 )
 set(JOBAI_COACH_SOURCES)
 
 # cords
 set(JOBAI_CORDS_HEADERS
-    cords/aligned_allocator.h  # done
-    cords/extents.h             # needs review
-    cords/view_iter.h           # needs review
-    cords/view.h                # needs review
-    cords/rank.h                # needs review
+    cords/aligned_allocator.h   # done
+    cords/extents.h             # done
+    cords/view_iter.h           # done
+    cords/view.h                # done
+    cords/rank.h                # done
     ## Tensors
-    cords/fiber.h               # needs review
-    cords/matrix.h              # needs review
-    cords/volume.h              # needs review
-    cords/batch.h               # needs review
+    cords/fiber.h               # done
+    cords/matrix.h              # done
+    cords/volume.h              # done
+    cords/batch.h               # done
     # Shapes
-    cords/layout.h        ## need to start this=
-    cords/tile4.h          ## need to start this=
-    cords/tile8.h       ## need to start this=
-    cords/tile16.h      ## need to start this=
+    cords/layout.h              ## done
+    cords/tile4.h               ## done
+    cords/tile8.h               ## done
+    cords/tile16.h              ## done
 )
 set(JOBAI_CORDS_SOURCES)
 
 # layers
 set(JOBAI_LAYERS_HEADERS
-    layers/layer_types.h    ## make list opf the types I want to support and then add them even if the decl is empty
-    layers/ilayer.h          # need to lock this down
-    layers/dense.h           # not started
+    layers/layer_types.h        # done'ish
+    layers/ilayer.h             # done'ish
+    layers/dense.h              # working example
+    layers/iparamgroup_provider.h
 )
 set(JOBAI_LAYERS_SOURCES)
 
 # mixure of experts
 set(JOBAI_MOE_HEADERS
-    moe/imoe.h               ## need to start this
-    moe/moe_types.h          ## make list opf the types I want to support and then add them even if the decl is empty
-    moe/sparse_moe.h         # not started
+    moe/imoe.h                  ## done'sh
+    moe/moe_types.h             ## done'ish
+    moe/sparse_moe.h            # needs refactor
 
     # moe/dense_moe.h
     # moe/conv_moe.h
     # moe/attn_moe.h
     # moe/controller_moe.h
     # ....
-    # irouter.h
-    # irouter_types.h
-    # hash_router.h
-    # rule_router.h
     # .....
 
 
@@ -80,24 +77,42 @@ set(JOBAI_MOE_HEADERS
 )
 set(JOBAI_MOE_SOURCES)
 
+set(JOBAI_ROUTER_HEADERS
+    # router/irouter.h
+    router/router_configs.h
+    router/router_plan.h
+    router/router_types.h
+    router/router_contoller.h
+    router/router_impl.h
+
+)
+set(JOBAI_ROUTER_SOURCES
+    router/router_impl.cpp
+)
+
+
+
+
+
 #######################
 # NOT SUBSYSTEMS !
 ########################
 
 set(JOBAI_BASE_HEADERS
-    base/smid_amd.h # immintrin.h wrapper
+    base/smid_amd.h             # immintrin.h wrapper
 )
 set(JOBAI_BASE_SOURCES)
 
 # comp
 set(JOBAI_COMP_HEADERS
-    comp/rrelu_config.h         # needs review
-    comp/gdn_params.h           # needs review
+    comp/rrelu_config.h         # done'ish
+    comp/gdn_params.h           # done'ish
     comp/activation_types.h     # done
-    comp/activation_math.h      # neeeds review
+    comp/activation_math.h      # done'ish
     comp/gemm.h                 # done
     comp/mlp.h                  # done
     comp/flash_attention.h      # done
+    comp/atomic_math.h          # done
 )
 set(JOBAI_COMP_SOURCES)
 
@@ -105,7 +120,7 @@ set(JOBAI_COMP_SOURCES)
 set(JOBAI_EVO_HEADERS
     evo/genome.h                # done
     evo/crossover.h             # not started
-    evo/mutator.h               # not started
+    evo/mutator.h               # done'ish
     evo/population.h            # not started
     evo/species.h               # not started
 )
@@ -140,6 +155,7 @@ add_library(JosephsOddBuilder_Ai SHARED
     ${JOBAI_CORDS_HEADERS}      ${JOBAI_CORDS_HEADERS}
     ${JOBAI_LAYERS_HEADERS}     ${JOBAI_LAYERS_SOURCES}
     ${JOBAI_MOE_HEADERS}        ${JOBAI_MOE_SOURCES}
+    ${JOBAI_ROUTER_HEADERS}     ${JOBAI_ROUTER_SOURCES}
     # non modules
     ${JOBAI_BASE_HEADERS}       ${JOBAI_BASE_SOURCES}
     ${JOBAI_COMP_HEADERS}       ${JOBAI_COMP_SOURCES}
@@ -173,6 +189,7 @@ target_include_directories(JosephsOddBuilder_Ai PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/cords>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/layers>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/moe>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/router>
     ## non modules
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/base>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/comp>
@@ -185,6 +202,7 @@ target_include_directories(JosephsOddBuilder_Ai PUBLIC
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobai/cords>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobai/layers>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobai/moe>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobai/router>
     ## non modules
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobai/base>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobai/comp>
@@ -200,6 +218,7 @@ install(FILES ${JOBAI_COACH_HEADERS}    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/
 install(FILES ${JOBAI_CORDS_HEADERS}    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobai/cords)
 install(FILES ${JOBAI_LAYERS_HEADERS}   DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobai/layers)
 install(FILES ${JOBAI_MOE_HEADERS}      DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobai/moe)
+install(FILES ${JOBAI_MOE_HEADERS}      DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobai/router)
 
 ## NON Module HEADERS  install
 install(FILES ${JOBAI_BASE_HEADERS}     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobai/base)
