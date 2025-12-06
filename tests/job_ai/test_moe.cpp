@@ -6,7 +6,6 @@
 #include <algorithm>
 #include <random>
 
-// The Correct Context
 #include <ctx/job_stealing_ctx.h>
 
 #include <sparse_moe.h>
@@ -18,7 +17,6 @@ using namespace job::ai::moe;
 using namespace job::ai::layers;
 using namespace job::threads;
 
-
 // Simple Mock Expert
 class ScalarMultLayer : public ILayer {
 public:
@@ -29,9 +27,8 @@ public:
 
     void forward(ThreadPool&, const cords::ViewR& input, cords::ViewR& output) override {
         const size_t n = input.size();
-        for(size_t i=0; i<n; ++i) {
+        for(size_t i=0; i<n; ++i)
             output[i] = input[i] * m_scalar;
-        }
     }
 
     [[nodiscard]] cords::ViewR parameters() override { return cords::ViewR(nullptr, cords::ViewR::Extent{0}); }
@@ -118,10 +115,8 @@ TEST_CASE("SparseMoE: Top-2 Routing (Mixing Experts)", "[ai][moe][usage]")
     CHECK(outputData[0] == Approx(1.5f).margin(0.01f));
 }
 
-// =============================================================================
-// BLOCK TWO: EDGE CASES
-// =============================================================================
 
+// edge cases
 TEST_CASE("SparseMoE: Empty Input Batch", "[ai][moe][edge]") {
     JobStealerCtx ctx(4);
     SparseMoE moe(16, 4, 1);
@@ -163,26 +158,28 @@ TEST_CASE("SparseMoE: Missing Expert Implementation", "[ai][moe][edge]") {
 // benchmarks
 
 TEST_CASE("SparseMoE: Throughput Benchmark (LLaMA-Small Scale)", "[ai][moe][bench]") {
-    // Simulating a small MoE layer
+    // simulating a small moe layer
     const int B = 128;
     const int D = 1024;
     const int E = 8;
     const int K = 2;
 
-    JobStealerCtx ctx(16); // Give it THREADS!
+    JobStealerCtx ctx(16); // me cave man me give THREADS!
     SparseMoE moe(D, E, K);
 
-    // Populate experts with real Dense layers
+    // populate experts with real dense layers
     for(int i = 0; i < E; ++i)
         moe.addExpert(i, std::make_shared<Dense>(D, D, job::ai::comp::ActivationType::GELU));
-
 
     using Alloc = cords::AlignedAllocator<float, 64>;
     std::vector<float, Alloc> input(B * D, 0.1f);
     std::vector<float, Alloc> output(B * D);
 
-    cords::ViewR inView(input.data(), cords::ViewR::Extent{static_cast<uint32_t>(B), static_cast<uint32_t>(D)});
-    cords::ViewR outView(output.data(), cords::ViewR::Extent{static_cast<uint32_t>(B), static_cast<uint32_t>(D)});
+    cords::ViewR inView(input.data(),
+                        cords::ViewR::Extent{static_cast<uint32_t>(B), static_cast<uint32_t>(D)});
+
+    cords::ViewR outView(output.data(),
+                         cords::ViewR::Extent{static_cast<uint32_t>(B), static_cast<uint32_t>(D)});
 
     BENCHMARK("MoE Forward (128x1024, 8 Experts, Top2)") {
         moe.forward(*ctx.pool, inView, outView);

@@ -2,7 +2,7 @@
 
 #include <concepts>
 
-namespace job::science {
+namespace job::threads {
 
 template <typename T>
 concept FmmScalar = std::floating_point<T>;
@@ -99,4 +99,4 @@ struct FmmNode {
     }
 };
 
-} // namespace job::science
+} // namespace job::threads

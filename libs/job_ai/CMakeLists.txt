@@ -12,12 +12,33 @@ project(JosephsOddBuilderAi
 
 # adapters
 set(JOBAI_ADAPTERS_HEADERS
-    adapters/iadapter.h         # done'sh
-    adapters/adapter_types.h    # done'sh
-    adapters/fmm_adapter.h      # batter up
-    # adapters/bh_adapter.h a bunch more
+    adapters/adapter_ctx.h
+    adapters/iadapter.h
+    adapters/adapter_types.h
+    # physics style adapter's
+    adapters/fmm_config.h
+    adapters/fmm_adapter.h
+    adapters/bh_config.h
+    adapters/bh_adapter.h
+    adapters/verlet_config.h
+    adapters/verlet_adapter.h
+    # LLM style adapter's
+    adapters/flash_adapter.h
+    adapters/lowrank_config.h
+    adapters/lowrank_adapter.h
+    adapters/dense_config.h
+    adapters/dense_adapter.h
+    ## Factory floor
+    adapters/adapter_factory.h
 )
-set(JOBAI_ADAPTERS_SOURCES)
+set(JOBAI_ADAPTERS_SOURCES
+    adapters/fmm_adapter.cpp
+    adapters/bh_adapter.cpp
+    adapters/verlet_adapter.cpp
+    adapters/dense_adapter.cpp
+    adapters/lowrank_adapter.cpp
+    adapters/flash_adapter.cpp
+)
 
 # coach's
 set(JOBAI_COACH_HEADERS
@@ -31,6 +52,7 @@ set(JOBAI_COACH_SOURCES)
 
 # cords
 set(JOBAI_CORDS_HEADERS
+    cords/attention_shape.h
     cords/aligned_allocator.h   # done
     cords/extents.h             # done
     cords/view_iter.h           # done
@@ -52,9 +74,11 @@ set(JOBAI_CORDS_SOURCES)
 # layers
 set(JOBAI_LAYERS_HEADERS
     layers/layer_types.h        # done'ish
+    layers/iparamgroup_provider.h
+    layers/attention_config.h
+    layers/attention.h
     layers/ilayer.h             # done'ish
     layers/dense.h              # working example
-    layers/iparamgroup_provider.h
 )
 set(JOBAI_LAYERS_SOURCES)
 
@@ -79,6 +103,7 @@ set(JOBAI_MOE_SOURCES)
 
 set(JOBAI_ROUTER_HEADERS
     # router/irouter.h
+    router/router_expert.h
     router/router_configs.h
     router/router_plan.h
     router/router_types.h
@@ -119,10 +144,17 @@ set(JOBAI_COMP_SOURCES)
 # evo
 set(JOBAI_EVO_HEADERS
     evo/genome.h                # done
-    evo/crossover.h             # not started
-    evo/mutator.h               # done'ish
-    evo/population.h            # not started
-    evo/species.h               # not started
+    evo/individual.h            # might not be needed
+    evo/crossover_type.h
+    evo/crossover_config.h
+    evo/crossover.h
+    evo/mutator_config.h
+    evo/mutator.h
+    evo/population_config.h
+    evo/population.h
+    evo/species_config.h
+    evo/species.h
+    evo/speciation_engine.h
 )
 set(JOBAI_EVO_SOURCES
     evo/genome.cpp              # empty for now
@@ -139,6 +171,7 @@ set(JOBAI_INFER_SOURCES
 # kv
 #######################
 set(JOBAI_KV_HEADERS
+    kv/kv_key.h
     kv/kv_cache.h               # not planned
 )
 set(JOBAI_KV_SOURCES)

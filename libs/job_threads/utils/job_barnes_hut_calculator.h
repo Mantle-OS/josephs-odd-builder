@@ -103,6 +103,10 @@ private:
         max_dim = std::max(max_dim, total_box.max.y - total_box.min.y);
         max_dim = std::max(max_dim, total_box.max.z - total_box.min.z);
 
+        if (max_dim <= std::numeric_limits<T_Scalar>::epsilon()) {
+            max_dim = T_Scalar(1.0); // Default size
+        }
+
         // 1% padding
         max_dim *= T_Scalar(1.01);
 

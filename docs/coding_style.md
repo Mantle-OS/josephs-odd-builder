@@ -332,7 +332,7 @@ We generally structure tests in **three conceptual blocks**. Some older tests do
   - These exist mainly to catch regressions and guard invariants.
   - It’s fine if these are a bit more mechanical or verbose.
 
-- **Block three: benchmarks / stress**
+- **Block three: benchmarks / stress if needed (they are not all the time)**
   - [Push it to the limit](https://youtu.be/3-3Yok5D3Aw?si=S7LgO8yxn0OCCdMK)
   - Micro-benchmarks (e.g. thread startup latency) and stress tests (e.g. 10k tasks through a scheduler, high-volume actor mailboxes).
   - These tests are about performance characteristics and stability, not correctness alone.

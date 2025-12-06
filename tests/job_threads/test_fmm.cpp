@@ -7,7 +7,6 @@
 #include <cmath>
 
 using namespace job::threads;
-using namespace job::science;
 
 // Old lets let this burn up in a .....
 // struct TestBody {

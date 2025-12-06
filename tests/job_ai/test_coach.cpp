@@ -45,7 +45,7 @@ TEST_CASE("ESCoach: Optimizes simple Target Sum problem", "[ai][coach][es][usage
 
     // 30 generations
     for(int i = 0; i < 50; ++i)
-        parent = coach.step(parent, evaluate_sum);
+        parent = coach.coach(parent, evaluate_sum);
 
     INFO("Generation: " << coach.generation());
     INFO("Final Fitness: " << coach.currentBestFitness());
@@ -85,7 +85,7 @@ TEST_CASE("ESCoach: Minimization Mode works", "[ai][coach][es][usage]")
     REQUIRE(startScore == Catch::Approx(100.0f));
 
     for(int i=0; i<20; ++i)
-        parent = coach.step(parent, eval_minimize);
+        parent = coach.coach(parent, eval_minimize);
 
 
     REQUIRE(coach.currentBestFitness() < startScore);
@@ -104,7 +104,7 @@ TEST_CASE("ESCoach: Handles Population Size 1(like me lol)", "[ai][coach][es][ed
 
     ESCoach coach(ctx.pool, cfg);
 
-    parent = coach.step(parent, evaluate_sum);
+    parent = coach.coach(parent, evaluate_sum);
     REQUIRE(coach.generation() == 1);
 }
 
@@ -121,7 +121,7 @@ TEST_CASE("ESCoach: Handles Zero Sigma (Stagnation)", "[ai][coach][es][edge]")
     ESCoach coach(ctx.pool, cfg);
 
     float startScore = evaluate_sum(parent);
-    parent = coach.step(parent, evaluate_sum);
+    parent = coach.coach(parent, evaluate_sum);
 
     REQUIRE(coach.currentBestFitness() == Catch::Approx(startScore));
 }
@@ -194,7 +194,7 @@ TEST_CASE("ESCoach: High-Throughput Population Benchmark", "[ai][coach][es][benc
     };
 
     BENCHMARK("ES Generation (Pop=1024, 1KB Genome)") {
-        return coach.step(parent, fastEval);
+        return coach.coach(parent, fastEval);
     };
 }
 

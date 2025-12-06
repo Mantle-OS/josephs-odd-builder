@@ -6,7 +6,7 @@
 
 #include "job_fmm_concepts.h"
 
-namespace job::science {
+namespace job::threads {
 
 template <typename T_Vec, typename T_Scalar>
 struct FmmTopology {
@@ -190,4 +190,4 @@ private:
     }
 };
 
-} // namespace job::science
+} // namespace job::threads

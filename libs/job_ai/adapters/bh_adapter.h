@@ -1,37 +1,39 @@
 #pragma once
 
 #include <memory>
+#include <string>
 
-#include <job_fmm_integrator.h>
+#include <job_barnes_hut_calculator.h>
+#include <job_scheduler_types.h>
+
+#include <vec3f.h>
 
 #include "iadapter.h"
 #include "adapter_types.h"
 
-#include "fmm_config.h"
-
-#include <vec3f.h>
+#include "bh_config.h"
 
 namespace job::ai::adapters {
 
-class FmmAdapter : public IAdapter {
+class BhAdapter : public IAdapter {
 public:
-    using FmmSolver = job::threads::JobFmmEngine<FmmTraits::Body, FmmTraits::Vec3,  FmmTraits::Real, FmmTraits>;
-    static std::unique_ptr<FmmAdapter> unique(FmmConfig cfg = {})
+    static std::unique_ptr<BhAdapter> unique(BhConfig cfg = {})
     {
-        return std::make_unique<FmmAdapter>(cfg);
+        return std::make_unique<BhAdapter>(cfg);
     }
 
-    explicit FmmAdapter(FmmConfig cfg = {});
+    explicit BhAdapter(BhConfig cfg = {});
+
     [[nodiscard]] AdapterType type() const override;
     [[nodiscard]] std::string name() const override;
 
-    void adapt(
-        job::threads::ThreadPool &pool,
+    void adapt(job::threads::ThreadPool &pool,
         const cords::AttentionShape &shape,
         const cords::ViewR &sources, const cords::ViewR &targets, const cords::ViewR &values, cords::ViewR &output,
         const AdapterCtx &ctx) override;
 
 private:
-    FmmConfig m_cfg;
+    BhConfig m_cfg;
 };
+
 } // namespace job::ai::adapters

@@ -12,7 +12,7 @@
 
 namespace job::threads {
 
-using namespace job::science;
+using namespace job::threads;
 
 template <typename T_Body, typename T_Vec, typename T_Scalar, typename T_Traits>
 class JobFmmEngine {
@@ -39,6 +39,13 @@ public:
         if(!m_pool)
             JOB_LOG_WARN("[JobFmmEngine] No Pool What in the hell are you up too....");
     }
+
+    JobFmmEngine(ThreadPool &pool, Params params):
+        m_pool(&pool, [](ThreadPool*){}),
+        m_params(params)
+    {
+    }
+
 
     void compute(Bodies &bodies)
     {

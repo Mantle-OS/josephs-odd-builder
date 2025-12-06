@@ -3,9 +3,9 @@
 #include "job_fmm_concepts.h"
 #include <cmath>
 
-namespace job::science {
+namespace job::threads {
 
-// SHIFT SHIFT SHIFT  __glibcxx_shiftSHIFT  SHIFT SHIFT SHIFT SHIFT SHIFT __glibcxx_shift
+// My brain SHIFT SHIFT SHIFT  __glibcxx_shiftSHIFT  SHIFT SHIFT SHIFT SHIFT SHIFT __glibcxx_shift
 template <typename T_Vec, typename T_Scalar>
 struct FmmKernels {
     using Coeffs = FmmCoefficients<T_Vec, T_Scalar>;
@@ -367,4 +367,4 @@ struct FmmKernels {
     }
 };
 
-} // namespace job::science
+} // namespace job::threads

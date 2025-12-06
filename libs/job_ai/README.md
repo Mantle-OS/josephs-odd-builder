@@ -138,10 +138,20 @@ Rules: three deep before I go crazy.
 |-------------------|---------------|----------------------------------------------------------|---------------------------------------|-------------------------------|                                                                       
 |                   |               |                                                          |                                       |                               |
 |                   |               |                                                          |                                       |                               |
-|      moe::        |   experts     |       experts, routers, gating, top-k routing,           |     sparse MoE: Expert interface,     |         TRUE                  |
-|                   |               |          load-balancing, capacity management,            |     router, dispatcher, expert        |                               |
-|                   |               |          sparsity patterns                               |             configs                   |                               |
-|-------------------|---------------|----------------------------------------------------------|-----------------------------------------------------------------------|                                                                                      
+|      moe::        |   experts     |       experts, SparseMoE                                 |     sparse MoE: Expert interface,     |         TRUE                  |
+|                   |               |                                                          |     router, dispatcher, expert        |                               |
+|                   |               |                                                          |             configs                   |                               |
+|-------------------|---------------|----------------------------------------------------------|-----------------------------------------------------------------------||                                                                       
+|                   |               |                                                          |                                       |                               |
+|                   |               |                                                          |                                       |                               |
+|      router::     |   routers     |       routers types, Spatial , hash, top-k,              |                                       |         TRUE                  |
+|                   |               |          state, irouter and classes based on irouter     |                                       |                               |
+|                   |               |          config(RouterConfig) with presets               |                                       |                               |
+|-------------------|---------------|----------------------------------------------------------|-----------------------------------------------------------------------|
+
+
+
+
 ```
 
 
