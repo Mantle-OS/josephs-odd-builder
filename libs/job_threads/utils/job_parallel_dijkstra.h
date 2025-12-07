@@ -42,10 +42,7 @@ namespace job::threads
 template <typename W>
 struct WeightTraits {
     static constexpr W zero() noexcept { return W(0); }
-    static constexpr W inf()  noexcept {
-        if constexpr (std::numeric_limits<W>::has_infinity) return std::numeric_limits<W>::infinity();
-        else return std::numeric_limits<W>::max();
-    }
+    static constexpr W inf()  noexcept {return std::numeric_limits<W>::max();}
 };
 
 template <typename W>

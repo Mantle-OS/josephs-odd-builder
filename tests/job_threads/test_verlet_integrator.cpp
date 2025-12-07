@@ -251,7 +251,7 @@ TEST_CASE("VerletIntegrator Determinism: Single Thread vs Thread Pool", "[thread
 
         const float dt = 0.01f;
         for(int i=0; i < 100; ++i)
-            sim4.step(dt);
+            sim4.step(dt); /// HERE
 
         pool4->shutdown();
     }

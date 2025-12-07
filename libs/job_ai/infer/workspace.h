@@ -23,6 +23,10 @@ public:
     void resize(std::size_t sizeBytes)
     {
         const std::size_t floatCount = sizeBytes / sizeof(float);
+
+        if (m_memory.capacity() >= floatCount)
+            return;
+
         m_memory.resize(floatCount);
     }
 

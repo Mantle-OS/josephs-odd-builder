@@ -102,8 +102,8 @@ void ThreadWatcher::monitorLoop(std::stop_token token, std::chrono::milliseconds
 
             const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - wt.startTime);
             if (elapsed > wt.timeout) {
-                JOB_LOG_ERROR("[ThreadWatcher] Thread ID {} exceeded timeout of {} ms (elapsed: {} ms)",
-                              wt.id, wt.timeout.count(), elapsed.count());
+                // JOB_LOG_ERROR("[ThreadWatcher] Thread ID {} exceeded timeout of {} ms (elapsed: {} ms)",
+                //               wt.id, wt.timeout.count(), elapsed.count());
                 wt.thread->requestStop();
             }
         }

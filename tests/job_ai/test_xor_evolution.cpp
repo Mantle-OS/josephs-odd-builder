@@ -10,6 +10,9 @@ using namespace job::ai::coach;
 using namespace job::ai::evo;
 using namespace job::ai::layers;
 
+
+
+
 // build the xor brain
 Genome buildXORGenome()
 {
@@ -48,9 +51,11 @@ Genome buildXORGenome()
 
 TEST_CASE("Evolution: Solving XOR", "[coach][xor]")
 {
-    job::threads::JobStealerCtx ctx(1);
+    JOB_LOG_INFO("Starting XOR This may take some time");
+    job::threads::JobStealerCtx ctx(8);
+    job::threads::JobStealerCtx evalCtx(1);
 
-    PortalEvaluator physics(ctx.pool);
+    PortalEvaluator physics(evalCtx.pool);
     physics.setDataset({
         { {0.0f, 0.0f}, {0.0f} },
         { {0.0f, 1.0f}, {1.0f} },
@@ -61,7 +66,7 @@ TEST_CASE("Evolution: Solving XOR", "[coach][xor]")
     Genome seed = buildXORGenome();
 
     ESCoach::Config cfg;
-    cfg.populationSize = 256;
+    cfg.populationSize = 512;// 256;
     cfg.sigma = 0.1f;
     cfg.decay = 0.99f;
 
@@ -72,6 +77,7 @@ TEST_CASE("Evolution: Solving XOR", "[coach][xor]")
 
     for (int i = 0; i < generations; ++i) {
         // winner winner chicken dinner
+        JOB_LOG_INFO("XOR Check {}", i);
         Genome winner = coach.coach(
             (i == 0) ? seed : coach.bestGenome(),
             physics.portal()
@@ -81,10 +87,12 @@ TEST_CASE("Evolution: Solving XOR", "[coach][xor]")
 
         // pray !@!
         if (bestFit > 0.95f) {
-            JOB_LOG_INFO("XOR Solved at Gen {} Score: ", i, bestFit);
+            JOB_LOG_INFO("XOR Solved at Gen {} Score: {}", i, bestFit);
             break;
         }
     }
 
     REQUIRE(bestFit > 0.85f); // hopefully close to 1.0
 }
+
+

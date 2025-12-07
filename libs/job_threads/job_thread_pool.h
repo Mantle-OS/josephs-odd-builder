@@ -10,6 +10,7 @@
 #include "job_thread.h"
 #include "job_thread_options.h"
 #include "job_thread_watcher.h"
+#include "job_semaphore.h"
 #include "sched/job_isched_policy.h"
 #include "descr/job_task_descriptor.h"
 
@@ -34,7 +35,6 @@ public:
     ThreadPool &operator=(const ThreadPool &) = delete;
 
     JobThreadMetrics snapshotMetrics() const noexcept;
-
     void updateLoadAverage();
 
     void shutdown();
@@ -44,33 +44,69 @@ public:
     {
         using ReturnType = std::invoke_result_t<Func, Args...>;
 
-        if (m_stopping.load() || !m_scheduler) {
+        if (m_stopping.load(std::memory_order_relaxed) || !m_scheduler) {
             JOB_LOG_ERROR("[ThreadPool] Stopping or no scheduler, cannot submit new tasks");
             return {};
         }
 
         if (!m_scheduler->admit(m_workers.size(), *desc)) {
-            JOB_LOG_WARN("[ThreadPool] Scheduler rejected task ID {}", desc->id());
-            // invalid future to signal rejection/BAD
+            // JOB_LOG_WARN("[ThreadPool] Scheduler rejected task ID {}", desc->id());
             return {};
         }
+
         auto task = std::make_shared<std::packaged_task<ReturnType()>>(
             std::bind(std::forward<Func>(f), std::forward<Args>(args)...)
             );
+
         std::future<ReturnType> result = task->get_future();
 
         uint64_t id = desc->id();
-
         {
-            std::lock_guard<std::mutex> lock(m_storageMutex);
-            m_taskStorage[id] = [task](){ (*task)(); };
+            TaskShard &shard = getShard(id);
+            std::lock_guard<std::mutex> lock(shard.mutex);
+            shard.map[id] = [task](){ (*task)(); };
         }
 
         m_scheduler->enqueue(std::move(desc));
-        m_workerCondition.notify_one();
+        (void)m_workSemaphore.post();
 
         return result;
     }
+
+
+
+    // template <typename Func, typename... Args>
+    // auto submit(JobIDescriptor::Ptr desc, Func &&f, Args &&...args) -> std::future<std::invoke_result_t<Func, Args...>>
+    // {
+    //     using ReturnType = std::invoke_result_t<Func, Args...>;
+
+    //     if (m_stopping.load() || !m_scheduler) {
+    //         JOB_LOG_ERROR("[ThreadPool] Stopping or no scheduler, cannot submit new tasks");
+    //         return {};
+    //     }
+
+    //     if (!m_scheduler->admit(m_workers.size(), *desc)) {
+    //         JOB_LOG_WARN("[ThreadPool] Scheduler rejected task ID {}", desc->id());
+    //         // invalid future to signal rejection/BAD
+    //         return {};
+    //     }
+    //     auto task = std::make_shared<std::packaged_task<ReturnType()>>(
+    //         std::bind(std::forward<Func>(f), std::forward<Args>(args)...)
+    //         );
+    //     std::future<ReturnType> result = task->get_future();
+
+    //     uint64_t id = desc->id();
+
+    //     {
+    //         std::lock_guard<std::mutex> lock(m_storageMutex);
+    //         m_taskStorage[id] = [task](){ (*task)(); };
+    //     }
+
+    //     m_scheduler->enqueue(std::move(desc));
+    //     m_workerCondition.notify_one();
+
+    //     return result;
+    // }
 
     template <typename Func, typename... Args>
     auto submit(int priority, Func &&f, Args &&...args) -> std::future<std::invoke_result_t<Func, Args...>>
@@ -111,24 +147,43 @@ protected:
     void workerLoop(std::stop_token token, uint32_t worker_id);
 
 private:
+
+    static constexpr size_t kShardCount = 64;
+
+    struct alignas(64) TaskShard {
+        mutable std::mutex mutex;
+        std::unordered_map<uint64_t, TaskFunction> map;
+    };
+
+    std::array<TaskShard, kShardCount> m_taskShards;
+
+    // Helper to pick the right bucket
+    TaskShard& getShard(uint64_t taskId)
+    {
+        // Simple hash: ID modulo Count
+        return m_taskShards[taskId % kShardCount];
+    }
+    // mutable std::mutex                          m_storageMutex;
+    // std::condition_variable                     m_workerCondition;
+    // std::unordered_map<uint64_t, TaskFunction>  m_taskStorage;
+    // std::atomic<int>                            m_progress{0};
+
+    JobSem m_workSemaphore;
+    std::atomic<int> m_progress{0};
+    std::atomic<double> m_loadAvg{0.0};
+
+
     std::vector<JobThread::Ptr>                 m_workers;
     ISchedPolicy::Ptr                           m_scheduler;
-    std::unordered_map<uint64_t, TaskFunction>  m_taskStorage;
-    mutable std::mutex                          m_storageMutex;
-    std::condition_variable                     m_workerCondition;
     std::atomic<uint64_t>                       m_nextTaskId{1};
     ThreadWatcher::Ptr                          m_watcher;
     std::atomic<bool>                           m_stopping{false};
-    std::atomic<int>                            m_progress{0};
     int                                         m_minProgress{0};
     int                                         m_maxProgress{0};
     JobThreadOptions                            m_threadOptions;
 };
 
 } // job::threads
-// CHECKPOINT: v1.3
+// CHECKPOINT: v1.4
 
 
-// While the m_storageMutex protects the m_taskStorage, it's clear this lock contention, with every task needing multiple acquisitions,
-// presents a bottleneck. For v1, this is acceptable, but I acknowledge that it is a future optimization.
-// The Fix (Later): Sharded maps. m_taskStorage[id % 16] with 16 mutexes.
