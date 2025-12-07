@@ -24,14 +24,14 @@ public:
     Rank(core::real_t *data, const Indices &indices) :
         AView(data, Extent(indices.begin(), indices.end()))
     {
-        assert(rank() == Rank);
+        assert(rank() == RankSize);
     }
 
     [[nodiscard]] core::real_t &at(const Indices &indices)
     {
         assert(rank() == RankSize);
         for (std::size_t i = 0; i < RankSize; ++i)
-            assert(dims[i] < m_shape[i]);
+            assert(indices[i] < m_extent[i]);
 
         return accessImpl(indices, std::make_index_sequence<RankSize>{});
     }
@@ -40,7 +40,7 @@ public:
     {
         assert(rank() == RankSize);
         for (std::size_t i = 0; i < RankSize; ++i)
-            assert(indices[i] < m_shape[i]);
+            assert(indices[i] < m_extent[i]);
 
         return accessImpl(indices, std::make_index_sequence<RankSize>{});
     }

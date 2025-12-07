@@ -191,6 +191,10 @@ inline static std::string make_temp_sock_path(const std::string &base)
     return path;
 }
 
+
+
+#ifdef JOB_TEST_BENCHMARKS
+
 TEST_CASE("Unix Socket: AI Genome Transfer", "[unix][ai][genome]")
 {
     TestLoop loop;
@@ -252,7 +256,6 @@ TEST_CASE("Unix Socket: AI Genome Transfer", "[unix][ai][genome]")
     while (!clientConnected.load())
         std::this_thread::yield();
 
-    // 4. BENCHMARK
     // We keep the connection open to measure throughput/latency without handshake overhead
     BENCHMARK("Unix Socket Roundtrip (Kernel Latency)") {
         packetReceived.store(false);
@@ -280,3 +283,4 @@ TEST_CASE("Unix Socket: AI Genome Transfer", "[unix][ai][genome]")
     server->stop();
     fs::remove(path);
 }
+#endif

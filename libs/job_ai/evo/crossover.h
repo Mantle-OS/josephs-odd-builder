@@ -14,31 +14,24 @@ namespace job::ai::evo {
 
 class Crossover {
 public:
-    // -------------------------------------------------------------------------
-    // Constructors & Rule of 5
-    // -------------------------------------------------------------------------
     Crossover() = default;
 
     explicit Crossover(const CrossoverConfig &cfg)
         : m_cfg(cfg)
     {}
 
-    // Copy/Move logic is now trivial since we only hold config
     Crossover(const Crossover&) = default;
     Crossover(Crossover&&) = default;
     Crossover& operator=(const Crossover&) = default;
     Crossover& operator=(Crossover&&) = default;
 
-    // -------------------------------------------------------------------------
-    // Operations
-    // -------------------------------------------------------------------------
     [[nodiscard]] Genome cross(const Genome &p1, const Genome &p2)
     {
-        // Basic topology check: In V1, only crossover matching topologies
         if (p1.weights.size() != p2.weights.size())
-            return p1; // Fallback: Cloning is safer than crashing
+            return p1;
 
-        Genome child = p1; // Copy structure/topology from P1
+
+        Genome child = p1;
 
         switch (m_cfg.type) {
         case CrossoverType::None:
@@ -61,17 +54,23 @@ public:
             break;
         }
 
+        // FIXME
         // Reset lineage info for the new child
         // (Though usually, the caller/Coach handles ID generation)
         child.header.uuid = 0;
-        child.header.parent_id = p1.header.uuid; // Primary parent
+        child.header.parent_id = p1.header.uuid;
 
         return child;
     }
 
-    // Configuration Access
-    void setConfig(const CrossoverConfig& cfg) { m_cfg = cfg; }
-    const CrossoverConfig& config() const { return m_cfg; }
+    void setConfig(const CrossoverConfig& cfg)
+    {
+        m_cfg = cfg;
+    }
+    const CrossoverConfig& config() const
+    {
+        return m_cfg;
+    }
 
 private:
     void applyUniform(Genome &child, const Genome &p1, const Genome &p2)
@@ -82,8 +81,7 @@ private:
         const size_t n = p1.weights.size();
         const float swapProb = m_cfg.uniformSwapProb;
 
-        // Optimization: If prob is 0.5 (common), I should use boolean distribution ?
-        // But float check is "fast" enough.
+        // float check is "fast" enough.
         for (size_t i = 0; i < n; ++i)
             if (dist(rng) < swapProb)
                 child.weights[i] = p2.weights[i];

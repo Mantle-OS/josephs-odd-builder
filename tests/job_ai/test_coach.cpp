@@ -126,29 +126,7 @@ TEST_CASE("ESCoach: Handles Zero Sigma (Stagnation)", "[ai][coach][es][edge]")
     REQUIRE(coach.currentBestFitness() == Catch::Approx(startScore));
 }
 
-// TEST_CASE("ESCoach: High-Throughput Population Benchmark", "[ai][coach][es][bench]")
-// {
-//     JobStealerCtx ctx(8); //8 cores
-
-//     Genome parent;
-//     parent.weights.resize(1024); // 1KB Genome
-//     std::fill(parent.weights.begin(), parent.weights.end(), 0.5f);
-
-//     auto cfg = CoachPresets::kStandard;
-//     cfg.populationSize = 1024; // 1024 mutants per gen
-
-//     ESCoach coach(ctx.pool, cfg);
-
-//     // "fast"
-//     auto fastEval = [](const Genome &g) {
-//         return g.weights[0] + g.weights[1];
-//     };
-
-//     BENCHMARK("ES Generation (Pop=1024, 1KB Genome)") {
-//         return coach.step(parent, fastEval);
-//     };
-// }
-
+#ifdef JOB_TEST_BENCHMARKS
 TEST_CASE("ESCoach: infra tax vs raw eval", "[ai][coach][es][bench-tax]")
 {
     JobStealerCtx ctx(8);
@@ -197,5 +175,5 @@ TEST_CASE("ESCoach: High-Throughput Population Benchmark", "[ai][coach][es][benc
         return coach.coach(parent, fastEval);
     };
 }
-
+#endif
 

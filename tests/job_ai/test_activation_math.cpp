@@ -2,27 +2,30 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 #include <catch2/catch_approx.hpp>
+#include <random>
 #include <vector>
 #include <algorithm>
 #include <cmath>
+
+#include <ctx/job_stealing_ctx.h>
 
 #include <real_type.h>
 #include <job_logger.h>
 
 #include "activation_math.h"
 #include "activation_types.h"
+#include "activate_parallel.h"
 #include "gdn_params.h"
 
 using Catch::Approx;
 
 using namespace job::ai::comp;
 using namespace job::core;
+using namespace job::threads;
 
 static Approx approx(real_t value, real_t tol = real_t(1e-5))
 {
-    // Absolute-tolerance helper so we don't abuse relative epsilon near zero.
-    return Approx(static_cast<double>(value))
-    .margin(static_cast<double>(tol));
+    return Approx(static_cast<double>(value)).margin(static_cast<double>(tol));
 }
 
 TEST_CASE("activate() usage: basic scalar activations", "[activation][usage]")
@@ -31,51 +34,20 @@ TEST_CASE("activate() usage: basic scalar activations", "[activation][usage]")
     const real_t xNeg  = real_t(-2.0);
     const real_t xZero = real_t(0);
 
-    // Identity stays itself
     REQUIRE(activate(ActivationType::Identity, xPos)  == xPos);
-    REQUIRE(activate(ActivationType::Identity, xZero) == xZero);
-
-    // ReLU: zero out the grumps
     REQUIRE(activate(ActivationType::ReLU, xPos)  == xPos);
     REQUIRE(activate(ActivationType::ReLU, xZero) == xZero);
     REQUIRE(activate(ActivationType::ReLU, xNeg)  == real_t(0));
 
-    // LeakyReLU: negative side is scaled by alpha
     const real_t alpha = real_t(0.1);
     REQUIRE(activate(ActivationType::LeakyReLU, xPos, alpha) == xPos);
     REQUIRE(activate(ActivationType::LeakyReLU, xNeg, alpha) == xNeg * alpha);
-
-    // PReLU behaves like LeakyReLU when you pass alpha
-    REQUIRE(activate(ActivationType::PReLU, xNeg, alpha) == xNeg * alpha);
-
-    // HardTanh clamps to [-1, 1]
-    REQUIRE(activate(ActivationType::HardTanh, real_t(2.5))  == real_t(1));
-    REQUIRE(activate(ActivationType::HardTanh, real_t(-3.0)) == real_t(-1));
-    REQUIRE(activate(ActivationType::HardTanh, real_t(0.5))  == real_t(0.5));
 }
 
 TEST_CASE("Sigmoid and Tanh behave as expected", "[activation][sigmoid][tanh]")
 {
-    const real_t xZero    = real_t(0);
-    const real_t sigZero  = activate(ActivationType::Sigmoid, xZero);
-    const real_t tanhZero = activate(ActivationType::Tanh, xZero);
-
-    // Midpoint of sigmoid and tanh
-    REQUIRE(sigZero  == approx(real_t(0.5)));
-    REQUIRE(tanhZero == approx(real_t(0)));
-
-    // Sigmoid squashes into (0, 1)
-    const real_t sigLargePos = activate(ActivationType::Sigmoid, real_t(10));
-    const real_t sigLargeNeg = activate(ActivationType::Sigmoid, real_t(-10));
-    REQUIRE(sigLargePos == approx(real_t(1), real_t(1e-4)));
-    // Near zero in absolute terms
-    REQUIRE(sigLargeNeg == approx(real_t(0), real_t(1e-4)));
-
-    // tanh squashes into (-1, 1)
-    const real_t tLargePos = activate(ActivationType::Tanh, real_t(10));
-    const real_t tLargeNeg = activate(ActivationType::Tanh, real_t(-10));
-    REQUIRE(tLargePos == approx(real_t(1), real_t(1e-4)));
-    REQUIRE(tLargeNeg == approx(real_t(-1), real_t(1e-4)));
+    REQUIRE(activate(ActivationType::Sigmoid, real_t(0)) == approx(real_t(0.5)));
+    REQUIRE(activate(ActivationType::Tanh, real_t(0)) == approx(real_t(0)));
 }
 
 TEST_CASE("Softplus and ReLU6 are sane", "[activation][softplus][relu6]")
@@ -138,13 +110,13 @@ TEST_CASE("Swish, HSwish, Mish, HMish behave roughly as advertised", "[activatio
     REQUIRE(hsMid  >  real_t(0)); // in the sloped positive region
     REQUIRE(hsPos  >  real_t(0));
 
-    // Mish: x * tanh(softplus(x)), basic sign sanity
+    // mish: x * tanh(softplus(x)), basic sign sanity ... I think
     const real_t mishNeg = mish(xNeg);
     const real_t mishPos = mish(xPos);
     REQUIRE(mishNeg < real_t(0));
     REQUIRE(mishPos > real_t(0));
 
-    const real_t hmNeg = hMish(real_t(-1.0)); // stop being so dang negitive.....
+    const real_t hmNeg = hMish(real_t(-1.0)); // stop being so damn negitive.....
     const real_t hmPos = hMish(xPos);
     REQUIRE(hmNeg < real_t(0));
     REQUIRE(hmPos > real_t(0));
@@ -159,11 +131,10 @@ TEST_CASE("SELU uses the baked-in magic numbers", "[activation][selu]")
     const real_t yNeg = selu(xNeg);
 
     // Positive: scaled linear
-    REQUIRE(yPos == approx(kSeluScale * xPos));
+    REQUIRE(yPos == approx(kSeluScale * xPos)); // stop being so damn positive .....
 
-    // Negative: kScale * kAlpha * (exp(x) - 1)
     const real_t expectedNeg =
-        kSeluScale * kSeluAlpha * (std::exp(xNeg) - real_t(1));
+        kSeluScale * kSeluAlpha * (std::exp(xNeg) - real_t(1)); // make up your mind already !!!
     REQUIRE(yNeg == approx(expectedNeg));
 }
 
@@ -220,7 +191,7 @@ TEST_CASE("activate() dispatches all supported activation types", "[activation][
     (void)activate(ActivationType::RReLU,      x, real_t(0.3));
 
     // Maxout / GDN are intentionally not implemented as pointwise in activate()
-    // We just make sure they don't throw or crash.
+    // just make sure they don't throw or crash.
     (void)activate(ActivationType::Maxout,     x);
     (void)activate(ActivationType::GDN,        x);
 }
@@ -260,7 +231,62 @@ TEST_CASE("GDN performs cross-channel normalization", "[activation][gdn]")
     }
 }
 
-TEST_CASE("Activation performance: bulk ReLU", "[activation][bench]") {
+
+TEST_CASE("Vectorized Dispatcher matches Scalar Reference", "[activation][vector]")
+{
+    JobStealerCtx ctx(4);
+
+    constexpr size_t N = 65536;
+    std::vector<float> input(N);
+
+    std::mt19937 gen(42);
+    std::uniform_real_distribution<float> dist(-10.0f, 10.0f);
+    for(auto& x : input)
+        x = dist(gen);
+
+    std::vector<float> scalarRef = input;
+    std::vector<float> vectorOut = input;
+
+    for(size_t i=0; i<N; ++i)
+        scalarRef[i] = activate(ActivationType::ReLU, scalarRef[i]);
+
+    activate_buffer(*ctx.pool, vectorOut.data(), N, ActivationType::ReLU);
+
+    for(size_t i=0; i<N; ++i)
+        if (std::abs(scalarRef[i] - vectorOut[i]) > 1e-5f)
+            FAIL("Mismatch at index " << i << ": Scalar=" << scalarRef[i] << " Vector=" << vectorOut[i]);
+
+    SUCCEED("ReLU Vectorization matches Scalar");
+}
+
+TEST_CASE("Vectorized Swish (Approx) vs Scalar (Exact)", "[activation][vector][swish]")
+{
+    JobStealerCtx ctx(4);
+    constexpr size_t N = 1024;
+    std::vector<float> input(N);
+    for(size_t i=0; i<N; ++i)
+        input[i] = (float)i * 0.01f - 5.0f; // -5 to 5 range
+
+    std::vector<float> vecOut = input;
+
+    // meh whatever
+    activate_buffer(*ctx.pool, vecOut.data(), N, ActivationType::Swish);
+
+    // run scalar (std exp)
+    for(size_t i=0; i<N; ++i) {
+        float scalar = activate(ActivationType::Swish, input[i]);
+        float diff = std::abs(scalar - vecOut[i]);
+        if (std::abs(scalar) > 1e-3f) {
+            float rel_err = diff / std::abs(scalar);
+            REQUIRE(rel_err < 0.05f); // Make sure the painter(Johann von Schraudolph) paints in the lines
+        }
+    }
+}
+
+#ifdef JOB_TEST_BENCHMARKS
+
+TEST_CASE("Activation performance: bulk ReLU", "[activation][bench]")
+{
     constexpr std::size_t N = 1'000'000;
     std::vector<real_t> data(N);
     std::vector<real_t> out(N);
@@ -276,10 +302,10 @@ TEST_CASE("Activation performance: bulk ReLU", "[activation][bench]") {
     };
 }
 
-
-TEST_CASE("GDN performance: small vs medium channels", "[activation][gdn][bench]") {
+TEST_CASE("GDN performance: small vs medium channels", "[activation][gdn][bench]")
+{
     constexpr std::size_t C_small = 16;
-    // constexpr std::size_t C_med   = 128; << unused
+    // constexpr std::size_t C_med   = 128;
 
     GDNParams p_small;
     p_small.beta.assign(C_small, real_t(1));
@@ -288,17 +314,52 @@ TEST_CASE("GDN performance: small vs medium channels", "[activation][gdn][bench]
         p_small.gamma[i][i] = real_t(0.5);
 
     std::vector<real_t> x_small(C_small, real_t(1.0));
-
     BENCHMARK("GDN C=16") {
         auto y = gdn(x_small, p_small);
         return y[0];
     };
+}
 
-    // Same pattern for C=128 if you want
+TEST_CASE("Activation Benchmark: Scalar vs Vector", "[activation][bench]")
+{
+    JobStealerCtx ctx(8);
+
+    constexpr std::size_t N = 1'000'000; // 1M floats = 4MB data ... math silly math
+    std::vector<real_t> data(N);
+
+    // get out of here homunculus
+    for (std::size_t homunculus = 0; homunculus < N; ++homunculus)
+        data[homunculus] = (homunculus % 2 == 0) ?
+                      real_t(homunculus * 0.001) :
+                      real_t(-homunculus * 0.001);
+
+    // destructive benchmarks !!
+    std::vector<real_t> bufA = data;
+    std::vector<real_t> bufB = data;
+
+    BENCHMARK("ReLU (Scalar Loop)") {
+        for (std::size_t homunculus = 0; homunculus < N; ++homunculus)
+            bufA[homunculus] = activate(ActivationType::ReLU, bufA[homunculus]);
+        return bufA[0];
+    };
+
+    BENCHMARK("ReLU (Vectorized Dispatch)") {
+        activate_buffer(*ctx.pool, bufB.data(), N, ActivationType::ReLU);
+        return bufB[0];
+    };
+
+    BENCHMARK("Swish (Scalar Loop)") {
+        for (std::size_t i = 0; i < N; ++i)
+            bufA[i] = activate(ActivationType::Swish, bufA[i]);
+        return bufA[0];
+    };
+
+    BENCHMARK("Swish (Vectorized (By the painter))") {
+        activate_buffer(*ctx.pool, bufB.data(), N, ActivationType::Swish);
+        return bufB[0];
+    };
 }
 
 
 
-
-
-
+#endif

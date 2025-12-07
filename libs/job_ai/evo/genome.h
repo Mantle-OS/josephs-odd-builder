@@ -3,14 +3,10 @@
 #include <vector>
 #include <cstdint>
 
-#include <real_type.h>
-
 #include "activation_types.h"
 #include "layer_types.h"
 
 namespace job::ai::evo {
-
-// alignas(64) ??
 
 struct LayerGene {
     layers::LayerType       type;                       // the types of Layer

@@ -1,5 +1,4 @@
 cmake_minimum_required(VERSION 3.16)
-add_compile_options(-mavx -mavx2 -mfma)
 
 add_executable(test_job_ai
     ../test_spin_till.h
@@ -18,6 +17,10 @@ add_executable(test_job_ai
     test_bh_adapter.cpp
     test_coach.cpp
     test_moe.cpp
+    test_runner.cpp
+    # test_trainer.cpp
+    test_xor_evolution.cpp
+
 )
 
 target_link_libraries(test_job_ai PRIVATE
@@ -32,10 +35,6 @@ target_link_libraries(test_job_ai PRIVATE
     JosephsOddBuilder_Science
     JosephsOddBuilder_Ai
 )
-target_compile_options(JosephsOddBuilder_Ai PRIVATE
-    -mavx -mavx2 -mfma
-)
-target_include_directories(test_job_ai PRIVATE
-    ${CatchTwo_INCLUDE_DIRS}
-)
+target_compile_options(JosephsOddBuilder_Ai PRIVATE ${JOB_CXX_FLAGS} )
+target_include_directories(test_job_ai PRIVATE ${CatchTwo_INCLUDE_DIRS} )
 # CHECKPOINT: v1

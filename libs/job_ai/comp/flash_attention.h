@@ -12,25 +12,18 @@
 
 namespace job::ai::comp {
 
+// FIXME this should all be defined in the SIMD stuff not here
 
 // 32 rows * 64 dim * 4 bytes = 8KB. => L1 cache
 constexpr int kBlockRows = 32;
 
-// Laptop
-constexpr int kBlockSize = 128;
-
-// Server
-// constexpr int kBlockSize = 256;
-
+constexpr int kBlockSize = JOB_BLOCK_SIZE;
 
 // 128 cols * 64 dim * 4 bytes = 32KB. Fits in L1/L2.
 constexpr int kBlockCols = 128;
 
 // "standard" transformer size
 constexpr int kHeadDim = 64;
-
-
-
 
 // Note: Assumes row-major layout. this implementation is "Single-Head".  I guess later I will "Batched/Multi-head" that wraps this.
 // Inputs: Q: [SeqLen, HeadDim] | K: [SeqLen, HeadDim] | V: [SeqLen, HeadDim]

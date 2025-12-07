@@ -114,6 +114,47 @@ TEST_CASE("sgemm: correctness vs naive reference on small shapes", "[ai][sgemm][
     }
 }
 
+
+
+
+TEST_CASE("sgemm: Matrix Object API Correctness", "[ai][sgemm][matrix]")
+{
+    // Small shape for correctness
+    constexpr int M = 128;
+    constexpr int K = 256;
+    constexpr int N = 128;
+
+    using AlignedVec = std::vector<real_t, AlignedAllocator<real_t, 64>>;
+    AlignedVec A_vec(M * K);
+    AlignedVec B_vec(K * N);
+    AlignedVec C_raw(M * N);
+    AlignedVec C_obj(M * N);
+
+    fillMatrix(A_vec, 0.1f);
+    fillMatrix(B_vec, 0.05f);
+    std::fill(C_raw.begin(), C_raw.end(), 0.0f);
+    std::fill(C_obj.begin(), C_obj.end(), 0.0f);
+
+    sgemm_raw(M, N, K, 1.0f, A_vec.data(), K, B_vec.data(), N, 0.0f, C_raw.data(), N);
+
+    Matrix matA(A_vec.data(), M, K);
+    Matrix matB(B_vec.data(), K, N);
+    Matrix matC(C_obj.data(), M, N);
+
+    sgemm(matA, matB, matC, 1.0f, 0.0f);
+    compareMats(C_raw, C_obj, M, N);
+    std::fill(C_obj.begin(), C_obj.end(), 0.0f);
+
+    auto sched = std::make_shared<job::threads::FifoScheduler>();
+    auto pool = job::threads::ThreadPool::create(sched, 4);
+
+    sgemm_parallel(*pool, matA, matB, matC, 1.0f, 0.0f);
+
+    compareMats(C_raw, C_obj, M, N);
+}
+
+#ifdef JOB_TEST_BENCHMARKS
+
 TEST_CASE("sgemm: Parallel Scaling (Single vs Multi-Thread)", "[ai][sgemm][bench][scaling]")
 {
     constexpr int M = 512;
@@ -177,41 +218,6 @@ TEST_CASE("SGEMM Showdown: Naive vs Optimized", "[ai][sgemm][bench][vs]")
         return C_opt[0];
     };
 }
-TEST_CASE("sgemm: Matrix Object API Correctness", "[ai][sgemm][matrix]")
-{
-    // Small shape for correctness
-    constexpr int M = 128;
-    constexpr int K = 256;
-    constexpr int N = 128;
-
-    using AlignedVec = std::vector<real_t, AlignedAllocator<real_t, 64>>;
-    AlignedVec A_vec(M * K);
-    AlignedVec B_vec(K * N);
-    AlignedVec C_raw(M * N);
-    AlignedVec C_obj(M * N);
-
-    fillMatrix(A_vec, 0.1f);
-    fillMatrix(B_vec, 0.05f);
-    std::fill(C_raw.begin(), C_raw.end(), 0.0f);
-    std::fill(C_obj.begin(), C_obj.end(), 0.0f);
-
-    sgemm_raw(M, N, K, 1.0f, A_vec.data(), K, B_vec.data(), N, 0.0f, C_raw.data(), N);
-
-    Matrix matA(A_vec.data(), M, K);
-    Matrix matB(B_vec.data(), K, N);
-    Matrix matC(C_obj.data(), M, N);
-
-    sgemm(matA, matB, matC, 1.0f, 0.0f);
-    compareMats(C_raw, C_obj, M, N);
-    std::fill(C_obj.begin(), C_obj.end(), 0.0f);
-
-    auto sched = std::make_shared<job::threads::FifoScheduler>();
-    auto pool = job::threads::ThreadPool::create(sched, 4);
-
-    sgemm_parallel(*pool, matA, matB, matC, 1.0f, 0.0f);
-
-    compareMats(C_raw, C_obj, M, N);
-}
 
 TEST_CASE("sgemm: Matrix Object vs Raw Overhead", "[ai][sgemm][bench][matrix]")
 {
@@ -239,3 +245,4 @@ TEST_CASE("sgemm: Matrix Object vs Raw Overhead", "[ai][sgemm][bench][matrix]")
         return C_vec[0];
     };
 }
+#endif

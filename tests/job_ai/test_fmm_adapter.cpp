@@ -122,10 +122,8 @@ TEST_CASE("FMM Adapter: The Singularity (Overlapping Tokens)", "[ai][fmm][edge]"
     CHECK(outputData[0] == Approx(0.0f).margin(0.1f));
 }
 
-// =============================================================================
-// BLOCK THREE: BENCHMARKS / STRESS
-// =============================================================================
 
+#ifdef JOB_TEST_BENCHMARKS
 TEST_CASE("FMM Adapter: Scaling Benchmark (O(N) Proof)", "[ai][fmm][bench]") {
     // N = 4096 (Standard Transformer Context)
     // N = 16384 (Long Context)
@@ -162,3 +160,4 @@ TEST_CASE("FMM Adapter: Scaling Benchmark (O(N) Proof)", "[ai][fmm][bench]") {
     // With O(N), it should be ~4x slower.
     // Check console output to verify linear scaling.
 }
+#endif

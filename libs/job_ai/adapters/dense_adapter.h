@@ -8,9 +8,6 @@ namespace job::ai::adapters {
 
 class DenseAdapter : public IAdapter {
 public:
-    static std::unique_ptr<DenseAdapter> unique(DenseConfig cfg = {}) {
-        return std::make_unique<DenseAdapter>(cfg);
-    }
 
     explicit DenseAdapter(DenseConfig cfg);
     [[nodiscard]] AdapterType type() const override;
@@ -26,6 +23,10 @@ public:
         const AdapterCtx &ctx
         ) override;
 
+    [[nodiscard]] static std::unique_ptr<DenseAdapter> unique(DenseConfig cfg = {})
+    {
+        return std::make_unique<DenseAdapter>(cfg);
+    }
 private:
     DenseConfig m_cfg;
 };

@@ -27,24 +27,53 @@ public:
         m_config(cfg),
         m_mutator()
     {
-        // ensure population is actually sized, not just reserved
         resizePopulation(cfg.populationSize);
     }
 
-    [[nodiscard]] CoachType type() const override { return CoachType::ES; }
-    [[nodiscard]] std::string name() const override { return "EvolutionStrategy (1, Lambda)"; }
+    [[nodiscard]] CoachType type() const override
+    {
+        return CoachType::ES;
+    }
+    [[nodiscard]] std::string name() const override
+    {
+        return "EvolutionStrategy (1, Lambda)";
 
-    void setPopulationSize(size_t size) override {
-        m_config.populationSize = size;
-        resizePopulation(size); // Resize immediately
     }
 
-    void setMutationRate(float rate) override { m_config.sigma = rate; }
-    void setMode(OptimizationMode mode) override { m_optMode = mode; }
+    void setPopulationSize(size_t size) override
+    {
+        m_config.populationSize = size;
+        resizePopulation(size);
+    }
 
-    [[nodiscard]] size_t generation() const override { return m_generation; }
-    [[nodiscard]] float currentBestFitness() const override { return m_bestFitness; }
+    void setMutationRate(float rate) override
+    {
+        m_config.sigma = rate;
 
+    }
+    void setMode(OptimizationMode mode) override
+    {
+        m_optMode = mode;
+
+    }
+
+    [[nodiscard]] size_t generation() const override
+    {
+        return m_generation;
+
+    }
+    [[nodiscard]] float currentBestFitness() const override
+    {
+        return m_bestFitness;
+
+    }
+    [[nodiscard]] const evo::Genome &bestGenome() const
+    {
+        if (m_population.size() == 0)
+            throw std::runtime_error("ESCoach: No population exists yet.");
+
+        return m_population.genome(m_currentBestIdx);
+    }
     evo::Genome coach(const evo::Genome &parent, Evaluator eval) override
     {
         m_generation++;
@@ -54,13 +83,11 @@ public:
             m_config.sigma *= m_config.decay;
 
         const size_t popSize = m_config.populationSize;
-
-        // Safety Check: Ensure population is sized correctly before parallel access
-        if (m_population.size() != popSize) {
+        if (m_population.size() != popSize)
             resizePopulation(popSize);
-        }
 
-        threads::parallel_for(*m_pool, size_t{0}, popSize, [&](size_t i) {
+
+        threads::parallel_for(*m_pool, size_t{0}, popSize, [&](size_t i) { // LOCKED HERE
             if (i >= m_population.size())
                 return;
 
@@ -68,11 +95,7 @@ public:
             mutant = parent;
             m_mutator.perturb(mutant, m_config.sigma);
 
-            // Evaluate
             float score = eval(mutant);
-
-            // Population::setFitnessUnsafe or similar would be better,
-            // but we know size is correct now.
             m_population.setFitness(i, score);
         });
 
@@ -93,17 +116,15 @@ public:
         }
 
         m_bestFitness = bestScore;
+        m_currentBestIdx = bestIdx;
         return m_population.genome(bestIdx);
     }
 
 private:
-    // Helper to resize population safely
     void resizePopulation(size_t size) {
         m_population.clear();
         for(size_t i=0; i<size; ++i)
             m_population.addGenome(evo::Genome{});
-        // Pre-size fitness vector inside Population (if possible via public API)
-        // Since Population::addGenome pushes 0.0f to fitness, this is handled.
     }
 
     threads::ThreadPool::Ptr    m_pool;
@@ -113,6 +134,7 @@ private:
     OptimizationMode            m_optMode{OptimizationMode::Maximize};
     size_t                      m_generation{0};
     float                       m_bestFitness{0.0f};
+    size_t                      m_currentBestIdx{0};
 };
 
 } // namespace job::ai::coach

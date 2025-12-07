@@ -22,8 +22,7 @@ void FlashAdapter::adapt(threads::ThreadPool &pool,
 {
     job::ai::comp::flashAttentionForward(
         pool,
-        shape.seq,
-        shape.dim,
+        shape.seq, shape.dim,
         targets.data(), // Q
         sources.data(), // K
         values.data(),  // V

@@ -4,9 +4,6 @@
 
 namespace job::ai::coach {
 
-// -----------------------------------------------------------------------------
-// Evolution Strategy Configuration
-// -----------------------------------------------------------------------------
 struct ESConfig {
     size_t      populationSize      = 64;       // Matches thread count usually
     float       sigma               = 0.02f;    // Mutation strength (Learning Rate)
@@ -14,7 +11,6 @@ struct ESConfig {
     uint64_t    seed                = 0;        // 0 = Random Device
 };
 
-// I have other things in job_science and what not that also follow this rule for presets "ModuleName" + "Presets"
 namespace CoachPresets {
 
 static constexpr ESConfig kFastTest {

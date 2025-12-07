@@ -1,20 +1,11 @@
 #pragma once
 
 #include <immintrin.h>
+#include "rounding_mode.h"
 
-namespace job::ai {
-enum class RoundingMode : int {
-    Nearest  = _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC, // 0x08
-    Down     = _MM_FROUND_TO_NEG_INF     | _MM_FROUND_NO_EXC, // 0x09
-    Up       = _MM_FROUND_TO_POS_INF     | _MM_FROUND_NO_EXC, // 0x0A
-    Truncate = _MM_FROUND_TO_ZERO        | _MM_FROUND_NO_EXC  // 0x0B
-};
+namespace job::ai::comp {
 
-#ifdef RYZEN_5950X
-constexpr int kBlockSize = 256;
-#else
-inline constexpr int kBlockSize = 128;
-#endif
+inline constexpr int kBlockSize = JOB_BLOCK_SIZE;
 
 using f32 = __m256;
 using i32 = __m256i;
@@ -38,6 +29,11 @@ struct AVX_F {
         return _mm256_set1_ps(v);
     }
 
+    static inline i32 set1_i32(int v)
+    {
+        return _mm256_set1_epi32(v);
+    }
+
     // get value of a register
     static inline f32 pull(const float *p)
     {
@@ -54,7 +50,13 @@ struct AVX_F {
     {
         return _mm256_add_ps(reg_a, reg_b);
     }
-    // -
+
+    static inline i32 add_i32(i32 reg_a, i32 reg_b)
+    {
+        return _mm256_add_epi32(reg_a, reg_b);
+    }
+
+    //
     static inline f32 sub(f32 reg_a, f32 reg_b)
     {
         return _mm256_sub_ps(reg_a, reg_b);
@@ -133,15 +135,27 @@ struct AVX_F {
     {
         return _mm256_andnot_ps(reg_a, reg_b);
     }
+
+    static inline f32 gt_ps(f32 a, f32 b)
+    {
+        return _mm256_cmp_ps(a, b, _CMP_GT_OQ);
+    }
+
+    static inline f32 blendv(f32 a, f32 b, f32 mask)
+    {
+        return _mm256_blendv_ps(a, b, mask);
+    }
+
+
     // Or
     static inline f32 or_ps(f32 reg_a, f32 reg_b)
     {
-        return _mm256_xor_ps(reg_a, reg_b);
+        return _mm256_or_ps(reg_a, reg_b);
     }
 
     static inline f32 xor_ps(f32 reg_a, f32 reg_b)
     {
-        return _mm256_or_ps(reg_a, reg_b);
+        return _mm256_xor_ps(reg_a, reg_b);
     }
 
     //Horizontally adds the adjacent pairs of values contained in two/ (VHADDPS)
@@ -166,5 +180,48 @@ struct AVX_F {
     {
         return _mm256_shuffle_ps(reg_a, reg_b, Mask);
     }
+
+    // Interleave lower halves (Unpack Lo)
+    // A: [a0 a1 a2 a3 ...] B: [b0 b1 b2 b3 ...] -> [a0 b0 a1 b1 ...]
+    static inline f32 unpack_lo(f32 a, f32 b)
+    {
+        return _mm256_unpacklo_ps(a, b);
+    }
+
+    // Interleave upper halves (Unpack Hi)
+    static inline f32 unpack_hi(f32 a, f32 b)
+    {
+        return _mm256_unpackhi_ps(a, b);
+    }
+
+    // Permute 128-bit lanes (AVX specific, but we expose it for 8-wide logic)
+    // 0x20: Lo(A), Lo(B) | 0x31: Hi(A), Hi(B)
+    template<int Mask>
+    static inline f32 permute_lanes(f32 a, f32 b)
+    {
+        return _mm256_permute2f128_ps(a, b, Mask);
+    }
+
+
+    static inline i32 cast_to_int(f32 reg)
+    {
+        return _mm256_castps_si256(reg);
+    }
+    static inline f32 cast_to_float(i32 reg)
+    {
+        return _mm256_castsi256_ps(reg);
+    }
+
+
+    static inline i32 cvt_f32_i32(f32 reg)
+    {
+        return _mm256_cvttps_epi32(reg);
+    }
+    static inline f32 cvt_i32_f32(i32 reg)
+    {
+        return _mm256_cvtepi32_ps(reg);
+    }
+
 };
-} // namespace job::ai
+
+} // namespace job::ai::comp

@@ -3,6 +3,7 @@
 #include "gemm.h"
 #include "matrix.h"
 #include "aligned_allocator.h"
+#include "transpose.h"
 
 namespace job::ai::adapters {
 
@@ -33,25 +34,26 @@ void LowRankAdapter::adapt(threads::ThreadPool &pool,
     const int S = shape.seq;
     const int D = shape.dim;
 
+    size_t floatsPerBatch = static_cast<size_t>(D) * S + static_cast<size_t>(D) * D;
+    size_t totalFloats = floatsPerBatch * B;
+
+    std::vector<float, AlignedAllocator<float, 64>> scratch(totalFloats);
+
     job::threads::parallel_for(pool, size_t{0}, size_t(B), [&](size_t b) {
         const float *q_ptr = targets.data() + b * S * D;
         const float *k_ptr = sources.data() + b * S * D;
         const float *v_ptr = values.data()  + b * S * D;
         float *o_ptr       = output.data()  + b * S * D;
 
-        // Scratchpad: K^T [D, S]
-        std::vector<float, AlignedAllocator<float, 64>> kT(D * S);
-        // Scratchpad: M = K^T * V [D, D] (The "State" Matrix)
-        std::vector<float, AlignedAllocator<float, 64>> M_state(D * D);
+        float* batch_scratch = scratch.data() + (b * floatsPerBatch);
+        float* kt_ptr = batch_scratch;
+        float* m_ptr  = batch_scratch + (D * S);
 
-        // transpose K -> KT
-        for(int i=0; i<S; ++i)
-            for(int j=0; j<D; ++j)
-                kT[j * S + i] = k_ptr[i * D + j];
+        comp::transpose(k_ptr, kt_ptr, S, D);
 
-        Matrix KT(kT.data(), D, S);
+        Matrix KT(kt_ptr, D, S);
         Matrix V(const_cast<float*>(v_ptr), S, D);
-        Matrix M(M_state.data(), D, D);
+        Matrix M(m_ptr, D, D);
 
         // [D, S] * [S, D] -> [D, D]
         sgemm(KT, V, M, 1.0f, 0.0f);

@@ -11,6 +11,7 @@
 #include "ilayer.h"
 
 #include "view.h"
+#include "workspace.h"
 
 namespace job::ai::moe {
 
@@ -28,7 +29,14 @@ public:
     // Router Configuration
     virtual void setRouterType(router::RouterType type) = 0;
     virtual void setLoadBalancing(router::LoadBalanceStrategy strategy) = 0;
-    virtual router::RouterPlan route(threads::ThreadPool &pool, const cords::ViewR &input, std::vector<float> *maybeGateLogits) = 0;
+    virtual router::RouterPlan route(threads::ThreadPool &pool, const cords::ViewR &input,
+                                     infer::Workspace &ws,
+                                     std::vector<float> *maybeGateLogits) = 0;
+
+    // virtual void forward(job::threads::ThreadPool &pool,
+    //              const cords::ViewR &input,
+    //              infer::Workspace &ws,
+    //              cords::ViewR &output) = 0;
 };
 
 } // namespace job::ai::moe

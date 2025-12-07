@@ -218,7 +218,7 @@ TEST_CASE("JobSharedMemory: Edge Cases and Error Handling",
     }
 }
 
-
+#ifdef JOB_TEST_BENCHMARKS
 TEST_CASE("JobSharedMemory: Benchmarks", "[io][shared_memory][bench]")
 {
     const std::string key = "/job_shm_bench";
@@ -307,3 +307,4 @@ TEST_CASE("JobSharedMemory: Stress Test (High Volume)",
 
     shm_cleanup(key);
 }
+#endif

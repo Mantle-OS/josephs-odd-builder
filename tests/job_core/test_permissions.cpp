@@ -211,6 +211,7 @@ TEST_CASE("IOPermissions edge cases for setuid/setgid/sticky and custom combos",
     }
 }
 
+#ifdef JOB_TEST_BENCHMARKS
 TEST_CASE("IOPermissions toString formatting stress and micro-benchmark",
           "[core][permissions][stress][benchmark]")
 {
@@ -263,3 +264,4 @@ TEST_CASE("IOPermissions toString formatting stress and micro-benchmark",
         };
     }
 }
+#endif

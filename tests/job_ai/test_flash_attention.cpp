@@ -84,6 +84,8 @@ TEST_CASE("FlashAttention Correctness", "[ai][att][correctness]") {
         REQUIRE_THAT(O_flash[i], Catch::Matchers::WithinRel(O_ref[i], 0.001f));
 }
 
+#ifdef JOB_TEST_BENCHMARKS
+
 TEST_CASE("FlashAttention Benchmark", "[ai][att][bench]") {
     int N = 2048; // "Realistic" Sequence Length
     int d = 64;   // "Standard" Head Dim
@@ -127,3 +129,4 @@ TEST_CASE("The Showdown FlashAttention Benchmark", "[ai][att][bench]") {
         return O[0];
     };
 }
+#endif

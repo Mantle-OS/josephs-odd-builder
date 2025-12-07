@@ -28,12 +28,7 @@ else()
 endif()
 
 include(CheckCXXCompilerFlag)
-check_cxx_compiler_flag("-march=native" COMPILER_SUPPORTS_MARCH_NATIVE)
-if(COMPILER_SUPPORTS_MARCH_NATIVE)
-    add_compile_options($<$<CONFIG:Release>:-march=native>)
-    add_compile_options($<$<CONFIG:RelWithDebInfo>:-march=native>)
-    message(STATUS "Enabling host architecture tuning (-march=native)")
-endif()
+
 
 add_compile_options(
     $<$<CONFIG:Release>:-O3>
@@ -43,30 +38,21 @@ add_compile_options(
 
 add_compile_options(-Wall -Wextra -Wpedantic -Werror)
 
+include(cmake/check_hardware.cmake)
+
 ##############################
 # Options
 ##############################
+## Becareful !!! if you are building the AI stack this can fuck shit up .....
 option(JOB_CORE_USE_DOUBLE "Use double precision" OFF)
 if(JOB_CORE_USE_DOUBLE)
     add_compile_definitions(JOB_CORE_USE_DOUBLE)
 endif()
 
-option(JOB_USE_FAST_MATH "Fast Math" OFF)
-if(JOB_USE_FAST_MATH)
-    add_compile_options($<$<CONFIG:Release>:-ffast-math>)
-endif()
-
-option(JOB_TEST_BENCHMARKS "If def the benchhmarks" OFF)
+option(JOB_TEST_BENCHMARKS "build and run the benchhmarks in the tests" ON)
 if(JOB_TEST_BENCHMARKS)
-    add_compile_options(JOB_TEST_BENCHMARKS)
+    add_compile_definitions(JOB_TEST_BENCHMARKS)
 endif()
-
-# option(JOB_AMD_BUILD "AMD Build" ON)
-# if(JOB_AMD_BUILD)
-#     add_compile_options(JOB_AMD_BUILD)
-# endif()
-
-
 
 ##############################
 # DEPS
@@ -106,4 +92,14 @@ add_subdirectory(apps)
 enable_testing()
 pkg_check_modules(CatchTwo REQUIRED catch2-with-main)   # libcatch2-dev
 add_subdirectory(tests)
-# CHECKPOINT: v1
+
+##############################
+# docs and stuff
+##############################
+add_subdirectory(docs)
+
+
+
+# CHECKPOINT: v1.1
+
+

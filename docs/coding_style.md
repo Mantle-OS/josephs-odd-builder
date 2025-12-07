@@ -316,6 +316,7 @@ Log messages should be:
 
 ## 10. Tests
 
+
 We use Catch2 (version 3) for tests
 
 Tests serve as both verification and documentation. 
@@ -333,6 +334,15 @@ We generally structure tests in **three conceptual blocks**. Some older tests do
   - It’s fine if these are a bit more mechanical or verbose.
 
 - **Block three: benchmarks / stress if needed (they are not all the time)**
+  - There is a compile time option called ```JOB_TEST_BENCHMARKS``` wrap all benchmarks in this please **Example**
+```cpp
+#ifdef JOB_TEST_BENCHMARKS
+TEST_CASE("some benchmark", "[module][some_feature][some_scope][benchmark]")
+{
+// .....
+}
+#endif
+```
   - [Push it to the limit](https://youtu.be/3-3Yok5D3Aw?si=S7LgO8yxn0OCCdMK)
   - Micro-benchmarks (e.g. thread startup latency) and stress tests (e.g. 10k tasks through a scheduler, high-volume actor mailboxes).
   - These tests are about performance characteristics and stability, not correctness alone.

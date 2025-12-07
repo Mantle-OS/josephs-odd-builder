@@ -11,8 +11,10 @@ namespace job::ai::adapters {
 class IAdapter {
 public:
     virtual ~IAdapter() = default;
+
     [[nodiscard]] virtual AdapterType type() const = 0;
     [[nodiscard]] virtual std::string name() const = 0;
+
     virtual void adapt(job::threads::ThreadPool &pool,
                        const cords::AttentionShape &shape,
                        const cords::ViewR &sources,

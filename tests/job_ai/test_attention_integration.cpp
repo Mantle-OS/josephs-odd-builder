@@ -33,6 +33,7 @@ TEST_CASE("Attention: Multi-Backend Integration", "[ai][attn][integration]") {
 
     // Setup Context
     JobStealerCtx ctx(8);
+    infer::Workspace ws(256 * 1024 * 1024);
 
     const int B = 2;   // Small batch
     const int S = 128; // Sequence
@@ -45,8 +46,22 @@ TEST_CASE("Attention: Multi-Backend Integration", "[ai][attn][integration]") {
 
     std::vector<float> outputData(B * S * D, 0.0f);
 
-    cords::ViewR input(inputData.data(), cords::ViewR::Extent{static_cast<uint32_t>(B), static_cast<uint32_t>(S)});
-    cords::ViewR output(outputData.data(), cords::ViewR::Extent{static_cast<uint32_t>(B), static_cast<uint32_t>(S)});
+    cords::ViewR input(inputData.data(),
+                       cords::ViewR::Extent{
+                           static_cast<uint32_t>(B),
+                           static_cast<uint32_t>(S),
+                           static_cast<uint32_t>(D)
+                       }
+                       );
+
+    cords::ViewR output(outputData.data(),
+                        cords::ViewR::Extent{
+                            static_cast<uint32_t>(B),
+                            static_cast<uint32_t>(S),
+                            static_cast<uint32_t>(D)
+                        }
+                        );
+
 
     // FMM
     SECTION("FMM Attention (O(N))") {
@@ -54,7 +69,8 @@ TEST_CASE("Attention: Multi-Backend Integration", "[ai][attn][integration]") {
         cfg.adapterType = adapters::AdapterType::FMM;
         layers::Attention attn(cfg, D);
         randomize_layer_params(attn);
-        attn.forward(*ctx.pool, input, output);
+        // Needs ws now
+        attn.forward(*ctx.pool, input, output, ws);
         bool gotSignal = false;
         for(int i = 0; i < 10; ++i) {
             if (std::abs(outputData[i]) > 1e-5f) {
@@ -75,7 +91,7 @@ TEST_CASE("Attention: Multi-Backend Integration", "[ai][attn][integration]") {
         // Clear output
         std::fill(outputData.begin(), outputData.end(), 0.0f);
 
-        attn.forward(*ctx.pool, input, output);
+        attn.forward(*ctx.pool, input, output, ws);
 
         bool gotSignal = false;
         for(int i=0; i<10; ++i) {
@@ -95,7 +111,7 @@ TEST_CASE("Attention: Multi-Backend Integration", "[ai][attn][integration]") {
         layers::Attention attn(cfg, D);
         randomize_layer_params(attn);
 
-        attn.forward(*ctx.pool, input, output);
+        attn.forward(*ctx.pool, input, output, ws);
         CHECK(outputData[0] != 0.0f);
     }
 
@@ -108,8 +124,26 @@ TEST_CASE("Attention: Multi-Backend Integration", "[ai][attn][integration]") {
         layers::Attention attn(cfg, D);
         randomize_layer_params(attn);
 
-        attn.forward(*ctx.pool, input, output);
-        CHECK(outputData[0] != 0.0f);
+        attn.forward(*ctx.pool, input, output, ws);
+        CHECK(outputData[0] != 0.0f); // REGRESSION
+
+
+        // layers::AttentionConfig cfg;
+        // cfg.adapterType = adapters::AdapterType::BarnesHut;
+        // layers::Attention attn(cfg, D);
+        // randomize_layer_params(attn);
+        // // Needs ws now
+        // attn.forward(*ctx.pool, input, output, ws);
+        // bool gotSignal = false;
+        // for(int i = 0; i < 10; ++i) {
+        //     if (std::abs(outputData[i]) > 1e-5f) {
+        //         gotSignal = true;
+        //         break;
+        //     }
+        // }
+        // CHECK(gotSignal);
+
+
     }
 
     // 5. LowRank (Dynamics)
@@ -123,7 +157,7 @@ TEST_CASE("Attention: Multi-Backend Integration", "[ai][attn][integration]") {
         // Clear output
         std::fill(outputData.begin(), outputData.end(), 0.0f);
 
-        attn.forward(*ctx.pool, input, output);
+        attn.forward(*ctx.pool, input, output, ws);
 
         bool gotSignal = false;
         for(int i=0; i<10; ++i) {
@@ -146,7 +180,7 @@ TEST_CASE("Attention: Multi-Backend Integration", "[ai][attn][integration]") {
         // Clear output
         std::fill(outputData.begin(), outputData.end(), 0.0f);
 
-        attn.forward(*ctx.pool, input, output);
+        attn.forward(*ctx.pool, input, output, ws);
 
         bool gotSignal = false;
         for(int i=0; i<10; ++i) {
@@ -159,7 +193,7 @@ TEST_CASE("Attention: Multi-Backend Integration", "[ai][attn][integration]") {
     }
 }
 
-
+#ifdef JOB_TEST_BENCHMARKS
 TEST_CASE("Attention: Scaling Benchmark (Seq=4096)", "[ai][attn][bench][scale]") {
     // Large Context. This is where O(N^2) dies and O(N) shines.
     const int B = 1; // Single batch to focus on Sequence Length scaling
@@ -168,6 +202,7 @@ TEST_CASE("Attention: Scaling Benchmark (Seq=4096)", "[ai][attn][bench][scale]")
 
     JobStealerCtx ctx(16);
 
+    infer::Workspace ws(512 * 1024 * 1024); // Bigger workspace for benchmarks
     std::vector<float> inputData(B * S * D);
     std::vector<float> outputData(B * S * D);
     randomize_buffer(inputData.data(), inputData.size());
@@ -180,7 +215,7 @@ TEST_CASE("Attention: Scaling Benchmark (Seq=4096)", "[ai][attn][bench][scale]")
         layers::AttentionConfig cfg;
         cfg.adapterType = adapters::AdapterType::FMM;
         layers::Attention attn(cfg, D);
-        attn.forward(*ctx.pool, input, output);
+        attn.forward(*ctx.pool, input, output, ws);
         return outputData[0];
     };
 
@@ -188,7 +223,7 @@ TEST_CASE("Attention: Scaling Benchmark (Seq=4096)", "[ai][attn][bench][scale]")
         layers::AttentionConfig cfg;
         cfg.adapterType = adapters::AdapterType::LowRank;
         layers::Attention attn(cfg, D);
-        attn.forward(*ctx.pool, input, output);
+        attn.forward(*ctx.pool, input, output, ws);
         return outputData[0];
     };
 
@@ -196,7 +231,7 @@ TEST_CASE("Attention: Scaling Benchmark (Seq=4096)", "[ai][attn][bench][scale]")
         layers::AttentionConfig cfg;
         cfg.adapterType = adapters::AdapterType::Dense;
         layers::Attention attn(cfg, D);
-        attn.forward(*ctx.pool, input, output);
+        attn.forward(*ctx.pool, input, output, ws);
         return outputData[0];
     };
 
@@ -211,4 +246,5 @@ TEST_CASE("Attention: Scaling Benchmark (Seq=4096)", "[ai][attn][bench][scale]")
     */
 }
 
+#endif
 

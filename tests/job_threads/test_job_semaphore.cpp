@@ -202,7 +202,7 @@ TEST_CASE("JobSem edge cases: invalid operations and timeouts", "[threads][semap
     }
 }
 
-
+#ifdef JOB_TEST_BENCHMARKS
 TEST_CASE("JobSem micro-benchmark: post+wait pair on unnamed semaphore",
           "[threads][semaphore][benchmark]")
 {
@@ -218,3 +218,4 @@ TEST_CASE("JobSem micro-benchmark: post+wait pair on unnamed semaphore",
 
     REQUIRE(sem.destroy() == JobSemRet::OK);
 }
+#endif

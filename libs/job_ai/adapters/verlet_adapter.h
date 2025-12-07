@@ -15,10 +15,6 @@
 namespace job::ai::adapters {
 class VerletAdapter : public IAdapter {
 public:
-    static std::unique_ptr<VerletAdapter> unique(VerletConfig cfg = {})
-    {
-        return std::make_unique<VerletAdapter>(cfg);
-    }
     explicit VerletAdapter(VerletConfig cfg = {});
 
     [[nodiscard]] AdapterType type() const override;
@@ -30,6 +26,10 @@ public:
                cords::ViewR &output,
                const AdapterCtx &ctx) override;
 
+    static std::unique_ptr<VerletAdapter> unique(VerletConfig cfg = {})
+    {
+        return std::make_unique<VerletAdapter>(cfg);
+    }
 private:
     VerletConfig m_cfg;
 };

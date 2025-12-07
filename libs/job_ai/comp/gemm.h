@@ -8,20 +8,14 @@
 #include <job_thread_pool.h>
 #include <job_parallel_for.h>
 
-#include "smid_amd.h"
+#include "simd_provider.h"
+
 #include "matrix.h"
 
 namespace job::ai::comp {
-using namespace job::ai::cords; // For Matrix
-
-// [Server] Ryzen 5950X (Use 256 for release builds on server)
-// constexpr int kBlockSize = 256;
-
-// [Laptop] Ryzen 5900HX - Safer default for thermal/cache constraints
-// constexpr int kBlockSize = 128;
+using namespace job::ai::cords;
 
 using SMID = AVX_F;
-
 
 constexpr int kMicroM = 8;
 constexpr int kMicroN = 8;
@@ -127,11 +121,9 @@ inline void sgemm_raw(int M, int N, int K,
     }
 
     // Tiling Loop
-    for (int i = 0; i < M; i += kBlockSize) {
-        for (int j = 0; j < N; j += kBlockSize) {
+    for (int i = 0; i < M; i += kBlockSize)
+        for (int j = 0; j < N; j += kBlockSize)
             compute_tile(M, N, K, alpha, A, lda, B, ldb, C, ldc, i, j, kBlockSize);
-        }
-    }
 }
 
 // Low-level raw pointer parallel sgemm

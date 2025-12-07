@@ -9,29 +9,17 @@
 
 namespace job::ai::router {
 
-// Logits: [Batch, NumExperts] (Flat buffer)
-[[nodiscard]] RouterPlan routeTopK(
-    const RouterConfig &cfg,
-    const RouterPlan &basePlan, // Contains batch/expert counts
-    const float *logits
-    );
 
-[[nodiscard]] RouterPlan routeHash(
-    const RouterConfig &cfg,
-    const RouterPlan &basePlan,
-    const cords::ViewR &input
-    );
+[[nodiscard]] RouterPlan routeTopK(const RouterConfig &cfg, int batch, int experts,
+                                   const float *logits, RouterToken *buffer);
 
-[[nodiscard]] RouterPlan routeSpatial(
-    const RouterConfig &cfg,
-    const RouterPlan &basePlan,
-    const cords::ViewR &input
-    );
+[[nodiscard]] RouterPlan routeHash(const RouterConfig &cfg, int batch, int experts,
+                                   const cords::ViewR &input, RouterToken *buffer);
 
-[[nodiscard]] RouterPlan routeState(
-    const RouterConfig &cfg,
-    const RouterPlan &basePlan,
-    const cords::ViewR &input
-    );
+[[nodiscard]] RouterPlan routeSpatial(const RouterConfig &cfg, int batch,
+                                      const cords::ViewR &input, RouterToken *buffer);
+
+[[nodiscard]] RouterPlan routeState(const RouterConfig &cfg, int batch, int experts,
+                                    RouterToken *buffer);
 
 } // namespace job::ai::router

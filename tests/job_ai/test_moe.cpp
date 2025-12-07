@@ -10,12 +10,14 @@
 
 #include <sparse_moe.h>
 #include <dense.h>
+#include <workspace.h> // <--- NEW: Include Workspace
 
 using Catch::Approx;
 using namespace job::ai;
 using namespace job::ai::moe;
 using namespace job::ai::layers;
 using namespace job::threads;
+using namespace job::ai::infer; // For Workspace
 
 // Simple Mock Expert
 class ScalarMultLayer : public ILayer {
@@ -25,7 +27,14 @@ public:
     [[nodiscard]] LayerType type() const override { return LayerType::Dense; } // Lie for test
     [[nodiscard]] std::string name() const override { return "ScalarMock"; }
 
-    void forward(ThreadPool&, const cords::ViewR& input, cords::ViewR& output) override {
+    cords::ViewR::Extent getOutputShape(const cords::ViewR::Extent &inputShape) const override
+    {
+        return inputShape;
+    };
+
+
+    // UPDATED: Added Workspace argument to match interface
+    void forward(ThreadPool&, const cords::ViewR& input, cords::ViewR& output, Workspace&) override {
         const size_t n = input.size();
         for(size_t i=0; i<n; ++i)
             output[i] = input[i] * m_scalar;
@@ -43,6 +52,8 @@ private:
 TEST_CASE("SparseMoE: Deterministic Top-1 Routing", "[ai][moe][usage]")
 {
     JobStealerCtx ctx(8);
+    // NEW: Create Workspace
+    Workspace ws(16 * 1024 * 1024);
 
     // Input Dim 4, 2 Experts, Top-1
     const int dim = 4;
@@ -76,7 +87,9 @@ TEST_CASE("SparseMoE: Deterministic Top-1 Routing", "[ai][moe][usage]")
     cords::ViewR inView(inputData.data(), cords::ViewR::Extent{2, 4});
     cords::ViewR outView(outputData.data(), cords::ViewR::Extent{2, 4});
 
-    moe.forward(*ctx.pool, inView, outView);
+    // UPDATED: Pass Workspace
+    moe.forward(*ctx.pool, inView, outView, ws);
+
     CHECK(outputData[0] == Approx(10.0f)); // 1.0 * 10.0
     CHECK(outputData[4] == Approx(10.0f)); // -1.0 * -10.0
 }
@@ -84,6 +97,7 @@ TEST_CASE("SparseMoE: Deterministic Top-1 Routing", "[ai][moe][usage]")
 TEST_CASE("SparseMoE: Top-2 Routing (Mixing Experts)", "[ai][moe][usage]")
 {
     JobStealerCtx ctx(8);
+    Workspace ws(16 * 1024 * 1024);
 
     // dim 4, 3 experts, top-2
     SparseMoE moe(4, 3, 2);
@@ -109,7 +123,7 @@ TEST_CASE("SparseMoE: Top-2 Routing (Mixing Experts)", "[ai][moe][usage]")
     cords::ViewR inView(inputData.data(), cords::ViewR::Extent{1, 4});
     cords::ViewR outView(outputData.data(), cords::ViewR::Extent{1, 4});
 
-    moe.forward(*ctx.pool, inView, outView);
+    moe.forward(*ctx.pool, inView, outView, ws);
 
     // output = (input * 1.0 * 0.5) + (input * 2.0 * 0.5) = 1.5
     CHECK(outputData[0] == Approx(1.5f).margin(0.01f));
@@ -119,17 +133,19 @@ TEST_CASE("SparseMoE: Top-2 Routing (Mixing Experts)", "[ai][moe][usage]")
 // edge cases
 TEST_CASE("SparseMoE: Empty Input Batch", "[ai][moe][edge]") {
     JobStealerCtx ctx(4);
+    Workspace ws(1024 * 1024);
     SparseMoE moe(16, 4, 1);
 
     cords::ViewR inView(nullptr, cords::ViewR::Extent{0, 16});
     cords::ViewR outView(nullptr, cords::ViewR::Extent{0, 16});
 
     // should not crash
-    moe.forward(*ctx.pool, inView, outView);
+    moe.forward(*ctx.pool, inView, outView, ws);
 }
 
 TEST_CASE("SparseMoE: Missing Expert Implementation", "[ai][moe][edge]") {
     JobStealerCtx ctx(4);
+    Workspace ws(1024 * 1024);
     SparseMoE moe(4, 2, 1);
 
     // add expert 0, but leave expert 1 null
@@ -149,14 +165,13 @@ TEST_CASE("SparseMoE: Missing Expert Implementation", "[ai][moe][edge]") {
     cords::ViewR outView(output.data(), cords::ViewR::Extent{1, 4});
 
     // "Should" route to E1, see it's null, and do nothing (result 0 due to memset)
-    moe.forward(*ctx.pool, inView, outView);
+    moe.forward(*ctx.pool, inView, outView, ws);
 
     CHECK(output[0] == 0.0f);
 }
 
 
-// benchmarks
-
+#ifdef JOB_TEST_BENCHMARKS
 TEST_CASE("SparseMoE: Throughput Benchmark (LLaMA-Small Scale)", "[ai][moe][bench]") {
     // simulating a small moe layer
     const int B = 128;
@@ -165,6 +180,8 @@ TEST_CASE("SparseMoE: Throughput Benchmark (LLaMA-Small Scale)", "[ai][moe][benc
     const int K = 2;
 
     JobStealerCtx ctx(16); // me cave man me give THREADS!
+    Workspace ws(256 * 1024 * 1024); // Give it a real workspace (256MB)
+
     SparseMoE moe(D, E, K);
 
     // populate experts with real dense layers
@@ -182,7 +199,8 @@ TEST_CASE("SparseMoE: Throughput Benchmark (LLaMA-Small Scale)", "[ai][moe][benc
                          cords::ViewR::Extent{static_cast<uint32_t>(B), static_cast<uint32_t>(D)});
 
     BENCHMARK("MoE Forward (128x1024, 8 Experts, Top2)") {
-        moe.forward(*ctx.pool, inView, outView);
+        moe.forward(*ctx.pool, inView, outView, ws);
         return output[0];
     };
 }
+#endif

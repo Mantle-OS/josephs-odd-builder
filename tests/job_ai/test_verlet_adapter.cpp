@@ -79,6 +79,7 @@ TEST_CASE("Verlet Adapter: N-Body Gravity", "[ai][verlet][usage]") {
 }
 
 
+#ifdef JOB_TEST_BENCHMARKS
 TEST_CASE("Verlet Adapter: Throughput (N-Body O(N^2))", "[ai][verlet][bench]") {
     JobStealerCtx ctx(16);
     VerletAdapter adapter; // Default config
@@ -106,3 +107,4 @@ TEST_CASE("Verlet Adapter: Throughput (N-Body O(N^2))", "[ai][verlet][bench]") {
         return data[0]; // Output dependency
     };
 }
+#endif

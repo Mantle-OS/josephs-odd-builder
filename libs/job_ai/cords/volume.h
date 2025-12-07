@@ -28,7 +28,7 @@ public:
     [[nodiscard]] const core::real_t &at(std::uint32_t dim0, std::uint32_t dim1, std::uint32_t dim2) const
     {
         assert(rank() == 3);
-        assert(dim0 < m_shape[0] && dim1 < m_shape[1] && dim2 < m_shape[2]);
+        assert(dim0 < m_extent[0] && dim1 < m_extent[1] && dim2 < m_extent[2]);
         return (*this)(dim0, dim1, dim2);
     }
 

@@ -2,11 +2,12 @@
 
 Joseph drinks a bunch of coffee and then speak's.....
 
-A place where past time has not meaning as it is never traveled. We do propagate back there..... 
+A place where past ```time``` has not meaning as it is never traveled. We do not propagate back there..... 
 
-I want AI, but I reject the "GPU Tax" (High VRAM, CUDA lock-in) and the "Algorithm Tax" Backpropagation(when needed), which requires storing the entire activation graph in memory (no constrants at all lol).
+I want AI, but I reject the "GPU Tax" (High VRAM, CUDA lock-in) and the "Algorithm Tax" Backpropagation(unless needed), 
+which requires storing the entire activation graph in memory (no constrants at all ...lol).
 
-If I are going to do this ....shit ...  I have to look at how biology & composition & physics do it.
+If I am going to do this ....shit ...  I have to look at how biology & composition & physics do it.
 
 * Biology doesn't do Backpropagation. Neurons don't send error signals backward up the axon. 
 * Physics doesn't do Backpropagation time flows one way. Try and observe that.
@@ -123,7 +124,7 @@ Rules: three deep before I go crazy.
 |-------------------|---------------|----------------------------------------------------------|---------------------------------------|-------------------------------|
 |                   |               |                                                          |                                       |                               |
 |                   |               |                                                          |                                       |                               |
-|       kv::        |  key/values   |          KV-cache, associative buffers, eviction         |    attention KV cache,                |          FALSE                |
+|     cache::       |  key/values   |          KV-cache, associative buffers, eviction         |    attention KV cache,                |          FALSE                |
 |                   |               |             policies (LRU/LFU/custom),                   |    other (key → state) maps,          |                               |
 |                   |               |           segmenting by head/layer                       |    on-CPU cache layout                |                               |
 |                   |               |                                                          |                                       |                               |
@@ -149,14 +150,11 @@ Rules: three deep before I go crazy.
 |                   |               |          config(RouterConfig) with presets               |                                       |                               |
 |-------------------|---------------|----------------------------------------------------------|-----------------------------------------------------------------------|
 
-
-
-
 ```
 
 
                                       
-### base
+### base namespace
 ```c++
 job::ai::
 ```
@@ -169,6 +167,7 @@ There are two types of namespace's
  
 ### helpers
 | namespace  |      desc          |            technial terms             |       mapping / notes       |   module   |
+|------------|--------------------|---------------------------------------|-----------------------------|------------|
 | base::     |    utils           | core                                  |                             |    FALSE   |
 | comp::     |    math            | kernels & math                        |                             |    FALSE   |
 | evo::      |    directions      | directions                            |    runtime helper           |    FALSE   |
@@ -181,6 +180,7 @@ There are two types of namespace's
 Each module has the following mandatory or optional area's
 
 |module interface| modules have interfaces to what there core function are |mandatory  |
+|----------------|---------------------------------------------------------|-----------|
 |types           |  all modules have a enum of types                       |mandatory  |
 |configs         |  what makes this uniq                                   |optional   |
 |presets         |  types plus configs pus interface  presets              |optional   |
@@ -188,6 +188,7 @@ Each module has the following mandatory or optional area's
 ### subsystem's
 
 | namespace  |      desc          |            technial terms             |       mapping / notes       |   module   |
+|------------|--------------------|---------------------------------------|-----------------------------|------------|
 | adapters:: |    algorithms      | used in directions (FMM, BH, VV etc)  |  [virtual, types, configs]  |    TRUE    |
 | coach::    |    motivation      | trainer's                             |  [virtual, types, configs]  |    TRUE    |
 | cords::    |    places          | tensor's                              |  [virtual, types, configs]  |    TRUE    |
@@ -197,6 +198,7 @@ Each module has the following mandatory or optional area's
 
 ### all
 | namespace  |      desc          |            technial terms             |       mapping / notes       |   subsystem |
+|------------|--------------------|---------------------------------------|-----------------------------|-------------|
 | adapters:: |    algorithms      | used in directions (FMM, BH, VV etc)  |  [virtual, types, configs]  |    TRUE     |
 | base::     |    utils           | core                                  |                             |    FALSE    |
 | coach::    |    motivation      | trainer's                             |  [virtual, types, configs]  |    TRUE     |

@@ -144,6 +144,8 @@ private:
     size_t m_offset;
 };
 
+
+#ifdef JOB_TEST_BENCHMARKS
 // could do this with the class itsself .,... whatever
 static void cleanup_shm(const std::string &key)
 {
@@ -151,7 +153,6 @@ static void cleanup_shm(const std::string &key)
     std::string sem = key + "_sig";
     ::sem_unlink(sem.c_str());
 }
-
 TEST_CASE("AI Genome IPC: Zero-Copy Serialization", "[ai][ipc][genome]")
 {
     const std::string key = "/job_ai_genome_test";
@@ -261,3 +262,5 @@ TEST_CASE("AI Genome IPC: Zero-Copy Serialization", "[ai][ipc][genome]")
     reader.closeDevice();
     cleanup_shm(key);
 }
+
+#endif

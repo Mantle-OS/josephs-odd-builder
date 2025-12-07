@@ -10,8 +10,26 @@ struct RouterToken {
 };
 
 struct RouterPlan {
-    std::vector<RouterToken>    tokens{{}};     // vector of tokens
-    int                         numExperts{0};  // how many experts
-    int                         batchSize{0};   // size on the plan
+    int                         batchSize{0};
+    int                         numExperts{0};
+    RouterToken                 *tokens = nullptr;
+    size_t                      tokenCount{0};
+
+    [[nodiscard]] RouterToken *begin()
+    {
+        return tokens;
+    }
+    [[nodiscard]] RouterToken *end()
+    {
+        return tokens + tokenCount;
+    }
+    [[nodiscard]] const RouterToken *begin() const
+    {
+        return tokens;
+    }
+    [[nodiscard]] const RouterToken *end() const
+    {
+        return tokens + tokenCount;
+    }
 };
 } // namespace job::ai::router

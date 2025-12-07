@@ -50,7 +50,6 @@ inline void computeNbodyForces(std::vector<Particle> &particles)
             // a1 += (m2 / r^3) * r
             // a2 -= (m1 / r^3) * r  (Newton's 3rd Law)
 
-            // Assuming Gravitational attraction (Positive).
             // Make negative for electrostatic repulsion.
             float f1 = p2.mass / distCb;
             float f2 = p1.mass / distCb;

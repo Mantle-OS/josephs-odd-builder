@@ -47,6 +47,9 @@ set(JOBAI_COACH_HEADERS
     coach/coach_config.h        # started and looks nice
     coach/genetic_coach.h       ## after contract
     coach/es_coach.h            ## working example needs perf
+    coach/fitness_evaluator.h
+    coach/portal_evaluator.h
+
 )
 set(JOBAI_COACH_SOURCES)
 
@@ -73,14 +76,17 @@ set(JOBAI_CORDS_SOURCES)
 
 # layers
 set(JOBAI_LAYERS_HEADERS
-    layers/layer_types.h        # done'ish
+    layers/layer_types.h
     layers/iparamgroup_provider.h
     layers/attention_config.h
     layers/attention.h
-    layers/ilayer.h             # done'ish
-    layers/dense.h              # working example
+    layers/ilayer.h
+    layers/dense.h
+    layers/layer_factory.h
 )
-set(JOBAI_LAYERS_SOURCES)
+set(JOBAI_LAYERS_SOURCES
+    layers/layer_factory.cpp
+)
 
 # mixure of experts
 set(JOBAI_MOE_HEADERS
@@ -107,7 +113,7 @@ set(JOBAI_ROUTER_HEADERS
     router/router_configs.h
     router/router_plan.h
     router/router_types.h
-    router/router_contoller.h
+
     router/router_impl.h
 
 )
@@ -115,21 +121,23 @@ set(JOBAI_ROUTER_SOURCES
     router/router_impl.cpp
 )
 
-
-
-
-
 #######################
 # NOT SUBSYSTEMS !
 ########################
 
 set(JOBAI_BASE_HEADERS
-    base/smid_amd.h             # immintrin.h wrapper
 )
 set(JOBAI_BASE_SOURCES)
 
 # comp
 set(JOBAI_COMP_HEADERS
+    comp/rounding_mode.h
+    comp/noise_table.h
+    comp/simd_provider.h
+    comp/transpose.h
+    comp/activation_functors.h
+    comp/activate_parallel.h
+    #
     comp/rrelu_config.h         # done'ish
     comp/gdn_params.h           # done'ish
     comp/activation_types.h     # done
@@ -140,6 +148,13 @@ set(JOBAI_COMP_HEADERS
     comp/atomic_math.h          # done
 )
 set(JOBAI_COMP_SOURCES)
+
+if(HAS_AVX)
+    list(APPEND  JOBAI_COMP_HEADERS comp/simd_avx.h)
+elseif(HAS_NEON)
+    list(APPEND  JOBAI_COMP_HEADERS comp/simd_arm.h)
+endif()
+
 
 # evo
 set(JOBAI_EVO_HEADERS
@@ -162,6 +177,7 @@ set(JOBAI_EVO_SOURCES
 
 # infer
 set(JOBAI_INFER_HEADERS
+    infer/workspace.h
     infer/runner.h              # way later
 )
 set(JOBAI_INFER_SOURCES
@@ -170,11 +186,11 @@ set(JOBAI_INFER_SOURCES
 
 # kv
 #######################
-set(JOBAI_KV_HEADERS
+set(JOBAI_CACHE_HEADERS
     kv/kv_key.h
     kv/kv_cache.h               # not planned
 )
-set(JOBAI_KV_SOURCES)
+set(JOBAI_CACHE_SOURCES)
 
 
 ################### END IMP,DECL ################################
@@ -190,14 +206,14 @@ add_library(JosephsOddBuilder_Ai SHARED
     ${JOBAI_MOE_HEADERS}        ${JOBAI_MOE_SOURCES}
     ${JOBAI_ROUTER_HEADERS}     ${JOBAI_ROUTER_SOURCES}
     # non modules
-    ${JOBAI_BASE_HEADERS}       ${JOBAI_BASE_SOURCES}
+    # ${JOBAI_BASE_HEADERS}       ${JOBAI_BASE_SOURCES}
     ${JOBAI_COMP_HEADERS}       ${JOBAI_COMP_SOURCES}
     ${JOBAI_EVO_HEADERS}        ${JOBAI_EVO_SOURCES}
     ${JOBAI_INFER_HEADERS}      ${JOBAI_INFER_SOURCES}
-    ${JOBAI_KV_HEADERS}         ${JOBAI_KV_SOURCES}
+    ${JOBAI_CACHE_HEADERS}      ${JOBAI_CACHE_SOURCES}
 )
 
-target_compile_options(JosephsOddBuilder_Ai PRIVATE -mavx -mavx2 -mfma -Wpsabi)
+target_compile_options(JosephsOddBuilder_Ai PRIVATE ${JOB_CXX_FLAGS})
 
 set_target_properties(JosephsOddBuilder_Ai PROPERTIES
     VERSION ${PROJECT_VERSION}
@@ -217,6 +233,7 @@ target_link_libraries(JosephsOddBuilder_Ai PUBLIC
 
 target_include_directories(JosephsOddBuilder_Ai PUBLIC
     # BUILD PATHS
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/adapters>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/coach>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/cords>
@@ -228,8 +245,9 @@ target_include_directories(JosephsOddBuilder_Ai PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/comp>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/evo>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/infer>
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/kv>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/cache>
     # INSTALL PATHS
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobai/>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobai/adapters>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobai/coach>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobai/cords>
@@ -241,7 +259,7 @@ target_include_directories(JosephsOddBuilder_Ai PUBLIC
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobai/comp>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobai/evo>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobai/infer>
-    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobai/kv>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobai/cache>
 )
 
 

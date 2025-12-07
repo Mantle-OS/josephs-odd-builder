@@ -95,6 +95,8 @@ TEST_CASE("MLP: Correctness vs Naive", "[ai][mlp][correctness]")
         REQUIRE_THAT(Out_Opt[i], Catch::Matchers::WithinRel(Out_Ref[i], 0.001f));
 }
 
+#ifdef JOB_TEST_BENCHMARKS
+
 // BERT/GPT Style .... I think)
 TEST_CASE("MLP: Benchmark Standard (GPT-3 Medium Sized ReLU)", "[ai][mlp][bench]")
 {
@@ -201,3 +203,4 @@ TEST_CASE("MLP: The Show down", "[ai][mlp][bench][compare]")
         return Out[0];
     };
 }
+#endif

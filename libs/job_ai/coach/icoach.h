@@ -17,27 +17,14 @@ public:
     [[nodiscard]] virtual CoachType type() const = 0;
     [[nodiscard]] virtual std::string name() const = 0;
 
-
-    // The Fitness Function Contract
-    // The user provides this lambda.
-    // Input: A candidate Genome (The model to test).
-    // Output: A float score (Fitness).
-    using Evaluator = std::function<float(const evo::Genome&)>;
+    using Evaluator = std::function<float(const evo::Genome&)>; // TODO this should not be a function and should come from its own module "eval" or "training"
 
     virtual void setPopulationSize(size_t size) = 0;
     virtual void setMutationRate(float rate) = 0;
     virtual void setMode(OptimizationMode mode) = 0;
 
-    // The Core Contract: "Coach the Population"
-    // 1. Perturb/Mutate/Crossover
-    // 2. Evaluate (Parallel)
-    // 3. Select
-    // Returns: The best genome of this generation.
     [[nodiscard]] virtual evo::Genome coach(const evo::Genome &parent, Evaluator eval) = 0;
 
-    // -------------------------------------------------------------------------
-    // Introspection
-    // -------------------------------------------------------------------------
     [[nodiscard]] virtual size_t generation() const = 0;
     [[nodiscard]] virtual float currentBestFitness() const = 0;
 };
