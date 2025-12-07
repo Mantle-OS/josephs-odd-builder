@@ -24,7 +24,7 @@
 #include "aligned_allocator.h"
 
 // Layers & Infer
-#include "iparamgroup_provider.h"
+#include "iparamgroup.h"
 #include "workspace.h" // The Zero-Alloc Memory Bank
 
 // Compute
@@ -35,7 +35,7 @@
 
 namespace job::ai::moe {
 
-class SparseMoE : public IMoE, public layers::IParamGroupProvider {
+class SparseMoE : public IMoE, public layers::IParamGroup {
 public:
     SparseMoE(int inputDim, int numExperts, int topk = 2) :
         m_routerCfg(router::RouterPresets::TopK(numExperts, topk)),
@@ -48,20 +48,21 @@ public:
         m_experts.resize(numExperts);
     }
 
-    [[nodiscard]] layers::LayerType type() const override
-    {
-        return layers::LayerType::SparseMoE;
-    }
-    [[nodiscard]] std::string name() const override
-    {
-        return "SparseMoE";
-    }
-
-    void addExpert(int id, std::shared_ptr<layers::ILayer> expert) override
+    void addExpert(int id, layers::ILayer::Ptr expert) override
     {
         if (id >= 0 && id < m_numExperts)
             m_experts[id] = std::move(expert);
     }
+
+    [[nodiscard]] layers::LayerType type() const noexcept override
+    {
+        return layers::LayerType::SparseMoE;
+    }
+    [[nodiscard]] std::string &name() noexcept override
+    {
+        return m_layerName;
+    }
+
 
     void setRouterType(router::RouterType type) override
     {
@@ -243,7 +244,7 @@ public:
             });
 
         } else {
-            // JOB_LOG_WARN("[SparseMoE] Workspace too small for private buffers. Falling back to Atomics.");
+            JOB_LOG_WARN("[SparseMoE] Workspace too small for private buffers. Falling back to Atomics.");
             threads::parallel_for(pool, size_t{0}, static_cast<size_t>(m_numExperts), [&](size_t eIdx) {
                 const int e = static_cast<int>(eIdx);
                 auto &tokens = buckets[e];
@@ -284,16 +285,15 @@ public:
         return inputShape; // Identity shape
     }
 
-    layers::ParameterGroup parameterGroups() override
+    layers::ParamGroup paramGroups() override
     {
-        using PV = layers::ParamView;
         using Ext = cords::ViewR::Extent;
-        layers::ParameterGroup group;
+        layers::ParamGroup group;
 
         // Gate weights
-        group.push_back(PV{
+        group.push_back(layers::ParamGroupConfig{
             .name = "gate",
-            .role = layers::ParamRole::GateWeights,
+            .type = layers::ParamGroupType::GateWeights,
             .data = cords::ViewR(m_gateWeights.data(),
                                  Ext(static_cast<uint32_t>(m_gateWeights.size())))
         });
@@ -303,12 +303,12 @@ public:
             if (!m_experts[i])
                 continue;
 
-            if (auto *pg = dynamic_cast<layers::IParamGroupProvider*>(m_experts[i].get())) {
-                auto sub = pg->parameterGroups();
+            if (auto *pg = dynamic_cast<layers::IParamGroup*>(m_experts[i].get())) {
+                auto sub = pg->paramGroups();
                 for (auto &slot : sub) {
                     // Namespacing: expert_0.weight
                     slot.name = "expert_" + std::to_string(i) + "." + slot.name;
-                    slot.role = layers::ParamRole::ExpertWeights;
+                    slot.type = layers::ParamGroupType::ExpertWeights;
                     group.push_back(std::move(slot));
                 }
             }
@@ -316,13 +316,13 @@ public:
         return group;
     }
 
-    cords::ViewR parameters() override
+    cords::ViewR parameters() noexcept override
     {
         using Ext = cords::ViewR::Extent;
         return cords::ViewR(m_gateWeights.data(), Ext(static_cast<uint32_t>(m_gateWeights.size())));
     }
 
-    size_t parameterCount() const override
+    size_t parameterCount() const noexcept override
     {
         return m_gateWeights.size();
     }
@@ -333,6 +333,7 @@ private:
     int                                                         m_numExperts{0};
     std::vector<float, cords::AlignedAllocator<float, 64>>      m_gateWeights;
     std::vector<std::shared_ptr<layers::ILayer>>                m_experts;
+    std::string m_layerName{"SparseMoE"};
 };
 
 } // namespace job::ai::moe

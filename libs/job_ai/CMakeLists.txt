@@ -77,10 +77,14 @@ set(JOBAI_CORDS_SOURCES)
 # layers
 set(JOBAI_LAYERS_HEADERS
     layers/layer_types.h
-    layers/iparamgroup_provider.h
+    layers/paramgroup_type.h    # new
+    layers/paramgroup_config.h  # new
+    layers/iparamgroup.h        # << we are here
+
+    layers/ilayer.h
+
     layers/attention_config.h
     layers/attention.h
-    layers/ilayer.h
     layers/dense.h
     layers/layer_factory.h
 )

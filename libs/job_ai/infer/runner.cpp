@@ -5,6 +5,9 @@
 
 namespace job::ai::infer {
 
+// TODO this code isa shity wrote to quick FIXME
+
+
 #ifndef JOB_DEFAULT_WS_MB
 #define JOB_DEFAULT_WS_MB 256 // 256MB Scratchpad
 #endif
@@ -28,8 +31,6 @@ void Runner::buildNetwork()
     m_maxLayerDim = 0;
 
     for (const auto &gene : m_genome.architecture) {
-
-        // 1. Create Layer
         auto layer = layers::LayerFactory::create(gene, m_genome.weights);
         if (layer) {
             m_layers.push_back(std::move(layer));

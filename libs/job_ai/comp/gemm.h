@@ -1,10 +1,9 @@
 #pragma once
 
-#include "real_type.h"
 #include <cstdint>
 #include <cstring>
 #include <algorithm>
-#include <immintrin.h>
+
 #include <job_thread_pool.h>
 #include <job_parallel_for.h>
 
@@ -94,7 +93,7 @@ inline void compute_tile(int M, int N, int K, float alpha,
                 int n_limit = std::min(kMicroN, N_curr - ni);
                 for (int row = 0; row < m_limit; ++row) {
                     for (int col = 0; col < n_limit; ++col) {
-                        core::real_t sum = 0.0f;
+                        float sum = 0.0f;
                         for (int p = 0; p < K; ++p) {
                             sum += A[(start_m + mi + row) * lda + p] * B[p * ldb + (start_n + ni + col)];
                         }
@@ -108,75 +107,76 @@ inline void compute_tile(int M, int N, int K, float alpha,
 
 // Low-level raw pointer sgemm (useful for batched operations on raw buffers)
 inline void sgemm_raw(int M, int N, int K,
-                      core::real_t alpha, const core::real_t* A, int lda,
-                      const core::real_t* B, int ldb,
-                      core::real_t beta, core::real_t* C, int ldc)
+                      float alpha, const float *A, int lda,
+                      const float *B, int ldb,
+                      float beta, float *C, int ldc)
 {
     // Beta Scaling
     if (beta == 0.0f) {
-        for(int i=0; i<M; ++i) std::memset(C + i * ldc, 0, N * sizeof(core::real_t));
+        for(int i=0; i<M; ++i) std::memset(C + i * ldc, 0, N * sizeof(float));
     } else if (beta != 1.0f) {
         for(int i=0; i<M; ++i)
             for(int j=0; j<N; ++j) C[i * ldc + j] *= beta;
     }
 
     // Tiling Loop
-    for (int i = 0; i < M; i += kBlockSize)
-        for (int j = 0; j < N; j += kBlockSize)
-            compute_tile(M, N, K, alpha, A, lda, B, ldb, C, ldc, i, j, kBlockSize);
+    for (int i = 0; i < M; i += JOB_BLOCK_SIZE)
+        for (int j = 0; j < N; j += JOB_BLOCK_SIZE)
+            compute_tile(M, N, K, alpha, A, lda, B, ldb, C, ldc, i, j, JOB_BLOCK_SIZE);
 }
 
 // Low-level raw pointer parallel sgemm
 inline void sgemm_parallel_raw(job::threads::ThreadPool& pool,
                                int M, int N, int K,
-                               core::real_t alpha, const core::real_t* A, int lda,
-                               const core::real_t* B, int ldb,
-                               core::real_t beta, core::real_t* C, int ldc)
+                               float alpha, const float *A, int lda,
+                               const float *B, int ldb,
+                               float beta, float *C, int ldc)
 {
-    // 1. Beta Scaling (Row Parallel)
+    // Beta Scaling (Row Parallel)
     job::threads::parallel_for(pool, size_t{0}, size_t(M), [&](size_t i) {
         if (beta == 0.0f) {
-            std::memset(C + i * ldc, 0, N * sizeof(core::real_t));
+            std::memset(C + i * ldc, 0, N * sizeof(float));
         } else if (beta != 1.0f) {
-            for(int j=0; j<N; ++j) C[i * ldc + j] *= beta;
+            for(int j=0; j<N; ++j)
+                C[i * ldc + j] *= beta;
         }
     });
 
-    // 2. 2D Block Parallelization
-    int m_chunks = (M + kBlockSize - 1) / kBlockSize;
-    int n_chunks = (N + kBlockSize - 1) / kBlockSize;
+    // 2D Block Parallelization
+    int m_chunks = (M + JOB_BLOCK_SIZE - 1) / JOB_BLOCK_SIZE;
+    int n_chunks = (N + JOB_BLOCK_SIZE - 1) / JOB_BLOCK_SIZE;
     size_t total_tiles = m_chunks * n_chunks;
 
     job::threads::parallel_for(pool, size_t{0}, total_tiles, [&](size_t tile_idx) {
         int chunk_m = tile_idx / n_chunks;
         int chunk_n = tile_idx % n_chunks;
-        int i = chunk_m * kBlockSize;
-        int j = chunk_n * kBlockSize;
+        int i = chunk_m * JOB_BLOCK_SIZE;
+        int j = chunk_n * JOB_BLOCK_SIZE;
 
-        compute_tile(M, N, K, alpha, A, lda, B, ldb, C, ldc, i, j, kBlockSize);
+        compute_tile(M, N, K, alpha, A, lda, B, ldb, C, ldc, i, j, JOB_BLOCK_SIZE);
     }, 0, 1); // Grain size 1 to prevent timeouts
 }
 
 inline void sgemm_strided_batched(job::threads::ThreadPool& pool,
                                   int batchCount,
                                   int M, int N, int K,
-                                  core::real_t alpha,
-                                  const core::real_t* A, int strideA, int lda,
-                                  const core::real_t* B, int strideB, int ldb,
-                                  core::real_t beta,
-                                  core::real_t* C, int strideC, int ldc)
+                                  float alpha,
+                                  const float *A, int strideA, int lda,
+                                  const float *B, int strideB, int ldb,
+                                  float beta,
+                                  float *C, int strideC, int ldc)
 {
     job::threads::parallel_for(pool, size_t{0}, size_t(batchCount), [&](size_t i) {
-        const core::real_t* a_ptr = A + (i * strideA);
-        const core::real_t* b_ptr = B + (i * strideB);
-        core::real_t* c_ptr       = C + (i * strideC);
+        const float *a_ptr = A + (i * strideA);
+        const float *b_ptr = B + (i * strideB);
+        float *c_ptr       = C + (i * strideC);
         sgemm_raw(M, N, K, alpha, a_ptr, lda, b_ptr, ldb, beta, c_ptr, ldc);
     });
 }
 
 // Serial SGEMM with Matrix objects
 inline void sgemm(const Matrix &A, const Matrix &B, Matrix &C,
-                  core::real_t alpha = 1.0f, core::real_t beta = 0.0f)
+                  float alpha = 1.0f, float beta = 0.0f)
 {
     assert(A.cols() == B.rows() && "Inner dimensions must match (K)");
     assert(C.rows() == A.rows() && "Output rows must match A rows");
@@ -191,7 +191,7 @@ inline void sgemm(const Matrix &A, const Matrix &B, Matrix &C,
 // Parallel SGEMM with Matrix objects
 inline void sgemm_parallel(job::threads::ThreadPool &pool,
                            const Matrix &A, const Matrix& B, Matrix& C,
-                           core::real_t alpha = 1.0f, core::real_t beta = 0.0f)
+                           float alpha = 1.0f, float beta = 0.0f)
 {
     assert(A.cols() == B.rows());
     assert(C.rows() == A.rows());

@@ -38,11 +38,13 @@ public:
     constexpr Extents(It first, It last)
     {
         const auto count = static_cast<std::size_t>(std::distance(first, last));
-        assert(count <= MaxRank);
-        m_size = count;
+        if (count > MaxRank)
+            throw std::length_error("Extents: too many dimensions");
+        else
+            m_size = count;
 
         std::size_t i = 0;
-        for (; first != last; ++first, ++i)
+        for (; first != last && i < MaxRank; ++first, ++i)
             m_data[i] = static_cast<std::uint32_t>(*first);
 
         for (; i < MaxRank; ++i)
@@ -131,20 +133,14 @@ public:
         return m_data.begin();
     }
 
-    constexpr auto end()   const noexcept
+    constexpr auto end() const noexcept
     {
         return m_data.begin() + m_size;
     }
 
 private:
-    std::array<std::uint32_t, MaxRank> m_data{};
-    std::size_t                        m_size;
+    std::array<std::uint32_t, MaxRank>  m_data{};
+    std::size_t                         m_size;
 };
-
-// FIXME these should be there own classes
-using Layout  = Extents<1>;
-using Tile4   = Extents<4>;
-using Tile8   = Extents<8>;
-using Tile6   = Extents<16>;
 
 } // namespace job::ai::cords

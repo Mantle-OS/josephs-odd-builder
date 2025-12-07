@@ -5,8 +5,6 @@
 
 namespace job::ai::comp {
 
-inline constexpr int kBlockSize = JOB_BLOCK_SIZE;
-
 using f32 = __m256;
 using i32 = __m256i;
 

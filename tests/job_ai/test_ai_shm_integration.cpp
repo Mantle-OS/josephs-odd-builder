@@ -181,8 +181,8 @@ TEST_CASE("AI Genome IPC: Zero-Copy Serialization", "[ai][ipc][genome]")
     l1.activation = ActivationType::ReLU;
     l1.inputs = 10;
     l1.outputs = 20;
-    l1.weight_count = 10 * 20; // 200 weights
-    l1.bias_count = 20;        // 20 biases
+    l1.weightCount = 10 * 20; // 200 weights
+    l1.biasCount = 20;        // 20 biases
     original.architecture.push_back(l1);
 
     // Add Layer: SparseMoE (Input 20 -> Output 10, 4 Experts)
@@ -191,16 +191,16 @@ TEST_CASE("AI Genome IPC: Zero-Copy Serialization", "[ai][ipc][genome]")
     l2.activation = ActivationType::GELU;
     l2.inputs = 20;
     l2.outputs = 10;
-    l2.weight_count = 20 * 10 * 4; // 800 weights
-    l2.bias_count = 10;
-    l2.auxiliary_data = 4; // 4 Experts
+    l2.weightCount = 20 * 10 * 4; // 800 weights
+    l2.biasCount = 10;
+    l2.auxiliaryData = 4; // 4 Experts
     original.architecture.push_back(l2);
 
     // Fill Weights with deterministic garbage
     size_t totalFloats = 200 + 20 + 800 + 10;
     original.weights.resize(totalFloats);
     for(size_t i=0; i<totalFloats; ++i)
-        original.weights[i] = static_cast<job::core::real_t>(i) * 0.1f;
+        original.weights[i] = static_cast<float>(i) * 0.1f;
 
     // Serialize -> Ring Buffer
     // write into a scratch buffer first to mimic packet assembly
@@ -233,7 +233,7 @@ TEST_CASE("AI Genome IPC: Zero-Copy Serialization", "[ai][ipc][genome]")
 
     // Check Weights (Floating point exact match because memcpy)
     REQUIRE(received.weights[0] == 0.0f);
-    REQUIRE(received.weights[totalFloats-1] == static_cast<job::core::real_t>(totalFloats-1) * 0.1f);
+    REQUIRE(received.weights[totalFloats-1] == static_cast<float>(totalFloats-1) * 0.1f);
 
     // BENCHMARK: Throughput of Genome Transfer
     BENCHMARK("Genome Roundtrip (Serialize+Transfer+Deserialize)") {

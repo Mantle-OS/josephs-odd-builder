@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cassert>
 #include <vector>
 #include <algorithm>
 #include <memory>
@@ -14,53 +15,46 @@
 
 namespace job::ai::evo {
 
-class Population {
+class Population final {
 public:
     Population() = default;
 
     explicit Population(const PopulationConfig &cfg) :
-        m_cfg(cfg)
-        , m_mutator(cfg.mutator)
-        , m_crossover(cfg.crossover)
+        m_cfg(cfg),
+        m_mutator(cfg.mutator),
+        m_crossover(cfg.crossover)
     {
-        // Reserve memory but don't initialize (User or Coach must seed population)
-        m_genomes.reserve(cfg.size);
-        m_fitness.reserve(cfg.size);
+        m_genomes.reserve(cfg.populationSize);
+        m_fitness.reserve(cfg.populationSize);
     }
 
-    ~Population() = default;
-    Population(const Population&) = default;
-    Population& operator=(const Population&) = default;
-    Population(Population&&) = default;
-    Population& operator=(Population&&) = default;
-
-
-    [[nodiscard]] size_t size() const noexcept
+    [[nodiscard]] std::size_t size() const noexcept
     {
         return m_genomes.size();
     }
 
-    Genome &genome(size_t idx)
+    Genome &genome(std::size_t index)
     {
-        return m_genomes[idx];
-    }
-    const Genome& genome(size_t idx) const
-    {
-        return m_genomes[idx];
+        assert(index < m_genomes.size());
+        return m_genomes[index];
     }
 
-    // Fitness is set externally by the Coach/Evaluator
-    void setFitness(size_t idx, float val)
+    const Genome &genome(std::size_t index) const
     {
-        if (m_fitness.size() <= idx)
-            m_fitness.resize(idx + 1);
-
-        m_fitness[idx] = val;
+        assert(index < m_genomes.size());
+        return m_genomes[index];
     }
 
-    [[nodiscard]] float getFitness(size_t idx) const
+    void setFitness(std::size_t index, float value)
     {
-        return m_fitness[idx];
+        assert(index < m_genomes.size());
+        m_fitness[index] = value;
+    }
+
+    [[nodiscard]] float getFitness(std::size_t index) const
+    {
+        assert(index < m_fitness.size());
+        return m_fitness[index];
     }
 
     void clear()
@@ -69,52 +63,48 @@ public:
         m_fitness.clear();
     }
 
-    void addGenome(Genome g)
+    void addGenome(Genome genome)
     {
-        m_genomes.push_back(std::move(g));
-        m_fitness.push_back(0.0f); // Placeholder
+        m_genomes.push_back(std::move(genome));
+        m_fitness.push_back(0.0f);
     }
-
 
     void evolveNextGeneration()
     {
         if (m_genomes.empty())
             return;
 
-        // sort indices by fitness (Descending)
-        std::vector<size_t> indices(m_genomes.size());
-        std::iota(indices.begin(), indices.end(), 0);
+        std::vector<std::size_t> indices(m_genomes.size());
+        std::iota(indices.begin(), indices.end(), std::size_t{0});
 
-        std::sort(indices.begin(), indices.end(), [&](size_t a, size_t b) {
+        std::sort(indices.begin(), indices.end(), [&](std::size_t a, std::size_t b) {
             return m_fitness[a] > m_fitness[b];
         });
 
         std::vector<Genome> nextGen;
-        nextGen.reserve(m_cfg.size);
+        nextGen.reserve(m_cfg.populationSize);
 
-        // elitism (Keep the best)
-        for(size_t i=0; i < m_cfg.eliteCount && i < indices.size(); ++i) {
+        const std::size_t maxElites =
+            std::min<std::size_t>(m_cfg.eliteCount, m_cfg.populationSize);
+
+        for (std::size_t i = 0; i < maxElites && i < indices.size(); ++i)
             nextGen.push_back(m_genomes[indices[i]]);
-        }
 
-        // reproduction (Selection + Crossover + Mutation)
-        // Use Top 50% as gene pool
-        size_t poolSize = std::max<size_t>(1, indices.size() / 2);
+        const std::size_t poolSize = std::max<std::size_t>(1, indices.size() / 2);
 
-        // FIXME  USE noise_table!!!!!!!!!!!!
         auto &rng = job::crypto::JobRandom::engine();
-        std::uniform_int_distribution<size_t> dist(0, poolSize - 1);
+        std::uniform_int_distribution<std::size_t> dist(0, poolSize - 1);
 
-        while (nextGen.size() < m_cfg.size) {
-            size_t idx1 = indices[dist(rng)];
-            size_t idx2 = indices[dist(rng)];
+        while (nextGen.size() < m_cfg.populationSize) {
+            const std::size_t idx1 = indices[dist(rng)];
+            const std::size_t idx2 = indices[dist(rng)];
+
             Genome child = m_crossover.cross(m_genomes[idx1], m_genomes[idx2]);
-            m_mutator.perturb(child, m_cfg.mutator.weightSigma);
+            m_mutator.perturb(child); // let Mutator use its own config
             nextGen.push_back(std::move(child));
         }
 
-        // swap
-        m_genomes = std::move(nextGen);
+        m_genomes  = std::move(nextGen);
         m_fitness.assign(m_genomes.size(), 0.0f);
     }
 
@@ -122,10 +112,8 @@ private:
     PopulationConfig    m_cfg;
     Mutator             m_mutator;
     Crossover           m_crossover;
-
-    // Structure of Arrays (SoA) for cache-friendly sorting
-    std::vector<Genome> m_genomes;
-    std::vector<float>  m_fitness;
+    std::vector<Genome> m_genomes;  // size = current population
+    std::vector<float>  m_fitness;  // same size as m_genomes
 };
 
 } // namespace job::ai::evo

@@ -2,9 +2,9 @@
 #include <cstdint>
 namespace job::ai::cords {
 struct AttentionShape {
-    uint32_t batch;
-    uint32_t seq;
-    uint32_t dim;
-    uint32_t numHeads;
+    uint32_t batch{0};
+    uint32_t seq{0};
+    uint32_t dim{0};
+    uint32_t numHeads{0};
 };
 }

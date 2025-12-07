@@ -11,96 +11,102 @@
 namespace job::ai::comp {
 
 // Magic numbers from the Self-Normalizing Neural Networks paper
-inline constexpr core::real_t kSeluAlpha        = core::real_t(1.6732632423543772848170429916717);
-inline constexpr core::real_t kSeluScale        = core::real_t(1.0507009873554804934193349852946);
-inline constexpr core::real_t kApproxGeluCoeff  = core::real_t(0.044715);
+inline constexpr float kSeluAlpha        = 1.6732632423543772848170429916717f;
+inline constexpr float kSeluScale        = 1.0507009873554804934193349852946f;
+inline constexpr float kApproxGeluCoeff  = 0.044715f;
+inline constexpr float kSqrt2V           = 1.41421356237309504880f;
+inline constexpr float kInvSqrt2         = 0.70710678118654752440f;                         // 1 / sqrt(2)
+inline constexpr float kSqrt2DivPi       = 0.79788456080286535587989f;                      // sqrt(2 / pi)
+inline constexpr float pi                = 3.141592653589793238462643383279502884L;
 
-[[nodiscard]] inline core::real_t sigmoid(core::real_t x) noexcept
+
+[[nodiscard]] inline float sigmoid(float x) noexcept
 {
-    return core::real_t(1) / (core::real_t(1) + std::exp(-x));
+    return 1.0f / (1.0f + std::exp(-x));
 }
 
-[[nodiscard]] inline core::real_t tanhAct(core::real_t x) noexcept
+[[nodiscard]] inline float tanhAct(float x) noexcept
 {
     return std::tanh(x);
 }
 
-[[nodiscard]] inline core::real_t hTanh(core::real_t x) noexcept
+[[nodiscard]] inline float hTanh(float x) noexcept
 {
-    return std::clamp(x, core::real_t(-1), core::real_t(1));
+    return std::clamp(x, -1.0f, 1.0f);
 }
 
-[[nodiscard]] inline core::real_t softplus(core::real_t x) noexcept
+[[nodiscard]] inline float softplus(float x) noexcept
 {
     // x is large (>20), ln(1+e^x) converges to x
-    if (x > core::real_t(20))
+    if (x > 20.0f)
         return x;
-    return std::log(core::real_t(1) + std::exp(x));
+    return std::log(1.0f + std::exp(x));
 }
 
-[[nodiscard]] inline core::real_t relu(core::real_t x) noexcept
+[[nodiscard]] inline float relu(float x) noexcept
 {
-    return std::max(core::real_t(0), x);
+    return std::max(0.0f, x);
 }
 
-[[nodiscard]] inline core::real_t leakyRelu(core::real_t x, core::real_t alpha = core::real_t(0.01)) noexcept
+[[nodiscard]] inline float leakyRelu(float x, float alpha = 0.01f) noexcept
 {
-    return (x > core::real_t(0)) ? x : (alpha * x);
+    return (x > 0.0f) ? x : (alpha * x);
 }
 
-[[nodiscard]] inline core::real_t prelu(core::real_t x, core::real_t alpha) noexcept
+[[nodiscard]] inline float prelu(float x, float alpha) noexcept
 {
-    return (x > core::real_t(0)) ? x : (alpha * x);
+    return (x > 0.0f) ? x : (alpha * x);
 }
 
-[[nodiscard]] inline core::real_t elu(core::real_t x, core::real_t alpha = core::real_t(1.0)) noexcept
+[[nodiscard]] inline float elu(float x, float alpha = 1.0f) noexcept
 {
-    return (x > core::real_t(0)) ? x : alpha * (std::exp(x) - core::real_t(1));
+    return (x > 0.0f) ? x : alpha * (std::exp(x) - 1.0f);
 }
 
-[[nodiscard]] inline core::real_t selu(core::real_t x) noexcept
+[[nodiscard]] inline float selu(float x) noexcept
 {
-    return kSeluScale * ((x > core::real_t(0)) ? x : kSeluAlpha * (std::exp(x) - core::real_t(1)));
+    return kSeluScale * ((x > 0.0f) ? x : kSeluAlpha * (std::exp(x) - 1.0f));
 }
 
-[[nodiscard]] inline core::real_t relu6(core::real_t x) noexcept
+[[nodiscard]] inline float relu6(float x) noexcept
 {
-    return std::min(std::max(core::real_t(0), x), core::real_t(6));
+    return std::min(std::max(0.0f, x), 6.0f);
 }
 
 // 0.5 * x * (1 + erf(x / sqrt(2)))
-[[nodiscard]] inline core::real_t gelu(core::real_t x) noexcept {
-    return core::real_t(0.5) * x * (core::real_t(1) + std::erf(x * core::kInvSqrt2));
+[[nodiscard]] inline float gelu(float x) noexcept
+{
+    return 0.5f * x * (1.0f + std::erf(x * kInvSqrt2));
 }
 
 // Tanh based - Faster, no erf() ?????
-[[nodiscard]] inline core::real_t approxGelu(core::real_t x) noexcept
+[[nodiscard]] inline float approxGelu(float x) noexcept
 {
-    const core::real_t inner = core::kSqrt2DivPi * (x + kApproxGeluCoeff * x * x * x);
-    return core::real_t(0.5) * x * (core::real_t(1) + std::tanh(inner));
+    const float inner = kSqrt2DivPi * (x + kApproxGeluCoeff * x * x * x);
+    return 0.5f * x * (1.0f + std::tanh(inner));
 }
 
-[[nodiscard]] inline core::real_t swish(core::real_t x, core::real_t beta = core::real_t(1)) noexcept
+[[nodiscard]] inline float swish(float x, float beta = 1.0f) noexcept
 {
     return x * sigmoid(beta * x);
 }
 
-[[nodiscard]] inline core::real_t hSwish(core::real_t x) noexcept
+[[nodiscard]] inline float hSwish(float x) noexcept
 {
-    return x * relu6(x + core::real_t(3)) / core::real_t(6);
+    return x * relu6(x + 3.0f) / 6.0f;
 }
 
-[[nodiscard]] inline core::real_t mish(core::real_t x) noexcept
+[[nodiscard]] inline float mish(float x) noexcept
 {
     return x * std::tanh(softplus(x));
 }
 
 // 0.5 * x * min(2, max(0, x + 2))
-[[nodiscard]] inline core::real_t hMish(core::real_t x) noexcept
+[[nodiscard]] inline float hMish(float x) noexcept
 {
-    core::real_t h = std::max(core::real_t(0), x + core::real_t(2));
-    h = std::min(core::real_t(2), h);
-    return core::real_t(0.5) * x * h;
+    float h = std::max(0.0f, x + 2.0f);
+    h = std::min(2.0f, h);
+    return 0.5f * x * h;
 }
 
 template <class It>
@@ -114,12 +120,12 @@ template <class It>
 }
 
 // alpha is already chosen (random or mean) see rrelu_config.h
-[[nodiscard]] inline core::real_t rRelu(core::real_t x, core::real_t alpha) noexcept
+[[nodiscard]] inline float rRelu(float x, float alpha) noexcept
 {
-    return x > core::real_t(0) ? x : alpha * x;
+    return x > 0.0f ? x : alpha * x;
 }
 
-[[nodiscard]] inline core::real_t activate(ActivationType type, core::real_t x, core::real_t alpha = 0)
+[[nodiscard]] inline float activate(ActivationType type, float x, float alpha = 0.0f)
 {
 
     switch (type) {

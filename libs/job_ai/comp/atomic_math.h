@@ -8,7 +8,7 @@ namespace job::ai::comp {
 // sum expert outputs into the final buffer without mutexes. opps ....
 // !!!! Note !!!! memory_order_relaxed is usually "sufficient" for accumulation if there is a barrier (thread join) at the end.
 __attribute__((always_inline))
-inline void atomicAdd(float& target, float value)
+inline void atomicAdd(float &target, float value)
 {
     static_assert(std::atomic_ref<float>::is_always_lock_free,
                   "atomic_ref<float> must be lock-free for atomicAdd");

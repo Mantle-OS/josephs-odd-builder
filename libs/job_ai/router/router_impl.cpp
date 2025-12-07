@@ -9,16 +9,32 @@ namespace job::ai::router {
 namespace {
 
 constexpr int kMaxK = 16;
-struct ValIdx { float val; int id; };
+struct ValIdx {
+    float val;
+    int id;
+};
+struct MinHeapComparator {
+    bool operator()(const ValIdx &a, const ValIdx &b) const noexcept
+    {
+        return a.val > b.val;
+    }
+};
 
 // Helper: Find Top-K (Stack based, zero alloc)
-void findTopK_Stack(const float* row, int n, int k, ValIdx* out_buffer)
+// rename n and k to something sane
+void findTopK_Stack(const float *row, int n, int k, ValIdx *out_buffer)
 {
+
+    assert(row);
+    assert(out_buffer);
+    assert(n > 0);
+    assert(k > 0);
+    assert(k <= n);
+
     for (int i = 0; i < k; ++i)
         out_buffer[i] = {row[i], i};
-    std::make_heap(out_buffer, out_buffer + k, [](auto& a, auto& b){
-        return a.val > b.val;
-    });
+
+    std::make_heap(out_buffer, out_buffer + k, MinHeapComparator{});
 
     for (int i = k; i < n; ++i) {
         if (row[i] > out_buffer[0].val) {
@@ -32,7 +48,8 @@ void findTopK_Stack(const float* row, int n, int k, ValIdx* out_buffer)
     });
 }
 
-adapters::AdapterType getAdapterForExpert(const RouterConfig& cfg, int expertId) {
+adapters::AdapterType getAdapterForExpert(const RouterConfig &cfg, int expertId)
+{
     if (static_cast<size_t>(expertId) < cfg.experts.size())
         return cfg.experts[expertId].adapter;
     return adapters::AdapterType::Dense;
@@ -40,15 +57,16 @@ adapters::AdapterType getAdapterForExpert(const RouterConfig& cfg, int expertId)
 
 } // namespace
 
-RouterPlan routeTopK(const RouterConfig &cfg, int batch, int experts, const float *logits, RouterToken* buffer)
-{
+RouterPlan routeTopK(const RouterConfig &cfg, int batch, int experts, const float *logits, RouterToken *buffer)
+{    
     int k = cfg.topK;
-    if (k > kMaxK) k = kMaxK;
+    if (k > kMaxK)
+        k = kMaxK;
     size_t tokenCount = 0;
     ValIdx best[kMaxK];
 
     for (int b = 0; b < batch; ++b) {
-        const float* rowLogits = logits + b * experts;
+        const float *rowLogits = logits + b * experts;
         findTopK_Stack(rowLogits, experts, k, best);
 
         float maxVal = best[0].val;
@@ -60,7 +78,7 @@ RouterPlan routeTopK(const RouterConfig &cfg, int batch, int experts, const floa
         float invSum = 1.0f / (sumExp + 1e-9f);
 
         for (int i = 0; i < k; ++i) {
-            RouterToken& tok = buffer[tokenCount++];
+            RouterToken &tok = buffer[tokenCount++];
             tok.row = b;
             tok.expert = best[i].id;
             tok.weight = best[i].val * invSum;
@@ -71,20 +89,20 @@ RouterPlan routeTopK(const RouterConfig &cfg, int batch, int experts, const floa
     return RouterPlan{ batch, experts, buffer, tokenCount };
 }
 
-RouterPlan routeHash(const RouterConfig &cfg, int batch, int experts, const cords::ViewR &input, RouterToken* buffer)
+RouterPlan routeHash(const RouterConfig &cfg, int batch, int experts, const cords::ViewR &input, RouterToken *buffer)
 {
     int k = cfg.topK;
     size_t tokenCount = 0;
-    const float* data = input.data();
+    const float *data = input.data();
     int dim = input.extent()[1];
     int stride = std::max(1, dim / 8);
     int scanCount = std::min(8, dim);
 
     for (int b = 0; b < batch; ++b) {
         uint32_t h = 2166136261u;
-        const float* row = data + b * dim;
+        const float *row = data + b * dim;
 
-        for(int i=0; i<scanCount; ++i) {
+        for(int i = 0; i < scanCount; ++i) {
             uint32_t bits;
             std::memcpy(&bits, &row[i * stride], 4);
             h ^= bits;
@@ -103,17 +121,18 @@ RouterPlan routeHash(const RouterConfig &cfg, int batch, int experts, const cord
     return RouterPlan{ batch, experts, buffer, tokenCount };
 }
 
-RouterPlan routeSpatial(const RouterConfig &cfg, int batch, [[maybe_unused]] const cords::ViewR &input, RouterToken* buffer)
+RouterPlan routeSpatial(const RouterConfig &cfg, int batch, [[maybe_unused]] const cords::ViewR &input, RouterToken *buffer)
 {
     size_t tokenCount = 0;
     int k = cfg.topK;
     // Total experts unknown from input, assume from config or just 1 for this stub
     int experts = static_cast<int>(cfg.experts.size());
-    if (experts == 0) experts = 1;
+    if (experts == 0)
+        experts = 1;
 
     for (int b = 0; b < batch; ++b) {
         for (int i = 0; i < k; ++i) {
-            RouterToken& tok = buffer[tokenCount++];
+            RouterToken &tok = buffer[tokenCount++];
             tok.row = b;
             tok.expert = i % experts;
             tok.weight = 1.0f / k;
@@ -123,7 +142,7 @@ RouterPlan routeSpatial(const RouterConfig &cfg, int batch, [[maybe_unused]] con
     return RouterPlan{ batch, experts, buffer, tokenCount };
 }
 
-RouterPlan routeState(const RouterConfig &cfg, int batch, int experts, RouterToken* buffer)
+RouterPlan routeState(const RouterConfig &cfg, int batch, int experts, RouterToken *buffer)
 {
     size_t tokenCount = 0;
     int k = cfg.topK;
@@ -131,7 +150,7 @@ RouterPlan routeState(const RouterConfig &cfg, int batch, int experts, RouterTok
     for (int b = 0; b < batch; ++b) {
         int baseExpert = b % experts;
         for (int i = 0; i < k; ++i) {
-            RouterToken& tok = buffer[tokenCount++];
+            RouterToken &tok = buffer[tokenCount++];
             tok.row = b;
             tok.expert = (baseExpert + i) % experts;
             tok.weight = 1.0f / k;

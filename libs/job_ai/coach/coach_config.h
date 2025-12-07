@@ -9,6 +9,21 @@ struct ESConfig {
     float       sigma               = 0.02f;    // Mutation strength (Learning Rate)
     float       decay               = 0.99f;    // Sigma decay per generation (Annealing)
     uint64_t    seed                = 0;        // 0 = Random Device
+
+    [[nodiscard]] inline bool validate(const ESConfig &cfg) noexcept
+    {
+        if (cfg.populationSize == 0)
+            return false;
+
+        if (cfg.sigma <= 0.0f)
+            return false;
+
+        if (cfg.decay <= 0.0f || cfg.decay > 1.0f)
+            return false;
+
+        return true;
+    }
+
 };
 
 namespace CoachPresets {

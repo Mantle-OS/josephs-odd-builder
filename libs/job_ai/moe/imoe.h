@@ -23,14 +23,14 @@ public:
     // The ID allows the router to map tokens to specific experts.
     virtual void addExpert(int id, layers::ILayer::Ptr expert) = 0;
 
-    [[nodiscard]] virtual layers::LayerType type() const = 0;
-    [[nodiscard]] virtual std::string name() const = 0;
+    [[nodiscard]] virtual layers::LayerType type() const noexcept = 0;
+    [[nodiscard]] virtual std::string &name() noexcept = 0;
 
     // Router Configuration
     virtual void setRouterType(router::RouterType type) = 0;
     virtual void setLoadBalancing(router::LoadBalanceStrategy strategy) = 0;
     virtual router::RouterPlan route(threads::ThreadPool &pool, const cords::ViewR &input,
-                                     infer::Workspace &ws,
+                                     infer::Workspace &workspace,
                                      std::vector<float> *maybeGateLogits) = 0;
 
     // virtual void forward(job::threads::ThreadPool &pool,

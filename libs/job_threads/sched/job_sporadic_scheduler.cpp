@@ -155,8 +155,8 @@ bool JobSporadicScheduler::canAdmitUnlocked(std::chrono::steady_clock::time_poin
     }
 
     // In flight to the PARTY
-    for (const auto& kv : m_inflight) {
-        const auto& sp = kv.second;
+    for (const auto &kv : m_inflight) {
+        const auto &sp = kv.second;
         const auto cost = sp->wcet().count();
         if (cost > 0)
             items.push_back({ sp->deadline(), cost });

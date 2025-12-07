@@ -4,7 +4,7 @@
 namespace job::ai::layers {
 struct AttentionConfig {
     adapters::AdapterType   adapterType{adapters::AdapterType::Flash};      // The "Engine" (Flash, FMM, etc.)
-    uint32_t                numHeads{8};
+    uint32_t                numHeads{8};                                    // the number od XXXXXXXXX
     bool                    causal{true};                                   // Mask future tokens maybe
     bool                    useBias{false};                                 // Standard LLaMA ignores bias in attention projections
 };

@@ -6,21 +6,21 @@
 namespace job::ai::comp {
 
 struct RReLUConfig {
-    core::real_t    lower = core::real_t(0.125);
-    core::real_t    upper = core::real_t(0.333);
+    float           lower = 0.125f;
+    float           upper = 0.333f;
     bool            training = true;
 };
 
 // training
-[[nodiscard]] inline core::real_t rrelu(core::real_t x, const RReLUConfig &cfg) noexcept
+[[nodiscard]] inline float rrelu(float x, const RReLUConfig &cfg) noexcept
 {
     if (!cfg.training) {
-        const core::real_t alpha = (cfg.lower + cfg.upper) / core::real_t(2);
-        return x > core::real_t(0) ? x : alpha * x;
+        const float alpha = (cfg.lower + cfg.upper) / 2.0f;
+        return x > 0.0f ? x : alpha * x;
     }
 
-    core::real_t alpha = crypto::JobRandom::uniformReal(cfg.lower, cfg.upper);
-    return x > core::real_t(0) ? x : alpha * x;
+    float alpha = crypto::JobRandom::uniformReal(cfg.lower, cfg.upper);
+    return x > 0.0f ? x : alpha * x;
 }
 } // namespace job::ai::comp
 

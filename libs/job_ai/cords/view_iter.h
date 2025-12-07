@@ -13,8 +13,9 @@ class ViewIter {
 public:
     using value_type        = View<T_View>;
     using difference_type   = std::ptrdiff_t;
-    using iterator_category = std::forward_iterator_tag;
+    using iterator_category = std::input_iterator_tag;
 
+    ViewIter() = default;
     ViewIter(const View<T_View> &parent, std::uint32_t index) :
         m_parent(parent),
         m_index(index)
@@ -32,9 +33,15 @@ public:
         return *this;
     }
 
+    [[nodiscard]] bool operator==(const ViewIter &other) const
+    {
+        return m_index == other.m_index &&
+               m_parent.view() == other.m_parent.view();
+    }
+
     [[nodiscard]] bool operator!=(const ViewIter &other) const
     {
-        return m_index != other.m_index;
+        return !(*this == other);
     }
 
 private:

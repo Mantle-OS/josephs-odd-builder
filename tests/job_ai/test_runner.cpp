@@ -31,8 +31,8 @@ void addDenseGene(Genome &genome, int input, int output, comp::ActivationType ac
     // weights + bias
     size_t count = static_cast<size_t>(input) * output + output;
 
-    gene.weight_offset = static_cast<uint32_t>(genome.weights.size());
-    gene.weight_count = static_cast<uint32_t>(count);
+    gene.weightOffset = static_cast<uint32_t>(genome.weights.size());
+    gene.weightCount = static_cast<uint32_t>(count);
 
     genome.architecture.push_back(gene);
 
@@ -47,13 +47,13 @@ void addAttentionGene(Genome &genome, int dim, int heads) {
     gene.type = layers::LayerType::Attention;
     gene.inputs = dim;
     gene.outputs = heads;
-    gene.auxiliary_data = static_cast<uint32_t>(adapters::AdapterType::Flash); // Use Flash
+    gene.auxiliaryData = static_cast<uint32_t>(adapters::AdapterType::Flash); // Use Flash
 
     // 4 matrices (Q,K,V,O) + bias's
     size_t count = 4 * (size_t(dim) * dim) + 4 * dim;
 
-    gene.weight_offset = static_cast<uint32_t>(genome.weights.size());
-    gene.weight_count = static_cast<uint32_t>(count);
+    gene.weightOffset = static_cast<uint32_t>(genome.weights.size());
+    gene.weightCount = static_cast<uint32_t>(count);
 
     genome.architecture.push_back(gene);
 
@@ -69,13 +69,13 @@ void addMoEGene(Genome &genome, int dim, int experts, int topk)
     gene.type = layers::LayerType::SparseMoE;
     gene.inputs = dim;
     gene.outputs = experts;
-    gene.auxiliary_data = topk;
+    gene.auxiliaryData = topk;
     gene.activation = comp::ActivationType::Identity;
 
     size_t gateCount = static_cast<size_t>(dim) * experts;
 
-    gene.weight_offset = static_cast<uint32_t>(genome.weights.size());
-    gene.weight_count = static_cast<uint32_t>(gateCount);
+    gene.weightOffset = static_cast<uint32_t>(genome.weights.size());
+    gene.weightCount = static_cast<uint32_t>(gateCount);
 
     genome.architecture.push_back(gene);
 

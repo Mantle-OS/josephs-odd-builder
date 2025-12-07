@@ -1,5 +1,8 @@
 #pragma once
+
+#include <cstddef>
 #include <vector>
+
 #include "aligned_allocator.h"
 
 namespace job::ai::infer {
@@ -10,40 +13,56 @@ namespace job::ai::infer {
 
 class Workspace {
 public:
-    explicit Workspace(size_t sizeBytes = JOB_DEFAULT_WS_MB * 1024 * 1024)
+    explicit Workspace(std::size_t sizeBytes = JOB_DEFAULT_WS_MB * 1024ull * 1024ull)
     {
-        size_t floatCount = sizeBytes / sizeof(float);
-        m_memory.resize(floatCount);
         resize(sizeBytes);
     }
 
-    void resize(size_t sizeBytes)
+    // Resize workspace to hold (sizeBytes / sizeof(float)) floats.
+    // This may grow or shrink the logical size; capacity is managed by std::vector.
+    void resize(std::size_t sizeBytes)
     {
-        size_t floatCount = sizeBytes / sizeof(float);
-        if (m_memory.capacity() >= floatCount)
-            return;
+        const std::size_t floatCount = sizeBytes / sizeof(float);
         m_memory.resize(floatCount);
     }
 
-    float *bufferA()
+    float *bufferA() noexcept
     {
         return m_memory.data();
     }
-    float *bufferB()
+
+    float *bufferB() noexcept
     {
         return m_memory.data() + (m_memory.size() / 2);
     }
-    float *raw()
+
+    float *raw() noexcept
     {
         return m_memory.data();
     }
-    size_t size() const
+
+    const float *bufferA() const noexcept
+    {
+        return m_memory.data();
+    }
+
+    const float *bufferB() const noexcept
+    {
+        return m_memory.data() + (m_memory.size() / 2);
+    }
+
+    const float *raw() const noexcept
+    {
+        return m_memory.data();
+    }
+
+    [[nodiscard]] std::size_t size() const noexcept
     {
         return m_memory.size();
     }
 
 private:
-    std::vector<float, cords::AlignedAllocator<float, 64>> m_memory;
+    std::vector<float, job::ai::cords::AlignedAllocator<float, 64>> m_memory;
 };
 
-}
+} // namespace job::ai::infer

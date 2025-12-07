@@ -8,7 +8,10 @@
 
 // Interfaces
 #include "ilayer.h"
-#include "iparamgroup_provider.h"
+#include "paramgroup_type.h"
+#include "paramgroup_config.h"
+#include "iparamgroup.h"
+
 #include "attention_config.h"
 
 // Cords
@@ -28,7 +31,7 @@
 
 namespace job::ai::layers {
 
-class Attention : public ILayer, public IParamGroupProvider {
+class Attention : public ILayer, public IParamGroup {
 public:
     Attention(const AttentionConfig &cfg, int dim) :
         m_cfg(cfg),
@@ -61,19 +64,25 @@ public:
             m_bo = ptr; ptr += dim;
         }
     }
-
-    [[nodiscard]] LayerType type() const override
+    //////////////////////////////////////////////
+    // ILayer  override
+    //////////////////////////////////////////////
+    [[nodiscard]] LayerType type() const noexcept override
     {
         return LayerType::Attention;
     }
 
-    [[nodiscard]] std::string name() const override
+    [[nodiscard]] std::string &name() noexcept override
     {
-        return "Attention";
+        return m_layerName;
     }
 
+    [[nodiscard]] cords::ViewR::Extent getOutputShape(const cords::ViewR::Extent& inputShape) const override
+    {
+        return inputShape; // Identity shape
+    }
 
-    void forward(job::threads::ThreadPool &pool,
+    void forward(threads::ThreadPool &pool,
                  const cords::ViewR &input,
                  cords::ViewR &output,
                  infer::Workspace &ws) override
@@ -178,51 +187,68 @@ public:
         }
     }
 
-    ParameterGroup parameterGroups() override
+
+
+
+    [[nodiscard]] std::size_t parameterCount() const noexcept  override
     {
-        using PV = ParamView;
-        using Ext = cords::ViewR::Extent;
-        ParameterGroup group;
-
-        auto add_view = [&](float* ptr, const std::string& suffix, ParamRole role) {
-            size_t sz = (role == ParamRole::Bias) ? m_dim : (static_cast<size_t>(m_dim) * m_dim);
-            group.push_back(PV{
-                .name = "attn." + suffix,
-                .role = role,
-                .data = cords::ViewR(ptr, Ext(static_cast<uint32_t>(sz)))
-            });
-        };
-
-        add_view(m_wq, "wq", ParamRole::Weights);
-        add_view(m_wk, "wk", ParamRole::Weights);
-        add_view(m_wv, "wv", ParamRole::Weights);
-        add_view(m_wo, "wo", ParamRole::Weights);
-
-        if (m_cfg.useBias) {
-            add_view(m_bq, "bq", ParamRole::Bias);
-            add_view(m_bk, "bk", ParamRole::Bias);
-            add_view(m_bv, "bv", ParamRole::Bias);
-            add_view(m_bo, "bo", ParamRole::Bias);
-        }
-
-        return group;
+        return m_storage.size();
     }
 
-    cords::ViewR parameters() override
+    [[nodiscard]] cords::ViewR parameters() noexcept override
     {
         using Ext = cords::ViewR::Extent;
         return cords::ViewR(m_storage.data(), Ext(static_cast<uint32_t>(m_storage.size())));
     }
 
-    size_t parameterCount() const override
+    void resetState() noexcept override
     {
-        return m_storage.size();
+        // FIXME LATER
+    };
+
+
+    //////////////////////////////////////////////
+    // End ILayer  override
+    //////////////////////////////////////////////
+
+
+
+
+
+    //////////////////////////////////////////////
+    // IParamGroup  override
+    //////////////////////////////////////////////
+    ParamGroup paramGroups() override
+    {
+        using Ext = cords::ViewR::Extent;
+        ParamGroup group;
+
+        auto add_view = [&](float* ptr, const std::string &suffix, ParamGroupType type) {
+            size_t sz = (type == ParamGroupType::Bias) ? m_dim : (static_cast<size_t>(m_dim) * m_dim);
+            group.push_back(ParamGroupConfig{
+                .name = "attn." + suffix,
+                .type = type,
+                .data = cords::ViewR(ptr, Ext(static_cast<uint32_t>(sz)))
+            });
+        };
+
+        add_view(m_wq, "wq", ParamGroupType::Weights);
+        add_view(m_wk, "wk", ParamGroupType::Weights);
+        add_view(m_wv, "wv", ParamGroupType::Weights);
+        add_view(m_wo, "wo", ParamGroupType::Weights);
+
+        if (m_cfg.useBias) {
+            add_view(m_bq, "bq", ParamGroupType::Bias);
+            add_view(m_bk, "bk", ParamGroupType::Bias);
+            add_view(m_bv, "bv", ParamGroupType::Bias);
+            add_view(m_bo, "bo", ParamGroupType::Bias);
+        }
+        // STCK FIXME
+        return group;
     }
 
-    cords::ViewR::Extent getOutputShape(const cords::ViewR::Extent& inputShape) const override
-    {
-        return inputShape; // Identity shape
-    }
+
+
 private:
     AttentionConfig                                         m_cfg;
     int                                                     m_dim;
@@ -237,6 +263,7 @@ private:
     float                                                   *m_bk{nullptr};
     float                                                   *m_bv{nullptr};
     float                                                   *m_bo{nullptr};
+    std::string                                             m_layerName{"Attention"};
 };
 
 } // namespace job::ai::layers

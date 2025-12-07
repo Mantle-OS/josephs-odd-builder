@@ -8,8 +8,6 @@
 #include <vector>
 #include <type_traits>
 
-#include <real_type.h>
-
 #include "extents.h"
 #include "view_iter.h"
 
@@ -86,10 +84,25 @@ public:
         requires (std::conjunction_v<std::is_integral<Indices>...>)
     [[nodiscard]] T_View &operator()(Indices... indices)
     {
+        // Must match rank
         assert(sizeof...(indices) == rank());
+
         std::size_t offset = 0;
         std::size_t dim    = 0;
-        ((offset += static_cast<std::size_t>(indices) * m_strides[dim++]), ...);
+
+        //  check dim < rank
+        //  check 0 <= index < extent[dim]
+        //  accumulate offset += index * stride[dim]
+        ([&]{
+            const auto idx = static_cast<std::size_t>(indices);
+
+            assert(dim < m_extent.size());
+            assert(idx < static_cast<std::size_t>(m_extent[dim]));
+
+            offset += idx * static_cast<std::size_t>(m_strides[dim]);
+            ++dim;
+        }(), ...);
+
         assert(offset < size());
         return m_view[offset];
     }
@@ -99,12 +112,24 @@ public:
     [[nodiscard]] const T_View &operator()(Indices... indices) const
     {
         assert(sizeof...(indices) == rank());
+
         std::size_t offset = 0;
         std::size_t dim    = 0;
-        ((offset += static_cast<std::size_t>(indices) * m_strides[dim++]), ...);
+
+        ([&]{
+            const auto idx = static_cast<std::size_t>(indices);
+
+            assert(dim < m_extent.size());
+            assert(idx < static_cast<std::size_t>(m_extent[dim]));
+
+            offset += idx * static_cast<std::size_t>(m_strides[dim]);
+            ++dim;
+        }(), ...);
+
         assert(offset < size());
         return m_view[offset];
     }
+
 
     [[nodiscard]] View<T_View> reshape(const Extent &newExtent) const
     {
@@ -163,7 +188,7 @@ protected:
     }
 };
 
-using ViewR      = View<job::core::real_t>;
-using ViewConstR = View<const job::core::real_t>;
+using ViewR      = View<float>;
+using ViewConstR = View<const float>;
 
 } // namespace job::ai::cords

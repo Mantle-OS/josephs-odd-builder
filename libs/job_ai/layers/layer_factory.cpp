@@ -8,6 +8,9 @@
 #include "attention.h"
 #include "sparse_moe.h"
 
+
+// FIXME THIS CODE IS SHIT FIXME
+
 namespace job::ai::layers {
 
 std::unique_ptr<ILayer> LayerFactory::create(const evo::LayerGene& gene, const std::vector<float> &genomeWeights)
@@ -34,24 +37,24 @@ std::unique_ptr<ILayer> LayerFactory::create(const evo::LayerGene& gene, const s
         return nullptr;
     }
 
-    size_t requiredEnd = gene.weight_offset + gene.weight_count;
+    size_t requiredEnd = gene.weightOffset + gene.weightCount;
     if (requiredEnd > genomeWeights.size()) {
         JOB_LOG_ERROR("Factory: Genome underflow. Layer needs weights [{}..{}) but genome size is {}",
-                      gene.weight_offset, requiredEnd, genomeWeights.size());
+                      gene.weightOffset, requiredEnd, genomeWeights.size());
         return nullptr; // Fail safe
     }
 
-    if (gene.weight_count > 0) {
+    if (gene.weightCount > 0) {
         cords::ViewR layerParams = layer->parameters();
-        if (layerParams.size() <= gene.weight_count) {
+        if (layerParams.size() <= gene.weightCount) {
             float* dst = const_cast<float*>(layerParams.data());
-            const float* src = genomeWeights.data() + gene.weight_offset;
+            const float* src = genomeWeights.data() + gene.weightOffset;
 
             // MEMCPY: The fastest way to load a neural net. Fo rnow MUHAHAHAAHA
             std::memcpy(dst, src, layerParams.size() * sizeof(float));
         } else {
             JOB_LOG_WARN("Factory: Layer param count mismatch. Gene says {}, Layer wants {}",
-                         gene.weight_count, layerParams.size());
+                         gene.weightCount, layerParams.size());
         }
     }
     return layer;
@@ -71,7 +74,7 @@ std::unique_ptr<ILayer> LayerFactory::createAttention(const evo::LayerGene& gene
     AttentionConfig cfg;
     cfg.numHeads = gene.outputs;
     cfg.useBias = true;
-    cfg.adapterType = static_cast<adapters::AdapterType>(gene.auxiliary_data);
+    cfg.adapterType = static_cast<adapters::AdapterType>(gene.auxiliaryData);
 
     return std::make_unique<Attention>(cfg, gene.inputs);
 }
@@ -80,7 +83,7 @@ std::unique_ptr<ILayer> LayerFactory::createMoE(const evo::LayerGene &gene, [[ma
 {
     int dim = gene.inputs;
     int numExperts = gene.outputs;
-    int k = gene.auxiliary_data; // Top-K stored in aux
+    int k = gene.auxiliaryData; // Top-K stored in aux
 
     // Validation
     if (numExperts <= 0 || k <= 0)

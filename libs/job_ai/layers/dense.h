@@ -11,6 +11,7 @@ namespace job::ai::layers {
 
 class Dense : public ILayer {
 public:
+
     Dense(int inputs, int outputs, comp::ActivationType act) :
         m_inputs(inputs),
         m_outputs(outputs),
@@ -29,19 +30,33 @@ public:
     Dense(Dense&&) noexcept = default;
     Dense& operator=(Dense&&) noexcept = default;
 
-    [[nodiscard]] LayerType type() const override
+
+
+    //////////////////////////////////////////////
+    // ILayer  override
+    //////////////////////////////////////////////
+    [[nodiscard]] LayerType type() const noexcept override
     {
         return LayerType::Dense;
     }
-    [[nodiscard]] std::string name() const override
+
+    [[nodiscard]] std::string &name() noexcept override
     {
-        return "Dense";
+        return m_layerName;
+    }
+
+    [[nodiscard]] cords::ViewR::Extent getOutputShape(const cords::ViewR::Extent &inputShape) const override
+    {
+        if (inputShape.rank() == 3)
+            return { inputShape[0], inputShape[1], static_cast<uint32_t>(m_outputs) };
+
+        return { inputShape[0], static_cast<uint32_t>(m_outputs) };
     }
 
     void forward(job::threads::ThreadPool &pool,
                  const cords::ViewR &input,
                  cords::ViewR &output,
-                 [[maybe_unused]] infer::Workspace &ws) override
+                 [[maybe_unused]] infer::Workspace &workspace) override
     {
         size_t rows = input.extent()[0];
         size_t inFeatures = 0;
@@ -100,23 +115,20 @@ public:
         }
     }
 
-    [[nodiscard]] cords::ViewR parameters() override
+    [[nodiscard]] cords::ViewR parameters() noexcept override
     {
         return cords::ViewR(m_storage.data(), cords::ViewR::Extent((uint32_t)m_storage.size()));
     }
 
-    [[nodiscard]] size_t parameterCount() const override
+    [[nodiscard]] size_t parameterCount() const noexcept override
     {
         return m_storage.size();
     }
 
-    cords::ViewR::Extent getOutputShape(const cords::ViewR::Extent& inputShape) const override
+    void resetState() noexcept override
     {
-        if (inputShape.rank() == 3)
-            return { inputShape[0], inputShape[1], static_cast<uint32_t>(m_outputs) };
-
-        return { inputShape[0], static_cast<uint32_t>(m_outputs) };
-    }
+        // FIXME LATER
+    };
 
 private:
     int                                                     m_inputs;
@@ -125,6 +137,7 @@ private:
     std::vector<float, cords::AlignedAllocator<float, 64>>  m_storage;
     float                                                   *m_weightsPtr{nullptr};
     float                                                   *m_biasPtr{nullptr};
+    std::string                                             m_layerName{"Dense"};
 };
 
 } // namespace job::ai::layers

@@ -30,50 +30,42 @@ public:
         resizePopulation(cfg.populationSize);
     }
 
-    [[nodiscard]] CoachType type() const override
+    [[nodiscard]] CoachType type() const noexcept override
     {
         return CoachType::ES;
     }
-    [[nodiscard]] std::string name() const override
+    [[nodiscard]] std::string &name() noexcept override
     {
-        return "EvolutionStrategy (1, Lambda)";
-
+        return m_coachName;
     }
 
-    void setPopulationSize(size_t size) override
+    void setPopulationSize(size_t size) noexcept override
     {
         m_config.populationSize = size;
         resizePopulation(size);
     }
 
-    void setMutationRate(float rate) override
+    void setMutationRate(float rate) noexcept override
     {
         m_config.sigma = rate;
 
     }
-    void setMode(OptimizationMode mode) override
+    void setMode(OptimizationMode mode) noexcept override
     {
         m_optMode = mode;
 
     }
 
-    [[nodiscard]] size_t generation() const override
+    [[nodiscard]] size_t generation() const noexcept override
     {
         return m_generation;
 
     }
-    [[nodiscard]] float currentBestFitness() const override
+    [[nodiscard]] float currentBestFitness() const noexcept override
     {
         return m_bestFitness;
-
     }
-    [[nodiscard]] const evo::Genome &bestGenome() const
-    {
-        if (m_population.size() == 0)
-            throw std::runtime_error("ESCoach: No population exists yet.");
 
-        return m_population.genome(m_currentBestIdx);
-    }
     evo::Genome coach(const evo::Genome &parent, Evaluator eval) override
     {
         m_generation++;
@@ -86,8 +78,7 @@ public:
         if (m_population.size() != popSize)
             resizePopulation(popSize);
 
-
-        threads::parallel_for(*m_pool, size_t{0}, popSize, [&](size_t i) { // LOCKED HERE
+        threads::parallel_for(*m_pool, size_t{0}, popSize, [&](size_t i) { // LOCKED HERE (maybe eval is not really captured ?)
             if (i >= m_population.size())
                 return;
 
@@ -120,6 +111,15 @@ public:
         return m_population.genome(bestIdx);
     }
 
+    [[nodiscard]] const evo::Genome &bestGenome() const
+    {
+        if (m_population.size() == 0)
+            throw std::runtime_error("ESCoach: No population exists yet.");
+
+        return m_population.genome(m_currentBestIdx);
+    }
+
+
 private:
     void resizePopulation(size_t size) {
         m_population.clear();
@@ -135,6 +135,7 @@ private:
     size_t                      m_generation{0};
     float                       m_bestFitness{0.0f};
     size_t                      m_currentBestIdx{0};
+    std::string                 m_coachName{"EvolutionStrategy (1, Lambda)"};
 };
 
 } // namespace job::ai::coach

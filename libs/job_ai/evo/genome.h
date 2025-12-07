@@ -1,45 +1,51 @@
 #pragma once
 
-#include <vector>
 #include <cstdint>
+#include <vector>
 
 #include "activation_types.h"
 #include "layer_types.h"
 
 namespace job::ai::evo {
 
+namespace layers = job::ai::layers;
+namespace comp   = job::ai::comp;
+
+// Silly math
 struct LayerGene {
-    layers::LayerType       type;                       // the types of Layer
-    comp::ActivationType    activation;                 // how was this thing activated
-    uint8_t                 _pad[2];                    // 2 bytes explicit padding (!!!!Zero this out!!!!!)
-    uint32_t                inputs;                     // number of input neurons/features
-    uint32_t                outputs;                    // number of output neurons/features
-    uint32_t                weight_offset;              // index into genome::weights
-    uint32_t                weight_count;               // how many floats this layer owns
-    uint32_t                bias_offset;                // index into genome::weights
-    uint32_t                bias_count;                 // how many floats for bias
-    uint32_t                auxiliary_data;             // e.g., number of experts or fmm order p
+    layers::LayerType       type{layers::LayerType::Dense};                    // the type of layer
+    comp::ActivationType    activation{comp::ActivationType::Identity};        // how this thing is activated
+    std::uint8_t            _pad[2]{};                                         // 2 bytes explicit padding (!!!!Zero this out!!!!!)
+    std::uint32_t           inputs{0};                                         // number of input neurons/features
+    std::uint32_t           outputs{0};                                        // number of output neurons/features
+    std::uint32_t           weightOffset{0};                                   // index into Genome::weights
+    std::uint32_t           weightCount{0};                                    // how many floats this layer owns
+    std::uint32_t           biasOffset{0};                                     // index into Genome::weights
+    std::uint32_t           biasCount{0};                                      // how many floats for bias
+    std::uint32_t           auxiliaryData{0};                                  // e.g., number of experts or FMM order p
 };
-static_assert(sizeof(LayerGene) == 32, "LayerGene must be 32 bytes for cache alignment");
+
+static_assert(sizeof(LayerGene) == 32,
+              "LayerGene must be 32 bytes for cache alignment");
 
 using LayerGenes = std::vector<LayerGene>;
 
 struct GenomeHeader {
-    uint64_t                magic;              // padding andf magic number
-    uint64_t                uuid;               // UUID
-    uint64_t                parent_id;          // tracking evolutionary trees
-    uint32_t                generation;         // epoch number
-    float                   fitness;            // error rate, Distance, etc
-    uint32_t                layer_count;        // How many LayerGenes follow?
-    uint64_t                weight_blob_size;   // Size in bytes of the weight buffer
-    uint8_t                 _res[8];            // Future proofing
+    std::uint64_t           magic{0};                                           // padding and magic number
+    std::uint64_t           uuid{0};                                            // UUID
+    std::uint64_t           parentId{0};                                        // tracking evolutionary trees
+    std::uint32_t           generation{0};                                      // epoch number
+    float                   fitness{0.0f};                                      // error rate, distance, etc.
+    std::uint32_t           layerCount{0};                                      // how many LayerGenes follow?
+    std::uint64_t           weightBlobSize{0};                                  // size in bytes of the weight buffer
+    std::uint8_t            _res[8]{};                                          // future proofing (zeroed)
 };
 
 struct Genome {
-    GenomeHeader            header{};           // packed header
-    bool                    tested{false};      // genome run yet?
-    std::vector<LayerGene>  architecture;       // NEAT, this might grow. In fixed topology, it stays static.... I think we will see
-    std::vector<float>      weights;            // weights and biases
+    GenomeHeader            header{};                                           // packed header
+    bool                    tested{false};                                      // genome run yet?
+    LayerGenes              architecture;                                       // NEAT: may grow; fixed topology: stays static
+    std::vector<float>      weights;                                            // weights and biases
 };
 
-} // namespace job::ai::base
+} // namespace job::ai::evo

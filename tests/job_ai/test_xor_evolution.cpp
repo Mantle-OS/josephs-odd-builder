@@ -21,8 +21,8 @@ Genome buildXORGenome()
     l1.inputs = 2;
     l1.outputs = 8;
 
-    l1.weight_count = (2 * 8) + 8; // Weights + Bias
-    l1.weight_offset = 0;          // Starts at 0 [CORRECT]
+    l1.weightCount = (2 * 8) + 8; // Weights + Bias
+    l1.weightOffset = 0;          // Starts at 0 [CORRECT]
 
     g.architecture.push_back(l1);
 
@@ -32,13 +32,13 @@ Genome buildXORGenome()
     l2.inputs = 8;
     l2.outputs = 1;
 
-    l2.weight_count = (8 * 1) + 1;
-    l2.weight_offset = l1.weight_offset + l1.weight_count;
+    l2.weightCount = (8 * 1) + 1;
+    l2.weightOffset = l1.weightOffset + l1.weightCount;
 
     g.architecture.push_back(l2);
 
     // Resize and Randomize
-    size_t total = l1.weight_count + l2.weight_count;
+    size_t total = l1.weightCount + l2.weightCount;
     g.weights.resize(total);
     for(auto& w : g.weights)
         w = ((rand() % 200) / 100.0f - 1.0f) * 0.5f;

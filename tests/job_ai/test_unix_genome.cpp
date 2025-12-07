@@ -150,11 +150,11 @@ Genome createTestGenome()
     l1.type = LayerType::Dense;
     l1.inputs = 128;
     l1.outputs = 64;
-    l1.weight_count = 128*64;
+    l1.weightCount = 128*64;
     g.architecture.push_back(l1);
 
     // Fill weights
-    g.weights.resize(l1.weight_count);
+    g.weights.resize(l1.weightCount);
     for(size_t i=0; i<g.weights.size(); ++i)
         g.weights[i] = i * 0.01f;
 

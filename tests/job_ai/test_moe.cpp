@@ -10,41 +10,58 @@
 
 #include <sparse_moe.h>
 #include <dense.h>
-#include <workspace.h> // <--- NEW: Include Workspace
+#include <workspace.h>
 
 using Catch::Approx;
 using namespace job::ai;
 using namespace job::ai::moe;
 using namespace job::ai::layers;
 using namespace job::threads;
-using namespace job::ai::infer; // For Workspace
+using namespace job::ai::infer;
 
 // Simple Mock Expert
 class ScalarMultLayer : public ILayer {
 public:
-    ScalarMultLayer(float scalar) : m_scalar(scalar) {}
+    ScalarMultLayer(float scalar) :
+        m_scalar(scalar)
+    {
+    }
 
-    [[nodiscard]] LayerType type() const override { return LayerType::Dense; } // Lie for test
-    [[nodiscard]] std::string name() const override { return "ScalarMock"; }
+    [[nodiscard]] LayerType type() const noexcept override
+    {
+        // Lie for test
+        return LayerType::Dense;
+    }
+    [[nodiscard]] std::string &name() noexcept override
+    {
+        return m_layerName;
+    }
 
     cords::ViewR::Extent getOutputShape(const cords::ViewR::Extent &inputShape) const override
     {
         return inputShape;
     };
 
-
-    // UPDATED: Added Workspace argument to match interface
-    void forward(ThreadPool&, const cords::ViewR& input, cords::ViewR& output, Workspace&) override {
+    void forward(ThreadPool&, const cords::ViewR& input, cords::ViewR& output, Workspace&) override
+    {
         const size_t n = input.size();
         for(size_t i=0; i<n; ++i)
             output[i] = input[i] * m_scalar;
     }
 
-    [[nodiscard]] cords::ViewR parameters() override { return cords::ViewR(nullptr, cords::ViewR::Extent{0}); }
-    [[nodiscard]] size_t parameterCount() const override { return 0; }
+    [[nodiscard]] cords::ViewR parameters() noexcept override
+    {
+        return cords::ViewR(nullptr, cords::ViewR::Extent{0});
+    }
+    [[nodiscard]] size_t parameterCount() const noexcept override
+    {
+        return 0;
+    }
 
 private:
-    float m_scalar;
+    float           m_scalar;
+    std::string     m_layerName{"ScalarMock"};
+
 };
 
 

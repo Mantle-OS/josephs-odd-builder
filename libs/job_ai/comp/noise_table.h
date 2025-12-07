@@ -72,8 +72,14 @@ public:
         }
     }
 
-    [[nodiscard]] const float* data() const { return m_data.data(); }
-    [[nodiscard]] size_t size() const { return kSize; }
+    [[nodiscard]] const float* data() const
+    {
+        return m_data.data();
+    }
+    [[nodiscard]] size_t size() const
+    {
+        return kSize;
+    }
 
 private:
     NoiseTable() {

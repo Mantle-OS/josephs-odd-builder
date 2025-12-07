@@ -9,32 +9,40 @@ namespace job::ai::cords {
 
 class Fiber : public ViewR {
 public:
-    using View = ViewR;
+    using View   = ViewR;
     using Extent = View::Extent;
-    using View::View;
 
-    Fiber(core::real_t *data, std::uint32_t size1) :
+    // Explicit 1D ctor
+    Fiber(float *data, std::uint32_t size1):
         View(data, Extent{size1})
     {
         assert(rank() == 1);
     }
 
-    [[nodiscard]] core::real_t &at(std::uint32_t size1)
+    // Optionally, a ctor from Extent that enforces rank==1
+    Fiber(float *data, const Extent& extent):
+        View(data, extent)
     {
         assert(rank() == 1);
-        assert(size1 < m_extent[0]);
-        return (*this)(size1);
     }
 
-    [[nodiscard]] const core::real_t &at(std::uint32_t size1) const
+    [[nodiscard]] float &at(std::uint32_t i)
     {
         assert(rank() == 1);
-        assert(size1 < m_extent[0]);
-        return (*this)(size1);
+        assert(i < m_extent[0]);
+        return (*this)(i);
+    }
+
+    [[nodiscard]] const float &at(std::uint32_t i) const
+    {
+        assert(rank() == 1);
+        assert(i < m_extent[0]);
+        return (*this)(i);
     }
 
     [[nodiscard]] std::uint32_t size1() const
     {
+        assert(rank() == 1);
         return m_extent[0];
     }
 };

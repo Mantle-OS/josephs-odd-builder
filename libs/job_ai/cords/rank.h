@@ -16,13 +16,13 @@ concept ValidRank = (R >= 1 && R <= 4);
 template<std::size_t RankSize>
 class Rank : public ViewR {
 public:
-    using AView  = ViewR;
-    using Extent = AView::Extent;
-    using AView::AView;
+    using View  = ViewR;
+    using Extent = View::Extent;
+    using View::View;
     using Indices = std::array<std::uint32_t, RankSize>;
 
     Rank(core::real_t *data, const Indices &indices) :
-        AView(data, Extent(indices.begin(), indices.end()))
+        View(data, Extent(indices.begin(), indices.end()))
     {
         assert(rank() == RankSize);
     }
@@ -59,6 +59,7 @@ private:
     }
 };
 
+// These are dumb as we have full classes for them but whatever
 using FiberRank     = Rank<1>;
 using MatrixRank    = Rank<2>;
 using VolumeRank    = Rank<3>;

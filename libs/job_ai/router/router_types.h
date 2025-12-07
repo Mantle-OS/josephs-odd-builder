@@ -4,10 +4,10 @@
 namespace job::ai::router {
 
 enum class RouterType : uint8_t {
-    Hash = 0,       // Deterministic hashing of input
-    TopK,           // Learned gating (standard MoE)
-    Spatial,        // "Geology" based (Region A -> Expert A)
-    State           // Finite State Machine based
+    Hash    = 0,    // Deterministic hashing of input
+    TopK    = 1,    // Learned gating (standard MoE)
+    Spatial = 2,    // "Geology" based (Region A -> Expert A)
+    State   = 3     // Finite State Machine based
 };
 
 [[nodiscard]] inline constexpr std::string_view routerName(RouterType type) noexcept
@@ -28,10 +28,10 @@ enum class RouterType : uint8_t {
 
 
 enum class LoadBalanceStrategy : uint8_t {
-    None,           // Whatever ...
-    TokenDropping,  // If expert full, drop token
-    Overflow,       // Send to shared expert
-    AuxLoss         // Penalty for imbalance (training only)
+    None            = 0,    // Whatever ...
+    TokenDropping   = 1,    // If expert full, drop token
+    Overflow        = 2,    // Send to shared expert
+    AuxLoss         = 3     // Penalty for imbalance (training only)
 };
 
 [[nodiscard]] inline constexpr std::string_view loadBalanceName(LoadBalanceStrategy lb) noexcept
@@ -48,9 +48,5 @@ enum class LoadBalanceStrategy : uint8_t {
     }
     return "Unknown LoadBalanceStrategy";
 }
-
-
-
-
 
 } // namespace job::ai::router

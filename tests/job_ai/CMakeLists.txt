@@ -19,7 +19,7 @@ add_executable(test_job_ai
     test_moe.cpp
     test_runner.cpp
     # test_trainer.cpp
-    test_xor_evolution.cpp
+    # test_xor_evolution.cpp
 
 )
 

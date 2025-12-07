@@ -1,7 +1,8 @@
 #pragma once
-#include "simd_provider.h"
 #include <cmath>
 #include <algorithm>
+
+#include "simd_provider.h"
 
 namespace job::ai::comp {
 

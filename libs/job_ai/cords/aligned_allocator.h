@@ -1,12 +1,12 @@
 #pragma once
 
-#include <cstdlib>   // posix_memalign, free
+#include <cstdlib>
 
 #include <vector>
 #include <limits>
 #include <memory>
 
-#include <real_type.h>
+
 namespace job::ai::cords {
 
 template <typename T_IDL, std::size_t Alignment = 64>
@@ -58,7 +58,6 @@ bool operator!=(const AlignedAllocator<T, Alignment> &, const AlignedAllocator<U
     return false;
 }
 
-// Pick your poison: core::real_t or float
-using AiWeights = std::vector<core::real_t, AlignedAllocator<core::real_t, 64>>;
+using AiWeights = std::vector<float, AlignedAllocator<float, 64>>;
 
 } // namespace job::ai::cords

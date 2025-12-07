@@ -3,6 +3,16 @@ include(CheckSourceCompiles)
 
 set(JOB_CXX_FLAGS)
 
+
+# 32 rows * 64 dim * 4 bytes = 8KB. => L1 cache
+add_compile_definitions(JOB_AI_BLOCK_ROWS=32)
+# 128 cols * 64 dim * 4 bytes = 32KB. Fits in L1/L2.
+add_compile_definitions(JOB_AI_BLOCK_COLS=128)
+# "standard" transformer size
+add_compile_definitions(JOB_AI_HEAD_DIM=64)
+
+
+
 check_cxx_compiler_flag("-march=native" COMPILER_SUPPORTS_MARCH_NATIVE)
 if(COMPILER_SUPPORTS_MARCH_NATIVE)
     message(STATUS "Enabling host architecture tuning (-march=native)")
@@ -66,7 +76,7 @@ elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^(arm|aarch64)")
     add_compile_definitions(JOB_L3_PER_CCD_BYTES=33554432) # 32MB
     add_compile_definitions(JOB_DEFAULT_WS_MB=256)         # Safe default
     check_cxx_compiler_flag("-mneon" CXX_SUPPORTS_NEON_FLAG)
-    if(NOT CXX_SUPPORTS_NEON_FLAG)
+    if(CXX_SUPPORTS_NEON_FLAG)
         set(HAS_NEON "" ON)
         list(APPEND JOB_CXX_FLAGS "-mneon")
     endif()
