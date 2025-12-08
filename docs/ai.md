@@ -236,9 +236,6 @@ a lower-level substrate for weird experiments in:
   >
   > Maybe some of our learning loops can, too.
 
-
-
-
 ---
 
 ## Philosophy in one paragraph

@@ -7,19 +7,19 @@ Benchmarks have been proformed on the following hardware.
 * Ryzen 5950X
 
 
-To run benchmarks yourself just build the tests and run them. One can also set the 
-
-```cmake
-JOB_BLOCK_SIZE_256=ON
-```
-
-If they have 64MB of L3 cache.
+To run benchmarks yourself. Just build the tests and run them. One can also set the 
 
 ```cmake 
 JOB_TEST_BENCHMARKS=ON
 ```
 
 They are on by default. 
+
+**If you have 64MB of L3 cache. We suggest turning this on.**
+
+```cmake
+JOB_BLOCK_SIZE_256=ON
+```
 
 
 ```text
