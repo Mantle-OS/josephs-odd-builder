@@ -1,5 +1,7 @@
 # Mantle / `job_ai`
 
+*Meh whatever .....*
+
 ### A Manifold of Future Time
 
 > *“Where is your AI stack?”*
@@ -230,6 +232,10 @@ a lower-level substrate for weird experiments in:
   > Physics runs forward.
   > Maybe some of our learning loops can, too.
 
+
+![Minkowski space time](https://en.wikipedia.org/wiki/Minkowski_space "Time")
+
+
 ---
 
 ## Philosophy in one paragraph
@@ -342,7 +348,7 @@ Rules: three deep before I go crazy.
 |-------------------|---------------|----------------------------------------------------------|-----------------------------------------------------------------------|                                                                       
 |                   |               |                                                          |                                       |                               |
 |                   |               |                                                          |                                       |                               |
-|      learn::      |               |       xor, suduko, cart-pole                             |                                       |         TRUE                  |
+|      learn::      |   evaluator   |       xor, suduko, cart-pole, more incoming              |                                       |         TRUE                  |
 |                   |               |                                                          |                                       |                               |
 |                   |               |                                                          |                                       |                               |
 |-------------------|---------------|----------------------------------------------------------|-----------------------------------------------------------------------|
