@@ -60,14 +60,9 @@ TEST_CASE("Evolution: Solving XOR", "[coach][xor][usage]")
 {
     JOB_LOG_INFO("Starting XOR Functional Test");
 
-    // 8 Workers for Evolution
     job::threads::JobStealerCtx ctx(8);
 
-    // 1 Worker for Physics (Runner execution)
-    // We separate them to keep the test clean, though the engine can handle shared pools now.
-    job::threads::JobStealerCtx evalCtx(1);
-
-    PortalEvaluator physics(evalCtx.pool);
+    PortalEvaluator physics(ctx.pool);
     physics.setDataset({
         { {0.0f, 0.0f}, {0.0f} },
         { {0.0f, 1.0f}, {1.0f} },
@@ -104,10 +99,6 @@ TEST_CASE("Evolution: Solving XOR", "[coach][xor][usage]")
     REQUIRE(bestFit > 0.85f);
 }
 
-// =================================================================================
-// BLOCK 2: EDGE CASES
-// Stressing corners: Empty populations, Single threads, High mutation
-// =================================================================================
 
 TEST_CASE("Evolution: Edge Cases (Single Survivor)", "[coach][xor][edge]")
 {
@@ -135,10 +126,6 @@ TEST_CASE("Evolution: Edge Cases (Single Survivor)", "[coach][xor][edge]")
 TEST_CASE("Evolution: Throughput Benchmarks", "[coach][benchmark]")
 {
     job::threads::JobStealerCtx ctx(8); // 8 Cores for Evolution
-
-    // No-Op Evaluator Pool (We want to benchmark the Coach overhead, not the physics)
-    // We pass nullptr to Runner inside Portal to force serial execution,
-    // simulating a pure math workload.
     PortalEvaluator physics(nullptr);
     physics.setDataset({
         { {0.0f, 0.0f}, {0.0f} },
@@ -148,10 +135,6 @@ TEST_CASE("Evolution: Throughput Benchmarks", "[coach][benchmark]")
     });
 
     Genome seed = buildXORGenome(8);
-
-    // Scenario 1: The Swarm
-    // High concurrency, small payload. Tests ThreadPool scheduling latency.
-    // 4096 tasks per step.
     BENCHMARK("Evolution Step (Pop=4096, Tiny Net)") {
         ESCoach::Config cfg;
         cfg.populationSize = 4096;
@@ -161,11 +144,8 @@ TEST_CASE("Evolution: Throughput Benchmarks", "[coach][benchmark]")
         return coach.coach(seed, physics.portal());
     };
 
-    // Scenario 2: The Big Brain
-    // Moderate concurrency, larger memory footprint. Tests Runner allocation & Cache.
-    // Network: 2 -> 256 -> 1
+    // The Big Brain
     Genome fatSeed = buildXORGenome(256);
-
     BENCHMARK("Evolution Step (Pop=512, Wide Net[256])") {
         ESCoach::Config cfg;
         cfg.populationSize = 512;
