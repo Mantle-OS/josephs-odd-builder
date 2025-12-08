@@ -66,56 +66,11 @@ public:
         return m_bestFitness;
     }
 
-#if 0
-// THIS PASSES
-    evo::Genome coach(const evo::Genome &parent, Evaluator eval) override
-    {
+evo::Genome coach(const evo::Genome &parent, Evaluator eval) override
+{
         m_generation++;
 
-        if (m_config.decay < 1.0f && m_config.decay > 0.0f)
-            m_config.sigma *= m_config.decay;
-
-        const size_t popSize = m_config.populationSize;
-        if (m_population.size() != popSize)
-            resizePopulation(popSize);
-
-        // TEMP: sequential eval to avoid nested pool use
-        for (size_t i = 0; i < popSize; ++i) {
-            evo::Genome &mutant = m_population.genome(i);
-            mutant = parent;
-            m_mutator.perturb(mutant, m_config.sigma);
-
-            float score = eval(mutant);
-            m_population.setFitness(i, score);
-        }
-
-        // reduction unchanged
-        size_t bestIdx   = 0;
-        float  bestScore = m_population.getFitness(0);
-
-        for (size_t i = 1; i < popSize; ++i) {
-            float s = m_population.getFitness(i);
-            bool isBetter = (m_optMode == OptimizationMode::Maximize)
-                                ? (s > bestScore)
-                                : (s < bestScore);
-            if (isBetter) {
-                bestScore = s;
-                bestIdx   = i;
-            }
-        }
-
-        m_bestFitness    = bestScore;
-        m_currentBestIdx = bestIdx;
-        return m_population.genome(bestIdx);
-    }
-#endif
-
-
-    evo::Genome coach(const evo::Genome &parent, Evaluator eval) override
-    {
-        m_generation++;
-
-        //  annealing
+        // Annealing
         if (m_config.decay < 1.0f && m_config.decay > 0.0f)
             m_config.sigma *= m_config.decay;
 
@@ -124,23 +79,23 @@ public:
             resizePopulation(popSize);
 
         threads::parallel_for(*m_pool, size_t{0}, popSize, [&](size_t i) {
-            if (i >= m_population.size())
-                return;
-
             evo::Genome &mutant = m_population.genome(i);
             mutant = parent;
-            m_mutator.perturb(mutant, m_config.sigma);
+            evo::Mutator localMutator;
+            // evo::Mutator localMutator(m_generation * popSize + i);
+            localMutator.seed(m_generation * popSize + i); // This still does not seem global !
+            localMutator.perturb(mutant, m_config.sigma);
 
-            float score = eval(mutant);
+            float score = eval(mutant); /// We get here which calls the function from     std::function<float(const evo::Genome&)> portal() which calls ->
             m_population.setFitness(i, score);
         });
 
-        // reduction
         size_t bestIdx = 0;
         float bestScore = m_population.getFitness(0);
-
         for(size_t i = 1; i < popSize; ++i) {
             float s = m_population.getFitness(i);
+
+
             bool isBetter = (m_optMode == OptimizationMode::Maximize)
                                 ? (s > bestScore)
                                 : (s < bestScore);

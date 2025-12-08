@@ -10,7 +10,7 @@ namespace job::ai::infer {
 class Runner {
     using Alloc = cords::AlignedAllocator<float, 64>;
 public:
-    Runner(const evo::Genome &genome, threads::ThreadPool::Ptr pool);
+    Runner(const evo::Genome &genome, threads::ThreadPool::Ptr pool , size_t workspaceSizeMB = 256);
     cords::ViewR run(const cords::ViewR& input);
     void reset();
 

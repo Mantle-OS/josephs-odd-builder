@@ -207,14 +207,10 @@ void ThreadPool::workerLoop(std::stop_token token, uint32_t worker_id)
             }
         } else {
             // Phantom Wakeup
-            // If the semaphore said "Go" but the scheduler said "Empty",
-            // it means another thread stole the work or the scheduler is inconsistent.
-            // This is harmless in a semaphore model; we just loop back and wait again.
-            (void)m_workSemaphore.post(); // Refund the token
-
-            // Yield to allow the thread holding the lock (that blocked us) to finish.
-            // Prevents hot-spinning.
-            std::this_thread::yield();
+            if (m_scheduler->size() > 0) {
+                std::this_thread::yield();
+                (void)m_workSemaphore.post();
+            }
         }
 
         // execute (Outside Lock)

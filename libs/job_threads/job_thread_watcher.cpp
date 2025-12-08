@@ -43,7 +43,9 @@ void ThreadWatcher::start(bool realTime)
     std::snprintf(opts.name.data(), opts.name.size(), "ThreadWatcher");
 
     m_monitorThread = std::make_shared<JobThread>(opts);
-    auto loop_heartbeat = std::chrono::milliseconds(opts.heartbeat);
+
+    auto safe_heartbeat = std::max<uint16_t>(opts.heartbeat, 10);
+    auto loop_heartbeat = std::chrono::milliseconds(safe_heartbeat) ;//(opts.heartbeat);
     m_monitorThread->setRunFunction([this, loop_heartbeat](std::stop_token token) {
         monitorLoop(token, loop_heartbeat);
     });
@@ -113,20 +115,20 @@ void ThreadWatcher::monitorLoop(std::stop_token token, std::chrono::milliseconds
                 JOB_LOG_ERROR("[ThreadWatcher] Scheduler stopped unexpectedly");
         }
         if (now - lastSummary >= m_summaryInterval) {
-            size_t threadCount = m_threads.size();
-            size_t queueSize = 0;
-            double loadAvg = 0.0;
-            if (auto s = m_scheduler.lock())
-                queueSize = s->size();
+            // size_t threadCount = m_threads.size();
+            // size_t queueSize = 0;
+            // double loadAvg = 0.0;
+            // if (auto s = m_scheduler.lock())
+                // queueSize = s->size();
 
             if (auto pool = m_threadPool.lock()) {
                 auto m = pool->snapshotMetrics();
-                loadAvg = m.loadAvg;
+                // loadAvg = m.loadAvg;
             }
 
-            JOB_LOG_INFO("[ThreadWatcher] Threads: {}", threadCount);
-            JOB_LOG_INFO("[ThreadWatcher] Queue size: {}",  queueSize);
-            JOB_LOG_INFO("[ThreadWatcher] Load avg: {} ", loadAvg);;
+            // JOB_LOG_INFO("[ThreadWatcher] Threads: {}", threadCount);
+            // JOB_LOG_INFO("[ThreadWatcher] Queue size: {}",  queueSize);
+            // JOB_LOG_INFO("[ThreadWatcher] Load avg: {} ", loadAvg);;
 
             lastSummary = now;
         }

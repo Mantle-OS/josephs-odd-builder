@@ -5,8 +5,8 @@
 #include <vector>
 #include <algorithm>
 
-#include <job_random.h>
-
+// We remove job_random.h dependency for the core logic
+// to ensure strict local determinism.
 #include "mutator_config.h"
 #include "genome.h"
 #include "noise_table.h"
@@ -15,19 +15,38 @@ namespace job::ai::evo {
 
 class Mutator {
 public:
-    Mutator() = default;
+    Mutator() {
+        // Default to non-deterministic random if not explicitly seeded
+        std::random_device rd;
+        m_rng.seed(rd());
+    }
 
     explicit Mutator(const MutatorConfig &cfg) :
         m_cfg(cfg)
     {
+        if (m_cfg.seed != 0) {
+            m_rng.seed(m_cfg.seed);
+        } else {
+            std::random_device rd;
+            m_rng.seed(rd());
+        }
     }
 
+    // Default copy/move is fine; copying a Mutator duplicates its RNG state.
+    // This is acceptable behavior.
     Mutator(const Mutator &) = default;
     Mutator(Mutator &&) = default;
     Mutator &operator=(const Mutator &) = default;
     Mutator &operator=(Mutator &&) = default;
 
-    // Use configured sigma
+    // --- THE MISSING LINK ---
+    // Allows the Coach to enforce determinism per thread/genome
+    void seed(std::uint64_t s)
+    {
+        m_rng.seed(s);
+        m_cfg.seed = s; // Update config to match reality
+    }
+
     void perturb(Genome &genome)
     {
         perturb(genome, m_cfg.weightSigma);
@@ -45,40 +64,43 @@ public:
             return;
 
         // Fast path: dense mutation (standard ES)
-        // Mutating every weight (prob ~ 1.0), use the AVX Noise Table.
         if (mutationProb >= 1.0f) {
-            // Entropy for offset; coach can control via MutatorConfig::seed later if needed.
-            std::uint64_t seed = (m_cfg.seed == 0)
-                                     ? job::crypto::JobRandom::secureU64()
-                                     : m_cfg.seed; // simple policy for now
+            // Generate a sub-seed for the Noise Table using our deterministic RNG.
+            // This ensures that if we seeded m_rng with (GenID + ThreadID),
+            // the Noise Table lookup is also deterministic.
+            std::uniform_int_distribution<uint64_t> dist;
+            uint64_t noiseSeed = dist(m_rng);
 
             job::ai::comp::NoiseTable::instance().perturb(
                 genome.weights.data(),
                 genome.weights.size(),
-                seed,
+                noiseSeed,
                 sigma
                 );
         } else {
             // Slow path: sparse mutation (prob < 1.0)
-            auto &rng = job::crypto::JobRandom::engine();
+            // Use LOCAL m_rng, not global JobRandom (Fixes Data Race)
             std::normal_distribution<float>     dist(0.0f, sigma);
             std::uniform_real_distribution<float> prob(0.0f, 1.0f);
 
             for (float &w : genome.weights) {
-                if (prob(rng) < mutationProb)
-                    w += dist(rng);
+                if (prob(m_rng) < mutationProb)
+                    w += dist(m_rng);
             }
         }
 
         // This genome is no longer the same individual – mark it as unevaluated
         genome.tested         = false;
         genome.header.fitness = 0.0f;
-        // uuid / parentId are still Coach territory; mutation alone doesn't define new lineage
     }
 
     void setConfig(const MutatorConfig &cfg)
     {
         m_cfg = cfg;
+        // If config implies a specific seed, honor it immediately
+        if (m_cfg.seed != 0) {
+            seed(m_cfg.seed);
+        }
     }
 
     [[nodiscard]] const MutatorConfig &config() const
@@ -88,6 +110,10 @@ public:
 
 private:
     MutatorConfig m_cfg;
+
+    // The Internal Engine.
+    // Using 64-bit Mersenne Twister for high-quality, reproducible sequences.
+    std::mt19937_64 m_rng;
 };
 
 } // namespace job::ai::evo

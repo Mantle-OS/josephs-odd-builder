@@ -26,7 +26,7 @@ struct JobThreadOptions final {
     uint8_t coreId{0xFF};
 
     // ms interval
-    uint16_t heartbeat{50};
+    uint16_t heartbeat{50}; // WAIT ??????
 
     std::array<char, 32> name{'\0'};
 

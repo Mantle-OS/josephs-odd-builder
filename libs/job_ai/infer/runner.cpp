@@ -12,10 +12,12 @@ namespace job::ai::infer {
 #define JOB_DEFAULT_WS_MB 256 // 256MB Scratchpad
 #endif
 
-Runner::Runner(const evo::Genome &genome, threads::ThreadPool::Ptr pool):
+Runner::Runner(const evo::Genome &genome,
+               threads::ThreadPool::Ptr pool,
+               size_t workspaceSizeMB):
     m_pool(std::move(pool)),
     m_genome(genome),
-    m_workspace(JOB_DEFAULT_WS_MB * 1024 * 1024)
+    m_workspace(workspaceSizeMB * 1024 * 1024)
 {
     comp::NoiseTable::instance();
     buildNetwork();
@@ -25,7 +27,7 @@ void Runner::buildNetwork()
 {
     m_layers.clear();
 
-    // CRITICAL: We must scan the architecture to find the widest layer.
+    // scan the architecture to find the widest layer.
     // If input is 64 but layer 1 outputs 128, we need buffer space for 128.
     size_t maxDim = 0;
     m_maxLayerDim = 0;
@@ -74,8 +76,6 @@ void Runner::reset() {
 cords::ViewR Runner::run(const cords::ViewR &input)
 {
     cords::ViewR::Extent shape = input.extent();
-
-    // CRITICAL FIX: Calculate total "Rows" (Tokens)
     // If Rank 3 [Batch, Seq, Dim], rows = Batch * Seq
     // If Rank 2 [Batch, Dim], rows = Batch
     size_t totalRows = shape[0];

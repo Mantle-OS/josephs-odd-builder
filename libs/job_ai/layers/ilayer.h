@@ -19,7 +19,7 @@ class ILayer {
 public:
     using Ptr = std::shared_ptr<ILayer>;
 
-    ~ILayer() = default;
+    virtual ~ILayer() = default;
 
     // What kind of layer is this? (Dense, Attention, etc.)
     [[nodiscard]] virtual LayerType type() const noexcept = 0;

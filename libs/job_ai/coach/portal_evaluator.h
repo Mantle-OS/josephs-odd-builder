@@ -50,7 +50,7 @@ private:
         if (m_dataset.empty())
             return 0.0f;
 
-        infer::Runner runner(genome, m_pool);
+        infer::Runner runner(genome, m_pool, 1);
 
         float totalPotential = 0.0f;
 
