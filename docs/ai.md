@@ -233,7 +233,7 @@ a lower-level substrate for weird experiments in:
   > Maybe some of our learning loops can, too.
 
 
-![Minkowski space time]("/docs/img/space_time.jpeg" "Time")
+![Minkowski space time](docs/img/space_time.jpeg "Time")
 
 
 ---
