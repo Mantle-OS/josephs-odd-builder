@@ -5,6 +5,7 @@
 ### A Manifold of Future Time
 
 > *“Where is your AI stack?”*
+
 > *“Right here. On the CPU. With dragons slain and no GPU tax.”*
 
 `job_ai` is an experimental C++ AI engine built for:
