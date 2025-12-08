@@ -5,8 +5,9 @@
 ### A Manifold of Future Time
 
 > *“Where is your AI stack?”*
-
+>
 > *“Right here. On the CPU. With dragons slain and no GPU tax.”*
+
 
 `job_ai` is an experimental C++ AI engine built for:
 
@@ -21,7 +22,7 @@
 
 ## Benchmarks
 
-[See This document](docs/ai_benchmarks.md) or run the tests.
+[See: This document](docs/ai_benchmarks.md) or run the tests.
 
 ---
 
@@ -230,9 +231,9 @@ a lower-level substrate for weird experiments in:
   - fuck around and find out.
 
   > Biology runs forward.
-  
+  > 
   > Physics runs forward.
-  
+  >
   > Maybe some of our learning loops can, too.
 
 
