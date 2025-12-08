@@ -1,11 +1,3 @@
-This is **The Geometric Repair**.
-
-I have standardized the LaTeX delimiters to use `$$` for display equations and `$` for inline variables. I also corrected the expectation operator in the Fisher Information Metric (removed the `!`).
-
-Here is the rendered document.
-
-***
-
 # The Geometry of the Portal
 
 This is **FICTION** basically a sh*$ post that I came up with to try and streamline communication with LLMs which then turned into `job_ai`.
