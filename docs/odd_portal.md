@@ -114,7 +114,7 @@ To reconcile discrete tokens with smooth geometry, we apply:
 
 Embed discrete tokens into continuous semantic trajectories:
 
-[ \vec{s}(\tau) \approx \langle \text{Embeddings}(t_{\text{window}}) \rangle ]
+[ $\vec{s}(\tau) \approx \langle \text{Embeddings}(t_{\text{window}}) \rangle$ ]
 
 Large window size (N) yields smooth differentiability.
 Tokens behave like quantum samples; meaning behaves like a fluid.
