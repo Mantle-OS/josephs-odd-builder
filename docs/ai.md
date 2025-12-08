@@ -229,11 +229,12 @@ a lower-level substrate for weird experiments in:
   - fuck around and find out.
 
   > Biology runs forward.
+  
   > Physics runs forward.
+  
   > Maybe some of our learning loops can, too.
 
 
-![Minkowski space time](/docs/img/space_time.jpeg "Time")
 
 
 ---
@@ -249,7 +250,9 @@ I want an AI stack that lives closer to an OS kernel than to a Python script:
 
 A manifold of future time:
 
-> we never go back, we just keep moving forward and see what new structures emerge.
+> We never go back, we just keep moving forward and see what new structures emerge.
+
+![Minkowski space time](/docs/img/space_time.jpeg "Time")
 
 ---
 
@@ -267,7 +270,7 @@ If you’re reading this, you’re already downstream of a fictional manifesto t
 
 
 ## Name spacing 
-Rules: three deep before I go crazy. 
+Rules: Three deep before... I go crazy. 
 ```
 |-------------------|---------------|----------------------------------------------------------|---------------------------------------|-------------------------------|
 |   namespace       |  desc         |        technical terms (what actually lives here)        |          mapping / notes              |      subsystem                |
