@@ -263,7 +263,7 @@ This part of the repository is:
 
 If you’re reading this, you’re already downstream of a fictional manifesto that accidentally turned into C++.
 
-[Welcome to the Portal]("/docs/odd_portal.md")
+[Welcome to the Portal](/docs/odd_portal.md)
 
 
 ## Name spacing 
