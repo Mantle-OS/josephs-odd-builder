@@ -1,76 +1,267 @@
-## A manifold of future time 
+# Mantle / `job_ai`
 
-Joseph drinks a bunch of coffee and then speak's.....
+### A Manifold of Future Time
 
-A place where past ```time``` has not meaning as it is never traveled. We do not propagate back there..... 
+> *“Where is your AI stack?”*
+> *“Right here. On the CPU. With dragons slain and no GPU tax.”*
 
-I want AI, but I reject the "GPU Tax" (High VRAM, CUDA lock-in) and the "Algorithm Tax" Backpropagation(unless needed), 
-which requires storing the entire activation graph in memory (no constrants at all ...lol).
+`job_ai` is an experimental C++ AI engine built for:
 
-If I am going to do this ....shit ...  I have to look at how biology & composition & physics do it.
-
-* Biology doesn't do Backpropagation. Neurons don't send error signals backward up the axon. 
-* Physics doesn't do Backpropagation time flows one way. Try and observe that.
-
-Lets say a number like ```5, 20, 50, 100.```
-
-20 distributed nodes and a massive Work Stealing Scheduler. 
-
-I don't need PyTorch nor do I want it. 
-
-I need population based training and sparse intelligence.
-
-1. The Hybrid of Biology in Backprop: "Forward-Only"  Evolution unless abousoulty needed
-
-Since job already has a highly parallel simulator (job_threads) and a cluster (job_net), Ipc(job_io), etc etc   
-
-The most "efficient" way to train is neuro evolution(Genetic Algorithms) ... I think lol 
-
-
-The Concept: Instead of calculating the gradient $\nabla$ (which is expensive), I generate 100 "mutants".
-  - Create 100 job_threads tasks. Each has a slightly different perturbed random noise.
-  - satellites, trains(lol), the physics sim for 5 seconds.
-  - crashed ? minimized the error ?
-  - clone the top 50%
-  - rinse and repeat
-
-**Pros**
-* No Memory Graph no stored activations. 
-* RAM usage is minimal.
-* Every thread runs independently.
-* No synchronization
-* Topology Search" (NEAT - NeuroEvolution of Augmenting Topologies)
-* I dont have to buy hardware that I dont need for my builder network (Mantle Os)
-
+* **CPU-first** inference and training
+* **Forward-only**, evolutionary learning (no backprop graph unless you absolutely insist)
+* **Sparse, structured intelligence**: FMM attention, MoE, and fast IPC
+* **Brutal simplicity** at the core: threads, math, and wires
+* It’s not a PyTorch wrapper. It’s not “yet another deep learning framework.”
+* Hand-rolled manifold where time only flows forward and gradients are optional guests.
 
 ---
 
-Distant particles to calculate gravity efficiently ($O(N)$ instead of $O(N^2)$). Particles calculating influence on each other ($O(N^2)$
+## Benchmarks
 
-> Linear attention -> FMM / Barnes-Hut etc -> "Semantic Relevance."
+[See This document](docs/ai_benchmarks.md) or run the tests.
 
-* Tokens  = Particles.
-* Q/K/V   = Position/Mass.
-* The Job = fmm, bh, rk4, carrier pidgons to calculate the context vector without building the massive matrix.
+---
 
-This could allow us to run massive context windows on CPU, because we are using a tree approximation instead of a matrix multiplication.
+## Why this exists
 
-3. Moe from the simpsons
-MoE is still heavy. Let's build a Spatial MoE.
-* we have a "Geology." Let's map experts to the geology.
-  - Expert A (The Crust): Handles basic IO / UART sanitization.
-  - Expert B (The Mantle): Handles Physics / Dynamics.
-  - Expert C (The Core): Handles long-term planning / Strategy.
-  
-The Router: Instead of a learned gating network(which needs backprop), we could use a hashed router or a "state machine router"
-* Input comes from UART? -> Route to Expert A.
-* Input velocity > threshold? -> Route to Expert B.
+Two taxes I didn’t want to pay *(I'm not stubborn not hard headed at all)*:
+
+1. **The GPU Tax**
+
+   * High VRAM, CUDA lock-in, and a hardware treadmill.
+   * Great for giant models. Overkill for a tightly-optimized builder OS.
+
+2. **The Algorithm Tax**
+
+   * Full backpropagation requires storing the entire activation graph.
+   * Time-symmetric, backward-in-time error signals that biology *doesn’t* use.
+   * Physics does not run reverse-time gradient descent every time something falls.
+
+So the question became:
+
+> What would an AI stack look like
+> if it cared first about **forward dynamics**, **evolution**, and **composition**,
+> not about replaying the universe backward through a tape of activations?
+
+`job_ai` is my attempt at that answer.
+
+---
+
+## Design principles
+
+**1. Forward-only by default**
+
+* Core training loop is **evolutionary**: population-based search, no stored activations.
+* Backprop is not banned; it’s just not the star of the show.
+* The “learning step” is: *mutate, evaluate, select* — not “differentiate a giant graph.”
+
+**2. CPU as a first-class citizen**
+
+* Hand-tuned AVX2/tiling GEMM for dense ops.
+* FMM / Barnes-Hut style structures for attention and N-body-like workloads.
+* Shared memory IPC tuned down to tens of nanoseconds per roundtrip.
+* Threading via `job_threads`: work-stealing, high-throughput, designed to saturate cores.
+
+**3. Sparse intelligence, not monolithic blobs**
+
+* Mixture-of-Experts (MoE) where experts are **mapped to roles**:
+
+  * “Crust” experts: IO, sanitization, lightweight transforms
+  * “Mantle” experts: physics, continuous dynamics
+  * “Core” experts: planning, higher-level structure
+* Router can be learned later; initially it can be state-machine / hashed / rule-based.
+
+**4. Physics & geometry as inspiration, not decoration**
+
+* Tokens treated like particles.
+* Attention treated like an N-body problem (influence, distance, scaling).
+* Evolution treated like geodesic search in a weird, human-in-the-loop manifold.
+
+---
+
+## Core ideas (the short version)
+
+### 1. Evolution instead of backprop (ESCoach)
+
+Instead of:
+
+* Build huge graph
+* Store all activations
+* Backpropagate gradients
+
+We do:
+
+* Maintain a **population** of candidate networks (`Genome`)
+* Perturb weights with noise
+* Evaluate each candidate in parallel using `job_threads`
+* Select the top performers, update mean & step size (ES-style)
+* Repeat
 
 
-Rules: three deep before I go crazy. 
+No global autograd tape. Just forward passes, scores, and selection.
+
+---
+
+### 2. Tokens as particles, attention as N-body
+
+Naive attention is O(N²): every token looks at every other token.
+
+In `job_ai`:
+
+* **Tokens** -> particles
+* **Q/K/V** -> position / mass / charge analogues
+* **Attention** -> influence field
+
+We borrow from FMM / Barnes–Hut style:
+
+* Cluster distant tokens into trees
+* Approximate their joint influence
+* Push complexity toward **O(N)** instead of O(N²)
+
+This is the route to:
+
+* **Long-context attention on CPU**
+* Context windows that don’t immediately explode your RAM .... Hopefully :P 
+* A more “physical” intuition for relevance: influence decays with distance (in some learned metric space)
+
+---
+
+### 3. Spatial MoE (Mixture of Experts with geography)
+
+Standard MoE:
+
+* Many experts, a gating network decides which ones to use.
+
+Here:
+
+* We treat the system like a **geology**:
+
+  * **Crust**: near-IO, sanitization, protocol handling
+  * **Mantle**: dynamics, control, physical-ish reasoning
+  * **Core**: long-term planning, global context
+
+Routing can start simple:
+
+```text
+if (input.source == UART)       → Crust experts
+if (input.velocity > threshold) → Mantle experts
+if (input.planning_depth > k)   → Core experts
+```
+
+Later, those can become learned gates — but only if they earn their complexity.
+
+---
+
+### 4. The Portal Evaluator: fitness as “worldline alignment”
+
+When we evaluate a model, we don’t just say “loss = MSE.”
+We treat it like: *how close is this system’s trajectory to the intended human trajectory?*
+
+It:
+
+* Runs a `Runner` on each sample.
+* Measures squared deviation, with:
+
+  * **NaN/Inf detection** as “singularity” (automatic catastrophic penalty).
+* Returns a scalar fitness in (0, 1], where `1.0` ≈ perfect alignment.
+
+It’s “just MSE,” but philosophically:
+it’s our little scalar version of “how close the model’s path is to the one we wanted.”
+
+---
+
+## Architecture (high level)
+
+For more informatiuon see the section titled "Name spacing" 
+
+Rough layout:
+
+* `job_ai/`
+  * `genome.*`  – genome's network topology + weights ect
+  * `runner.*`  – inference engine (builds layers, runs forward)
+  * `layers/`   – Dense, Attention, MLP, activations
+  * `coach/`    – `ESCoach`, `GeniticCoach`, training loops
+  * `adapters/` – Swappable runtime adapter's example FlashAttention, Barnes–Hut, FMM, Dense, Flash, LowRank
+  * `learn/`    - xor, 
+  * `moe/`      - Mixure of experts 
+  * `router/`   - routes to take.
+
+---
+
+## Current state (honest version)
+
+What it **can** do right now:
+
+* Run neural-ish architectures on CPU with:
+
+  * Dense layers (optimized GEMM)
+  * FlashAttention variants
+  * FMM / Barnes–Hut attention experiments
+  * SparseMoE with simple routing
+* Evolve networks (like XOR) via ES at very high throughput
+* Beat stock PyTorch in some controlled, apples-to-apples microbenchmarks
+  (e.g., evolutionary XOR runs **30 times faster** on the same hardware, same task)
+
+What it **does not** do (yet):
+
+* Train giant LLMs
+* Replace your day job as an ML engineer
+* Magically know what you meant without careful datasets & evaluators
+
+This is a **builder’s engine**:
+a lower-level substrate for weird experiments in:
+
+* CPU-only AI
+* Evolutionary search
+* Sparse, physically-inspired architectures
+* Fast, minimal-latency OS-level “thinking modules”
+
+---
+
+## Who is this for?
+
+* A person that looks at 24 GB VRAM requirements and say “nah.”
+* You might like C++ templates, AVX intrinsics, and thread pools a little too much.
+* You like the idea that:
+* Have a builder networks that are CPU driven and not GPU/TPU driven.
+* Like to fuck around and find out.
+
+  > Biology runs forward.
+  > Physics runs forward.
+  > Maybe some of our learning loops can, too.
+
+---
+
+## Philosophy in one paragraph
+
+I want an AI stack that lives closer to an OS kernel than to a Python script:
+
+* **Think in-place** with millisecond-to-microsecond latency.
+* **Learn** (in the evolutionary sense) without needing an activation time machine.
+* Treat **tokens as particles**, **experts as geology**, and **fitness as geometry**.
+* And it should absolutely, stubbornly, joyfully refuse to pay any tax it doesn’t have to.
+
+A manifold of future time:
+
+> we never go back, we just keep moving forward and see what new structures emerge.
+
+---
+
+## Status: active experiment
+
+This part of the repository is:
+
+* A lab notebook
+* An engine room
+* A pile of dragons, some slain, some mid-roar
+
+If you’re reading this, you’re already downstream of a fictional manifesto that accidentally turned into C++.
+
+[Welcome to the Portal]("/docs/odd_portal.md")
 
 
 ## Name spacing 
+Rules: three deep before I go crazy. 
 ```
 |-------------------|---------------|----------------------------------------------------------|---------------------------------------|-------------------------------|
 |   namespace       |  desc         |        technical terms (what actually lives here)        |          mapping / notes              |      subsystem                |
@@ -148,65 +339,11 @@ Rules: three deep before I go crazy.
 |      router::     |   routers     |       routers types, Spatial , hash, top-k,              |                                       |         TRUE                  |
 |                   |               |          state, irouter and classes based on irouter     |                                       |                               |
 |                   |               |          config(RouterConfig) with presets               |                                       |                               |
+|-------------------|---------------|----------------------------------------------------------|-----------------------------------------------------------------------|                                                                       
+|                   |               |                                                          |                                       |                               |
+|                   |               |                                                          |                                       |                               |
+|      learn::      |               |       xor, suduko, cart-pole                             |                                       |         TRUE                  |
+|                   |               |                                                          |                                       |                               |
+|                   |               |                                                          |                                       |                               |
 |-------------------|---------------|----------------------------------------------------------|-----------------------------------------------------------------------|
-
 ```
-
-
-                                      
-### base namespace
-```c++
-job::ai::
-```
-
-
-### namespace types
-There are two types of namespace's 
-1. helpers / utils runtime one offs
-2. modules 
- 
-### helpers
-| namespace  |      desc          |            technial terms             |       mapping / notes       |   module   |
-|------------|--------------------|---------------------------------------|-----------------------------|------------|
-| base::     |    utils           | core                                  |                             |    FALSE   |
-| comp::     |    math            | kernels & math                        |                             |    FALSE   |
-| evo::      |    directions      | directions                            |    runtime helper           |    FALSE   |
-| infer::    |    inference       | runtime helpers                       |                             |    FALSE   |
-| kv::       |    key vales       | cache and other bits)                 |                             |    FALSE   |
-
-
-### subsystems
-
-Each module has the following mandatory or optional area's
-
-|module interface| modules have interfaces to what there core function are |mandatory  |
-|----------------|---------------------------------------------------------|-----------|
-|types           |  all modules have a enum of types                       |mandatory  |
-|configs         |  what makes this uniq                                   |optional   |
-|presets         |  types plus configs pus interface  presets              |optional   |
-
-### subsystem's
-
-| namespace  |      desc          |            technial terms             |       mapping / notes       |   module   |
-|------------|--------------------|---------------------------------------|-----------------------------|------------|
-| adapters:: |    algorithms      | used in directions (FMM, BH, VV etc)  |  [virtual, types, configs]  |    TRUE    |
-| coach::    |    motivation      | trainer's                             |  [virtual, types, configs]  |    TRUE    |
-| cords::    |    places          | tensor's                              |  [virtual, types, configs]  |    TRUE    |
-| layers::   |    layers          | hidden, input, output layers etc      |  [virtual, types, configs]  |    TRUE    |
-| moe::      |    experts         | mixure of experts  & router's         |  [virtual, types, configs]  |    TRUE    |
-
-
-### all
-| namespace  |      desc          |            technial terms             |       mapping / notes       |   subsystem |
-|------------|--------------------|---------------------------------------|-----------------------------|-------------|
-| adapters:: |    algorithms      | used in directions (FMM, BH, VV etc)  |  [virtual, types, configs]  |    TRUE     |
-| base::     |    utils           | core                                  |                             |    FALSE    |
-| coach::    |    motivation      | trainer's                             |  [virtual, types, configs]  |    TRUE     |
-| cords::    |    places          | tensor's                              |  [virtual, types, configs]  |    TRUE     |
-| comp::     |    math            | kernels & math                        |                             |    FALSE    |
-| evo::      |    directions      | directions                            |    runtime helper           |    FALSE    |
-| infer::    |    inference       | runtime helpers                       |                             |    FALSE    |
-| kv::       |    key vales       | cache and other bits)                 |                             |    FALSE    |
-| layers::   |    layers          | hidden, input, output layers etc      | [virtual, types, configs]   |    TRUE     |
-| moe::      |    experts         | mixure of experts  & router's         | [virtual, types, configs]   |    TRUE     |
-
