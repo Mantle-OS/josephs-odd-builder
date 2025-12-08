@@ -174,19 +174,19 @@ it’s our little scalar version of “how close the model’s path is to the on
 
 ## Architecture (high level)
 
-For more informatiuon see the section titled "Name spacing" 
+For more information see the section titled "Name spacing" 
 
 Rough layout:
 
 * `job_ai/`
-  * `genome.*`  – genome's network topology + weights ect
+  * `genome.*`  – genome's network topology + weights, etc
   * `runner.*`  – inference engine (builds layers, runs forward)
   * `layers/`   – Dense, Attention, MLP, activations
   * `coach/`    – `ESCoach`, `GeniticCoach`, training loops
   * `adapters/` – Swappable runtime adapter's example FlashAttention, Barnes–Hut, FMM, Dense, Flash, LowRank
-  * `learn/`    - xor, 
+  * `learn/`    - xor, cart-pole, portal, etc
   * `moe/`      - Mixure of experts 
-  * `router/`   - routes to take.
+  * `router/`   - Routes - Hash, TopK, Spatial(Geology), State
 
 ---
 
@@ -224,9 +224,9 @@ a lower-level substrate for weird experiments in:
 
 * A person that looks at 24 GB VRAM requirements and say “nah.”
 * You might like C++ templates, AVX intrinsics, and thread pools a little too much.
-* You like the idea that:
-* Have a builder networks that are CPU driven and not GPU/TPU driven.
-* Like to fuck around and find out.
+* You like the idea of:
+  - Having a builder networks that are CPU driven, and not GPU/TPU driven.
+  - fuck around and find out.
 
   > Biology runs forward.
   > Physics runs forward.
