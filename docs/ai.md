@@ -28,7 +28,7 @@
 
 ## Why this exists
 
-Two taxes I didn’t want to pay *(I'm not stubborn not hard headed at all)*:
+Two taxes I didn’t want to pay *(I'm not stubborn, not hard headed at all)*:
 
 1. **The GPU Tax**
 
@@ -39,7 +39,7 @@ Two taxes I didn’t want to pay *(I'm not stubborn not hard headed at all)*:
 
    * Full backpropagation requires storing the entire activation graph.
    * Time-symmetric, backward-in-time error signals that biology *doesn’t* use.
-   * Physics does not run reverse-time gradient descent every time something falls.
+   * Physics does not run reverse-time gradient descent every time something fails.
 
 So the question became:
 
@@ -323,7 +323,7 @@ Rules: Three deep before... I go crazy.
 |-------------------|---------------|----------------------------------------------------------|---------------------------------------|-------------------------------|
 |                   |               |                                                          |                                       |                               |
 |                   |               |                                                          |                                       |                               |
-|     cache::       |  key/values   |          KV-cache, associative buffers, eviction         |    attention KV cache,                |          FALSE                |
+|     cache::       |  key/values   |          KV-cache, associative buffers, eviction         |    attention KV cache,                |         FALSE                 |
 |                   |               |             policies (LRU/LFU/custom),                   |    other (key → state) maps,          |                               |
 |                   |               |           segmenting by head/layer                       |    on-CPU cache layout                |                               |
 |                   |               |                                                          |                                       |                               |
@@ -341,7 +341,7 @@ Rules: Three deep before... I go crazy.
 |      moe::        |   experts     |       experts, SparseMoE                                 |     sparse MoE: Expert interface,     |         TRUE                  |
 |                   |               |                                                          |     router, dispatcher, expert        |                               |
 |                   |               |                                                          |             configs                   |                               |
-|-------------------|---------------|----------------------------------------------------------|-----------------------------------------------------------------------||                                                                       
+|-------------------|---------------|----------------------------------------------------------|-----------------------------------------------------------------------|                                                                       
 |                   |               |                                                          |                                       |                               |
 |                   |               |                                                          |                                       |                               |
 |      router::     |   routers     |       routers types, Spatial , hash, top-k,              |                                       |         TRUE                  |
