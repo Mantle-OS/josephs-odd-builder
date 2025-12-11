@@ -15,17 +15,20 @@
 #include "coach_config.h"
 #include "mutator.h"
 #include "population.h"
+#include "learn_concept.h"
 
 namespace job::ai::coach {
 
+template <learn::Learn TLearner>
 class ESCoach : public ICoach {
 public:
     using Config = ESConfig;
 
-    ESCoach(threads::ThreadPool::Ptr pool, Config cfg = CoachPresets::kStandard) :
+    ESCoach(threads::ThreadPool::Ptr pool, Config cfg = CoachPresets::kStandard, TLearner learn) :
         m_pool(std::move(pool)),
         m_config(cfg),
-        m_mutator()
+        m_mutator(),
+        m_learn(std::move(learn))
     {
         resizePopulation(cfg.populationSize);
     }
@@ -66,7 +69,7 @@ public:
         return m_bestFitness;
     }
 
-evo::Genome coach(const evo::Genome &parent, Evaluator eval) override
+evo::Genome coach(const evo::Genome &parent) override
 {
         m_generation++;
 
@@ -86,7 +89,10 @@ evo::Genome coach(const evo::Genome &parent, Evaluator eval) override
             localMutator.seed(m_generation * popSize + i); // This still does not seem global !
             localMutator.perturb(mutant, m_config.sigma);
 
-            float score = eval(mutant); /// We get here which calls the function from     std::function<float(const evo::Genome&)> portal() which calls ->
+            // float score = eval(mutant); /// We get here which calls the function from     std::function<float(const evo::Genome&)> portal() which calls ->
+
+            float score = m_learn.learn(mutant);
+
             m_population.setFitness(i, score);
         });
 
@@ -135,7 +141,9 @@ private:
     size_t                      m_generation{0};
     float                       m_bestFitness{0.0f};
     size_t                      m_currentBestIdx{0};
-    std::string                 m_coachName{"EvolutionStrategy (1, Lambda)"};
+    std::string                 m_coachName{"EvolutionStrategy (1, Lambda)"};\
+
+    TLearner                    m_learn;
 };
 
 } // namespace job::ai::coach

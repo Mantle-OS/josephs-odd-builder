@@ -74,7 +74,7 @@ pkg_check_modules(LibUdev REQUIRED libudev) # libudev-dev
 ## TRANSLATIONS Fuck Translations
 
 ## DATA fun
-pkg_check_modules(Flatbuffers REQUIRED flatbuffers)    # libflatbuffers-dev flatbuffers-compiler
+pkg_check_modules(Flatbuffers  REQUIRED flatbuffers)    # libflatbuffers-dev flatbuffers-compiler
 pkg_check_modules(NlohmannJson REQUIRED nlohmann_json)   # nlohmann-json3-dev
 pkg_check_modules(YAMLCpp      REQUIRED yaml-cpp)        # libyaml-cpp-dev
 

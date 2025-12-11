@@ -23,7 +23,7 @@ public:
     virtual void setMutationRate(float rate) noexcept = 0;
     virtual void setMode(OptimizationMode mode) noexcept = 0;
 
-    [[nodiscard]] virtual evo::Genome coach(const evo::Genome &parent, Evaluator eval) = 0;
+    [[nodiscard]] virtual evo::Genome coach(const evo::Genome &parent) = 0;
 
     [[nodiscard]] virtual size_t generation() const noexcept = 0;
     [[nodiscard]] virtual float currentBestFitness() const noexcept = 0;

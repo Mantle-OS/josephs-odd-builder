@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <memory>
 #include <string>
 #include <unistd.h>
 
@@ -13,6 +14,7 @@ namespace job::core {
 class IODevice {
 
 public:
+    using Ptr                   = std::shared_ptr<IODevice>;
     using ReadCallback          = std::function<void(const char *data, size_t size)>;
     using PermissionsCallback   = std::function<void(IOPermissions perms)>;
 

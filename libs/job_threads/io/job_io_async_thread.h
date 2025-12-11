@@ -13,8 +13,9 @@ using IOEventCallback = std::function<void(uint32_t events)>;
 
 class JobIoAsyncThread : public AsyncEventLoop {
 public:
+    using Ptr = std::shared_ptr<JobIoAsyncThread>;
     JobIoAsyncThread();
-    ~JobIoAsyncThread() noexcept override;
+    virtual ~JobIoAsyncThread() noexcept override;
 
     JobIoAsyncThread(const JobIoAsyncThread &) = delete;
     JobIoAsyncThread &operator=(const JobIoAsyncThread &) = delete;

@@ -190,7 +190,7 @@ inline void sgemm(const Matrix &A, const Matrix &B, Matrix &C,
 
 // Parallel SGEMM with Matrix objects
 inline void sgemm_parallel(job::threads::ThreadPool &pool,
-                           const Matrix &A, const Matrix& B, Matrix& C,
+                           const Matrix &A, const Matrix &B, Matrix &C,
                            float alpha = 1.0f, float beta = 0.0f)
 {
     assert(A.cols() == B.rows());
@@ -201,6 +201,18 @@ inline void sgemm_parallel(job::threads::ThreadPool &pool,
                        alpha, A.data(), A.extent()[1],
                        B.data(), B.extent()[1],
                        beta, C.data(), C.extent()[1]);
+}
+
+
+inline void sgemm_parallel(job::threads::ThreadPool &pool,
+                           const ViewR &A, const ViewR &B, ViewR &C,
+                           float alpha = 1.0f, float beta = 0.0f)
+{
+    sgemm_parallel_raw(pool,
+                       A.size(), B.size(), C.size(),
+                       alpha, A.data(), A.extent()[1],
+                       B.data(), B.extent()[1], beta,
+                       C.data(), C.extent()[1]);
 }
 
 

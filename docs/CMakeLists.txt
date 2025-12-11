@@ -3,7 +3,6 @@ add_custom_target(Documentation SOURCES
     ai_benchmarks.md
     odd_portal.md
     ansi_overview.md
-
     coding_style.md
     core_overview.md
     crypto_overview.md

@@ -13,7 +13,8 @@ enum class LayerType : uint8_t {
     LayerNorm   = 5,    // Normalization
     RMSNorm     = 6,    // LLaMA style norm
     Residual    = 7,    // Add
-    Output      = 8     // Logits
+    LinearLoRA  = 9,    // Meh whatever
+    Output      = 9     // Logits
 };
 
 // Initializer types for weights

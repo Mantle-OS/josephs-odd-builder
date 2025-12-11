@@ -1,5 +1,4 @@
 add_subdirectory(job_core)
-# add_subdirectory(job_ansi)
 add_subdirectory(job_threads)
 add_subdirectory(job_crypto)
 add_subdirectory(job_io)
@@ -8,4 +7,6 @@ add_subdirectory(job_net)
 add_subdirectory(job_serializer)
 add_subdirectory(job_science)
 add_subdirectory(job_ai)
+add_subdirectory(job_ansi)
+add_subdirectory(job_tui)
 # CHECKPOINT: v1.0

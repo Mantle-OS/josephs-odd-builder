@@ -87,6 +87,8 @@ set(JOBAI_LAYERS_HEADERS
     layers/attention.h
     layers/dense.h
     layers/layer_factory.h
+    # layers/layer_lora.h
+
 )
 set(JOBAI_LAYERS_SOURCES
     layers/layer_factory.cpp
@@ -188,13 +190,22 @@ set(JOBAI_INFER_SOURCES
     infer/runner.cpp            # way later
 )
 
-# kv
-#######################
+# cache
 set(JOBAI_CACHE_HEADERS
-    kv/kv_key.h
-    kv/kv_cache.h               # not planned
+    cache/kv_key.h
+    cache/kv_cache.h               # not planned
 )
 set(JOBAI_CACHE_SOURCES)
+
+
+# learner
+set(JOBAI_LEARNER_HEADERS
+    learner/learn_concept.h
+    learner/learn_type.h
+    learner/learn_xor.h
+    learner/learn_cart_pole.h
+)
+set(JOBAI_LEARNER_SOURCES)
 
 
 ################### END IMP,DECL ################################
@@ -207,6 +218,7 @@ add_library(JosephsOddBuilder_Ai SHARED
     ${JOBAI_COACH_HEADERS}      ${JOBAI_COACH_SOURCES}
     ${JOBAI_CORDS_HEADERS}      ${JOBAI_CORDS_HEADERS}
     ${JOBAI_LAYERS_HEADERS}     ${JOBAI_LAYERS_SOURCES}
+    ${JOBAI_LEARNER_HEADERS}    ${JOBAI_LEARNER_SOURCES}
     ${JOBAI_MOE_HEADERS}        ${JOBAI_MOE_SOURCES}
     ${JOBAI_ROUTER_HEADERS}     ${JOBAI_ROUTER_SOURCES}
     # non modules
@@ -242,6 +254,7 @@ target_include_directories(JosephsOddBuilder_Ai PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/coach>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/cords>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/layers>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/learner>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/moe>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/router>
     ## non modules
@@ -256,6 +269,7 @@ target_include_directories(JosephsOddBuilder_Ai PUBLIC
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobai/coach>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobai/cords>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobai/layers>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobai/learner>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobai/moe>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobai/router>
     ## non modules
@@ -272,6 +286,7 @@ install(FILES ${JOBAI_ADAPTERS_HEADERS} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/
 install(FILES ${JOBAI_COACH_HEADERS}    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobai/coach)
 install(FILES ${JOBAI_CORDS_HEADERS}    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobai/cords)
 install(FILES ${JOBAI_LAYERS_HEADERS}   DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobai/layers)
+install(FILES ${JOBAI_LEARNER_HEADERS}   DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobai/learner)
 install(FILES ${JOBAI_MOE_HEADERS}      DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobai/moe)
 install(FILES ${JOBAI_MOE_HEADERS}      DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobai/router)
 
@@ -280,7 +295,7 @@ install(FILES ${JOBAI_BASE_HEADERS}     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/
 install(FILES ${JOBAI_COMP_HEADERS}     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobai/comp)
 install(FILES ${JOBAI_EVO_HEADERS}      DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobai/evo)
 install(FILES ${JOBAI_INFER_HEADERS}    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobai/infer)
-install(FILES ${JOBAI_KV_HEADERS}       DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobai/kv)
+install(FILES ${JOBAI_CACHE_HEADERS}    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobai/cache)
 
 ## PKGCONFIG
 set(PKGCONFIG_FILE "${CMAKE_CURRENT_BINARY_DIR}/jobai.pc")
