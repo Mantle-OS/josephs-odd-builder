@@ -10,10 +10,10 @@ struct RouterToken {
 };
 
 struct RouterPlan {
-    int                         batchSize{0};           // number of rows in the batch
-    int                         numExperts{0};          // total experts available
-    RouterToken                 *tokens = nullptr;      // non-owning pointer to routing table
-    std::size_t                 tokenCount{0};          // total entries in tokens
+    int                         batchSize{0};                               // number of rows in the batch
+    int                         numExperts{0};                              // total experts available
+    RouterToken                 *tokens = nullptr;                          // non-owning pointer to routing table
+    std::size_t                 tokenCount{0};                              // total entries in tokens
 
     [[nodiscard]] RouterToken *begin()
     {

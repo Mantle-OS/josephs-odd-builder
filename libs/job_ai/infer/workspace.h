@@ -18,8 +18,8 @@ public:
         resize(sizeBytes);
     }
 
-    // Resize workspace to hold (sizeBytes / sizeof(float)) floats.
-    // This may grow or shrink the logical size; capacity is managed by std::vector.
+    // resize workspace to hold (sizebytes / sizeof(float)) floats.
+    // this may grow or shrink the logical size; capacity is managed by std::vector.
     void resize(std::size_t sizeBytes)
     {
         const std::size_t floatCount = sizeBytes / sizeof(float);

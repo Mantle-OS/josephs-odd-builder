@@ -24,13 +24,15 @@ public:
     using AccessorFunc    = std::function<T_Vec&(T_Particle&)>;
     using AccelCalculator = std::function<void(std::vector<T_Particle>&)>;
 
-    JobRK4Integrator(ThreadPool::Ptr pool, std::vector<T_Particle> *particles, AccessorFunc getPos, AccessorFunc getVel, AccessorFunc getAcc, AccelCalculator accelCalc) :
+    JobRK4Integrator(ThreadPool::Ptr pool, std::vector<T_Particle> *particles, AccessorFunc getPos, AccessorFunc getVel, AccessorFunc getAcc,
+                     AccelCalculator accelCalc, bool parallel = true) :
         m_pool(std::move(pool)),
         m_particles(particles),
         m_getPos(std::move(getPos)),
         m_getVel(std::move(getVel)),
         m_getAcc(std::move(getAcc)),
-        m_accelCalc(std::move(accelCalc))
+        m_accelCalc(std::move(accelCalc)),
+        m_parallel(parallel)
     {
 
         if (!m_pool)
@@ -54,26 +56,43 @@ public:
         const std::size_t N = m_particles->size();
         resizeScratch(N);
 
-        // copy :( 'particles' to 'scratch' to ensure Mass/Properties are current.
-        parallel_for(*m_pool, std::size_t{0}, N, [&](std::size_t i) {
-            const auto &orig = (*m_particles)[i];
-            m_scratch[i] = orig;
+        auto execute = [&](auto &&kernel) {
+            if (m_parallel) {
+                parallel_for(*m_pool, std::size_t{0}, N, kernel);
+            } else {
+                // Serial Fallback (Safe inside another parallel_for)
+                for (std::size_t i = 0; i < N; ++i)
+                    kernel(i);
+            }
+        };
 
+        execute([&](std::size_t i) {
+            m_scratch[i] = (*m_particles)[i];
             m_x0[i] = m_getPos(m_scratch[i]);
             m_v0[i] = m_getVel(m_scratch[i]);
-
-            // RK4 Final = x0 + (k1 + 2k2 + 2k3 + k4) * dt/6
             m_accumX[i] = T_Vec{};
             m_accumV[i] = T_Vec{};
         });
+
+        // copy :( 'particles' to 'scratch' to ensure Mass/Properties are current.
+        // parallel_for(*m_pool, std::size_t{0}, N, [&](std::size_t i) {
+        //     const auto &orig = (*m_particles)[i];
+        //     m_scratch[i] = orig;
+
+        //     m_x0[i] = m_getPos(m_scratch[i]);
+        //     m_v0[i] = m_getVel(m_scratch[i]);
+
+        //     // RK4 Final = x0 + (k1 + 2k2 + 2k3 + k4) * dt/6
+        //     m_accumX[i] = T_Vec{};
+        //     m_accumV[i] = T_Vec{};
+        // });
 
         const T_Scalar halfDt = dt * T_Scalar(0.5);
         const T_Scalar oneSixthDt = dt / T_Scalar(6.0);
 
         // k1 | x0, v0 cal a1 based on x0, v0 inside m_scratch
         m_accelCalc(m_scratch);
-
-        parallel_for(*m_pool, std::size_t{0}, N, [&](std::size_t i) {
+        execute([&](std::size_t i) {
             T_Vec k1_dx = m_v0[i];
             T_Vec k1_dv = m_getAcc(m_scratch[i]);
 
@@ -83,11 +102,20 @@ public:
             m_getPos(m_scratch[i]) = m_x0[i] + (k1_dx * halfDt);
             m_getVel(m_scratch[i]) = m_v0[i] + (k1_dv * halfDt);
         });
+        // parallel_for(*m_pool, std::size_t{0}, N, [&](std::size_t i) {
+        //     T_Vec k1_dx = m_v0[i];
+        //     T_Vec k1_dv = m_getAcc(m_scratch[i]);
+
+        //     m_accumX[i] = m_accumX[i] + k1_dx;
+        //     m_accumV[i] = m_accumV[i] + k1_dv;
+
+        //     m_getPos(m_scratch[i]) = m_x0[i] + (k1_dx * halfDt);
+        //     m_getVel(m_scratch[i]) = m_v0[i] + (k1_dv * halfDt);
+        // });
 
         // k2 | x0 + k1*0.5dt)
         m_accelCalc(m_scratch);
-
-        parallel_for(*m_pool, std::size_t{0}, N, [&](std::size_t i) {
+        execute([&](std::size_t i) {
             T_Vec k2_dx = m_getVel(m_scratch[i]);
             T_Vec k2_dv = m_getAcc(m_scratch[i]);
 
@@ -97,11 +125,20 @@ public:
             m_getPos(m_scratch[i]) = m_x0[i] + (k2_dx * halfDt);
             m_getVel(m_scratch[i]) = m_v0[i] + (k2_dv * halfDt);
         });
+        // parallel_for(*m_pool, std::size_t{0}, N, [&](std::size_t i) {
+        //     T_Vec k2_dx = m_getVel(m_scratch[i]);
+        //     T_Vec k2_dv = m_getAcc(m_scratch[i]);
+
+        //     m_accumX[i] = m_accumX[i] + (k2_dx * T_Scalar(2.0));
+        //     m_accumV[i] = m_accumV[i] + (k2_dv * T_Scalar(2.0));
+
+        //     m_getPos(m_scratch[i]) = m_x0[i] + (k2_dx * halfDt);
+        //     m_getVel(m_scratch[i]) = m_v0[i] + (k2_dv * halfDt);
+        // });
 
         // k3 | x0 + k2*0.5dt
         m_accelCalc(m_scratch);
-
-        parallel_for(*m_pool, std::size_t{0}, N, [&](std::size_t i) {
+        execute([&](std::size_t i) {
             T_Vec k3_dx = m_getVel(m_scratch[i]);
             T_Vec k3_dv = m_getAcc(m_scratch[i]);
 
@@ -111,11 +148,21 @@ public:
             m_getPos(m_scratch[i]) = m_x0[i] + (k3_dx * dt);
             m_getVel(m_scratch[i]) = m_v0[i] + (k3_dv * dt);
         });
+        // parallel_for(*m_pool, std::size_t{0}, N, [&](std::size_t i) {
+        //     T_Vec k3_dx = m_getVel(m_scratch[i]);
+        //     T_Vec k3_dv = m_getAcc(m_scratch[i]);
+
+        //     m_accumX[i] = m_accumX[i] + (k3_dx * T_Scalar(2.0));
+        //     m_accumV[i] = m_accumV[i] + (k3_dv * T_Scalar(2.0));
+
+        //     m_getPos(m_scratch[i]) = m_x0[i] + (k3_dx * dt);
+        //     m_getVel(m_scratch[i]) = m_v0[i] + (k3_dv * dt);
+        // });
 
         // k4 | x0 + k3*dt
         m_accelCalc(m_scratch);
 
-        parallel_for(*m_pool, std::size_t{0}, N, [&](std::size_t i) {
+        execute([&](std::size_t i) {
             T_Vec k4_dx = m_getVel(m_scratch[i]);
             T_Vec k4_dv = m_getAcc(m_scratch[i]);
 
@@ -130,11 +177,27 @@ public:
             v = m_v0[i] + (m_accumV[i] * oneSixthDt);
         });
 
+        // parallel_for(*m_pool, std::size_t{0}, N, [&](std::size_t i) {
+        //     T_Vec k4_dx = m_getVel(m_scratch[i]);
+        //     T_Vec k4_dv = m_getAcc(m_scratch[i]);
+
+        //     m_accumX[i] = m_accumX[i] + k4_dx;
+        //     m_accumV[i] = m_accumV[i] + k4_dv;
+
+        //     auto &p = (*m_particles)[i];
+        //     auto &x = m_getPos(p);
+        //     auto &v = m_getVel(p);
+
+        //     x = m_x0[i] + (m_accumX[i] * oneSixthDt);
+        //     v = m_v0[i] + (m_accumV[i] * oneSixthDt);
+        // });
+
         // keep real particle accelerations in sync with final state. Test to see if thiws is too heavy
         if (m_accelCalc)
             m_accelCalc(*m_particles);
 
     }
+
 
     void step_n(std::size_t iterations, T_Scalar dt)
     {
@@ -168,6 +231,7 @@ private:
     std::vector<T_Vec>          m_accumV;
     // Scratch particles used for intermediate force calculations
     std::vector<T_Particle>     m_scratch;
+    bool                        m_parallel{true};
 };
 
 } // namespace job::threads

@@ -16,7 +16,8 @@ using namespace job::ai;
 using namespace job::threads;
 
 
-void randomize_buffer(float* ptr, size_t count) {
+void randomize_buffer(float* ptr, size_t count)
+{
     static std::mt19937 gen(42);
     std::uniform_real_distribution<float> dist(-1.0f, 1.0f);
     for(size_t i=0; i<count; ++i) {
@@ -24,7 +25,8 @@ void randomize_buffer(float* ptr, size_t count) {
     }
 }
 
-void randomize_layer_params(layers::ILayer& layer) {
+void randomize_layer_params(layers::AbstractLayer &layer)
+{
     auto params = layer.parameters();
     randomize_buffer(params.data(), params.extent()[0]);
 }
@@ -65,9 +67,10 @@ TEST_CASE("Attention: Multi-Backend Integration", "[ai][attn][integration]") {
 
     // FMM
     SECTION("FMM Attention (O(N))") {
-        layers::AttentionConfig cfg;
+        layers::LayerConfig cfg;
         cfg.adapterType = adapters::AdapterType::FMM;
-        layers::Attention attn(cfg, D);
+
+        layers::AttentionLayer attn(D, cfg);
         randomize_layer_params(attn);
         // Needs ws now
         attn.forward(*ctx.pool, input, output, ws);
@@ -82,10 +85,10 @@ TEST_CASE("Attention: Multi-Backend Integration", "[ai][attn][integration]") {
     }
     // 2. Dense
     SECTION("Dense Attention") {
-        layers::AttentionConfig cfg;
+        layers::LayerConfig cfg;
         cfg.adapterType = adapters::AdapterType::Dense;
 
-        layers::Attention attn(cfg, D);
+        layers::AttentionLayer attn(D, cfg);
         randomize_layer_params(attn);
 
         // Clear output
@@ -105,10 +108,10 @@ TEST_CASE("Attention: Multi-Backend Integration", "[ai][attn][integration]") {
 
     // 3. Verlet (Dynamics)
     SECTION("Verlet Dynamics (Particle Simulation)") {
-        layers::AttentionConfig cfg;
+        layers::LayerConfig cfg;
         cfg.adapterType = adapters::AdapterType::Verlet;
 
-        layers::Attention attn(cfg, D);
+        layers::AttentionLayer attn(D, cfg);
         randomize_layer_params(attn);
 
         attn.forward(*ctx.pool, input, output, ws);
@@ -118,10 +121,10 @@ TEST_CASE("Attention: Multi-Backend Integration", "[ai][attn][integration]") {
 
     // 4. Barns n Hut (Dynamics)
     SECTION("Barns and Hut Dynamics (Particle Simulation)") {
-        layers::AttentionConfig cfg;
+        layers::LayerConfig cfg;
         cfg.adapterType = adapters::AdapterType::BarnesHut;
 
-        layers::Attention attn(cfg, D);
+        layers::AttentionLayer attn(D, cfg);
         randomize_layer_params(attn);
 
         attn.forward(*ctx.pool, input, output, ws);
@@ -148,10 +151,10 @@ TEST_CASE("Attention: Multi-Backend Integration", "[ai][attn][integration]") {
 
     // 5. LowRank (Dynamics)
     SECTION("LowRank (Simulation)") {
-        layers::AttentionConfig cfg;
+        layers::LayerConfig cfg;
         cfg.adapterType = adapters::AdapterType::LowRank;
 
-        layers::Attention attn(cfg, D);
+        layers::AttentionLayer attn(D, cfg);
         randomize_layer_params(attn);
 
         // Clear output
@@ -171,10 +174,10 @@ TEST_CASE("Attention: Multi-Backend Integration", "[ai][attn][integration]") {
 
     // 5. Flash (Dynamics)
     SECTION("Flash (Simulation)") {
-        layers::AttentionConfig cfg;
+        layers::LayerConfig cfg;
         cfg.adapterType = adapters::AdapterType::Flash;
 
-        layers::Attention attn(cfg, D);
+        layers::AttentionLayer attn(D, cfg);
         randomize_layer_params(attn);
 
         // Clear output
@@ -212,25 +215,25 @@ TEST_CASE("Attention: Scaling Benchmark (Seq=4096)", "[ai][attn][bench][scale]")
 
     // Only run the scalable ones to save time in test suite
     BENCHMARK("FMM Attention (O(N)) - Long Context") {
-        layers::AttentionConfig cfg;
+        layers::LayerConfig cfg;
         cfg.adapterType = adapters::AdapterType::FMM;
-        layers::Attention attn(cfg, D);
+        layers::AttentionLayer attn(D, cfg);
         attn.forward(*ctx.pool, input, output, ws);
         return outputData[0];
     };
 
     BENCHMARK("LowRank Attention (O(N)) - Long Context") {
-        layers::AttentionConfig cfg;
+        layers::LayerConfig cfg;
         cfg.adapterType = adapters::AdapterType::LowRank;
-        layers::Attention attn(cfg, D);
+        layers::AttentionLayer attn(D, cfg);
         attn.forward(*ctx.pool, input, output, ws);
         return outputData[0];
     };
 
     BENCHMARK("Dense Attention - Long Context") {
-        layers::AttentionConfig cfg;
+        layers::LayerConfig cfg;
         cfg.adapterType = adapters::AdapterType::Dense;
-        layers::Attention attn(cfg, D);
+        layers::AttentionLayer attn(D, cfg);
         attn.forward(*ctx.pool, input, output, ws);
         return outputData[0];
     };

@@ -61,6 +61,7 @@ void BhAdapter::adapt(
             return body.mass;
         };
 
+        // The magic !!
         using Solver = job::threads::BarnesHutForceCalculator<BhTraits::Body, BhTraits::Vec3, BhTraits::Real>;
         Solver solver(poolPtr, get_pos, get_mass,
                       m_cfg.theta, m_cfg.gravity, m_cfg.epsilon);

@@ -4,5 +4,5 @@ if(MSGPACK_BINDINGS)
 endif()
 
 add_subdirectory(job_ansi_examples)
-
+add_subdirectory(job_ai_terminal_dashboard_example)
 # CHECKPOINT: v1

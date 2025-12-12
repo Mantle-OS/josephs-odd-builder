@@ -27,9 +27,6 @@ void LowRankAdapter::adapt(threads::ThreadPool &pool,
                            const cords::ViewR &sources, const cords::ViewR &targets, const cords::ViewR &values, cords::ViewR &output,
                            [[maybe_unused]] const AdapterCtx &ctx)
 {
-    using namespace job::ai::cords;
-    using namespace job::ai::comp;
-
     const int B = shape.batch;
     const int S = shape.seq;
     const int D = shape.dim;
@@ -37,7 +34,7 @@ void LowRankAdapter::adapt(threads::ThreadPool &pool,
     size_t floatsPerBatch = static_cast<size_t>(D) * S + static_cast<size_t>(D) * D;
     size_t totalFloats = floatsPerBatch * B;
 
-    std::vector<float, AlignedAllocator<float, 64>> scratch(totalFloats);
+    std::vector<float, comp::AlignedAllocator<float, 64>> scratch(totalFloats);
 
     job::threads::parallel_for(pool, size_t{0}, size_t(B), [&](size_t b) {
         const float *q_ptr = targets.data() + b * S * D;
@@ -45,25 +42,25 @@ void LowRankAdapter::adapt(threads::ThreadPool &pool,
         const float *v_ptr = values.data()  + b * S * D;
         float *o_ptr       = output.data()  + b * S * D;
 
-        float* batch_scratch = scratch.data() + (b * floatsPerBatch);
-        float* kt_ptr = batch_scratch;
-        float* m_ptr  = batch_scratch + (D * S);
+        float *batch_scratch = scratch.data() + (b * floatsPerBatch);
+        float *kt_ptr = batch_scratch;
+        float *m_ptr  = batch_scratch + (D * S);
 
         comp::transpose(k_ptr, kt_ptr, S, D);
 
-        Matrix KT(kt_ptr, D, S);
-        Matrix V(const_cast<float*>(v_ptr), S, D);
-        Matrix M(m_ptr, D, D);
+        cords::Matrix KT(kt_ptr, D, S);
+        cords::Matrix V(const_cast<float*>(v_ptr), S, D);
+        cords::Matrix M(m_ptr, D, D);
 
         // [D, S] * [S, D] -> [D, D]
-        sgemm(KT, V, M, 1.0f, 0.0f);
+        comp::sgemm(KT, V, M, 1.0f, 0.0f);
 
         // [S, D] * [D, D] -> [S, D]
-        Matrix Q(const_cast<float*>(q_ptr), S, D);
-        Matrix O(o_ptr, S, D);
+        cords::Matrix Q(const_cast<float*>(q_ptr), S, D);
+        cords::Matrix O(o_ptr, S, D);
 
-        sgemm(Q, M, O, m_cfg.scale, 0.0f);
+        comp::sgemm(Q, M, O, m_cfg.scale, 0.0f);
     });
 }
 
-} // namespace
+}

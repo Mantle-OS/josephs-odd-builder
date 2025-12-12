@@ -65,10 +65,11 @@ template <typename T_Cell>
 class JobStencilGrid2D {
 public:
 
-    JobStencilGrid2D(ThreadPool &pool, int width, int height, T_Cell init = T_Cell{}) :
+    JobStencilGrid2D(ThreadPool &pool, int width, int height, bool parallel = true, T_Cell init = T_Cell{}) :
         m_pool(pool),
         m_width(std::max(1, width)),
         m_height(std::max(1, height)),
+        m_parallel(parallel),
         m_buffers{std::vector<T_Cell>(static_cast<size_t>(m_width) * m_height, init),
                   std::vector<T_Cell>(static_cast<size_t>(m_width) * m_height, init)}
     {
@@ -105,13 +106,18 @@ public:
 
         std::size_t total = static_cast<std::size_t>(m_width) * m_height;
 
-        parallel_for(m_pool, std::size_t{0}, total, [&](std::size_t idx) {
+        auto exec = [&](std::size_t idx) {
             int y = static_cast<int>(idx / m_width);
             int x = static_cast<int>(idx % m_width);
-
             writePtr[idx] = kernel(x, y, reader);
-        });
+        };
 
+        if(m_parallel){
+            parallel_for(m_pool, std::size_t{0}, total, exec);
+        }else{
+            for (std::size_t i = 0; i < total; ++i)
+                exec(i);
+        }
         // Swappy swappy
         m_front = 1 - m_front;
     }
@@ -136,6 +142,7 @@ private:
     ThreadPool              &m_pool;
     int                     m_width;
     int                     m_height;
+    bool                    m_parallel{true};
     std::vector<T_Cell>     m_buffers[2];
     int                     m_front{0};
 };

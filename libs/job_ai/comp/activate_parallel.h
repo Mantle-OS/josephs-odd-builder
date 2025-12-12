@@ -5,6 +5,7 @@
 
 #include "activation_functors.h"
 #include "activation_types.h"
+#include "activation_math.h"
 
 #include "simd_provider.h"
 
@@ -27,7 +28,7 @@ inline void activation_kernel_impl(float* __restrict__ data, size_t n)
 
 }
 
-inline void activate_buffer(job::threads::ThreadPool &pool, float* data, size_t n, ActivationType type)
+inline void activate_buffer([[maybe_unused]]job::threads::ThreadPool &pool, float *data, size_t n, ActivationType type, float alpha = 0.0f)
 {
     constexpr size_t kMinParallelSize = 16384;
     if (n < kMinParallelSize) {
@@ -46,7 +47,10 @@ inline void activate_buffer(job::threads::ThreadPool &pool, float* data, size_t 
         case ActivationType::GELU:
             activation_kernel_impl<FunctorGELU, true>(data, n);
             break;
-        default: break;
+        default:
+            for (size_t i = 0; i < n; ++i)
+                data[i] = activate(type, data[i], alpha);
+            break;
         }
         return;
     }
@@ -77,6 +81,8 @@ inline void activate_buffer(job::threads::ThreadPool &pool, float* data, size_t 
             activation_kernel_impl<FunctorGELU, true>(ptr, len);
             break;
         default:
+            for (size_t i = 0; i < len; ++i)
+                ptr[i] = activate(type, ptr[i], alpha);
             break;
         }
     });

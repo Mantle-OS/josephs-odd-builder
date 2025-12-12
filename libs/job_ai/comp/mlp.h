@@ -37,14 +37,11 @@ inline void mlpForward(
     float* __restrict__ Out,
     ActivationType act = ActivationType::GELU)
 {
-    // X [B, d_model] * W1 [d_model, d_hidden] -> HiddenBuf [B, d_hidden]
-    // Alpha=1, Beta=0 (Overwrite HiddenBuf)
+
     sgemm_parallel_raw(pool, Batch, d_hidden, d_model,
                    1.0f, X, d_model, W1,
                    d_hidden, 0.0f, HiddenBuf, d_hidden);
 
-    // Activation: HiddenBuf = Activate(HiddenBuf)
-    // This is memory-bound, parallelize to saturate bandwidth.
     size_t total_hidden = static_cast<size_t>(Batch) * d_hidden;
 
     // treat the buffer as a flat 1D array for activation

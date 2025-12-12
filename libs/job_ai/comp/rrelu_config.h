@@ -1,6 +1,5 @@
 #pragma once
 
-#include <real_type.h>
 #include <job_random.h>
 
 namespace job::ai::comp {

@@ -1,6 +1,5 @@
 #pragma once
 
-#include "real_type.h"
 #include <vector>
 #include <cmath>
 #include <algorithm>
@@ -14,7 +13,7 @@
 
 namespace job::ai::comp {
 
-// Note: Assumes row-major layout. this implementation is "Single-Head".  I guess later I will "Batched/Multi-head" that wraps this.
+// IMPORANT !! Assumes row-major layout. this implementation is "Single-Head".  I guess later I will "Batched/Multi-head" that wraps this.
 // Inputs: Q: [SeqLen, HeadDim] | K: [SeqLen, HeadDim] | V: [SeqLen, HeadDim]
 // Output: O: [SeqLen, HeadDim]
 inline void flashAttentionForward(
@@ -33,7 +32,6 @@ inline void flashAttentionForward(
         int i_end = std::min(i_start + JOB_AI_BLOCK_ROWS, N);
         int rows = i_end - i_start;
 
-        // registers
         // O_local: Accumulates weighted sum of V
         float O_local[JOB_AI_BLOCK_ROWS][JOB_AI_HEAD_DIM] = {{0}};
 

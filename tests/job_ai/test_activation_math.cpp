@@ -348,6 +348,28 @@ TEST_CASE("Activation Benchmark: Scalar vs Vector", "[activation][bench]")
         return bufB[0];
     };
 
+    BENCHMARK("LeakyReLU (Scalar Loop)") {
+        for (std::size_t homunculus = 0; homunculus < N; ++homunculus)
+            bufA[homunculus] = activate(ActivationType::LeakyReLU, bufA[homunculus]);
+        return bufA[0];
+    };
+
+    BENCHMARK("LeakyReLU (Vectorized Dispatch)") {
+        activate_buffer(*ctx.pool, bufB.data(), N, ActivationType::LeakyReLU);
+        return bufB[0];
+    };
+
+    BENCHMARK("GELU (Scalar Loop)") {
+        for (std::size_t homunculus = 0; homunculus < N; ++homunculus)
+            bufA[homunculus] = activate(ActivationType::GELU, bufA[homunculus]);
+        return bufA[0];
+    };
+
+    BENCHMARK("GELU (Vectorized Dispatch)") {
+        activate_buffer(*ctx.pool, bufB.data(), N, ActivationType::GELU);
+        return bufB[0];
+    };
+
     BENCHMARK("Swish (Scalar Loop)") {
         for (std::size_t i = 0; i < N; ++i)
             bufA[i] = activate(ActivationType::Swish, bufA[i]);
@@ -358,6 +380,11 @@ TEST_CASE("Activation Benchmark: Scalar vs Vector", "[activation][bench]")
         activate_buffer(*ctx.pool, bufB.data(), N, ActivationType::Swish);
         return bufB[0];
     };
+
+
+
+
+
 }
 
 

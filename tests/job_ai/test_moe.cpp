@@ -20,9 +20,10 @@ using namespace job::threads;
 using namespace job::ai::infer;
 
 // Simple Mock Expert
-class ScalarMultLayer : public ILayer {
+class ScalarMultLayer : public AbstractLayer {
 public:
-    ScalarMultLayer(float scalar) :
+    ScalarMultLayer(float scalar, LayerConfig cfg = LayerPresets::DenseConfig(), float alpha = 0.0f) :
+        AbstractLayer{cfg, alpha},
         m_scalar(scalar)
     {
     }
@@ -32,17 +33,13 @@ public:
         // Lie for test
         return LayerType::Dense;
     }
-    [[nodiscard]] std::string &name() noexcept override
-    {
-        return m_layerName;
-    }
 
     cords::ViewR::Extent getOutputShape(const cords::ViewR::Extent &inputShape) const override
     {
         return inputShape;
     };
 
-    void forward(ThreadPool&, const cords::ViewR& input, cords::ViewR& output, Workspace&) override
+    void forward(ThreadPool&, const cords::ViewR &input, cords::ViewR &output, Workspace&) override
     {
         const size_t n = input.size();
         for(size_t i=0; i<n; ++i)
@@ -57,6 +54,24 @@ public:
     {
         return 0;
     }
+
+    void loadWeights(float *) override
+    {
+
+    }
+
+    // the size of the scratch pad.
+    [[nodiscard]] size_t scratchSize(const cords::ViewR::Extent &) const override
+    {
+        return 0;
+    }
+
+    // Reset any internal state (KV cache, running stats, RNG state, etc.). when I get here ....
+    virtual void resetState() noexcept override {};
+
+
+
+
 
 private:
     float           m_scalar;
@@ -201,9 +216,12 @@ TEST_CASE("SparseMoE: Throughput Benchmark (LLaMA-Small Scale)", "[ai][moe][benc
 
     SparseMoE moe(D, E, K);
 
+    // auto den_cfg = LayerPresets::DenseConfig();
+    // den_cfg.activation = comp::ActivationType::GELU;
+
     // populate experts with real dense layers
     for(int i = 0; i < E; ++i)
-        moe.addExpert(i, std::make_shared<Dense>(D, D, job::ai::comp::ActivationType::GELU));
+        moe.addExpert(i, std::make_shared<DenseLayer>(D, D /*, den_cfg*/));
 
     using Alloc = cords::AlignedAllocator<float, 64>;
     std::vector<float, Alloc> input(B * D, 0.1f);

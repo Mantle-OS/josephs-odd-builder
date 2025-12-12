@@ -13,8 +13,8 @@ project(JosephsOddBuilderAi
 # adapters
 set(JOBAI_ADAPTERS_HEADERS
     adapters/adapter_ctx.h
-    adapters/iadapter.h
     adapters/adapter_types.h
+    adapters/iadapter.h
     # physics style adapter's
     adapters/fmm_config.h
     adapters/fmm_adapter.h
@@ -22,6 +22,11 @@ set(JOBAI_ADAPTERS_HEADERS
     adapters/bh_adapter.h
     adapters/verlet_config.h
     adapters/verlet_adapter.h
+    adapters/stencil_config.h
+    adapters/stencil_adapter.h
+    adapters/rk4_config.h
+    adapters/rk4_adapter.h
+
     # LLM style adapter's
     adapters/flash_adapter.h
     adapters/lowrank_config.h
@@ -38,15 +43,17 @@ set(JOBAI_ADAPTERS_SOURCES
     adapters/dense_adapter.cpp
     adapters/lowrank_adapter.cpp
     adapters/flash_adapter.cpp
+    adapters/stencil_adapter.cpp
+    adapters/rk4_adapter.cpp
 )
 
 # coach's
 set(JOBAI_COACH_HEADERS
-    coach/icoach.h              # done needs love
-    coach/coach_types.h         # done'ish
-    coach/coach_config.h        # started and looks nice
-    coach/genetic_coach.h       ## after contract
-    coach/es_coach.h            ## working example needs perf
+    coach/coach_types.h
+    coach/icoach.h
+    coach/coach_config.h
+    coach/genetic_coach.h
+    coach/es_coach.h
     coach/fitness_evaluator.h
     coach/portal_evaluator.h
 
@@ -56,49 +63,62 @@ set(JOBAI_COACH_SOURCES)
 # cords
 set(JOBAI_CORDS_HEADERS
     cords/attention_shape.h
-    cords/aligned_allocator.h   # done
-    cords/extents.h             # done
-    cords/view_iter.h           # done
-    cords/view.h                # done
-    cords/rank.h                # done
+    cords/aligned_allocator.h
+    cords/extents.h
+    cords/view_iter.h
+    cords/view.h
+    cords/rank.h
     ## Tensors
-    cords/fiber.h               # done
-    cords/matrix.h              # done
-    cords/volume.h              # done
-    cords/batch.h               # done
+    cords/fiber.h
+    cords/matrix.h
+    cords/volume.h
+    cords/batch.h
     # Shapes
-    cords/layout.h              ## done
-    cords/tile4.h               ## done
-    cords/tile8.h               ## done
-    cords/tile16.h              ## done
+    cords/layout.h
+    cords/tile4.h
+    cords/tile8.h
+    cords/tile16.h
 )
 set(JOBAI_CORDS_SOURCES)
 
 # layers
 set(JOBAI_LAYERS_HEADERS
     layers/layer_types.h
-    layers/paramgroup_type.h    # new
-    layers/paramgroup_config.h  # new
-    layers/iparamgroup.h        # << we are here
+    layers/layer_config.h
+
+    layers/paramgroup_type.h
+    layers/paramgroup_config.h
+    layers/iparamgroup.h
 
     layers/ilayer.h
+    layers/abstract_layer.h
 
     layers/attention_config.h
     layers/attention.h
     layers/dense.h
     layers/layer_factory.h
-    # layers/layer_lora.h
+    # layers/layer_lora.h # coming soon near some frozen weights near you
 
 )
 set(JOBAI_LAYERS_SOURCES
     layers/layer_factory.cpp
 )
 
+
+# learner
+set(JOBAI_LEARNER_HEADERS
+    learner/learn_concept.h
+    learner/learn_type.h
+    learner/learn_xor.h
+    learner/learn_cart_pole.h
+)
+set(JOBAI_LEARNER_SOURCES)
+
 # mixure of experts
 set(JOBAI_MOE_HEADERS
-    moe/imoe.h                  ## done'sh
-    moe/moe_types.h             ## done'ish
-    moe/sparse_moe.h            # needs refactor
+    moe/imoe.h
+    moe/moe_types.h
+    moe/sparse_moe.h
 
     # moe/dense_moe.h
     # moe/conv_moe.h
@@ -108,17 +128,16 @@ set(JOBAI_MOE_HEADERS
     # .....
 
 
-    ## Load balencer ?
-
+    ## Load balencer Later
 )
 set(JOBAI_MOE_SOURCES)
 
 set(JOBAI_ROUTER_HEADERS
     # router/irouter.h
+    router/router_types.h
     router/router_expert.h
     router/router_configs.h
     router/router_plan.h
-    router/router_types.h
 
     router/router_impl.h
 
@@ -126,6 +145,17 @@ set(JOBAI_ROUTER_HEADERS
 set(JOBAI_ROUTER_SOURCES
     router/router_impl.cpp
 )
+
+
+# learner
+set(JOBAI_LEARNER_HEADERS
+    learner/learn_concept.h
+    learner/learn_type.h
+    learner/learn_xor.h
+    learner/learn_cart_pole.h
+)
+set(JOBAI_LEARNER_SOURCES)
+
 
 #######################
 # NOT SUBSYSTEMS !
@@ -144,14 +174,14 @@ set(JOBAI_COMP_HEADERS
     comp/activation_functors.h
     comp/activate_parallel.h
     #
-    comp/rrelu_config.h         # done'ish
-    comp/gdn_params.h           # done'ish
-    comp/activation_types.h     # done
-    comp/activation_math.h      # done'ish
-    comp/gemm.h                 # done
-    comp/mlp.h                  # done
-    comp/flash_attention.h      # done
-    comp/atomic_math.h          # done
+    comp/rrelu_config.h
+    comp/gdn_params.h
+    comp/activation_types.h
+    comp/activation_math.h
+    comp/gemm.h
+    comp/mlp.h
+    comp/flash_attention.h
+    comp/atomic_math.h
 )
 set(JOBAI_COMP_SOURCES)
 
@@ -164,8 +194,8 @@ endif()
 
 # evo
 set(JOBAI_EVO_HEADERS
-    evo/genome.h                # done
-    evo/individual.h            # might not be needed
+    evo/genome.h
+    evo/individual.h
     evo/crossover_type.h
     evo/crossover_config.h
     evo/crossover.h
@@ -198,14 +228,6 @@ set(JOBAI_CACHE_HEADERS
 set(JOBAI_CACHE_SOURCES)
 
 
-# learner
-set(JOBAI_LEARNER_HEADERS
-    learner/learn_concept.h
-    learner/learn_type.h
-    learner/learn_xor.h
-    learner/learn_cart_pole.h
-)
-set(JOBAI_LEARNER_SOURCES)
 
 
 ################### END IMP,DECL ################################

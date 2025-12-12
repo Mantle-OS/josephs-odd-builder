@@ -5,8 +5,6 @@
 #include <vector>
 #include <algorithm>
 
-// We remove job_random.h dependency for the core logic
-// to ensure strict local determinism.
 #include "mutator_config.h"
 #include "genome.h"
 #include "noise_table.h"
@@ -15,8 +13,9 @@ namespace job::ai::evo {
 
 class Mutator {
 public:
-    Mutator() {
-        // Default to non-deterministic random if not explicitly seeded
+    Mutator()
+    {
+        // default to non-deterministic random if not explicitly seeded (IE I hate this but it is needed)
         std::random_device rd;
         m_rng.seed(rd());
     }
@@ -32,15 +31,14 @@ public:
         }
     }
 
-    // Default copy/move is fine; copying a Mutator duplicates its RNG state.
-    // This is acceptable behavior.
+    // default copy/move is fine; copying a mutator duplicates its rng state. this is "acceptable" behavior.
     Mutator(const Mutator &) = default;
     Mutator(Mutator &&) = default;
     Mutator &operator=(const Mutator &) = default;
     Mutator &operator=(Mutator &&) = default;
 
-    // --- THE MISSING LINK ---
-    // Allows the Coach to enforce determinism per thread/genome
+
+    // allows the coach to enforce determinism per thread/genome
     void seed(std::uint64_t s)
     {
         m_rng.seed(s);
@@ -52,18 +50,17 @@ public:
         perturb(genome, m_cfg.weightSigma);
     }
 
-    // "Sigma" override allows annealing from the Coach
+    // "sigma" override allows annealing from the coach
     void perturb(Genome &genome, float sigma)
     {
         if (genome.weights.empty())
             return;
 
-        // Clamp prob into [0,1]
         const float mutationProb = std::clamp(m_cfg.weightMutationProb, 0.0f, 1.0f);
         if (mutationProb <= 0.0f)
             return;
 
-        // Fast path: dense mutation (standard ES)
+        // fast path: dense mutation (standard E.S)
         if (mutationProb >= 1.0f) {
             // Generate a sub-seed for the Noise Table using our deterministic RNG.
             // This ensures that if we seeded m_rng with (GenID + ThreadID),
@@ -78,15 +75,14 @@ public:
                 sigma
                 );
         } else {
-            // Slow path: sparse mutation (prob < 1.0)
-            // Use LOCAL m_rng, not global JobRandom (Fixes Data Race)
-            std::normal_distribution<float>     dist(0.0f, sigma);
+            // slow path: sparse mutation (prob < 1.0)
+            std::normal_distribution<float> dist(0.0f, sigma);
             std::uniform_real_distribution<float> prob(0.0f, 1.0f);
 
-            for (float &w : genome.weights) {
+            for (float &w : genome.weights)
                 if (prob(m_rng) < mutationProb)
                     w += dist(m_rng);
-            }
+
         }
 
         // This genome is no longer the same individual – mark it as unevaluated
@@ -97,10 +93,9 @@ public:
     void setConfig(const MutatorConfig &cfg)
     {
         m_cfg = cfg;
-        // If config implies a specific seed, honor it immediately
-        if (m_cfg.seed != 0) {
+        // if config implies a specific seed, honor it immediately
+        if (m_cfg.seed != 0)
             seed(m_cfg.seed);
-        }
     }
 
     [[nodiscard]] const MutatorConfig &config() const
@@ -110,9 +105,7 @@ public:
 
 private:
     MutatorConfig m_cfg;
-
-    // The Internal Engine.
-    // Using 64-bit Mersenne Twister for high-quality, reproducible sequences.
+    // The Internal Engine. Using 64-bit Mersenne Twister for "high-quality", reproducible sequences.
     std::mt19937_64 m_rng;
 };
 

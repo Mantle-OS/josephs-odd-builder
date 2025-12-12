@@ -4,7 +4,6 @@
 #include <algorithm>
 #include <type_traits>
 
-#include <real_type.h>
 #include "activation_types.h"
 #include "job_logger.h"
 

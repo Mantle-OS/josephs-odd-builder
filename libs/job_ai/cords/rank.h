@@ -6,7 +6,6 @@
 #include <cstdint>
 
 #include "view.h"
-#include <real_type.h>
 
 namespace job::ai::cords {
 
@@ -21,13 +20,13 @@ public:
     using View::View;
     using Indices = std::array<std::uint32_t, RankSize>;
 
-    Rank(core::real_t *data, const Indices &indices) :
+    Rank(float *data, const Indices &indices) :
         View(data, Extent(indices.begin(), indices.end()))
     {
         assert(rank() == RankSize);
     }
 
-    [[nodiscard]] core::real_t &at(const Indices &indices)
+    [[nodiscard]] float &at(const Indices &indices)
     {
         assert(rank() == RankSize);
         for (std::size_t i = 0; i < RankSize; ++i)
@@ -36,7 +35,7 @@ public:
         return accessImpl(indices, std::make_index_sequence<RankSize>{});
     }
 
-    [[nodiscard]] const core::real_t &at(const Indices &indices) const
+    [[nodiscard]] const float &at(const Indices &indices) const
     {
         assert(rank() == RankSize);
         for (std::size_t i = 0; i < RankSize; ++i)
@@ -47,13 +46,13 @@ public:
 
 private:
     template<std::size_t... Indice>
-    [[nodiscard]] core::real_t &accessImpl(const Indices &indices, std::index_sequence<Indice...>)
+    [[nodiscard]] float &accessImpl(const Indices &indices, std::index_sequence<Indice...>)
     {
         return (*this)(indices[Indice]...);
     }
 
     template<std::size_t... Indice>
-    [[nodiscard]] const core::real_t &accessImpl(const Indices &indices, std::index_sequence<Indice...>) const
+    [[nodiscard]] const float &accessImpl(const Indices &indices, std::index_sequence<Indice...>) const
     {
         return (*this)(indices[Indice]...);
     }

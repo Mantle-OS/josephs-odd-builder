@@ -15,7 +15,8 @@
 #include "fmm_adapter.h"
 #include "verlet_adapter.h"
 #include "bh_adapter.h"
-
+#include "stencil_adapter.h"
+#include "rk4_adapter.h"
 namespace job::ai::adapters {
 
 [[nodiscard]] inline std::unique_ptr<IAdapter> makeAdapter(AdapterType adapterType)
@@ -36,6 +37,10 @@ namespace job::ai::adapters {
         return BhAdapter::unique();
     case AdapterType::Verlet:
         return VerletAdapter::unique();
+    case AdapterType::Stencil:
+        return StencilAdapter::unique();
+    case AdapterType::RK4:
+        return Rk4Adapter::unique();
     default:
         JOB_LOG_ERROR("[makeAdapter] Unknown AdapterType: {}", static_cast<int>(adapterType));
         return nullptr;

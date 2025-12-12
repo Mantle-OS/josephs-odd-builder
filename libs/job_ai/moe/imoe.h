@@ -8,23 +8,18 @@
 #include "router_plan.h"
 #include "router_types.h"
 
-#include "ilayer.h"
+#include "abstract_layer.h"
 
 #include "view.h"
 #include "workspace.h"
 
 namespace job::ai::moe {
 
-class IMoE : public layers::ILayer {
+class IMoE {
 public:
     virtual ~IMoE() = default;
-    // Expert Management
-    // An expert is just an ILayer (usually a Dense/MLP layer).
-    // The ID allows the router to map tokens to specific experts.
-    virtual void addExpert(int id, layers::ILayer::Ptr expert) = 0;
 
-    [[nodiscard]] virtual layers::LayerType type() const noexcept = 0;
-    [[nodiscard]] virtual std::string &name() noexcept = 0;
+    virtual void addExpert(uint32_t id, layers::AbstractLayer::Ptr expert) = 0;
 
     // Router Configuration
     virtual void setRouterType(router::RouterType type) = 0;
@@ -32,11 +27,6 @@ public:
     virtual router::RouterPlan route(threads::ThreadPool &pool, const cords::ViewR &input,
                                      infer::Workspace &workspace,
                                      std::vector<float> *maybeGateLogits) = 0;
-
-    // virtual void forward(job::threads::ThreadPool &pool,
-    //              const cords::ViewR &input,
-    //              infer::Workspace &ws,
-    //              cords::ViewR &output) = 0;
 };
 
 } // namespace job::ai::moe

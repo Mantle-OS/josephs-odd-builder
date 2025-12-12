@@ -36,7 +36,9 @@ void VerletAdapter::adapt(
     if (D < 3)
         return;
 
-    std::shared_ptr<ThreadPool> poolPtr(&pool, [](void*){});
+    std::shared_ptr<ThreadPool> poolPtr(&pool, [](void*){
+
+    });
 
     job::threads::parallel_for(pool, size_t{0}, size_t(B), [&](size_t b) {
         std::vector<Particle> bodies(S);
@@ -85,8 +87,8 @@ void VerletAdapter::adapt(
             computeNbodyForces(ps);
         };
 
-        using Integrator = job::threads::VerletIntegrator<Particle, Vec3>;
-        Integrator integrator(poolPtr, &bodies, get_pos, get_vel, get_acc, calc_accel);
+        // the magic !
+        job::threads::VerletIntegrator<Particle, Vec3> integrator(poolPtr, &bodies, get_pos, get_vel, get_acc, calc_accel);
         float dt = (ctx.dt > 0.0f) ?
                        ctx.dt :
                        m_cfg.dt;

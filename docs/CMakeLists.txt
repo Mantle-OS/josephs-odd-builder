@@ -1,7 +1,4 @@
 add_custom_target(Documentation SOURCES
-    ai.md
-    ai_benchmarks.md
-    odd_portal.md
     ansi_overview.md
     coding_style.md
     core_overview.md
@@ -12,3 +9,21 @@ add_custom_target(Documentation SOURCES
     threading_overview.md
     uart_overview.md
 )
+
+add_custom_target(AI_Documentation SOURCES
+    ai.md               # needs rewrite after all other things are done
+    ai_benchmarks.md    # done
+    odd_portal.md       # done
+    ai/cords.md         # done
+    ai/comp.md          # done
+    ai/evo.md           # done
+    ai/layers.md        # done
+    ai/router.md        # done
+    ai/moe.md           # done
+    ai/adapter.md       # done
+    ai/coach.md         # done
+    ai/infer.md         #
+    ai/learn.md
+    ai/cache.md
+)
+

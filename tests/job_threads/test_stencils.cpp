@@ -259,7 +259,8 @@ TEST_CASE("Stencil 2D: BoundaryMode::FixedZero returns default constructed value
     auto sched = std::make_shared<FifoScheduler>();
     auto pool = ThreadPool::create(sched, 1);
 
-    JobStencilGrid2D<int> grid(*pool, 3, 3, 100);
+    // JobStencilGrid2D<int> grid(*pool, 3, 3, 100);
+    JobStencilGrid2D<int> grid(*pool, 3, 3, true, 100);
     auto leftLooker = [](int x, int y, GridReader2D<int> view) {
         return view.at(x - 1, y, BoundaryMode::FixedZero);
     };
@@ -268,7 +269,7 @@ TEST_CASE("Stencil 2D: BoundaryMode::FixedZero returns default constructed value
 
     const int *res = grid.data();
     REQUIRE(res[0] == 0);
-    REQUIRE(res[1] == 100);
+    REQUIRE(res[1] == 100); // FAILS NOW
 
     pool->shutdown();
 }

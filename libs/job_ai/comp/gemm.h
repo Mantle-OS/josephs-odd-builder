@@ -19,7 +19,7 @@ using SMID = AVX_F;
 constexpr int kMicroM = 8;
 constexpr int kMicroN = 8;
 
-//  MICRO KERNEL (8x8)
+//  micro kernel (8x8)
 // Computes 8x8 block: C = alpha * (A * B) + C
 __attribute__((always_inline))
 inline void microKernel8x8(int K, float alpha,
@@ -73,9 +73,6 @@ inline void compute_tile(int M, int N, int K, float alpha,
                          float *C, int ldc,
                          int start_m, int start_n, int block_size)
 {
-
-
-
     int M_curr = std::min(block_size, M - start_m);
     int N_curr = std::min(block_size, N - start_n);
 
@@ -105,13 +102,13 @@ inline void compute_tile(int M, int N, int K, float alpha,
     }
 }
 
-// Low-level raw pointer sgemm (useful for batched operations on raw buffers)
+// low-level raw pointer sgemm (useful for batched operations on raw buffers)
 inline void sgemm_raw(int M, int N, int K,
                       float alpha, const float *A, int lda,
                       const float *B, int ldb,
                       float beta, float *C, int ldc)
 {
-    // Beta Scaling
+    // beta scaling
     if (beta == 0.0f) {
         for(int i=0; i<M; ++i) std::memset(C + i * ldc, 0, N * sizeof(float));
     } else if (beta != 1.0f) {
@@ -119,20 +116,20 @@ inline void sgemm_raw(int M, int N, int K,
             for(int j=0; j<N; ++j) C[i * ldc + j] *= beta;
     }
 
-    // Tiling Loop
+    // Tiling
     for (int i = 0; i < M; i += JOB_BLOCK_SIZE)
         for (int j = 0; j < N; j += JOB_BLOCK_SIZE)
             compute_tile(M, N, K, alpha, A, lda, B, ldb, C, ldc, i, j, JOB_BLOCK_SIZE);
 }
 
-// Low-level raw pointer parallel sgemm
+// low-level raw pointer parallel sgemm
 inline void sgemm_parallel_raw(job::threads::ThreadPool& pool,
                                int M, int N, int K,
                                float alpha, const float *A, int lda,
                                const float *B, int ldb,
                                float beta, float *C, int ldc)
 {
-    // Beta Scaling (Row Parallel)
+    // beta scaling (row parallel)
     job::threads::parallel_for(pool, size_t{0}, size_t(M), [&](size_t i) {
         if (beta == 0.0f) {
             std::memset(C + i * ldc, 0, N * sizeof(float));
@@ -142,7 +139,7 @@ inline void sgemm_parallel_raw(job::threads::ThreadPool& pool,
         }
     });
 
-    // 2D Block Parallelization
+    // 2d block parallelization
     int m_chunks = (M + JOB_BLOCK_SIZE - 1) / JOB_BLOCK_SIZE;
     int n_chunks = (N + JOB_BLOCK_SIZE - 1) / JOB_BLOCK_SIZE;
     size_t total_tiles = m_chunks * n_chunks;
@@ -154,7 +151,7 @@ inline void sgemm_parallel_raw(job::threads::ThreadPool& pool,
         int j = chunk_n * JOB_BLOCK_SIZE;
 
         compute_tile(M, N, K, alpha, A, lda, B, ldb, C, ldc, i, j, JOB_BLOCK_SIZE);
-    }, 0, 1); // Grain size 1 to prevent timeouts
+    }, 0, 1); // grain size 1 to prevent timeouts
 }
 
 inline void sgemm_strided_batched(job::threads::ThreadPool& pool,
@@ -174,7 +171,7 @@ inline void sgemm_strided_batched(job::threads::ThreadPool& pool,
     });
 }
 
-// Serial SGEMM with Matrix objects
+// serial sgemm with matrix objects
 inline void sgemm(const Matrix &A, const Matrix &B, Matrix &C,
                   float alpha = 1.0f, float beta = 0.0f)
 {
@@ -188,7 +185,7 @@ inline void sgemm(const Matrix &A, const Matrix &B, Matrix &C,
               beta, C.data(), C.extent()[1]); // ldc = N
 }
 
-// Parallel SGEMM with Matrix objects
+// parallel sgemm with matrix objects
 inline void sgemm_parallel(job::threads::ThreadPool &pool,
                            const Matrix &A, const Matrix &B, Matrix &C,
                            float alpha = 1.0f, float beta = 0.0f)
@@ -203,7 +200,7 @@ inline void sgemm_parallel(job::threads::ThreadPool &pool,
                        beta, C.data(), C.extent()[1]);
 }
 
-
+/* FIXME later
 inline void sgemm_parallel(job::threads::ThreadPool &pool,
                            const ViewR &A, const ViewR &B, ViewR &C,
                            float alpha = 1.0f, float beta = 0.0f)
@@ -214,6 +211,6 @@ inline void sgemm_parallel(job::threads::ThreadPool &pool,
                        B.data(), B.extent()[1], beta,
                        C.data(), C.extent()[1]);
 }
-
+*/
 
 } // namespace job::ai::comp

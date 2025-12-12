@@ -7,7 +7,7 @@ enum class CoachType : uint8_t {
     Genetic     = 0,    // Standard GA (Crossover + Mutation)
     ES          = 1,    // Evolution Strategy (Gaussian Perturbation, no crossover)
     CMA_ES      = 2,    // Covariance Matrix Adaptation (Advanced)
-    // ADD_MORE
+    // ADD_MORE Later
 };
 
 enum class OptimizationMode : uint8_t {

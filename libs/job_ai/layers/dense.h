@@ -1,56 +1,45 @@
 #pragma once
 
-#include "ilayer.h"
+#include <vector>
+
+#include "abstract_layer.h"
+#include "layer_config.h"
 #include "matrix.h"
 #include "aligned_allocator.h"
 #include "gemm.h"
-#include "activation_math.h"
 #include "activate_parallel.h"
+
 
 namespace job::ai::layers {
 
-class Dense : public ILayer {
+class DenseLayer final : public AbstractLayer {
 public:
-
-    Dense(int inputs, int outputs, comp::ActivationType act) :
-        m_inputs(inputs),
-        m_outputs(outputs),
-        m_act(act)
+    DenseLayer(uint32_t input, uint32_t output,LayerConfig cfg = LayerPresets::DenseConfig(), float alpha = 0.0f) :
+        AbstractLayer(cfg, alpha)
     {
-        size_t weightCount = static_cast<size_t>(inputs) * outputs;
-        size_t biasCount   = static_cast<size_t>(outputs);
+        m_cfg.inputs = input;
+        m_cfg.outputs = output;
+
+        const std::size_t weightCount = size_t(m_cfg.inputs) * m_cfg.outputs;
+        const std::size_t biasCount   = m_cfg.hasBias() ? size_t(m_cfg.outputs) : 0;
 
         m_storage.resize(weightCount + biasCount);
         m_weightsPtr = m_storage.data();
-        m_biasPtr    = m_storage.data() + weightCount;
+        m_biasPtr = biasCount ? (m_storage.data() + weightCount) : nullptr;
     }
 
-    Dense(const Dense&) = delete;
-    Dense& operator=(const Dense&) = delete;
-    Dense(Dense&&) noexcept = default;
-    Dense& operator=(Dense&&) noexcept = default;
-
+    DenseLayer(const DenseLayer&) = delete;
+    DenseLayer& operator=(const DenseLayer&) = delete;
+    DenseLayer(DenseLayer&&) noexcept = default;
+    DenseLayer& operator=(DenseLayer&&) noexcept = default;
 
 
     //////////////////////////////////////////////
-    // ILayer  override
+    // AbstractLayer override
     //////////////////////////////////////////////
-    [[nodiscard]] LayerType type() const noexcept override
+    [[nodiscard]] LayerType type() const noexcept override final
     {
-        return LayerType::Dense;
-    }
-
-    [[nodiscard]] std::string &name() noexcept override
-    {
-        return m_layerName;
-    }
-
-    [[nodiscard]] cords::ViewR::Extent getOutputShape(const cords::ViewR::Extent &inputShape) const override
-    {
-        if (inputShape.rank() == 3)
-            return { inputShape[0], inputShape[1], static_cast<uint32_t>(m_outputs) };
-
-        return { inputShape[0], static_cast<uint32_t>(m_outputs) };
+        return m_cfg.type;
     }
 
     void forward(job::threads::ThreadPool &pool,
@@ -58,60 +47,25 @@ public:
                  cords::ViewR &output,
                  [[maybe_unused]] infer::Workspace &workspace) override
     {
-        size_t rows = input.extent()[0];
-        size_t inFeatures = 0;
+        // flatten in
+        std::size_t rows;
+        std::size_t inFeatures = flattenInput(input, &rows);
 
-        if (input.rank() == 3) {
-            rows *= input.extent()[1];     // Flatten Batch * Seq
-            inFeatures = input.extent()[2];
-        } else {
-            inFeatures = input.extent()[1];
-        }
-
-        size_t approxFlops = rows * static_cast<size_t>(m_inputs) * static_cast<size_t>(m_outputs);
+        size_t flops = rows * static_cast<size_t>(m_cfg.inputs) * m_cfg.outputs;
         constexpr size_t kMinFlopsForParallel = 16384;
 
-        // Prepare Matrices
         cords::Matrix A(input.data(), rows, inFeatures);
-        cords::Matrix W(m_weightsPtr, m_inputs, m_outputs);
-        cords::Matrix C(output.data(), rows, m_outputs);
+        cords::Matrix W(m_weightsPtr, m_cfg.inputs, m_cfg.outputs);
+        cords::Matrix C(output.data(), rows, m_cfg.outputs);
 
-        if (approxFlops < kMinFlopsForParallel) {
+        if (flops < kMinFlopsForParallel) {
+            // SERIAL PATH
             comp::sgemm(A, W, C);
-
-            float *outData = output.data();
-            const float *biasData = m_biasPtr;
-            for (size_t i = 0; i < rows; ++i) {
-                float* row_ptr = outData + (i * m_outputs);
-                for (size_t j = 0; j < (size_t)m_outputs; ++j) {
-                    // Bias
-                    row_ptr[j] += biasData[j];
-                    // Activation (Using the correct function from your header)
-                    row_ptr[j] = comp::activate(m_act, row_ptr[j]);
-                }
-            }
-            return ;
+            handleBiasAndActivation(pool, output.data(), rows, m_cfg.outputs, false);
         } else {
+            // RUN FOREST RUN !@!!!!!!!
             comp::sgemm_parallel(pool, A, W, C);
-
-            float *outData = output.data();
-            const float *biasData = m_biasPtr;
-            size_t outDim = m_outputs;
-
-            // Parallel Bias
-            job::threads::parallel_for(pool, size_t{0}, rows, [=](size_t row_idx) {
-                float* row_ptr = outData + (row_idx * outDim);
-                using SIMD = job::ai::comp::SIMD;
-                constexpr int K = SIMD::width();
-
-                size_t j = 0;
-                for (; j + (K-1) < outDim; j += K) {
-                    auto v = SIMD::add(SIMD::pull(row_ptr + j), SIMD::pull(biasData + j));
-                    SIMD::mov(row_ptr + j, v);
-                }
-                for (; j < outDim; ++j)
-                    row_ptr[j] += biasData[j];
-            });
+            handleBiasAndActivation(pool, output.data(), rows, m_cfg.outputs, true);
         }
     }
 
@@ -120,24 +74,73 @@ public:
         return cords::ViewR(m_storage.data(), cords::ViewR::Extent((uint32_t)m_storage.size()));
     }
 
-    [[nodiscard]] size_t parameterCount() const noexcept override
-    {
-        return m_storage.size();
-    }
-
     void resetState() noexcept override
     {
-        // FIXME LATER
+        // FIXME LATER Not now.
     };
 
+    void loadWeights(float *weights) override
+    {
+        m_weightsPtr = weights;
+        if (m_cfg.hasBias()) {
+            const size_t offset = size_t(m_cfg.inputs) * m_cfg.outputs;
+            m_biasPtr = weights + offset;
+        } else {
+            m_biasPtr = nullptr;
+        }
+    }
+
+    // Dense is in-place / direct-write
+    [[nodiscard]] size_t scratchSize(const cords::ViewR::Extent &) const override
+    {
+        return 0;
+    }
+
+    [[nodiscard]] cords::ViewR::Extent getOutputShape(const cords::ViewR::Extent &inputShape) const override
+    {
+        if (inputShape.rank() == 3)
+            return { inputShape[0], inputShape[1], static_cast<uint32_t>(m_cfg.outputs) };
+
+        return { inputShape[0], static_cast<uint32_t>(m_cfg.outputs) };
+    }
+
+
 private:
-    int                                                     m_inputs;
-    int                                                     m_outputs;
-    comp::ActivationType                                    m_act;
-    std::vector<float, cords::AlignedAllocator<float, 64>>  m_storage;
-    float                                                   *m_weightsPtr{nullptr};
-    float                                                   *m_biasPtr{nullptr};
-    std::string                                             m_layerName{"Dense"};
+
+    static inline void addBiasRow(float *row, const float *bias, size_t count)
+    {
+        using SIMD = job::ai::comp::SIMD;
+        constexpr int K = SIMD::width();
+        size_t j = 0;
+        for (; j + K <= count; j += K) {
+            auto v = SIMD::add(SIMD::pull(row + j), SIMD::pull(bias + j));
+            SIMD::mov(row + j, v);
+        }
+        for (; j < count; ++j)
+            row[j] += bias[j];
+    }
+
+    void handleBiasAndActivation(job::threads::ThreadPool &pool, float *outData,
+                                 size_t rows, size_t cols, bool parallel)
+    {
+        if (m_cfg.hasBias()) {
+            float *biasPtr = m_biasPtr;
+            if (parallel) {
+                job::threads::parallel_for(pool, size_t{0}, rows, [outData, biasPtr, cols](size_t i) {
+                    addBiasRow(outData + i*cols, biasPtr, cols);
+                });
+            } else {
+                for(size_t i=0; i<rows; ++i)
+                    addBiasRow(outData + i*cols, biasPtr, cols);
+            }
+        }
+        // RUN FOREST RUN !!!!@!@!@!
+        comp::activate_buffer(pool, outData, rows * cols, m_cfg.activation, m_alpha);
+    }
+
+    std::vector<float, cords::AlignedAllocator<float, 64>>      m_storage;
+    float                                                       *m_weightsPtr{nullptr};
+    float                                                       *m_biasPtr{nullptr};
 };
 
 } // namespace job::ai::layers

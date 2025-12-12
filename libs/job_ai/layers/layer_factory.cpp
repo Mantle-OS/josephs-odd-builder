@@ -13,9 +13,9 @@
 
 namespace job::ai::layers {
 
-std::unique_ptr<ILayer> LayerFactory::create(const evo::LayerGene& gene, const std::vector<float> &genomeWeights)
+std::unique_ptr<AbstractLayer> LayerFactory::create(const evo::LayerGene &gene, const std::vector<float> &genomeWeights)
 {
-    std::unique_ptr<ILayer> layer = nullptr;
+    std::unique_ptr<AbstractLayer> layer = nullptr;
 
     switch (gene.type) {
     case LayerType::Dense:
@@ -60,26 +60,27 @@ std::unique_ptr<ILayer> LayerFactory::create(const evo::LayerGene& gene, const s
     return layer;
 }
 
-std::unique_ptr<ILayer> LayerFactory::createDense(const evo::LayerGene& gene)
+std::unique_ptr<AbstractLayer> LayerFactory::createDense(const evo::LayerGene &gene)
 {
-    return std::make_unique<Dense>(
+    LayerConfig cfg = LayerPresets::DenseConfig();
+    cfg.activation = gene.activation;
+    return std::make_unique<DenseLayer>(
         gene.inputs,
         gene.outputs,
-        gene.activation
-        );
+        cfg, 0.0f);
 }
 
-std::unique_ptr<ILayer> LayerFactory::createAttention(const evo::LayerGene& gene)
+std::unique_ptr<AbstractLayer> LayerFactory::createAttention(const evo::LayerGene& gene)
 {
-    AttentionConfig cfg;
+    LayerConfig cfg;
     cfg.numHeads = gene.outputs;
-    cfg.useBias = true;
+    cfg.setHasBias(true);
     cfg.adapterType = static_cast<adapters::AdapterType>(gene.auxiliaryData);
 
-    return std::make_unique<Attention>(cfg, gene.inputs);
+    return std::make_unique<AttentionLayer>(gene.inputs, cfg, 0.0f);
 }
 
-std::unique_ptr<ILayer> LayerFactory::createMoE(const evo::LayerGene &gene, [[maybe_unused]]const std::vector<float> &genomeWeights)
+std::unique_ptr<AbstractLayer> LayerFactory::createMoE(const evo::LayerGene &gene, [[maybe_unused]]const std::vector<float> &genomeWeights)
 {
     int dim = gene.inputs;
     int numExperts = gene.outputs;
@@ -91,8 +92,9 @@ std::unique_ptr<ILayer> LayerFactory::createMoE(const evo::LayerGene &gene, [[ma
 
     auto moe = std::make_unique<moe::SparseMoE>(dim, numExperts, k);
     moe->setRouterType(router::RouterType::TopK);
-    for(int i=0; i<numExperts; ++i) {
-        auto expert = std::make_unique<Dense>(dim, dim, comp::ActivationType::GELU);
+
+    for(int i = 0; i < numExperts; ++i) {
+        auto expert = std::make_unique<DenseLayer>(dim, dim);
         moe->addExpert(i, std::move(expert));
     }
 

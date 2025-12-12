@@ -15,6 +15,8 @@ add_executable(test_job_ai
     test_fmm_adapter.cpp
     test_verlet_adapter.cpp
     test_bh_adapter.cpp
+    test_stencil_adapter.cpp
+    test_rk4_adapter.cpp
     test_coach.cpp
     test_moe.cpp
     test_runner.cpp

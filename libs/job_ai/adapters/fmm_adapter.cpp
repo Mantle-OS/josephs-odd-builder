@@ -47,7 +47,7 @@ void FmmAdapter::adapt(
         std::vector<FmmTraits::Body> bodies(S);
 
         // Pointers to this batch's data slice
-        // !!! NOTE !!!!!! We assume RowMajor layout (stride = D)
+        // !!! NOTE !!!!!! I assume RowMajor layout (stride = D)
         const float *k_ptr = sources.data() + (b * S * D);
         // const float *q_ptr = targets.data() + (b * S * D);
 
@@ -56,15 +56,10 @@ void FmmAdapter::adapt(
 
         float* out_ptr = output.data() + (b * S * D);
 
-
-        // encoder: Tensor -> Physics Body
-        // map the first 3 dimensions of the Embedding to X, Y, Z. map the magnitude (or 4th dim) to Mass.
         for (int i = 0; i < S; ++i) {
             auto& p = bodies[i];
             int idx = i * D;
 
-            // Position: Where is this token in semantic space ?
-            // Using config mapping allows rotation/selection of dims.
             p.position.x = k_ptr[idx + m_cfg.dim_mapping[0]];
             p.position.y = k_ptr[idx + m_cfg.dim_mapping[1]];
 
@@ -74,8 +69,6 @@ void FmmAdapter::adapt(
             else
                 p.position.z = 0.0f;
 
-            // Mass: How "heavy" (important) is this token?
-            // Simple heuristic: Use the Value's first dim, or just 1.0 (Democratic Attention). use 1.0 for pure topological analysis.
             p.mass = 1.0f;
             p.acceleration = {0,0,0};
             p.id = i;

@@ -70,10 +70,10 @@ TEST_CASE("Evolution: Solving XOR", "[coach][xor][usage]")
         { {1.0f, 1.0f}, {0.0f} }
     });
 
-    Genome seed = buildXORGenome(8); // Standard 2->8->1 network
+    Genome seed = buildXORGenome(8);
 
     ESCoach::Config cfg;
-    cfg.populationSize = 512; // Proven stable size
+    cfg.populationSize = 512;
     cfg.sigma = 0.1f;
     cfg.decay = 0.99f;
 
@@ -102,14 +102,13 @@ TEST_CASE("Evolution: Solving XOR", "[coach][xor][usage]")
 
 TEST_CASE("Evolution: Edge Cases (Single Survivor)", "[coach][xor][edge]")
 {
-    // Can we run with a population of 1? (Hill Climbing)
     job::threads::JobStealerCtx ctx(1);
-    PortalEvaluator physics(ctx.pool); // Reuse pool is risky but valid for size 1
-    physics.setDataset({ {{0.0f, 0.0f}, {0.0f}} }); // Trivial dataset
+    PortalEvaluator physics(ctx.pool);
+    physics.setDataset({ {{0.0f, 0.0f}, {0.0f}} });
 
     Genome seed = buildXORGenome(4);
     ESCoach::Config cfg;
-    cfg.populationSize = 1; // <--- The Edge Case
+    cfg.populationSize = 1;
     cfg.sigma = 0.5f;
 
     ESCoach coach(ctx.pool, cfg);

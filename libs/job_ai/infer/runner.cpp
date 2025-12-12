@@ -5,8 +5,7 @@
 
 namespace job::ai::infer {
 
-// TODO this code isa shity wrote to quick FIXME
-
+// TODO this code is shity wrote to quick FIXME I really just wanted to test a full loop
 
 #ifndef JOB_DEFAULT_WS_MB
 #define JOB_DEFAULT_WS_MB 256 // 256MB Scratchpad
@@ -26,78 +25,61 @@ Runner::Runner(const evo::Genome &genome,
 void Runner::buildNetwork()
 {
     m_layers.clear();
-
-    // scan the architecture to find the widest layer.
-    // If input is 64 but layer 1 outputs 128, we need buffer space for 128.
     size_t maxDim = 0;
     m_maxLayerDim = 0;
 
     for (const auto &gene : m_genome.architecture) {
         auto layer = layers::LayerFactory::create(gene, m_genome.weights);
-        if (layer) {
+        if (layer)
             m_layers.push_back(std::move(layer));
-        }
 
-        // 2. Calculate Width
         size_t layerWidth = 0;
         switch (gene.type) {
         case layers::LayerType::Dense:
-            // Dense requires max(Input, Output) because it does in-place bias/act
-            // or simply produces larger output.
             layerWidth = std::max(gene.inputs, gene.outputs);
             break;
         case layers::LayerType::Attention:
-            // Attention usually preserves embedding dimension (gene.inputs)
             layerWidth = gene.inputs;
             break;
         case layers::LayerType::SparseMoE:
-            // MoE usually preserves embedding dimension
             layerWidth = gene.inputs;
             break;
         default:
             layerWidth = gene.inputs;
         }
 
-        if (layerWidth > maxDim) maxDim = layerWidth;
+        if (layerWidth > maxDim)
+            maxDim = layerWidth;
     }
 
-    // Store this for run()
-    // We add a safety margin or ensure it's at least 1
     m_maxLayerDim = (maxDim > 0) ? maxDim : 1;
 }
 
-void Runner::reset() {
-    for(auto& l : m_layers)
+void Runner::reset()
+{
+    for(auto &l : m_layers)
         l->resetState();
 }
-
-
 
 cords::ViewR Runner::run(const cords::ViewR &input)
 {
     cords::ViewR::Extent shape = input.extent();
-    // If Rank 3 [Batch, Seq, Dim], rows = Batch * Seq
-    // If Rank 2 [Batch, Dim], rows = Batch
+    // if rank 3 [batch, seq, dim], rows = batch * seq
+    // if rank 2 [batch, dim], rows = batch
     size_t totalRows = shape[0];
-    if (shape.rank() >= 3) {
+    if (shape.rank() >= 3)
         totalRows *= shape[1];
-    }
 
-    // Calculate worst-case buffer size needed
-    // Max Width (128) * Total Rows (4*16=64) = 8192
     size_t requiredSize = totalRows * m_maxLayerDim;
 
-    // Safety: ensure it fits the input itself
     if (input.size() > requiredSize)
         requiredSize = input.size();
 
-    // 1. Resize Buffers (Lazy)
     if (m_bufA.size() < requiredSize) {
         m_bufA.resize(requiredSize);
         m_bufB.resize(requiredSize);
     }
 
-    // ... (The rest of the function remains identical) ...
     float *ptrA = m_bufA.data();
     float *ptrB = m_bufB.data();
 
@@ -124,58 +106,5 @@ cords::ViewR Runner::run(const cords::ViewR &input)
     float *finalPtr = flip ? ptrB : ptrA;
     return cords::ViewR(finalPtr, currentShape);
 }
-
-
-// cords::ViewR Runner::run(const cords::ViewR &input)
-// {
-//     cords::ViewR::Extent shape = input.extent();
-
-//     // Batch Size (Rows) comes from runtime input.
-//     // Feature Size (Cols) comes from our m_maxLayerDim calculation.
-//     size_t batchRows = shape[0];
-
-//     // Calculate worst-case buffer size needed
-//     size_t requiredSize = batchRows * m_maxLayerDim;
-
-//     // Also ensure it fits the input itself (in case input is the widest thing)
-//     if (input.size() > requiredSize)
-//         requiredSize = input.size();
-
-//     // 1. Resize Buffers (Lazy)
-//     if (m_bufA.size() < requiredSize) {
-//         m_bufA.resize(requiredSize);
-//         m_bufB.resize(requiredSize);
-//     }
-
-//     float *ptrA = m_bufA.data(); // 0  << ODD that it is 0
-//     float *ptrB = m_bufB.data(); // 0
-
-//     // 2. Copy Input
-//     std::memcpy(ptrA, input.data(), input.size() * sizeof(float));
-
-//     bool flip = false;
-//     cords::ViewR::Extent currentShape = shape;
-
-//     // 3. Run Layers
-//     for (auto &layer : m_layers) {
-//         float *srcPtr = flip ? ptrB : ptrA;
-//         float *dstPtr = flip ? ptrA : ptrB;
-
-//         cords::ViewR src(srcPtr, currentShape);
-
-//         // Ask layer what the output shape will be
-//         cords::ViewR::Extent nextShape = layer->getOutputShape(currentShape);
-//         cords::ViewR dst(dstPtr, nextShape);
-
-//         // Execute
-//         layer->forward(*m_pool, src, dst, m_workspace);
-
-//         flip = !flip;
-//         currentShape = nextShape;
-//     }
-
-//     float *finalPtr = flip ? ptrB : ptrA;
-//     return cords::ViewR(finalPtr, currentShape);
-// }
 
 } // namespace job::ai::infer

@@ -38,9 +38,13 @@ void findTopK_Stack(const float *row, int n, int k, ValIdx *out_buffer)
 
     for (int i = k; i < n; ++i) {
         if (row[i] > out_buffer[0].val) {
-            std::pop_heap(out_buffer, out_buffer + k, [](auto& a, auto& b){ return a.val > b.val; });
+            std::pop_heap(out_buffer, out_buffer + k, [](auto &a, auto &b){
+                return a.val > b.val;
+            });
             out_buffer[k-1] = {row[i], i};
-            std::push_heap(out_buffer, out_buffer + k, [](auto& a, auto& b){ return a.val > b.val; });
+            std::push_heap(out_buffer, out_buffer + k, [](auto &a, auto &b){
+                return a.val > b.val;
+            });
         }
     }
     std::sort(out_buffer, out_buffer + k, [](auto& a, auto& b){
@@ -75,6 +79,7 @@ RouterPlan routeTopK(const RouterConfig &cfg, int batch, int experts, const floa
             best[i].val = std::exp(best[i].val - maxVal);
             sumExp += best[i].val;
         }
+
         float invSum = 1.0f / (sumExp + 1e-9f);
 
         for (int i = 0; i < k; ++i) {
@@ -85,7 +90,7 @@ RouterPlan routeTopK(const RouterConfig &cfg, int batch, int experts, const floa
             tok.adapter = getAdapterForExpert(cfg, tok.expert);
         }
     }
-    // MATCHING NEW STRUCT ORDER: batchSize, numExperts, tokens, tokenCount
+    // matching new struct order: batchSize, numExperts, tokens, tokenCount
     return RouterPlan{ batch, experts, buffer, tokenCount };
 }
 
@@ -110,14 +115,14 @@ RouterPlan routeHash(const RouterConfig &cfg, int batch, int experts, const cord
         }
 
         for (int i = 0; i < k; ++i) {
-            RouterToken& tok = buffer[tokenCount++];
+            RouterToken &tok = buffer[tokenCount++];
             tok.row = b;
             tok.expert = (h + i) % experts;
             tok.weight = 1.0f / k;
             tok.adapter = getAdapterForExpert(cfg, tok.expert);
         }
     }
-    // MATCHING NEW STRUCT ORDER
+    // matching new struct order
     return RouterPlan{ batch, experts, buffer, tokenCount };
 }
 
@@ -139,6 +144,7 @@ RouterPlan routeSpatial(const RouterConfig &cfg, int batch, [[maybe_unused]] con
             tok.adapter = getAdapterForExpert(cfg, tok.expert);
         }
     }
+    // matching new struct order
     return RouterPlan{ batch, experts, buffer, tokenCount };
 }
 
@@ -157,6 +163,7 @@ RouterPlan routeState(const RouterConfig &cfg, int batch, int experts, RouterTok
             tok.adapter = getAdapterForExpert(cfg, tok.expert);
         }
     }
+    // matching new struct order
     return RouterPlan{ batch, experts, buffer, tokenCount };
 }
 

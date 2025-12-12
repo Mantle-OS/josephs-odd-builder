@@ -4,7 +4,6 @@
 #include <vector>
 
 #include <job_logger.h>
-#include <real_type.h>
 
 namespace job::ai::comp {
 struct GDNParams {

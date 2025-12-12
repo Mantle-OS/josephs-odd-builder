@@ -45,7 +45,14 @@ This file is the “big map” of the threading library:
 Current layout of the threading zoo: more incoming
 
 ```text
-job_threads/
+├── job_semaphore.h
+├── job_thread.cpp
+├── job_thread.h
+├── job_thread_pool.cpp
+├── job_thread_pool.h
+├── jobthreads.pc.in
+├── job_thread_watcher.cpp
+├── job_thread_watcher.h
 ├── ctx
 │   ├── job_fifo_ctx.h
 │   ├── job_rr_ctx.h
@@ -62,13 +69,6 @@ job_threads/
 │   ├── job_async_event_loop.h
 │   ├── job_io_async_thread.cpp
 │   └── job_io_async_thread.h
-├── job_thread.cpp
-├── job_thread.h
-├── job_thread_pool.cpp
-├── job_thread_pool.h
-├── jobthreads.pc.in
-├── job_thread_watcher.cpp
-├── job_thread_watcher.h
 ├── queue
 │   ├── job_mcmp_queue.h
 │   ├── job_task_queue.cpp
@@ -116,7 +116,6 @@ job_threads/
     ├── job_verlet_adapters.h
     ├── job_verlet_concepts.h
     └── job_verlet_integrator.h
-
 ```
 
 ## The rough mental model:

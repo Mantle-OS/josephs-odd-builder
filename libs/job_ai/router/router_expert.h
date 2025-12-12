@@ -1,10 +1,10 @@
 #pragma once
 #include "adapter_types.h"
 namespace job::ai::router {
-// VERY ALPHA Shit is getting odd bro .... whos on 1st or 2nd ?
+// VERY ALPHA
 struct RouterExpertConfig {
     int                         id{0};                                  // expert index
     adapters::AdapterType       adapter{adapters::AdapterType::None};   // Dense / Flash / FMM / BH
-    // FIXME bounds, region center, etc. for spatial routing
+    // FIXME bounds, region center, etc. for spatial routing later if even needed
 };
 } // namespace job::ai::router

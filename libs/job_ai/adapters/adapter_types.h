@@ -8,7 +8,9 @@ enum class AdapterType : uint8_t {
     LowRank     = 3,    // LoRA / SVD based approximation
     FMM         = 4,    // Fast Multipole Method (Gravity/Electrostatics)
     BarnesHut   = 5,    // Tree-code (Gravity)
-    Verlet      = 6     // Velocity Verlet (Dynamics)
+    Verlet      = 6,    // Velocity Verlet (Dynamics)
+    Stencil     = 7,    // Stencil 2d grid
+    RK4         = 8     // Runge-Kutta 4th Order
 };
 
 // Kernelized, // Linear Attention kernels

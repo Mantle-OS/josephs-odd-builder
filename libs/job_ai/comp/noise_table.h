@@ -16,14 +16,14 @@ class NoiseTable final {
 public:
 
 #ifdef JOB_BLOCK_SIZE_256
-    // 32MB = 8 Million floats. Fits in 64MB L3 Cache.
+    // 32MB = 8 million floats. fits in 64MB l3 cache.
     static constexpr size_t kSize = 8 * 1024 * 1024;
 #else
-    // 16MB = 4 Million floats. Safer for Laptop/ARM L3 sizes.
+    // 16MB = 4 million floats. safer for laptop/arm l3 sizes.
     static constexpr size_t kSize = 4 * 1024 * 1024;
 #endif
 
-    static constexpr size_t kMask = kSize - 1; // For fast wrapping
+    static constexpr size_t kMask = kSize - 1; // for fast wrapping
     static_assert((kSize & kMask) == 0, "kSize must be a power-of-two.");
 
     static NoiseTable& instance()
@@ -38,8 +38,6 @@ public:
     // sigma: Mutation strength (learning rate)
     void perturb(float* __restrict__ w_ptr, size_t count, uint64_t seed, float sigma) const
     {
-
-
         size_t offset = (seed * 0x9E3779B97F4A7C15ULL) & kMask;
 
         const float* __restrict__ n_ptr = m_data.data();
@@ -51,12 +49,12 @@ public:
         for (; i + (W - 1) < count; i += W) {
             size_t idx = (offset + i) & kMask;
 
-            // Fast Path: Contiguous load (No wrapping in the middle of a register)
+            // fast path: contiguous load (no wrapping in the middle of a register)
             if (idx + W <= kSize) {
-                auto w = SIMD::pull(w_ptr + i);     // Load Weights
-                auto n = SIMD::pull(n_ptr + idx);   // Load Noise
+                auto w = SIMD::pull(w_ptr + i);     // load weights
+                auto n = SIMD::pull(n_ptr + idx);   // load noise
                 w = SIMD::mul_plus(n, vSigma, w);   // w = w + (n * sigma)
-                SIMD::mov(w_ptr + i, w);            // Store back
+                SIMD::mov(w_ptr + i, w);            // store back
             }
             // Slow Path: The wrap happens inside this register block
             else {
@@ -91,7 +89,6 @@ private:
             f = dist(gen);
     }
 
-    // Aligned storage for SIMD loads
     std::vector<float, job::ai::cords::AlignedAllocator<float, 64>> m_data;
 };
 
