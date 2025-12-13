@@ -79,6 +79,7 @@ public:
         // FIXME LATER Not now.
     };
 
+    // FLY WHEEL
     void loadWeights(float *weights) override
     {
         m_weightsPtr = weights;
