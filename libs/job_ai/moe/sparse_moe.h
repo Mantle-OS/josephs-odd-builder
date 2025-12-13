@@ -33,6 +33,7 @@
 #include "gemm.h"
 #include "activation_math.h"
 #include "atomic_math.h"
+#include "workspace_arena.h"
 
 namespace job::ai::moe {
 using namespace job::ai::layers;
@@ -128,146 +129,119 @@ public:
 
         return plan;
     }
-
     void forward(job::threads::ThreadPool &pool,
                  const cords::ViewR &input,
                  cords::ViewR &output,
                  infer::Workspace &ws) override
     {
-        const int batch = static_cast<int>(input.extent()[0]);
-        const int dim = static_cast<int>(input.extent()[1]);
-        const size_t outputSizeBytes = static_cast<size_t>(batch) * dim * sizeof(float);
+        const uint32_t B = input.extent()[0];
+        const uint32_t D = input.extent()[1];
+        const uint32_t E = m_cfg.numExperts;
+        const uint32_t K = m_cfg.topK;
 
-        std::memset(output.data(), 0, outputSizeBytes);
+        std::memset(output.data(), 0, std::size_t(B) * D * sizeof(float));
 
-        router::RouterPlan plan = route(pool, input, ws, nullptr);
+        // Route (assume route writes logits+tokens into ws and returns non-owning plan.tokens)
+        auto plan = route(pool, input, ws, nullptr);
+        const uint32_t T = (uint32_t)plan.tokenCount;
 
-        std::vector<std::vector<router::RouterToken>> buckets(m_cfg.numExperts);
-        for (const auto &tok : plan)
-            buckets[tok.expert].push_back(tok);
+        // Arena starts AFTER routing storage (logits + tokens)
+        infer::WorkspaceArena arena{ws};
+        arena.cursorBytes = infer::WorkspaceArena::align_up(
+            std::size_t(B) * E * sizeof(float) + std::size_t(T) * sizeof(router::RouterToken),
+            64
+            );
 
-        size_t routeUsedFloats = (static_cast<size_t>(batch) * m_cfg.numExperts) // Logits
-                                 + (plan.tokenCount * sizeof(router::RouterToken)/sizeof(float)); // Tokens
-
-        // 16 floats -> AVX
-        routeUsedFloats = (routeUsedFloats + 15) & ~15;
-
-        float* freeMemBase = ws.raw() + routeUsedFloats;
-        size_t floatsNeededPerExpert = static_cast<size_t>(batch) * dim;
-        size_t totalFloatsNeeded = floatsNeededPerExpert * m_cfg.numExperts;
-
-        // convert floats to bytes
-        size_t bytesNeeded = totalFloatsNeeded * sizeof(float);
-        size_t bytesAvailable = (ws.size() - routeUsedFloats) * sizeof(float);
-
-        bool usePrivateBuffers = (bytesNeeded <= bytesAvailable);
-
-        if (usePrivateBuffers) {
-            threads::parallel_for(pool, size_t{0}, static_cast<size_t>(m_cfg.numExperts), [&](size_t eIdx) {
-                const int e = static_cast<int>(eIdx);
-                auto &tokens = buckets[e];
-                if (tokens.empty() || !m_experts[e])
-                    return;
-
-                const int subBatch = static_cast<int>(tokens.size());
-
-                float *localOutput = freeMemBase + (eIdx * floatsNeededPerExpert);
-                // Zero it out first!
-                std::memset(localOutput, 0, outputSizeBytes);
-
-                // scratchpads for input/output (small, so vector is fine for now :>( )
-                std::vector<float, cords::AlignedAllocator<float, 64>> expertInput(subBatch * dim);
-                std::vector<float, cords::AlignedAllocator<float, 64>> expertOutput(subBatch * dim);
-
-                for (int i = 0; i < subBatch; ++i) {
-                    const float *src = input.data() + tokens[i].row * dim;
-                    std::memcpy(expertInput.data() + i*dim, src, dim * sizeof(float));
-                }
-
-                cords::ViewR inView(expertInput.data(), cords::ViewR::Extent{ (uint32_t)subBatch, (uint32_t)dim });
-                cords::ViewR outView(expertOutput.data(), cords::ViewR::Extent{ (uint32_t)subBatch, (uint32_t)dim });
-
-                // LATER pass a sub-workspace, but for now ... trust the expert.
-                m_experts[e]->forward(pool, inView, outView, ws);
-
-                // Scatter to PRIVATE buffer (No Atomics needed!)
-                for (int i = 0; i < subBatch; ++i) {
-                    const int row = tokens[i].row;
-                    const float weight = tokens[i].weight;
-                    const float *src = expertOutput.data() + i * dim;
-                    float *dst = localOutput + row * dim;
-
-                    if (weight == 1.0f){
-                        for (int d = 0; d < dim; ++d)
-                            dst[d] += src[d];
-                    } else {
-                        for (int d = 0; d < dim; ++d)
-                            dst[d] += src[d] * weight;
-                    }
-                }
-            });
-
-            // This is memory bound, parallelize over the whole tensor [Batch * Dim]
-            size_t totalElements = static_cast<size_t>(batch) * dim;
-
-            // block size for cache locality
-            size_t reduceBlock = 1024;
-
-            threads::parallel_for(pool, size_t{0}, (totalElements + reduceBlock - 1) / reduceBlock, [&](size_t blockIdx) {
-                size_t start = blockIdx * reduceBlock;
-                size_t end = std::min(start + reduceBlock, totalElements);
-
-                float *finalOut = output.data();
-
-                // For every element in this block
-                for (size_t i = start; i < end; ++i) {
-                    float sum = 0.0f;
-                    // Sum across all expert buffers
-                    for (uint32_t e = 0; e < m_cfg.numExperts; ++e) {
-                        float* expertBuf = freeMemBase + (e * floatsNeededPerExpert);
-                        sum += expertBuf[i];
-                    }
-                    finalOut[i] = sum;
-                }
-            });
-
-        } else {
-            JOB_LOG_WARN("[SparseMoE] Workspace too small for private buffers. Falling back to Atomics.");
-            threads::parallel_for(pool, size_t{0}, static_cast<size_t>(m_cfg.numExperts), [&](size_t eIdx) {
-                const int e = static_cast<int>(eIdx);
-                auto &tokens = buckets[e];
-
-                if (tokens.empty() || !m_experts[e])
-                    return;
-
-                const int subBatch = static_cast<int>(tokens.size());
-                std::vector<float, cords::AlignedAllocator<float, 64>> expertInput(subBatch * dim);
-                std::vector<float, cords::AlignedAllocator<float, 64>> expertOutput(subBatch * dim);
-
-                for (int i = 0; i < subBatch; ++i) {
-                    const float *src = input.data() + tokens[i].row * dim;
-                    std::memcpy(expertInput.data() + i*dim, src, dim * sizeof(float));
-                }
-
-                cords::ViewR inView(expertInput.data(), cords::ViewR::Extent{ (uint32_t)subBatch, (uint32_t)dim });
-                cords::ViewR outView(expertOutput.data(), cords::ViewR::Extent{ (uint32_t)subBatch, (uint32_t)dim });
-
-                m_experts[e]->forward(pool, inView, outView, ws);
-
-                for (int i = 0; i < subBatch; ++i) {
-                    const int row = tokens[i].row;
-                    const float weight = tokens[i].weight;
-                    const float *src = expertOutput.data() + i * dim;
-                    float *dst = output.data() + row * dim;
-
-                    for (int d = 0; d < dim; ++d) {
-                        float val = weight * src[d];
-                        comp::atomicAdd(dst[d], val);
-                    }
-                }
-            });
+        float *expertIn  = arena.allocFloats(std::size_t(T) * D);
+        float *expertOut = arena.allocFloats(std::size_t(T) * D);
+        if (!expertIn || !expertOut) {
+            // fallback path (atomics) or enlarge ws
+            // ...
+            return;
         }
+
+        std::vector<uint32_t> counts(E, 0);
+        for (uint32_t t = 0; t < T; ++t)
+            counts[plan.tokens[t].expert]++;
+
+        std::vector<uint32_t> expertBase(E + 1, 0);
+        for (uint32_t e = 0; e < E; ++e)
+            expertBase[e + 1] = expertBase[e] + counts[e];
+
+        std::vector<uint32_t> writeHead(E);
+        for (uint32_t e = 0; e < E; ++e)
+            writeHead[e] = expertBase[e];
+
+        std::vector<uint32_t> tokenIdxByExpert(T);
+        std::vector<uint32_t> localIndex(T);
+
+        for (uint32_t t = 0; t < T; ++t) {
+            uint32_t e = (uint32_t)plan.tokens[t].expert;
+            uint32_t pos = writeHead[e]++;
+            tokenIdxByExpert[pos] = t;
+            localIndex[t] = pos - expertBase[e];
+        }
+
+        // Per-row token list (<=K). Avoid atomics at the end.
+        std::vector<uint32_t> rowCount(B, 0);
+        std::vector<uint32_t> rowTok(std::size_t(B) * K, 0xFFFFFFFF);
+
+        for (uint32_t t = 0; t < T; ++t) {
+            uint32_t r = (uint32_t)plan.tokens[t].row;
+            uint32_t c = rowCount[r]++;
+            if (c < K)
+                rowTok[std::size_t(r) * K + c] = t;
+        }
+
+        // Experts in parallel (safe ONLY if experts don't use ws internally)
+        threads::parallel_for(pool, size_t{0}, size_t(E), [&](size_t eIdx) {
+            const uint32_t e = (uint32_t)eIdx;
+            if (!m_experts[e] || counts[e] == 0)
+                return;
+
+            const uint32_t nTok  = counts[e];
+            const uint32_t start = expertBase[e];
+
+            for (uint32_t i = 0; i < nTok; ++i) {
+                const uint32_t t = tokenIdxByExpert[start + i];
+                const uint32_t r = (uint32_t)plan.tokens[t].row;
+                std::memcpy(expertIn + std::size_t(start + i) * D,
+                            input.data() + std::size_t(r) * D,
+                            std::size_t(D) * sizeof(float));
+            }
+
+            cords::ViewR inV (expertIn  + std::size_t(start) * D, cords::ViewR::Extent{nTok, D});
+            cords::ViewR outV(expertOut + std::size_t(start) * D, cords::ViewR::Extent{nTok, D});
+
+            m_experts[e]->forward(pool, inV, outV, ws);
+        });
+
+        // Final combine (parallel over rows, no full reduction, no atomics)
+        threads::parallel_for(pool, size_t{0}, size_t(B), [&](size_t r) {
+            float* dst = output.data() + r * D;
+            // dst already zeroed; keep ?????
+
+            const uint32_t cnt = rowCount[(uint32_t)r];
+            for (uint32_t j = 0; j < cnt && j < K; ++j) {
+                const uint32_t t = rowTok[r*K + j];
+                if (t == 0xFFFFFFFF)
+                    continue;
+
+                const uint32_t e   = (uint32_t)plan.tokens[t].expert;
+                const uint32_t idx = expertBase[e] + localIndex[t];
+                const float* src   = expertOut + std::size_t(idx) * D;
+                const float w       = plan.tokens[t].weight;
+
+                if (w == 1.0f)
+                    for (uint32_t d = 0; d < D; ++d)
+                        dst[d] += src[d];
+                else
+                    for (uint32_t d = 0; d < D; ++d)
+                        dst[d] += src[d] * w;
+            }
+        });
     }
+
     cords::ViewR::Extent getOutputShape(const cords::ViewR::Extent &inputShape) const override
     {
         return inputShape;
@@ -342,8 +316,6 @@ public:
         const size_t tokensBytes = size_t(batch) * m_cfg.topK * sizeof(router::RouterToken);
 
         size_t bytes = logitsBytes + tokensBytes;
-
-        // Align up a bit (helps your AVX alignment habit)
         bytes = (bytes + 63) & ~size_t(63);
 
         // B) include it if we WANT the fast path
@@ -354,16 +326,11 @@ public:
         return bytes + privateBytes;
     }
 
-
     // Reset any internal state (KV cache, running stats, RNG state, etc.). when I get here ....
     void resetState() noexcept override
     {
             // FIXME LATER NOT NOW.
     }
-
-
-
-
 
 
 private:

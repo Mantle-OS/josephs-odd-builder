@@ -2,7 +2,6 @@
 
 #include <cstddef>
 #include <vector>
-
 #include "aligned_allocator.h"
 
 namespace job::ai::infer {
@@ -18,18 +17,43 @@ public:
         resize(sizeBytes);
     }
 
-    // resize workspace to hold (sizebytes / sizeof(float)) floats.
-    // this may grow or shrink the logical size; capacity is managed by std::vector.
+    // Resize to hold at least 'sizeBytes'.
+    // Aligns to float boundary.
     void resize(std::size_t sizeBytes)
     {
-        const std::size_t floatCount = sizeBytes / sizeof(float);
+        // Round up to next float
+        const std::size_t count = (sizeBytes + sizeof(float) - 1) / sizeof(float);
 
-        if (m_memory.capacity() >= floatCount)
-            return;
-
-        m_memory.resize(floatCount);
+        if (m_memory.size() != count)
+            m_memory.resize(count);
     }
 
+
+    // Returns the total size in BYTES.
+    // Matches ILayer::scratchSize().
+    [[nodiscard]] std::size_t size() const noexcept
+    {
+        return m_memory.size() * sizeof(float);
+    }
+
+    // Helper for math kernels that think in floats
+    [[nodiscard]] std::size_t floatCount() const noexcept
+    {
+        return m_memory.size();
+    }
+
+    // Raw float pointer (Start of memory)
+    float *raw() noexcept
+    {
+        return m_memory.data();
+    }
+
+    const float *raw() const noexcept
+    {
+        return m_memory.data();
+    }
+
+    // Ping-Pong Buffers (Half-Split)
     float *bufferA() noexcept
     {
         return m_memory.data();
@@ -37,12 +61,8 @@ public:
 
     float *bufferB() noexcept
     {
+        // Pointer arithmetic on float* handles the sizeof automatically
         return m_memory.data() + (m_memory.size() / 2);
-    }
-
-    float *raw() noexcept
-    {
-        return m_memory.data();
     }
 
     const float *bufferA() const noexcept
@@ -53,16 +73,6 @@ public:
     const float *bufferB() const noexcept
     {
         return m_memory.data() + (m_memory.size() / 2);
-    }
-
-    const float *raw() const noexcept
-    {
-        return m_memory.data();
-    }
-
-    [[nodiscard]] std::size_t size() const noexcept
-    {
-        return m_memory.size();
     }
 
 private:

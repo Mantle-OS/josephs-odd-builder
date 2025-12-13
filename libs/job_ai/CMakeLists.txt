@@ -214,6 +214,7 @@ set(JOBAI_EVO_SOURCES
 # infer
 set(JOBAI_INFER_HEADERS
     infer/workspace.h
+    infer/workspace_arena.h
     infer/runner.h              # way later
 )
 set(JOBAI_INFER_SOURCES
