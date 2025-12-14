@@ -6,115 +6,171 @@
 #include <catch2/benchmark/catch_benchmark.hpp>
 #endif
 
-#include <ctx/job_stealing_ctx.h>
+#include <job_stealing_ctx.h>
 
-#include "es_coach.h"
-#include "portal_evaluator.h"
-#include "layer_factory.h"
+// The New Architecture
+#include <es_coach.h>
+#include <learn_type.h>
+#include <layer_factory.h>
 
 using namespace job::ai;
 using namespace job::ai::coach;
 using namespace job::ai::evo;
 using namespace job::ai::layers;
+using namespace job::ai::learn;
+using namespace job::threads;
 
-// Helper to build variable size XOR-like brains
-Genome buildXORGenome(int hiddenSize = 8)
+// -----------------------------------------------------------------------------
+// HELPER: Build XOR Genome
+// -----------------------------------------------------------------------------
+Genome buildXORGenome()
 {
     Genome g;
-
-    // Layer 1: Input(2) -> Hidden(N)
+    // Layer 1: 2 -> 8 (Tanh is safer for small nets than ReLU)
     LayerGene l1{};
     l1.type = LayerType::Dense;
-    l1.activation = comp::ActivationType::ReLU;
+    l1.activation = comp::ActivationType::Tanh;
     l1.inputs = 2;
-    l1.outputs = hiddenSize;
-
-    l1.weightCount = (2 * hiddenSize) + hiddenSize;
+    l1.outputs = 8;
+    l1.weightCount = (2 * 8) + 8;
     l1.weightOffset = 0;
-
     g.architecture.push_back(l1);
 
-    // Layer 2: Hidden(N) -> Output(1)
+    // Layer 2: 8 -> 1 (Sigmoid)
     LayerGene l2{};
     l2.type = LayerType::Dense;
-    l2.activation = comp::ActivationType::Identity;
-    l2.inputs = hiddenSize;
+    l2.activation = comp::ActivationType::Sigmoid;
+    l2.inputs = 8;
     l2.outputs = 1;
-
-    l2.weightCount = (hiddenSize * 1) + 1;
-    l2.weightOffset = l1.weightOffset + l1.weightCount;
-
+    l2.weightCount = (8 * 1) + 1;
+    l2.weightOffset = l1.weightCount;
     g.architecture.push_back(l2);
 
-    // Resize and Randomize
-    size_t total = l1.weightCount + l2.weightCount;
-    g.weights.resize(total);
+    g.weights.resize(l1.weightCount + l2.weightCount);
     for(auto& w : g.weights)
-        w = ((rand() % 200) / 100.0f - 1.0f) * 0.5f;
+        w = ((rand() % 200) / 100.0f - 1.0f); // Range [-1.0, 1.0]
 
     return g;
 }
 
-
-TEST_CASE("Evolution: Solving XOR", "[coach][xor][usage]")
+// -----------------------------------------------------------------------------
+// HELPER: Build CartPole Genome (Robust Init)
+// -----------------------------------------------------------------------------
+Genome buildCartPoleGenome()
 {
-    JOB_LOG_INFO("Starting XOR Functional Test");
+    Genome g;
+    // Layer 1: 4 Inputs -> 32 Hidden
+    // Use Tanh. It behaves linearly near 0, preventing "Dead ReLU" on start.
+    LayerGene l1{};
+    l1.type = LayerType::Dense;
+    l1.activation = comp::ActivationType::Tanh;
+    l1.inputs = 4;
+    l1.outputs = 32;
+    l1.weightCount = (4 * 32) + 32; // Weights + Biases
+    l1.weightOffset = 0;
+    g.architecture.push_back(l1);
 
-    job::threads::JobStealerCtx ctx(8);
+    // Layer 2: 32 Hidden -> 2 Logits
+    LayerGene l2{};
+    l2.type = LayerType::Dense;
+    l2.activation = comp::ActivationType::Identity;
+    l2.inputs = 32;
+    l2.outputs = 2;
+    l2.weightCount = (32 * 2) + 2;
+    l2.weightOffset = l1.weightCount;
+    g.architecture.push_back(l2);
 
-    PortalEvaluator physics(ctx.pool);
-    physics.setDataset({
-        { {0.0f, 0.0f}, {0.0f} },
-        { {0.0f, 1.0f}, {1.0f} },
-        { {1.0f, 0.0f}, {1.0f} },
-        { {1.0f, 1.0f}, {0.0f} }
-    });
+    g.weights.resize(l1.weightCount + l2.weightCount);
 
-    Genome seed = buildXORGenome(8);
+    // Wider initialization to ensure we don't start with 0 output
+    for(auto& w : g.weights)
+        w = ((rand() % 200) / 100.0f - 1.0f) * 1.0f; // Range [-1.0, 1.0]
+
+    return g;
+}
+
+// -----------------------------------------------------------------------------
+// TESTS
+// -----------------------------------------------------------------------------
+
+TEST_CASE("ESCoach: Solves XOR", "[ai][coach][es][xor]")
+{
+    JobStealerCtx ctx(8);
+
+    Genome parent = buildXORGenome();
 
     ESCoach::Config cfg;
-    cfg.populationSize = 512;
+    cfg.populationSize = 128;
     cfg.sigma = 0.1f;
     cfg.decay = 0.99f;
+    cfg.taskType = LearnType::XOR;
+    cfg.memLimitMB = 1;
 
     ESCoach coach(ctx.pool, cfg);
 
     float bestFit = 0.0f;
-    const int generations = 100;
+    for(int i = 0; i < 100; ++i) {
+        coach.coach((i == 0) ? parent : coach.bestGenome());
+        bestFit = coach.currentBestFitness();
+        if (bestFit > 0.98f) break;
+    }
 
-    for (int i = 0; i < generations; ++i) {
-        coach.coach(
-            (i == 0) ? seed : coach.bestGenome(),
-            physics.portal()
-            );
+    INFO("Final XOR Fitness: " << bestFit);
+    REQUIRE(bestFit > 0.90f);
+}
+
+TEST_CASE("ESCoach: Masters CartPole", "[ai][coach][es][cartpole]")
+{
+    JobStealerCtx ctx(8);
+
+    Genome parent = buildCartPoleGenome();
+
+    ESCoach::Config cfg;
+    cfg.populationSize = 128; // Decent population size
+    cfg.sigma = 0.2f;         // HIGHER SIGMA to break out of "suicide" mode
+    cfg.decay = 0.99f;        // Anneal gently
+    cfg.taskType = LearnType::CartPole;
+    cfg.memLimitMB = 1;
+
+    ESCoach coach(ctx.pool, cfg);
+
+    float bestFit = 0.0f;
+    int solvedGen = -1;
+
+    for(int i = 0; i < 100; ++i) { // Give it 100 gens
+        coach.coach((i == 0) ? parent : coach.bestGenome());
 
         bestFit = coach.currentBestFitness();
 
-        if (bestFit > 0.95f) {
-            JOB_LOG_INFO("XOR Solved at Gen {} Score: {}", i, bestFit);
+        if (bestFit >= 490.0f) {
+            solvedGen = i;
             break;
         }
     }
 
-    REQUIRE(bestFit > 0.85f);
+    if (solvedGen != -1) {
+        JOB_LOG_INFO("CartPole Solved at Gen {} | Score: {}", solvedGen, bestFit);
+    } else {
+        JOB_LOG_WARN("CartPole Best Run: {}", bestFit);
+    }
+
+    // Even if not perfect 500, it should be well above random (20)
+    REQUIRE(bestFit > 100.0f);
 }
-
-
-TEST_CASE("Evolution: Edge Cases (Single Survivor)", "[coach][xor][edge]")
+TEST_CASE("Evolution: Edge Cases (Single Thread / Pop 1)", "[coach][edge]")
 {
-    job::threads::JobStealerCtx ctx(1);
-    PortalEvaluator physics(ctx.pool);
-    physics.setDataset({ {{0.0f, 0.0f}, {0.0f}} });
+    job::threads::JobStealerCtx ctx(1); // Single thread
 
-    Genome seed = buildXORGenome(4);
     ESCoach::Config cfg;
     cfg.populationSize = 1;
     cfg.sigma = 0.5f;
+    cfg.taskType = LearnType::XOR;
 
     ESCoach coach(ctx.pool, cfg);
+    Genome seed = buildXORGenome();
 
-    // Should not crash
-    Genome survivor = coach.coach(seed, physics.portal());
+    // Should run without crashing
+    Genome survivor = coach.coach(seed);
 
     REQUIRE(survivor.weights.size() == seed.weights.size());
     REQUIRE(coach.generation() == 1);
@@ -122,36 +178,28 @@ TEST_CASE("Evolution: Edge Cases (Single Survivor)", "[coach][xor][edge]")
 
 #ifdef JOB_TEST_BENCHMARKS
 
-TEST_CASE("Evolution: Throughput Benchmarks", "[coach][benchmark]")
+TEST_CASE("Evolution: Flywheel Throughput", "[coach][benchmark]")
 {
-    job::threads::JobStealerCtx ctx(8); // 8 Cores for Evolution
-    PortalEvaluator physics(nullptr);
-    physics.setDataset({
-        { {0.0f, 0.0f}, {0.0f} },
-        { {0.0f, 1.0f}, {1.0f} },
-        { {1.0f, 0.0f}, {1.0f} },
-        { {1.0f, 1.0f}, {0.0f} }
-    });
+    job::threads::JobStealerCtx ctx(8);
 
-    Genome seed = buildXORGenome(8);
-    BENCHMARK("Evolution Step (Pop=4096, Tiny Net)") {
+    // Benchmark XOR (High Frequency, Small Net)
+    Genome xorSeed = buildXORGenome();
+    BENCHMARK("XOR (Pop=4096)") {
         ESCoach::Config cfg;
         cfg.populationSize = 4096;
-        cfg.sigma = 0.1f;
-
+        cfg.taskType = LearnType::XOR;
         ESCoach coach(ctx.pool, cfg);
-        return coach.coach(seed, physics.portal());
+        return coach.coach(xorSeed);
     };
 
-    // The Big Brain
-    Genome fatSeed = buildXORGenome(256);
-    BENCHMARK("Evolution Step (Pop=512, Wide Net[256])") {
+    // Benchmark CartPole (Physics + Inference)
+    Genome cartSeed = buildCartPoleGenome();
+    BENCHMARK("CartPole (Pop=1024)") {
         ESCoach::Config cfg;
-        cfg.populationSize = 512;
-        cfg.sigma = 0.1f;
-
+        cfg.populationSize = 1024;
+        cfg.taskType = LearnType::CartPole;
         ESCoach coach(ctx.pool, cfg);
-        return coach.coach(fatSeed, physics.portal());
+        return coach.coach(cartSeed);
     };
 }
 

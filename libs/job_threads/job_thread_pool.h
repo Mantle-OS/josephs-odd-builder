@@ -73,41 +73,6 @@ public:
         return result;
     }
 
-
-
-    // template <typename Func, typename... Args>
-    // auto submit(JobIDescriptor::Ptr desc, Func &&f, Args &&...args) -> std::future<std::invoke_result_t<Func, Args...>>
-    // {
-    //     using ReturnType = std::invoke_result_t<Func, Args...>;
-
-    //     if (m_stopping.load() || !m_scheduler) {
-    //         JOB_LOG_ERROR("[ThreadPool] Stopping or no scheduler, cannot submit new tasks");
-    //         return {};
-    //     }
-
-    //     if (!m_scheduler->admit(m_workers.size(), *desc)) {
-    //         JOB_LOG_WARN("[ThreadPool] Scheduler rejected task ID {}", desc->id());
-    //         // invalid future to signal rejection/BAD
-    //         return {};
-    //     }
-    //     auto task = std::make_shared<std::packaged_task<ReturnType()>>(
-    //         std::bind(std::forward<Func>(f), std::forward<Args>(args)...)
-    //         );
-    //     std::future<ReturnType> result = task->get_future();
-
-    //     uint64_t id = desc->id();
-
-    //     {
-    //         std::lock_guard<std::mutex> lock(m_storageMutex);
-    //         m_taskStorage[id] = [task](){ (*task)(); };
-    //     }
-
-    //     m_scheduler->enqueue(std::move(desc));
-    //     m_workerCondition.notify_one();
-
-    //     return result;
-    // }
-
     template <typename Func, typename... Args>
     auto submit(int priority, Func &&f, Args &&...args) -> std::future<std::invoke_result_t<Func, Args...>>
     {
@@ -158,20 +123,15 @@ private:
     std::array<TaskShard, kShardCount> m_taskShards;
 
     // Helper to pick the right bucket
-    TaskShard& getShard(uint64_t taskId)
+    TaskShard &getShard(uint64_t taskId)
     {
         // Simple hash: ID modulo Count
         return m_taskShards[taskId % kShardCount];
     }
-    // mutable std::mutex                          m_storageMutex;
-    // std::condition_variable                     m_workerCondition;
-    // std::unordered_map<uint64_t, TaskFunction>  m_taskStorage;
-    // std::atomic<int>                            m_progress{0};
 
     JobSem m_workSemaphore;
     std::atomic<int> m_progress{0};
     std::atomic<double> m_loadAvg{0.0};
-
 
     std::vector<JobThread::Ptr>                 m_workers;
     ISchedPolicy::Ptr                           m_scheduler;

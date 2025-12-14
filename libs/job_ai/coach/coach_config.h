@@ -1,14 +1,17 @@
 #pragma once
+#include "learn_type.h"
 #include <cstddef>
 #include <cstdint>
 
 namespace job::ai::coach {
 
 struct ESConfig {
-    size_t      populationSize      = 64;       // Matches thread count usually
-    float       sigma               = 0.02f;    // Mutation strength (Learning Rate)
-    float       decay               = 0.99f;    // Sigma decay per generation (Annealing)
-    uint64_t    seed                = 0;        // 0 = Random Device
+    size_t              populationSize      = 64;                       // Matches thread count usually
+    float               sigma               = 0.02f;                    // Mutation strength (Learning Rate)
+    float               decay               = 0.99f;                    // Sigma decay per generation (Annealing)
+    uint64_t            seed                = 0;                        // 0 = Random Device
+    learn::LearnType    taskType            = learn::LearnType::XOR;    // What type od learner the Coach is going to use
+    uint8_t             memLimitMB          = 1;                        // The MB for the wordkspace when creating the leaner for the runner.
 
     [[nodiscard]] inline bool validate(const ESConfig &cfg) noexcept
     {

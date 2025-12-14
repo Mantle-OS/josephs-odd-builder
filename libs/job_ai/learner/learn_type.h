@@ -1,12 +1,13 @@
 #pragma once
 #include <cstdint>
-namespace job::ai::learner {
+namespace job::ai::learn {
 
-enum class LearnerType : uint8_t {
+enum class LearnType : uint8_t {
     None        = 0,
     XOR         = 1,
     CartPole    = 2,
-    Portal      = 3
+    Portal      = 3,
+    Bard        = 4
 };
 
 }

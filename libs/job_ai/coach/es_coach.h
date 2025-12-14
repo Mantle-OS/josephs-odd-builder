@@ -13,6 +13,7 @@
 #include "icoach.h"
 #include "coach_types.h"
 #include "coach_config.h"
+#include "learn_factory.h"
 #include "mutator.h"
 #include "population.h"
 
@@ -27,6 +28,8 @@ public:
         m_config(cfg),
         m_mutator()
     {
+
+        m_guiLearner = learn::makeLearner(m_config.taskType, m_pool);
         resizePopulation(cfg.populationSize);
     }
 
@@ -66,11 +69,9 @@ public:
         return m_bestFitness;
     }
 
-evo::Genome coach(const evo::Genome &parent, Evaluator eval) override
+evo::Genome coach(const evo::Genome &parent) override
 {
         m_generation++;
-
-        // Annealing
         if (m_config.decay < 1.0f && m_config.decay > 0.0f)
             m_config.sigma *= m_config.decay;
 
@@ -79,16 +80,18 @@ evo::Genome coach(const evo::Genome &parent, Evaluator eval) override
             resizePopulation(popSize);
 
         threads::parallel_for(*m_pool, size_t{0}, popSize, [&](size_t i) {
-            evo::Genome &mutant = m_population.genome(i);
-            mutant = parent;
-            evo::Mutator localMutator;
-            // evo::Mutator localMutator(m_generation * popSize + i);
-            localMutator.seed(m_generation * popSize + i); // This still does not seem global !
-            localMutator.perturb(mutant, m_config.sigma);
+            learn::ILearn* worker = getLearnerForThread();
+            float score = -1000.0f;
+            if (worker) {
+                evo::Genome &mutant = m_population.genome(i);
+                mutant = parent;
 
-            float score = eval(mutant);
-            // float score = m_learn.learn(mutant);
+                evo::Mutator localMutator;
+                localMutator.seed(m_generation * popSize + i);
+                localMutator.perturb(mutant, m_config.sigma);
 
+                score = worker->learn(mutant, m_config.memLimitMB);
+            }
             m_population.setFitness(i, score);
         });
 
@@ -121,23 +124,51 @@ evo::Genome coach(const evo::Genome &parent, Evaluator eval) override
         return m_population.genome(m_currentBestIdx);
     }
 
+    [[nodiscard]] learn::ILearn* learner() override
+    {
+        return m_guiLearner.get();
+    }
 
 private:
+
+
+    // Helper: Find or Create a learner for the calling thread
+    learn::ILearn* getLearnerForThread() {
+        auto id = std::this_thread::get_id();
+        std::lock_guard<std::mutex> lock(m_registryMutex);
+
+        auto it = m_registry.find(id);
+        if (it != m_registry.end())
+            return it->second.get();
+
+        auto newLearner = learn::makeLearner(m_config.taskType, m_pool);
+        learn::ILearn* ptr = newLearner.get();
+        m_registry[id] = std::move(newLearner);
+        return ptr;
+    }
+
+
     void resizePopulation(size_t size) {
         m_population.clear();
         for(size_t i=0; i<size; ++i)
             m_population.addGenome(evo::Genome{});
     }
 
-    threads::ThreadPool::Ptr    m_pool;
-    Config                      m_config;
-    evo::Mutator                m_mutator;
-    evo::Population             m_population;
-    OptimizationMode            m_optMode{OptimizationMode::Maximize};
-    size_t                      m_generation{0};
-    float                       m_bestFitness{0.0f};
-    size_t                      m_currentBestIdx{0};
-    std::string                 m_coachName{"EvolutionStrategy (1, Lambda)"};
+    threads::ThreadPool::Ptr                                    m_pool;
+    Config                                                      m_config;
+    evo::Mutator                                                m_mutator;
+    evo::Population                                             m_population;
+    OptimizationMode                                            m_optMode{OptimizationMode::Maximize};
+    size_t                                                      m_generation{0};
+    float                                                       m_bestFitness{0.0f};
+    size_t                                                      m_currentBestIdx{0};
+    std::string                                                 m_coachName{"EvolutionStrategy (1, Lambda)"};
+    std::unordered_map<std::thread::id, learn::ILearn::UPtr>    m_registry;
+    std::mutex                                                  m_registryMutex;
+    learn::ILearn::UPtr                                         m_guiLearner;
+
+
+
 };
 
 } // namespace job::ai::coach

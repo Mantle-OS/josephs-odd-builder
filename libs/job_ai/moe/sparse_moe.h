@@ -27,13 +27,14 @@
 #include "abstract_layer.h"
 #include "iparamgroup.h"
 #include "workspace.h" // The Zero-Alloc Memory Bank
+#include "workspace_arena.h"
+#include "workspace_view.h"
 
 // Compute
 #include "noise_table.h"
 #include "gemm.h"
 #include "activation_math.h"
 #include "atomic_math.h"
-#include "workspace_arena.h"
 
 namespace job::ai::moe {
 using namespace job::ai::layers;
@@ -47,8 +48,16 @@ public:
         m_cfg.numExperts = numExperts;
         m_cfg.topK = topk;
 
+        // Cold Start Allocation
         m_gateWeights.resize(inputDim * numExperts);
+        m_gateWeightsPtr = m_gateWeights.data(); // Point to internal
+
         m_experts.resize(numExperts);
+    }
+
+    void setLoadBalancing(router::LoadBalanceStrategy strategy) override
+    {
+        m_routerCfg.lbStrategy = strategy;
     }
 
     void addExpert(uint32_t id, AbstractLayer::Ptr expert) override
@@ -67,68 +76,92 @@ public:
         m_routerCfg.type = type;
     }
 
-    void setLoadBalancing(router::LoadBalanceStrategy strategy) override
+    router::RouterPlan route(job::threads::ThreadPool &pool,
+                             const cords::ViewR &input,
+                             infer::Workspace &ws,
+                             std::vector<float> *maybeGateLogits) override
     {
-        m_routerCfg.lbStrategy = strategy;
-    }
+        const int batch   = (int)input.extent()[0];
+        const int dim     = (int)input.extent()[1];
+        const int experts = (int)m_cfg.numExperts;
 
-    router::RouterPlan route(threads::ThreadPool &pool, const cords::ViewR &input,
-                             infer::Workspace &ws, std::vector<float> *maybeGateLogits) override
-    {
-        const int batch = input.extent()[0];
-        const int dim   = input.extent()[1];
-        size_t logitCount = batch * m_cfg.numExperts;
-        float *logitsPtr = ws.raw();
+        const std::size_t logitCount = (std::size_t)batch * (std::size_t)experts;
+        const std::size_t logitsBytes = logitCount * sizeof(float);
 
-        // Note: In a "real stack", I'd advance the WS pointer. For now, assume I own the start of WS.
+        // capacity we promise to the router
+        // TopK is clamped internally to 16 in routeTopK()
+        const int kCap = (m_routerCfg.type == router::RouterType::TopK) ?
+                             std::min((int)m_routerCfg.topK, 16) :
+                             (int)m_routerCfg.topK;
 
-        // TopK
+        const std::size_t tokenCap = (std::size_t)batch * (std::size_t)kCap;
+        const std::size_t tokensBytesCap = tokenCap * sizeof(router::RouterToken);
+
+        // Layout inside ws
+        std::byte *base = reinterpret_cast<std::byte*>(ws.raw());
+        float *logitsPtr = reinterpret_cast<float*>(base);
+
+        // align token start
+        std::size_t tokenOffset = infer::WorkspaceArena::align_up(logitsBytes, alignof(router::RouterToken));
+        router::RouterToken *tokenStore = reinterpret_cast<router::RouterToken*>(base + tokenOffset);
+
+        // total reserved bytes
+        std::size_t reservedBytes = tokenOffset + tokensBytesCap;
+
+        // Ensure ws big enough (optional: assert only, or grow once per forward)
+        if (ws.size() < reservedBytes) {
+            ws.resize(reservedBytes);
+            base = reinterpret_cast<std::byte*>(ws.raw());
+            logitsPtr = reinterpret_cast<float*>(base);
+            tokenStore = reinterpret_cast<router::RouterToken*>(base + tokenOffset);
+            // ws.resize preserves tokenOffset validity because tokenOffset is an integer byte offset
+        }
+
+        // TopK logits generation (writes logitsPtr[logitCount])
         if (m_routerCfg.type == router::RouterType::TopK) {
             cords::Matrix A(const_cast<float*>(input.data()), batch, dim);
-            cords::Matrix W(m_gateWeights.data(), dim, m_cfg.numExperts);
-            cords::Matrix G(logitsPtr, batch, m_cfg.numExperts);
 
+            // USE THE HOT POINTER
+            cords::Matrix W(m_gateWeightsPtr, dim, experts);
+
+            cords::Matrix G(logitsPtr, batch, experts);
+            comp::sgemm_parallel(pool, A, W, G);
             comp::sgemm_parallel(pool, A, W, G);
 
-            // noise
             if (!m_routerCfg.deterministic) {
                 uint64_t fastSeed = (uint64_t)input.data() ^ 0xDEADBEEF;
                 comp::NoiseTable::instance().perturb(logitsPtr, logitCount, fastSeed, 1.0f);
             }
         }
 
-        size_t maxTokens = batch * m_routerCfg.topK;
-        [[maybe_unused]] size_t usedBytes = (logitCount * sizeof(float)) + (maxTokens * sizeof(router::RouterToken));
-        assert(usedBytes <= ws.size() * sizeof(float) && "Workspace overflow!");
-
-        float *tokenRawPtr = logitsPtr + logitCount;
-
-        // cast to RouterToken*
-        router::RouterToken* tokenStore = reinterpret_cast<router::RouterToken*>(tokenRawPtr);
         router::RouterPlan plan;
-
         switch (m_routerCfg.type) {
         case router::RouterType::TopK:
-            plan = router::routeTopK(m_routerCfg, batch, m_cfg.numExperts, logitsPtr, tokenStore);
+            plan = router::routeTopK(m_routerCfg, batch, experts, logitsPtr, tokenStore);
             break;
         case router::RouterType::Hash:
-            plan = router::routeHash(m_routerCfg, batch, m_cfg.numExperts, input, tokenStore);
+            plan = router::routeHash(m_routerCfg, batch, experts, input, tokenStore);
             break;
         case router::RouterType::Spatial:
             plan = router::routeSpatial(m_routerCfg, batch, input, tokenStore);
             break;
         case router::RouterType::State:
-            plan = router::routeState(m_routerCfg, batch, m_cfg.numExperts, tokenStore);
+            plan = router::routeState(m_routerCfg, batch, experts, tokenStore);
             break;
         }
 
+        // optional debug sanity: plan.tokenCount must fit the reserved buffer
+        assert(plan.tokenCount <= tokenCap && "Router wrote more tokens than capacity!");
+
         if (maybeGateLogits) {
             maybeGateLogits->resize(logitCount);
-            std::memcpy(maybeGateLogits->data(), logitsPtr, logitCount * sizeof(float));
+            std::memcpy(maybeGateLogits->data(), logitsPtr, logitsBytes);
         }
 
         return plan;
     }
+
+
     void forward(job::threads::ThreadPool &pool,
                  const cords::ViewR &input,
                  cords::ViewR &output,
@@ -137,100 +170,134 @@ public:
         const uint32_t B = input.extent()[0];
         const uint32_t D = input.extent()[1];
         const uint32_t E = m_cfg.numExperts;
-        const uint32_t K = m_cfg.topK;
+
+        const int kCap = (m_routerCfg.type == router::RouterType::TopK) ?
+                             std::min<int>(m_routerCfg.topK, 16) : int(m_routerCfg.topK);
+
+        const uint32_t T_max = B * kCap;
+
+        const std::size_t logitsBytes = std::size_t(B) * E * sizeof(float);
+        const std::size_t tokenOffset = infer::WorkspaceArena::align_up(logitsBytes, alignof(router::RouterToken));
+        const std::size_t routeBytes  = tokenOffset + (std::size_t(T_max) * sizeof(router::RouterToken));
+
+        const std::size_t expertInBytes  = std::size_t(T_max) * D * sizeof(float);
+        const std::size_t expertOutBytes = std::size_t(T_max) * D * sizeof(float);
+
+        std::size_t maxExpertScratch = 0;
+        for(auto &ex : m_experts)
+            if(ex)
+                maxExpertScratch = std::max(maxExpertScratch, ex->scratchSize({T_max, D}));
+
+        maxExpertScratch = infer::WorkspaceArena::align_up(maxExpertScratch, 64);
+
+        const std::size_t totalBytesNeeded =
+            infer::WorkspaceArena::align_up(routeBytes, 64) +
+            infer::WorkspaceArena::align_up(expertInBytes, 64) +
+            infer::WorkspaceArena::align_up(expertOutBytes, 64) +
+            (std::size_t(E) * maxExpertScratch);
+
+        if (ws.size() < totalBytesNeeded)
+            ws.resize(totalBytesNeeded);
 
         std::memset(output.data(), 0, std::size_t(B) * D * sizeof(float));
 
-        // Route (assume route writes logits+tokens into ws and returns non-owning plan.tokens)
         auto plan = route(pool, input, ws, nullptr);
-        const uint32_t T = (uint32_t)plan.tokenCount;
+        const uint32_t T = static_cast<uint32_t>(plan.tokenCount);
 
-        // Arena starts AFTER routing storage (logits + tokens)
         infer::WorkspaceArena arena{ws};
-        arena.cursorBytes = infer::WorkspaceArena::align_up(
-            std::size_t(B) * E * sizeof(float) + std::size_t(T) * sizeof(router::RouterToken),
-            64
-            );
+
+        // Skip past the routing data
+        arena.cursorBytes = infer::WorkspaceArena::align_up(routeBytes, 64);
 
         float *expertIn  = arena.allocFloats(std::size_t(T) * D);
         float *expertOut = arena.allocFloats(std::size_t(T) * D);
-        if (!expertIn || !expertOut) {
-            // fallback path (atomics) or enlarge ws
-            // ...
-            return;
+
+        // scratch window base
+        std::byte *scratchBase = nullptr;
+        if (maxExpertScratch > 0) {
+            scratchBase = arena.allocBytes(std::size_t(E) * maxExpertScratch, 64);
         }
 
+        // CSR: Histogram -> Prefix Sum -> Index Fill
         std::vector<uint32_t> counts(E, 0);
-        for (uint32_t t = 0; t < T; ++t)
-            counts[plan.tokens[t].expert]++;
+        for (uint32_t t = 0; t < T; ++t) counts[(uint32_t)plan.tokens[t].expert]++;
 
         std::vector<uint32_t> expertBase(E + 1, 0);
         for (uint32_t e = 0; e < E; ++e)
             expertBase[e + 1] = expertBase[e] + counts[e];
 
-        std::vector<uint32_t> writeHead(E);
-        for (uint32_t e = 0; e < E; ++e)
-            writeHead[e] = expertBase[e];
-
+        std::vector<uint32_t> writeHead = expertBase;
         std::vector<uint32_t> tokenIdxByExpert(T);
-        std::vector<uint32_t> localIndex(T);
+        std::vector<uint32_t> packedPosOfToken(T);
 
         for (uint32_t t = 0; t < T; ++t) {
-            uint32_t e = (uint32_t)plan.tokens[t].expert;
-            uint32_t pos = writeHead[e]++;
+            const uint32_t e = (uint32_t)plan.tokens[t].expert;
+            const uint32_t pos = writeHead[e]++;
             tokenIdxByExpert[pos] = t;
-            localIndex[t] = pos - expertBase[e];
+            packedPosOfToken[t] = pos;
         }
 
-        // Per-row token list (<=K). Avoid atomics at the end.
-        std::vector<uint32_t> rowCount(B, 0);
-        std::vector<uint32_t> rowTok(std::size_t(B) * K, 0xFFFFFFFF);
-
-        for (uint32_t t = 0; t < T; ++t) {
-            uint32_t r = (uint32_t)plan.tokens[t].row;
-            uint32_t c = rowCount[r]++;
-            if (c < K)
-                rowTok[std::size_t(r) * K + c] = t;
-        }
-
-        // Experts in parallel (safe ONLY if experts don't use ws internally)
         threads::parallel_for(pool, size_t{0}, size_t(E), [&](size_t eIdx) {
             const uint32_t e = (uint32_t)eIdx;
-            if (!m_experts[e] || counts[e] == 0)
+            const uint32_t nTok = counts[e];
+            if (!m_experts[e] || nTok == 0)
                 return;
 
-            const uint32_t nTok  = counts[e];
             const uint32_t start = expertBase[e];
+            float *myIn  = expertIn  + std::size_t(start) * D;
+            float *myOut = expertOut + std::size_t(start) * D;
 
+            // Gather
             for (uint32_t i = 0; i < nTok; ++i) {
                 const uint32_t t = tokenIdxByExpert[start + i];
                 const uint32_t r = (uint32_t)plan.tokens[t].row;
-                std::memcpy(expertIn + std::size_t(start + i) * D,
+                std::memcpy(myIn + std::size_t(i) * D,
                             input.data() + std::size_t(r) * D,
                             std::size_t(D) * sizeof(float));
             }
 
-            cords::ViewR inV (expertIn  + std::size_t(start) * D, cords::ViewR::Extent{nTok, D});
-            cords::ViewR outV(expertOut + std::size_t(start) * D, cords::ViewR::Extent{nTok, D});
+            cords::ViewR inV (myIn,  cords::ViewR::Extent{nTok, D});
+            cords::ViewR outV(myOut, cords::ViewR::Extent{nTok, D});
 
-            m_experts[e]->forward(pool, inV, outV, ws);
+            if (scratchBase) {
+                // This prevents the expert from seeing (or ruining) the rest of the workspace.
+                float *myScratch = reinterpret_cast<float*>(scratchBase + std::size_t(e) * maxExpertScratch);
+                infer::Workspace localWs(myScratch, maxExpertScratch);
+                m_experts[e]->forward(pool, inV, outV, localWs);
+            } else {
+                // No scratch needed (or Dense layer), pass root (safe-ish) or empty view
+                // Ideally passing 'ws' is safe if maxExpertScratch was 0.
+                m_experts[e]->forward(pool, inV, outV, ws);
+            }
         });
 
-        // Final combine (parallel over rows, no full reduction, no atomics)
-        threads::parallel_for(pool, size_t{0}, size_t(B), [&](size_t r) {
-            float* dst = output.data() + r * D;
-            // dst already zeroed; keep ?????
+        // CSR for Rows
+        std::vector<uint32_t> rowCount(B, 0);
+        std::vector<uint32_t> rowTok(std::size_t(B) * kCap, 0xFFFFFFFFu);
 
-            const uint32_t cnt = rowCount[(uint32_t)r];
-            for (uint32_t j = 0; j < cnt && j < K; ++j) {
-                const uint32_t t = rowTok[r*K + j];
-                if (t == 0xFFFFFFFF)
+        for (uint32_t t = 0; t < T; ++t) {
+            const uint32_t r = (uint32_t)plan.tokens[t].row;
+            const uint32_t c = rowCount[r]++;
+            if (c < (uint32_t)kCap)
+                rowTok[std::size_t(r) * kCap + c] = t;
+        }
+
+        threads::parallel_for(pool, size_t{0}, size_t(B), [&](size_t rr) {
+            const uint32_t r = (uint32_t)rr;
+            const uint32_t cnt = rowCount[r];
+            if (cnt == 0)
+                return;
+
+            float *dst = output.data() + std::size_t(r) * D;
+
+            for (uint32_t j = 0; j < cnt && j < (uint32_t)kCap; ++j) {
+                const uint32_t t = rowTok[std::size_t(r) * kCap + j];
+                if (t == 0xFFFFFFFFu)
                     continue;
 
-                const uint32_t e   = (uint32_t)plan.tokens[t].expert;
-                const uint32_t idx = expertBase[e] + localIndex[t];
-                const float* src   = expertOut + std::size_t(idx) * D;
-                const float w       = plan.tokens[t].weight;
+                const uint32_t pos = packedPosOfToken[t];
+                const float *src = expertOut + std::size_t(pos) * D;
+                const float w = plan.tokens[t].weight;
 
                 if (w == 1.0f)
                     for (uint32_t d = 0; d < D; ++d)
@@ -238,9 +305,11 @@ public:
                 else
                     for (uint32_t d = 0; d < D; ++d)
                         dst[d] += src[d] * w;
+
             }
         });
     }
+
 
     cords::ViewR::Extent getOutputShape(const cords::ViewR::Extent &inputShape) const override
     {
@@ -286,44 +355,60 @@ public:
         return m_gateWeights.size();
     }
 
-
     void loadWeights(float *weights) override
     {
         float *p = weights;
+
+        // Router Flywheel: Swap the pointer!
+        m_gateWeightsPtr = p;
+
+        // Advance past router weights
         const size_t gateCount = size_t(m_inputDim) * m_cfg.numExperts;
-        std::memcpy(m_gateWeights.data(), p, gateCount * sizeof(float));
         p += gateCount;
 
+        // Recursive Load
         for (uint32_t i = 0; i < m_cfg.numExperts; ++i) {
             if (!m_experts[i])
                 continue;
 
+            // Pass the hot pointer to the expert (it will swap its own internals)
             m_experts[i]->loadWeights(p);
 
-            // advance by what that expert expects
+            // Advance by what that expert consumes
             p += m_experts[i]->parameterCount();
         }
     }
 
-    // the size of the scratch pad.
     [[nodiscard]] size_t scratchSize(const cords::ViewR::Extent &extent) const override
     {
-        // Expect [batch, dim]
         const uint32_t batch = extent.rank() >= 1 ? extent[0] : 0;
         const uint32_t dim   = extent.rank() >= 2 ? extent[1] : 0;
 
         const size_t logitsBytes = size_t(batch) * m_cfg.numExperts * sizeof(float);
-        const size_t tokensBytes = size_t(batch) * m_cfg.topK * sizeof(router::RouterToken);
+
+        // Clamp K (Matches forward logic)
+        const int kCap = (m_routerCfg.type == router::RouterType::TopK) ?
+                             std::min<int>(m_routerCfg.topK, 16) : int(m_routerCfg.topK);
+
+        const size_t tokensBytes = size_t(batch) * kCap * sizeof(router::RouterToken);
 
         size_t bytes = logitsBytes + tokensBytes;
         bytes = (bytes + 63) & ~size_t(63);
 
-        // B) include it if we WANT the fast path
-        // scratchSize to mean "minimum required" ? Then we can drop that
-        const size_t privateBytes =
-            size_t(batch) * dim * m_cfg.numExperts * sizeof(float);
+        // OPTIMIZATION: Only reserve space for active tokens (TopK), not all Experts
+        // We need Input + Output buffers for the active tokens
+        const size_t ioBytes = size_t(batch) * kCap * dim * 2 * sizeof(float);
 
-        return bytes + privateBytes;
+        // We also need scratch windows for the experts.
+        // We can't easily know maxExpertScratch here without iterating experts,
+        // so a safe overestimate is (Batch * TopK * D) * Experts? No, too big.
+        // Let's stick to your safe logic or just add a margin.
+
+        // Your existing logic:
+        // const size_t privateBytes = size_t(batch) * dim * m_cfg.numExperts * sizeof(float);
+
+        // Tighter logic matching forward():
+        return bytes + ioBytes + (ioBytes / 2); // Heuristic margin
     }
 
     // Reset any internal state (KV cache, running stats, RNG state, etc.). when I get here ....
@@ -337,7 +422,16 @@ private:
     router::RouterConfig                                        m_routerCfg;
     [[maybe_unused]]uint32_t                                    m_inputDim{0}; // asserts only
     std::vector<float, cords::AlignedAllocator<float, 64>>      m_gateWeights;
+    float                                                       *m_gateWeightsPtr{nullptr};
     std::vector<AbstractLayer::Ptr>                             m_experts;
+
+
+    // // 1. Owns memory for Cold Start / Default Init
+    // std::vector<float, cords::AlignedAllocator<float, 64>> m_gateStorage;
+
+    // // 2. The Hot Pointer (Points to m_gateStorage initially, then to Genome)
+
+
 };
 
 } // namespace job::ai::moe

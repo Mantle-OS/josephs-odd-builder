@@ -5,6 +5,7 @@
 #include <string>
 
 #include "coach_types.h"
+#include "ilearn.h"
 #include "genome.h"
 
 namespace job::ai::coach {
@@ -17,16 +18,16 @@ public:
     [[nodiscard]] virtual CoachType type() const noexcept = 0;
     [[nodiscard]] virtual std::string &name() noexcept = 0;
 
-    using Evaluator = std::function<float(const evo::Genome&)>; // TODO(Stage 3) this should not be a function and should come from its own module "learn"
-
     virtual void setPopulationSize(size_t size) noexcept = 0;
     virtual void setMutationRate(float rate) noexcept = 0;
     virtual void setMode(OptimizationMode mode) noexcept = 0;
 
-    [[nodiscard]] virtual evo::Genome coach(const evo::Genome &parent, Evaluator eval) = 0;
+    [[nodiscard]] virtual evo::Genome coach(const evo::Genome &parent) = 0;
 
     [[nodiscard]] virtual size_t generation() const noexcept = 0;
     [[nodiscard]] virtual float currentBestFitness() const noexcept = 0;
+
+    [[nodiscard]] virtual learn::ILearn* learner() = 0;
 };
 
 } // namespace job::ai::coach

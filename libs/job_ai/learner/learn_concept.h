@@ -2,21 +2,35 @@
 
 #include <concepts>
 #include <string>
-
-#include "genome.h"
+#include <cstdint>
 
 namespace job::ai::learn {
 
-// T_Learner is the Learner (e.g., XORLearn, CartPoleLearn, PortalLearn)
-template <typename T_Learn>
-concept Learn = requires(T_Learn t, const evo::Genome &genome, int memSize)
+// The "Contract" for any Config object passed to a Learner
+template <typename T>
+concept LearnerConfig = requires(T c) {
+    { c.memSize } -> std::convertible_to<uint32_t>; // Workspace Limit
+    { c.name }    -> std::convertible_to<std::string>;
+};
+
+// The "Contract" for the Learner itself
+template <typename T, typename T_Genome, typename T_Config>
+concept IsLearner =
+    LearnerConfig<T_Config> &&
+    requires(T t, const T_Genome& g, const T_Config& config)
 {
-    // Must have an learn method that returns a float (fitness)
-    { t.learn(genome) } -> std::convertible_to<float>;
+    // 1. The Core Loop (Must return fitness float)
+    //    We pass memSize explicitly to ensure the learner respects the budget
+    { t.learn(g, config.memSize) } -> std::convertible_to<float>;
 
-    { t.name() } -> std::convertible_to<std::string>;
+    // 2. Topology Requirements (Trainer needs these to build the network)
+    { t.inputDim() }  -> std::convertible_to<uint32_t>;
+    { t.outputDim() } -> std::convertible_to<uint32_t>;
 
-    { t.memSize(memSize) } -> std::convertible_to<int>;
+    // 3. Configuration Injection
+    //    The Trainer will call these to set up the Learner before running
+    { t.setMemLimit(config.memSize) } -> std::same_as<void>;
+    { t.setName(config.name) }        -> std::same_as<void>;
 };
 
 } // namespace job::ai::learn

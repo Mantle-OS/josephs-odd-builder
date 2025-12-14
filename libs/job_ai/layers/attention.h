@@ -121,9 +121,12 @@ public:
         const size_t elementsPerBuffer = static_cast<size_t>(B) * S * D;
 
         size_t totalFloatsNeeded = elementsPerBuffer * 4;
+        const size_t bytesNeeded = totalFloatsNeeded * sizeof(float);
+        if (ws.size() < bytesNeeded)
+            ws.resize(bytesNeeded);
 
-        if (ws.size() < totalFloatsNeeded)
-            ws.resize(totalFloatsNeeded * sizeof(float));
+        // if (ws.size() < totalFloatsNeeded)
+        //     ws.resize(totalFloatsNeeded * sizeof(float));
 
         float *rawMem = ws.raw();
         float *qPtr = rawMem;
@@ -184,7 +187,7 @@ public:
         comp::sgemm_parallel(pool, A_Out, WO, Final_Out);
 
         if (m_cfg.hasBias()) {
-            float* out = Final_Out.data();
+            float *out = Final_Out.data();
             const float* bo = m_bo;
             size_t total = elementsPerBuffer;
 

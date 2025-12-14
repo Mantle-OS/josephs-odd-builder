@@ -111,6 +111,7 @@ set(JOBAI_LEARNER_HEADERS
     learner/learn_type.h
     learner/learn_xor.h
     learner/learn_cart_pole.h
+    learner/learn_bard.h
 )
 set(JOBAI_LEARNER_SOURCES)
 
@@ -150,9 +151,11 @@ set(JOBAI_ROUTER_SOURCES
 # learner
 set(JOBAI_LEARNER_HEADERS
     learner/learn_concept.h
+    learner/ilearn.h
     learner/learn_type.h
     learner/learn_xor.h
     learner/learn_cart_pole.h
+    learner/learn_factory.h
 )
 set(JOBAI_LEARNER_SOURCES)
 
@@ -208,23 +211,24 @@ set(JOBAI_EVO_HEADERS
     evo/speciation_engine.h
 )
 set(JOBAI_EVO_SOURCES
-    evo/genome.cpp              # empty for now
+    evo/genome.cpp
 )
 
 # infer
 set(JOBAI_INFER_HEADERS
     infer/workspace.h
     infer/workspace_arena.h
-    infer/runner.h              # way later
+    infer/workspace_view.h
+    infer/runner.h
 )
 set(JOBAI_INFER_SOURCES
-    infer/runner.cpp            # way later
+    infer/runner.cpp
 )
 
 # cache
 set(JOBAI_CACHE_HEADERS
     cache/kv_key.h
-    cache/kv_cache.h               # not planned
+    cache/kv_cache.h
 )
 set(JOBAI_CACHE_SOURCES)
 

@@ -45,7 +45,7 @@ TEST_CASE("ESCoach: Optimizes simple Target Sum problem", "[ai][coach][es][usage
 
     // 30 generations
     for(int i = 0; i < 50; ++i)
-        parent = coach.coach(parent, evaluate_sum);
+        parent = coach.coach(parent);
 
     INFO("Generation: " << coach.generation());
     INFO("Final Fitness: " << coach.currentBestFitness());
@@ -167,12 +167,8 @@ TEST_CASE("ESCoach: High-Throughput Population Benchmark", "[ai][coach][es][benc
 
     ESCoach coach(ctx.pool, cfg);
 
-    auto fastEval = [](const Genome &g) {
-        return g.weights[0] + g.weights[1];
-    };
-
     BENCHMARK("ES Generation (Pop=1024, 1KB Genome)") {
-        return coach.coach(parent, fastEval);
+        return coach.coach(parent);
     };
 }
 #endif

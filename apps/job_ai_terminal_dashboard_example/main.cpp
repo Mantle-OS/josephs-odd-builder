@@ -1,225 +1,135 @@
+#include <memory>
+#include <iostream>
 #include <thread>
 #include <atomic>
-#include <vector>
-#include <list>
-#include <cmath>
-#include <mutex>
-#include <sstream>
-#include <iomanip>
+#include <string>
 
-// IO & TUI
 #include <io_factory.h>
-#include <color_utils.h>
+#include <job_ansi_attributes.h>
 #include <job_tui_core_application.h>
 #include <containers/window.h>
-#include <layout/grid_layout.h>
-#include <layout/linear_layout.h>
 #include <elements/rectangle.h>
-#include <elements/label.h>
-#include <elements/button.h>
+#include <job_tui_mouse_area.h>
 
-// AI & Threads
+// AI Backend
 #include <ctx/job_stealing_ctx.h>
 #include <es_coach.h>
-#include <stencil_adapter.h>
-#include <layer_factory.h>
+#include <learn_type.h>
+#include <layer_factory.h> // Needed for LayerGene
 
 using namespace job::io;
+using namespace job::ansi;
 using namespace job::tui;
 using namespace job::tui::gui;
-using namespace job::ai;
-using namespace job::ai::coach;
-using namespace job::ai::adapters;
 
 // ---------------------------------------------------------
-// The Simulation State
+// HELPER: Create the Neural Network Topology
 // ---------------------------------------------------------
-class SimulationState {
-public:
-    std::atomic<size_t> generation{0};
-    std::atomic<float>  bestFitness{0.0f};
-    std::atomic<float>  currentSigma{0.0f};
-    std::atomic<bool>   running{false};
+job::ai::evo::Genome buildNetwork() {
+    using namespace job::ai::evo;
+    using namespace job::ai::layers;
 
-    // The "Brain Scan" (Heatmap data)
-    // Protected by mutex to prevent tearing during render
-    std::mutex mapMutex;
-    std::vector<float> heatMap;
-    int width{16};
-    int height{16};
+    Genome g;
+    // Layer 1: 4 Inputs -> 32 Hidden (Tanh is stable)
+    LayerGene l1{};
+    l1.type = LayerType::Dense;
+    l1.activation = comp::ActivationType::Tanh;
+    l1.inputs = 4;
+    l1.outputs = 32;
+    l1.weightCount = (4 * 32) + 32;
+    l1.weightOffset = 0;
+    g.architecture.push_back(l1);
 
-    void updateMap(const float* data, size_t size) {
-        std::lock_guard<std::mutex> lock(mapMutex);
-        if (heatMap.size() != size) heatMap.resize(size);
-        for(size_t i=0; i<size; ++i) {
-            heatMap[i] = data[i];
-        }
-    }
-};
+    // Layer 2: 32 Hidden -> 2 Output (Left/Right)
+    LayerGene l2{};
+    l2.type = LayerType::Dense;
+    l2.activation = comp::ActivationType::Identity;
+    l2.inputs = 32;
+    l2.outputs = 2;
+    l2.weightCount = (32 * 2) + 2;
+    l2.weightOffset = l1.weightCount;
+    g.architecture.push_back(l2);
 
-// ---------------------------------------------------------
-// The Application
-// ---------------------------------------------------------
+    // Initialize Weights (Random Noise)
+    g.weights.resize(l1.weightCount + l2.weightCount);
+    for(auto& w : g.weights)
+        w = ((rand() % 200) / 100.0f - 1.0f); // -1.0 to 1.0
+
+    return g;
+}
+
 int main() {
-    // 1. Setup TUI IO
-    auto dev = IOFactory::createFromType(FactoryType::FILE_STD_OUT, "");
-    if (!dev || !dev->openDevice()) return 1;
+    auto device = IOFactory::createFromType(FactoryType::FILE_STD_OUT, "");
+    if (!device || !device->openDevice()) return 1;
 
-    auto app = std::make_shared<JobTuiCoreApplication>(dev);
-    // Bigger window to fit everything nicely
-    auto root = Window::create({0, 0, 80, 30}, "Mantle OS - Neural Physics Dashboard", app.get());
+    auto app = std::make_shared<JobTuiCoreApplication>(device);
+    // Taller window to see the title clearly
+    auto root = Window::create({2, 1, 80, 20}, "Neural CartPole: Idle", app.get());
 
-    // -------------------------------------------------
-    // UI Layout: Split Left (Heatmap) and Right (Stats)
-    // -------------------------------------------------
+    // 1. LEFT RECTANGLE (Start/Stop)
+    auto rect1 = Rectangle::create(root.get());
+    rect1->setGeometry(5, 3, 30, 10);
+    rect1->setColor("blue");
 
-    // Left Panel: The Brain (Stencil Grid)
-    // 16x16 Grid.
-    auto brainPanel = JobTuiItem::create({2, 2, 34, 20}, root.get());
-    brainPanel->setItemHasContents(true);
+    // 2. RIGHT RECTANGLE (Status)
+    auto rect2 = Rectangle::create(root.get());
+    rect2->setGeometry(40, 3, 30, 10);
+    rect2->setColor("dark_gray");
 
-    // We keep a Vector for random access in the thread
-    std::vector<std::shared_ptr<JobTuiItem>> pixels;
-    pixels.reserve(256);
+    // 3. AI BACKEND
+    std::atomic<bool> runSim{false};
 
-    // Create 256 Rectangles
-    for(int i=0; i<256; ++i) {
-        // Init black
-        auto rect = Rectangle::create({0,0,2,1}, "black", nullptr);
-        pixels.push_back(rect);
-    }
+    std::thread aiThread([rect2, root, app, &runSim]() {
+        job::threads::JobStealerCtx ctx(8);
 
-    // Convert to List for Layout Engine
-    std::list<JobTuiItem::Ptr> pixelList(pixels.begin(), pixels.end());
+        job::ai::coach::ESCoach::Config cfg;
+        cfg.taskType = job::ai::learn::LearnType::CartPole;
+        cfg.populationSize = 128;
+        cfg.sigma = 0.5f; // Good noise level
+        cfg.memLimitMB = 1;
 
-    // Cols=16, Spacing=0 (Tight Grid)
-    auto gridLayout = GridLayout::create(brainPanel->boundingRect(), 16, 0, pixelList, brainPanel.get());
-    brainPanel->applyLayout();
+        job::ai::coach::ESCoach coach(ctx.pool, cfg);
 
-    // Right Panel: Stats
-    auto statsPanel = JobTuiItem::create({40, 2, 35, 20}, root.get());
-    statsPanel->setItemHasContents(true);
-    auto statsLayout = LinearLayout::create(statsPanel->boundingRect(), statsPanel.get());
-    statsLayout->setOrientation(LayoutEngine::Orientation::Vertical);
+        // *** CRITICAL FIX: Pass the Architecture here! ***
+        coach.coach(buildNetwork());
 
-    auto lblGen   = Label::create({0,0,30,1}, "Generation: 0", statsLayout.get());
-    auto lblFit   = Label::create({0,0,30,1}, "Fitness:    0.000", statsLayout.get());
+        while(true) {
+            if (runSim) {
+                // Train
+                coach.coach(coach.bestGenome());
+                float score = coach.currentBestFitness();
 
-    // Spacer
-    Rectangle::create({0,0,30,1}, "default", statsLayout.get());
+                // UI Logic
+                std::string status = "Training: " + std::to_string((int)score);
 
-    auto btnToggle = Button::create({0,0,20,3}, "START SIMULATION", statsLayout.get());
-
-    statsPanel->applyLayout();
-
-    // -------------------------------------------------
-    // The AI Backend
-    // -------------------------------------------------
-    auto simState = std::make_shared<SimulationState>();
-
-    // Background Thread
-    std::thread worker([simState, app, pixels, lblGen, lblFit]() {
-        job::threads::JobStealerCtx ctx(4); // 4 Cores for Physics
-
-        // Setup Stencil Adapter to generate "Thoughts"
-        StencilConfig stencilCfg;
-        stencilCfg.steps = 5;
-        stencilCfg.diffusionRate = 0.1f;
-        stencilCfg.boundary = job::threads::BoundaryMode::Wrap;
-        StencilAdapter adapter(stencilCfg);
-
-        // Dummy Genome (We just want to visualize the physics really)
-        // We'll treat the Genome weights as the Stencil Grid state
-        evo::Genome genome;
-        genome.weights.resize(16*16, 0.0f); // 256 floats
-
-        // Coach
-        ESConfig coachCfg = CoachPresets::kStandard;
-        coachCfg.populationSize = 64;
-        coachCfg.sigma = 0.5f; // High noise for visuals
-        ESCoach coach(ctx.pool, coachCfg);
-
-        // The Evaluator (Creates a Checkerboard target)
-        auto eval = [&](const evo::Genome& g) -> float {
-            std::vector<float> state = g.weights; // Copy
-
-            cords::ViewR view(state.data(), cords::ViewR::Extent{1, 256});
-            cords::ViewR out(state.data(), cords::ViewR::Extent{1, 256}); // In-place
-            cords::AttentionShape shape{1, 256, 1, 1};
-            AdapterCtx aCtx;
-
-            adapter.adapt(*ctx.pool, shape, view, view, view, out, aCtx);
-
-            // Goal: Checkerboard pattern
-            float error = 0.0f;
-            for(int i=0; i<256; ++i) {
-                int x = i % 16;
-                int y = i / 16;
-                float target = ((x+y)%2 == 0) ? 1.0f : 0.0f;
-                float diff = state[i] - target;
-                error += diff * diff;
-            }
-            return 1.0f / (1.0f + error);
-        };
-
-        while(app->isRunning()) {
-            if (simState->running) {
-                evo::Genome survivor = coach.coach(genome, eval);
-
-                simState->generation = coach.generation();
-                simState->bestFitness = coach.currentBestFitness();
-
-                std::vector<float> displayState = survivor.weights;
-                cords::ViewR view(displayState.data(), cords::ViewR::Extent{1, 256});
-                cords::ViewR out(displayState.data(), cords::ViewR::Extent{1, 256});
-                cords::AttentionShape shape{1, 256, 1, 1};
-                AdapterCtx ctxDummy;
-                adapter.adapt(*ctx.pool, shape, view, view, view, out, ctxDummy);
-
-                simState->updateMap(displayState.data(), 256);
-
-                {
-                    std::stringstream ss;
-                    ss << "Generation: " << simState->generation;
-                    lblGen->setText(ss.str());
-
-                    ss.str(""); ss << std::fixed << std::setprecision(4) << "Fitness:    " << simState->bestFitness;
-                    lblFit->setText(ss.str());
-
-                    std::lock_guard<std::mutex> lock(simState->mapMutex);
-                    for(int i=0; i<256; ++i) {
-                        float val = simState->heatMap[i];
-                        auto rect = std::static_pointer_cast<Rectangle>(pixels[i]);
-
-                        using namespace job::ansi::utils::colors;
-                        if (val < 0.25f) rect->setColor(Black());
-                        else if (val < 0.5f) rect->setColor(Blue());
-                        else if (val < 0.75f) rect->setColor(Cyan());
-                        else rect->setColor(White());
-                    }
+                if (score > 490.0f) {
+                    rect2->setColor("yellow"); // Victory!
+                    status += " (SOLVED)";
+                } else {
+                    rect2->setColor("green");  // Learning...
                 }
 
-                app->markDirty(); // Trigger redraw
-                genome = survivor; // Evolution
+                // Update Title safely (assuming thread safe or risky-but-ok for simple app)
+                root->setTitle(status);
+                app->markDirty();
             }
-            std::this_thread::sleep_for(std::chrono::milliseconds(33)); // ~30 FPS
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
         }
     });
-    worker.detach();
+    aiThread.detach();
 
-    // -------------------------------------------------
-    // Wiring Controls
-    // -------------------------------------------------
-    btnToggle->onClicked = [simState, btnToggle, app]() {
-        bool running = !simState->running;
-        simState->running = running;
-        btnToggle->setText(running ? "STOP SIMULATION" : "START SIMULATION");
+    // 4. MOUSE
+    auto mouseOne = JobTuiMouseArea::create(rect1.get());
+    mouseOne->onClicked = [rect1, root, app, &runSim](const Event &) {
+        bool running = !runSim;
+        runSim = running;
 
-        auto attrs = std::make_shared<job::ansi::Attributes>();
-        attrs->setBackground(running ? job::ansi::utils::colors::Red() : job::ansi::utils::colors::Green());
-        attrs->setForeground(job::ansi::utils::colors::White());
-        btnToggle->setNormalAttributes(attrs);
-
+        if (running) {
+            rect1->setColor("red");
+        } else {
+            rect1->setColor("blue");
+            root->setTitle("Paused");
+        }
         app->markDirty();
     };
 

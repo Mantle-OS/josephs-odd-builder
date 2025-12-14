@@ -1,5 +1,7 @@
 #pragma once
 #include <cstddef>
+#include <vector>
+
 #include "adapter_types.h"
 namespace job::ai::router {
 struct RouterToken {
@@ -10,10 +12,11 @@ struct RouterToken {
 };
 
 struct RouterPlan {
-    int                         batchSize{0};                               // number of rows in the batch
-    int                         numExperts{0};                              // total experts available
-    RouterToken                 *tokens = nullptr;                          // non-owning pointer to routing table
-    std::size_t                 tokenCount{0};                              // total entries in tokens
+    int                                     batchSize{0};                               // number of rows in the batch
+    int                                     numExperts{0};                              // total experts available
+    RouterToken                             *tokens = nullptr;                          // non-owning pointer to routing table
+    std::size_t                             tokenCount{0};                              // total entries in tokens
+    // std::vector<std::vector<uint32_t>>      expertAssignments;                          // DOC ME
 
     [[nodiscard]] RouterToken *begin()
     {
