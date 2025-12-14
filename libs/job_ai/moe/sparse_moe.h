@@ -26,7 +26,7 @@
 // Layers & Infer
 #include "abstract_layer.h"
 #include "iparamgroup.h"
-#include "workspace.h" // The Zero-Alloc Memory Bank
+#include "workspace.h"
 #include "workspace_arena.h"
 #include "workspace_view.h"
 
