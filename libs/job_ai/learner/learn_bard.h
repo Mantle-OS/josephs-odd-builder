@@ -81,11 +81,13 @@ public:
             return 0.0f;
 
         float avgNLL = totalNLL / (float)samplesProcessed;
-        // return std::exp(-avgNLL / 0.5f);
-        return std::exp(-avgNLL / std::log((float)kVocabSize));
 
+        // Normalize: uniform random ≈ 1.0
+        float norm = avgNLL / std::log((float)BardLearn::kVocabSize);
 
-
+        // Map norm ∈ [0, ∞) → (0, 100]
+        float fitness = 100.0f / (1.0f + norm);
+        return fitness;
     }
 
     [[nodiscard]] std::string hallucinate(int length)
@@ -140,6 +142,18 @@ public:
     {
         return std::make_unique<BardLearn>(std::move(pool));
     }
+
+    [[nodiscard]] const std::string &corpus() const noexcept
+    {
+        return m_corpus;
+    }
+
+    [[nodiscard]] std::size_t corpusSize() const noexcept
+    {
+        auto size = static_cast<int>(m_corpus.size()) - kContextLen;
+        return std::max(size, 1); // never 0 or negative
+    }
+
 
 private:
     threads::ThreadPool::Ptr            m_pool;

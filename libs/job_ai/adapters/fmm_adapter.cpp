@@ -4,7 +4,6 @@
 #include <cmath>
 #include <vector>
 
-// The Physics Engine
 #include <job_fmm_integrator.h>
 
 namespace job::ai::adapters {
@@ -15,7 +14,6 @@ using namespace job::threads;
 FmmAdapter::FmmAdapter(FmmConfig cfg) :
     m_cfg(cfg)
 {
-
 }
 
 AdapterType FmmAdapter::type() const
@@ -47,17 +45,17 @@ void FmmAdapter::adapt(
         std::vector<FmmTraits::Body> bodies(S);
 
         // Pointers to this batch's data slice
-        // !!! NOTE !!!!!! I assume RowMajor layout (stride = D)
+        // !!! NOTE !!!!!! this assume RowMajor layout (stride = D) :(
         const float *k_ptr = sources.data() + (b * S * D);
         // const float *q_ptr = targets.data() + (b * S * D);
 
-        // Optional: Use V as the "Charge" magnitude ...I hope  let's stick to: K determines Pos & Mass.
+        // IDK if I should Use V as the "Charge" magnitude ..."I think"  stick to: K determines Pos & Mass ?
         // const float *v_ptr = values.data() + (b * S * D);
 
-        float* out_ptr = output.data() + (b * S * D);
+        float *out_ptr = output.data() + (b * S * D);
 
         for (int i = 0; i < S; ++i) {
-            auto& p = bodies[i];
+            auto &p = bodies[i];
             int idx = i * D;
 
             p.position.x = k_ptr[idx + m_cfg.dim_mapping[0]];
@@ -76,11 +74,11 @@ void FmmAdapter::adapt(
 
 
         // The Math Dragon: FMM Execution
-        using Solver = job::threads::JobFmmEngine<FmmTraits::Body, FmmTraits::Vec3, FmmTraits::Real, FmmTraits>;
-        typename Solver::Params fmmParams;
-        fmmParams.theta       = m_cfg.theta;     // e.g. 0.5
-        fmmParams.maxLeafSize = m_cfg.max_leaf;  // e.g. 64
-        Solver engine(pool, fmmParams);
+        typename FmmSolver::Params fmmParams;
+        fmmParams.theta       = m_cfg.theta;
+        fmmParams.maxLeafSize = m_cfg.maxLeaf;
+        fmmParams.maxDepth    = m_cfg.maxDepth;
+        FmmSolver engine(pool, fmmParams);
 
         // P2M -> M2M -> M2L -> L2L -> L2P  LETS FUCKING GO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         engine.compute(bodies);
@@ -88,11 +86,11 @@ void FmmAdapter::adapt(
         // decoder: Force -> Output Tensor
         // The "Force" felt by a token is the aggregate "Attention" it received. map this force vector back into the embedding.
         for (const auto &p : bodies) {
-            // Use p.id because FMM might have reordered the vector!
+            // Use p.id because FMM might have reordered the vector ?
             int i = p.id;
             int idx = i * D;
 
-            // Write Context Vector (Force) apply gravity constant (G)
+            // write context vector (force) apply gravity constant (G)
             float fx = p.acceleration.x * m_cfg.gravity;
             float fy = p.acceleration.y * m_cfg.gravity;
             float fz = p.acceleration.z * m_cfg.gravity;

@@ -57,7 +57,7 @@ TEST_CASE("ESCoach: Trains the Drunk Bard", "[ai][coach][bard]")
     JobStealerCtx ctx(8);
 
     ESCoach::Config cfg;
-    cfg.populationSize = 64;      // Good balance for speed/search ?
+    cfg.populationSize = 32; //64;      // Good balance for speed/search ?
     cfg.sigma          = 0.05f;    // Aggressive start ?
     cfg.decay          = 0.995f;   // Slow cool down ?
     cfg.taskType       = LearnType::Bard;
@@ -82,21 +82,20 @@ TEST_CASE("ESCoach: Trains the Drunk Bard", "[ai][coach][bard]")
         bestFitness = coach.currentBestFitness();
         bestGenome  = survivor;
 
-        if (gen % 50 == 0) {
+        if (gen % bard->corpusSize() == 0) {
             (void)bard->learn(survivor, cfg.memLimitMB);
+            std::string thought = bard->hallucinate(bard->corpusSize());
+            // std::replace(thought.begin(), thought.end(), '\n', ' ');
 
-            std::string thought = bard->hallucinate(60);
-            std::replace(thought.begin(), thought.end(), '\n', ' ');
-
-            JOB_LOG_INFO("Gen {} | Fit: {} | Say: \"{}\"", gen, bestFitness, thought);
-            if (bestFitness > 0.90f)
+            // JOB_LOG_INFO("Gen {} | Fit: {} | Say: \"{}\"", gen, bestFitness, thought);
+            if (bestFitness > 96) // I could drop this down to say 97% depends on how "close" to real it "sounds"
                 break;
         }
     }
 
     (void)bard->learn(coach.bestGenome());
-    std::string finalThought = bard->hallucinate(60);
+    std::string finalThought = bard->hallucinate(bard->corpusSize());
 
     JOB_LOG_INFO("[Drunk Bard Integration] Final: {}", finalThought);
-    REQUIRE(bestFitness > 0.80f);
+    REQUIRE(bestFitness > 80);
 }
