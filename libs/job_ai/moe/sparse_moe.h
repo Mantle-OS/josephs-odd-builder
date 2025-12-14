@@ -81,8 +81,12 @@ public:
                              infer::Workspace &ws,
                              std::vector<float> *maybeGateLogits) override
     {
+        assert(input.extent().rank() == 2 && "SparseMoE::route expects [B, D] for now");
         const int batch   = (int)input.extent()[0];
+
         const int dim     = (int)input.extent()[1];
+        assert(dim == (int)m_inputDim && "SparseMoE: router input dim != m_inputDim");
+
         const int experts = (int)m_cfg.numExperts;
 
         const std::size_t logitCount = (std::size_t)batch * (std::size_t)experts;
@@ -126,7 +130,6 @@ public:
 
             cords::Matrix G(logitsPtr, batch, experts);
             comp::sgemm_parallel(pool, A, W, G);
-            comp::sgemm_parallel(pool, A, W, G);
 
             if (!m_routerCfg.deterministic) {
                 uint64_t fastSeed = (uint64_t)input.data() ^ 0xDEADBEEF;
@@ -167,6 +170,10 @@ public:
                  cords::ViewR &output,
                  infer::Workspace &ws) override
     {
+
+        assert(input.extent().rank() == 2 &&
+               "SparseMoE expects [B, D] for now");
+
         const uint32_t B = input.extent()[0];
         const uint32_t D = input.extent()[1];
         const uint32_t E = m_cfg.numExperts;
@@ -379,37 +386,81 @@ public:
         }
     }
 
-    [[nodiscard]] size_t scratchSize(const cords::ViewR::Extent &extent) const override
+
+    size_t scratchSize(const cords::ViewR::Extent &extent) const override
     {
-        const uint32_t batch = extent.rank() >= 1 ? extent[0] : 0;
-        const uint32_t dim   = extent.rank() >= 2 ? extent[1] : 0;
+        assert(extent.rank() == 2 &&
+               "SparseMoE::scratchSize expects [B,D] for now");
 
-        const size_t logitsBytes = size_t(batch) * m_cfg.numExperts * sizeof(float);
+        const uint32_t B = extent[0];
+        const uint32_t D = extent[1];
+        const uint32_t E = m_cfg.numExperts;
 
-        // Clamp K (Matches forward logic)
         const int kCap = (m_routerCfg.type == router::RouterType::TopK) ?
-                             std::min<int>(m_routerCfg.topK, 16) : int(m_routerCfg.topK);
+                             std::min<int>(m_routerCfg.topK, 16) :
+                             int(m_routerCfg.topK);
 
-        const size_t tokensBytes = size_t(batch) * kCap * sizeof(router::RouterToken);
+        const uint32_t T_max = B * kCap;
+        const size_t logitsBytes = size_t(B) * E * sizeof(float);
+        const size_t tokenOffset = infer::WorkspaceArena::align_up(logitsBytes, alignof(router::RouterToken));
+        const size_t routeBytes  =
+            tokenOffset + size_t(T_max) * sizeof(router::RouterToken);
 
-        size_t bytes = logitsBytes + tokensBytes;
-        bytes = (bytes + 63) & ~size_t(63);
+        const size_t expertInBytes  = size_t(T_max) * D * sizeof(float);
+        const size_t expertOutBytes = size_t(T_max) * D * sizeof(float);
 
-        // OPTIMIZATION: Only reserve space for active tokens (TopK), not all Experts
-        // We need Input + Output buffers for the active tokens
-        const size_t ioBytes = size_t(batch) * kCap * dim * 2 * sizeof(float);
+        size_t maxExpertScratch = 0;
+        for (auto &ex : m_experts) {
+            if (!ex)
+                continue;
+            maxExpertScratch = std::max(
+                maxExpertScratch,
+                ex->scratchSize(cords::ViewR::Extent{T_max, D})
+                );
+        }
+        maxExpertScratch = infer::WorkspaceArena::align_up(maxExpertScratch, 64);
 
-        // We also need scratch windows for the experts.
-        // We can't easily know maxExpertScratch here without iterating experts,
-        // so a safe overestimate is (Batch * TopK * D) * Experts? No, too big.
-        // Let's stick to your safe logic or just add a margin.
+        const size_t totalBytes =
+            infer::WorkspaceArena::align_up(routeBytes, 64) +
+            infer::WorkspaceArena::align_up(expertInBytes, 64) +
+            infer::WorkspaceArena::align_up(expertOutBytes, 64) +
+            size_t(E) * maxExpertScratch;
 
-        // Your existing logic:
-        // const size_t privateBytes = size_t(batch) * dim * m_cfg.numExperts * sizeof(float);
-
-        // Tighter logic matching forward():
-        return bytes + ioBytes + (ioBytes / 2); // Heuristic margin
+        return totalBytes;
     }
+
+
+    // [[nodiscard]] size_t scratchSize(const cords::ViewR::Extent &extent) const override
+    // {
+    //     const uint32_t batch = extent.rank() >= 1 ? extent[0] : 0;
+    //     const uint32_t dim   = extent.rank() >= 2 ? extent[1] : 0;
+
+    //     const size_t logitsBytes = size_t(batch) * m_cfg.numExperts * sizeof(float);
+
+    //     // Clamp K (Matches forward logic)
+    //     const int kCap = (m_routerCfg.type == router::RouterType::TopK) ?
+    //                          std::min<int>(m_routerCfg.topK, 16) : int(m_routerCfg.topK);
+
+    //     const size_t tokensBytes = size_t(batch) * kCap * sizeof(router::RouterToken);
+
+    //     size_t bytes = logitsBytes + tokensBytes;
+    //     bytes = (bytes + 63) & ~size_t(63);
+
+    //     // OPTIMIZATION: Only reserve space for active tokens (TopK), not all Experts
+    //     // Need Input + Output buffers for the active tokens
+    //     const size_t ioBytes = size_t(batch) * kCap * dim * 2 * sizeof(float);
+
+    //     // I think I am lost .........
+    //     // also need scratch windows for the experts ?
+    //     // I can't easily know maxExpertScratch here without iterating experts, .....
+    //     // so a safe overestimate is (Batch * TopK * D) * Experts? No..... too big ?
+    //     // stick to tjhe safe logic or just add a margin ?
+
+    //     // const size_t privateBytes = size_t(batch) * dim * m_cfg.numExperts * sizeof(float);
+
+    //     // Tighter logic matching forward(): Heuristic margin
+    //     return bytes + ioBytes + (ioBytes / 2);
+    // }
 
     // Reset any internal state (KV cache, running stats, RNG state, etc.). when I get here ....
     void resetState() noexcept override
@@ -424,14 +475,6 @@ private:
     std::vector<float, cords::AlignedAllocator<float, 64>>      m_gateWeights;
     float                                                       *m_gateWeightsPtr{nullptr};
     std::vector<AbstractLayer::Ptr>                             m_experts;
-
-
-    // // 1. Owns memory for Cold Start / Default Init
-    // std::vector<float, cords::AlignedAllocator<float, 64>> m_gateStorage;
-
-    // // 2. The Hot Pointer (Points to m_gateStorage initially, then to Genome)
-
-
 };
 
 } // namespace job::ai::moe

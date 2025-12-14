@@ -2,7 +2,7 @@
 #include <catch2/catch_approx.hpp>
 
 #ifdef JOB_TEST_BENCHMARKS
-    #include <catch2/benchmark/catch_benchmark.hpp>
+#include <catch2/benchmark/catch_benchmark.hpp>
 #endif
 
 #include <vector>
@@ -19,7 +19,6 @@ using namespace job::threads;
 
 TEST_CASE("Stencil Adapter: Heat Diffusion (3x3 Grid)", "[ai][stencil][usage]")
 {
-    // 4 workers to handle the parallel dimension/batch processing
     JobStealerCtx ctx(4);
 
     StencilConfig cfg;
@@ -30,53 +29,43 @@ TEST_CASE("Stencil Adapter: Heat Diffusion (3x3 Grid)", "[ai][stencil][usage]")
     StencilAdapter adapter(cfg);
 
     // Geometry: 1 Batch, Sequence 9 (3x3 grid), Dim 1 (Single channel heat map)
-    int B = 1;
-    int S = 9;
-    int D = 1;
+    const uint32_t B = 1;
+    const uint32_t S = 9;
+    const uint32_t D = 1;
 
     std::vector<float> data(S * D, 0.0f);
 
-    // Set Center (index 4) to Hot
-    // Grid:
-    // 0 0 0
-    // 0 H 0
-    // 0 0 0
-    data[4] = 100.0f;
+    // Center hot
+    data[4 * D + 0] = 100.0f;
 
-    ViewR view(data.data(), ViewR::Extent{1, (uint32_t)S});
-    // In-place modification is allowed by IAdapter contract usually,
-    // but here we act like 'output' is the write target.
-    // For this test, let's write back to the same buffer to mimic a residual update or state update.
-    ViewR out(data.data(), ViewR::Extent{1, (uint32_t)S});
+    ViewR view(data.data(), makeBSD(B, S, D));
+    ViewR out (data.data(), makeBSD(B, S, D));
 
-    AttentionShape shape{ (uint32_t)B, (uint32_t)S, (uint32_t)D, 1 };
-    AdapterCtx aCtx; // Defaults
+    AttentionShape shape{B, S, D, 1};
+    AdapterCtx aCtx;
 
     adapter.adapt(*ctx.pool, shape, view, view, view, out, aCtx);
 
-    // Verify Physics
-    // Laplacian Rule: New = Old + Rate * (Sum_Neighbors - 4*Old)
-    // Center Neighbors are all 0. Sum = 0.
-    // Center New = 100 + 0.1 * (0 - 400) = 100 - 40 = 60.
-    CHECK(data[4] == Catch::Approx(60.0f).epsilon(0.01));
+    // Index helper: (s, d) in [B=1] layout
+    auto at = [&](int s, int d = 0) -> float& {
+        return data[s * D + d];
+    };
 
-    // Neighbor (e.g., index 3, to the left)
-    // Old = 0. Neighbors = 100 (center) + 0 + 0 + 0 = 100.
-    // Neighbor New = 0 + 0.1 * (100 - 0) = 10.
-    CHECK(data[3] == Catch::Approx(10.0f).epsilon(0.01)); // Left
-    CHECK(data[5] == Catch::Approx(10.0f).epsilon(0.01)); // Right
-    CHECK(data[1] == Catch::Approx(10.0f).epsilon(0.01)); // Top
-    CHECK(data[7] == Catch::Approx(10.0f).epsilon(0.01)); // Bottom
+    // Center
+    CHECK(at(4) == Catch::Approx(60.0f).epsilon(0.01));
 
-    // Corners should still be 0 (Manhattan distance > 1)
-    CHECK(data[0] == 0.0f);
+    // 4-neighbors
+    CHECK(at(3) == Catch::Approx(10.0f).epsilon(0.01)); // Left
+    CHECK(at(5) == Catch::Approx(10.0f).epsilon(0.01)); // Right
+    CHECK(at(1) == Catch::Approx(10.0f).epsilon(0.01)); // Top
+    CHECK(at(7) == Catch::Approx(10.0f).epsilon(0.01)); // Bottom
+
+    // Corners unchanged
+    CHECK(at(0) == 0.0f);
 }
 
-// BLOCK 2: Edge Cases
 TEST_CASE("Stencil Adapter: Dimension Isolation", "[ai][stencil][edge]")
 {
-    // Ensure that physics in Dimension 0 do not bleed into Dimension 1.
-    // This verifies that the "transpose" or striding logic is correct.
     JobStealerCtx ctx(2);
 
     StencilConfig cfg;
@@ -86,63 +75,63 @@ TEST_CASE("Stencil Adapter: Dimension Isolation", "[ai][stencil][edge]")
 
     StencilAdapter adapter(cfg);
 
-    int S = 4; // 2x2 Grid
-    int D = 2; // Two distinct chemical channels
+    const uint32_t B = 1;
+    const uint32_t S = 4; // 2x2 grid
+    const uint32_t D = 2; // two channels
 
     std::vector<float> data(S * D, 0.0f);
 
-    // Dim 0: All 100s (Uniform heat, should not change)
-    // Dim 1: All 0s (Absolute zero, should not change)
-    for(int i=0; i<S; ++i) {
-        data[i * D + 0] = 100.0f;
-        data[i * D + 1] = 0.0f;
+    for (uint32_t i = 0; i < S; ++i) {
+        data[i * D + 0] = 100.0f; // channel 0
+        data[i * D + 1] = 0.0f;   // channel 1
     }
 
-    ViewR view(data.data(), ViewR::Extent{1, (uint32_t)S});
-    ViewR out(data.data(), ViewR::Extent{1, (uint32_t)S});
-    AttentionShape shape{ 1, (uint32_t)S, (uint32_t)D, 1 };
+    ViewR view(data.data(), makeBSD(B, S, D));
+    ViewR out (data.data(), makeBSD(B, S, D));
+
+    AttentionShape shape{B, S, D, 1};
     AdapterCtx aCtx;
 
     adapter.adapt(*ctx.pool, shape, view, view, view, out, aCtx);
 
-    for(int i=0; i<S; ++i) {
-        // Dim 0 should remain 100 (Sum neighbors = 400, 4*Center = 400, Delta = 0)
-        CHECK(data[i * D + 0] == Catch::Approx(100.0f));
-        // Dim 1 should remain 0 (No heat from Dim 0 leaked in)
-        CHECK(data[i * D + 1] == 0.0f);
+    for (uint32_t i = 0; i < S; ++i) {
+        CHECK(data[i * D + 0] == Catch::Approx(100.0f)); // uniform field -> no change
+        CHECK(data[i * D + 1] == 0.0f);                  // no cross-channel leak
     }
 }
 
 TEST_CASE("Stencil Adapter: Zero Rate (Identity)", "[ai][stencil][edge]")
 {
     JobStealerCtx ctx(1);
+
     StencilConfig cfg;
     cfg.diffusionRate = 0.0f; // Nothing moves
+    cfg.boundary = BoundaryMode::Wrap; // whatever, rate=0 kills it anyway
     StencilAdapter adapter(cfg);
 
-    int S = 9;
-    int D = 1;
-    std::vector<float> data(S * D);
-    for(int i=0; i<S; ++i) data[i] = (float)i;
+    const uint32_t B = 1;
+    const uint32_t S = 9;
+    const uint32_t D = 1;
 
-    ViewR view(data.data(), ViewR::Extent{1, (uint32_t)S});
-    ViewR out(data.data(), ViewR::Extent{1, (uint32_t)S});
-    AttentionShape shape{ 1, (uint32_t)S, (uint32_t)D, 1 };
+    std::vector<float> data(S * D);
+    for (uint32_t i = 0; i < S; ++i)
+        data[i * D + 0] = static_cast<float>(i);
+
+    ViewR view(data.data(), makeBSD(B, S, D));
+    ViewR out (data.data(), makeBSD(B, S, D));
+
+    AttentionShape shape{B, S, D, 1};
     AdapterCtx aCtx;
 
     adapter.adapt(*ctx.pool, shape, view, view, view, out, aCtx);
 
-    // Should be unchanged
-    for(int i=0; i<S; ++i) {
-        CHECK(data[i] == (float)i);
-    }
+    for (uint32_t i = 0; i < S; ++i)
+        CHECK(data[i * D + 0] == static_cast<float>(i));
 }
 
-// BLOCK 3: Benchmarks
 #ifdef JOB_TEST_BENCHMARKS
 TEST_CASE("Stencil Adapter: Throughput", "[ai][stencil][bench]")
 {
-    // Stencil is memory bound. We want to saturate the bandwidth.
     JobStealerCtx ctx(8);
 
     StencilConfig cfg;
@@ -154,33 +143,33 @@ TEST_CASE("Stencil Adapter: Throughput", "[ai][stencil][bench]")
     AdapterCtx aCtx;
 
     auto run_bench = [&](int seq_len, int dims) {
-        int B = 4; // Moderate batch size
-        size_t total = (size_t)B * seq_len * dims;
+        const uint32_t B = 4;
+        const uint32_t S = static_cast<uint32_t>(seq_len);
+        const uint32_t D = static_cast<uint32_t>(dims);
+
+        const std::size_t total = static_cast<std::size_t>(B) * S * D;
         std::vector<float> data(total, 1.0f);
 
-        // Randomize slightly to avoid compiler optimizing uniform math
+        // Break uniformity a bit
         data[0] = 5.0f;
-        data[total-1] = 10.0f;
+        data[total - 1] = 10.0f;
 
-        ViewR view(data.data(), ViewR::Extent{(uint32_t)B, (uint32_t)seq_len});
-        ViewR out(data.data(), ViewR::Extent{(uint32_t)B, (uint32_t)seq_len});
-        AttentionShape shape{ (uint32_t)B, (uint32_t)seq_len, (uint32_t)dims, 1 };
+        ViewR view(data.data(), makeBSD(B, S, D));
+        ViewR out (data.data(), makeBSD(B, S, D));
+
+        AttentionShape shape{B, S, D, 1};
 
         adapter.adapt(*ctx.pool, shape, view, view, view, out, aCtx);
     };
 
-    // Small Context (ViT patch size equivalent? 16x16 = 256)
     BENCHMARK("Stencil S=256 D=64 (Small)") {
         run_bench(256, 64);
     };
 
-    // Medium Context (32x32 = 1024)
     BENCHMARK("Stencil S=1024 D=128 (Medium)") {
         run_bench(1024, 128);
     };
 
-    // Large Context (64x64 = 4096)
-    // This stresses the Transpose logic heavily
     BENCHMARK("Stencil S=4096 D=256 (Large)") {
         run_bench(4096, 256);
     };

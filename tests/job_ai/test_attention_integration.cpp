@@ -2,7 +2,6 @@
 #include <catch2/benchmark/catch_benchmark.hpp>
 
 #include <vector>
-#include <iostream>
 #include <algorithm>
 #include <random> // Added for real randomness
 
@@ -15,20 +14,18 @@
 using namespace job::ai;
 using namespace job::threads;
 
-
 void randomize_buffer(float* ptr, size_t count)
 {
     static std::mt19937 gen(42);
     std::uniform_real_distribution<float> dist(-1.0f, 1.0f);
-    for(size_t i=0; i<count; ++i) {
+    for (size_t i = 0; i < count; ++i)
         ptr[i] = dist(gen);
-    }
 }
 
 void randomize_layer_params(layers::AbstractLayer &layer)
 {
     auto params = layer.parameters();
-    randomize_buffer(params.data(), params.extent()[0]);
+    randomize_buffer(params.data(), params.extent().volume());
 }
 
 TEST_CASE("Attention: Multi-Backend Integration", "[ai][attn][integration]") {
@@ -37,45 +34,39 @@ TEST_CASE("Attention: Multi-Backend Integration", "[ai][attn][integration]") {
     JobStealerCtx ctx(8);
     infer::Workspace ws(256 * 1024 * 1024);
 
-    const int B = 2;   // Small batch
-    const int S = 128; // Sequence
-    const int D = 64;  // Dim
+    const uint32_t B = 2;   // Small batch
+    const uint32_t S = 128; // Sequence
+    const uint32_t D = 64;  // Dim
 
     // 1. Randomize Inputs (Critical for Physics/FMM)
     // If these are all 1.0f, all particles overlap -> Zero Gravity.
-    std::vector<float> inputData(B * S * D);
+    std::vector<float> inputData(static_cast<size_t>(B) * S * D);
     randomize_buffer(inputData.data(), inputData.size());
 
-    std::vector<float> outputData(B * S * D, 0.0f);
+    std::vector<float> outputData(static_cast<size_t>(B) * S * D, 0.0f);
 
-    cords::ViewR input(inputData.data(),
-                       cords::ViewR::Extent{
-                           static_cast<uint32_t>(B),
-                           static_cast<uint32_t>(S),
-                           static_cast<uint32_t>(D)
-                       }
-                       );
+    cords::ViewR input(
+        inputData.data(),
+        cords::makeBSD(B, S, D)
+        );
 
-    cords::ViewR output(outputData.data(),
-                        cords::ViewR::Extent{
-                            static_cast<uint32_t>(B),
-                            static_cast<uint32_t>(S),
-                            static_cast<uint32_t>(D)
-                        }
-                        );
+    cords::ViewR output(
+        outputData.data(),
+        cords::makeBSD(B, S, D)
+        );
 
-
-    // FMM
+    // 1. FMM
     SECTION("FMM Attention (O(N))") {
         layers::LayerConfig cfg;
         cfg.adapterType = adapters::AdapterType::FMM;
 
-        layers::AttentionLayer attn(D, cfg);
+        layers::AttentionLayer attn(static_cast<int>(D), cfg);
         randomize_layer_params(attn);
-        // Needs ws now
+
         attn.forward(*ctx.pool, input, output, ws);
+
         bool gotSignal = false;
-        for(int i = 0; i < 10; ++i) {
+        for (int i = 0; i < 10; ++i) {
             if (std::abs(outputData[i]) > 1e-5f) {
                 gotSignal = true;
                 break;
@@ -83,12 +74,13 @@ TEST_CASE("Attention: Multi-Backend Integration", "[ai][attn][integration]") {
         }
         CHECK(gotSignal);
     }
+
     // 2. Dense
     SECTION("Dense Attention") {
         layers::LayerConfig cfg;
         cfg.adapterType = adapters::AdapterType::Dense;
 
-        layers::AttentionLayer attn(D, cfg);
+        layers::AttentionLayer attn(static_cast<int>(D), cfg);
         randomize_layer_params(attn);
 
         // Clear output
@@ -97,7 +89,7 @@ TEST_CASE("Attention: Multi-Backend Integration", "[ai][attn][integration]") {
         attn.forward(*ctx.pool, input, output, ws);
 
         bool gotSignal = false;
-        for(int i=0; i<10; ++i) {
+        for (int i = 0; i < 10; ++i) {
             if (std::abs(outputData[i]) > 1e-5f) {
                 gotSignal = true;
                 break;
@@ -111,42 +103,23 @@ TEST_CASE("Attention: Multi-Backend Integration", "[ai][attn][integration]") {
         layers::LayerConfig cfg;
         cfg.adapterType = adapters::AdapterType::Verlet;
 
-        layers::AttentionLayer attn(D, cfg);
+        layers::AttentionLayer attn(static_cast<int>(D), cfg);
         randomize_layer_params(attn);
 
         attn.forward(*ctx.pool, input, output, ws);
         CHECK(outputData[0] != 0.0f);
     }
 
-
-    // 4. Barns n Hut (Dynamics)
+    // 4. Barnes-Hut (Dynamics)
     SECTION("Barns and Hut Dynamics (Particle Simulation)") {
         layers::LayerConfig cfg;
         cfg.adapterType = adapters::AdapterType::BarnesHut;
 
-        layers::AttentionLayer attn(D, cfg);
+        layers::AttentionLayer attn(static_cast<int>(D), cfg);
         randomize_layer_params(attn);
 
         attn.forward(*ctx.pool, input, output, ws);
-        CHECK(outputData[0] != 0.0f); // REGRESSION
-
-
-        // layers::AttentionConfig cfg;
-        // cfg.adapterType = adapters::AdapterType::BarnesHut;
-        // layers::Attention attn(cfg, D);
-        // randomize_layer_params(attn);
-        // // Needs ws now
-        // attn.forward(*ctx.pool, input, output, ws);
-        // bool gotSignal = false;
-        // for(int i = 0; i < 10; ++i) {
-        //     if (std::abs(outputData[i]) > 1e-5f) {
-        //         gotSignal = true;
-        //         break;
-        //     }
-        // }
-        // CHECK(gotSignal);
-
-
+        CHECK(outputData[0] != 0.0f); // REGRESSION PROBE
     }
 
     // 5. LowRank (Dynamics)
@@ -154,7 +127,7 @@ TEST_CASE("Attention: Multi-Backend Integration", "[ai][attn][integration]") {
         layers::LayerConfig cfg;
         cfg.adapterType = adapters::AdapterType::LowRank;
 
-        layers::AttentionLayer attn(D, cfg);
+        layers::AttentionLayer attn(static_cast<int>(D), cfg);
         randomize_layer_params(attn);
 
         // Clear output
@@ -163,7 +136,7 @@ TEST_CASE("Attention: Multi-Backend Integration", "[ai][attn][integration]") {
         attn.forward(*ctx.pool, input, output, ws);
 
         bool gotSignal = false;
-        for(int i=0; i<10; ++i) {
+        for (int i = 0; i < 10; ++i) {
             if (std::abs(outputData[i]) > 1e-5f) {
                 gotSignal = true;
                 break;
@@ -172,12 +145,12 @@ TEST_CASE("Attention: Multi-Backend Integration", "[ai][attn][integration]") {
         CHECK(gotSignal);
     }
 
-    // 5. Flash (Dynamics)
+    // 6. Flash (Dynamics)
     SECTION("Flash (Simulation)") {
         layers::LayerConfig cfg;
         cfg.adapterType = adapters::AdapterType::Flash;
 
-        layers::AttentionLayer attn(D, cfg);
+        layers::AttentionLayer attn(static_cast<int>(D), cfg);
         randomize_layer_params(attn);
 
         // Clear output
@@ -186,7 +159,7 @@ TEST_CASE("Attention: Multi-Backend Integration", "[ai][attn][integration]") {
         attn.forward(*ctx.pool, input, output, ws);
 
         bool gotSignal = false;
-        for(int i=0; i<10; ++i) {
+        for (int i = 0; i < 10; ++i) {
             if (std::abs(outputData[i]) > 1e-5f) {
                 gotSignal = true;
                 break;
@@ -199,25 +172,31 @@ TEST_CASE("Attention: Multi-Backend Integration", "[ai][attn][integration]") {
 #ifdef JOB_TEST_BENCHMARKS
 TEST_CASE("Attention: Scaling Benchmark (Seq=4096)", "[ai][attn][bench][scale]") {
     // Large Context. This is where O(N^2) dies and O(N) shines.
-    const int B = 1; // Single batch to focus on Sequence Length scaling
-    const int S = 4096;
-    const int D = 64;
+    const uint32_t B = 1; // Single batch to focus on Sequence Length scaling
+    const uint32_t S = 4096;
+    const uint32_t D = 64;
 
     JobStealerCtx ctx(16);
 
     infer::Workspace ws(512 * 1024 * 1024); // Bigger workspace for benchmarks
-    std::vector<float> inputData(B * S * D);
-    std::vector<float> outputData(B * S * D);
+    std::vector<float> inputData(static_cast<size_t>(B) * S * D);
+    std::vector<float> outputData(static_cast<size_t>(B) * S * D);
     randomize_buffer(inputData.data(), inputData.size());
 
-    cords::ViewR input(inputData.data(), cords::ViewR::Extent{static_cast<uint32_t>(B), static_cast<uint32_t>(S)});
-    cords::ViewR output(outputData.data(), cords::ViewR::Extent{static_cast<uint32_t>(B), static_cast<uint32_t>(S)});
+    cords::ViewR input(
+        inputData.data(),
+        cords::makeBSD(B, S, D)
+        );
+    cords::ViewR output(
+        outputData.data(),
+        cords::makeBSD(B, S, D)
+        );
 
     // Only run the scalable ones to save time in test suite
     BENCHMARK("FMM Attention (O(N)) - Long Context") {
         layers::LayerConfig cfg;
         cfg.adapterType = adapters::AdapterType::FMM;
-        layers::AttentionLayer attn(D, cfg);
+        layers::AttentionLayer attn(static_cast<int>(D), cfg);
         attn.forward(*ctx.pool, input, output, ws);
         return outputData[0];
     };
@@ -225,7 +204,7 @@ TEST_CASE("Attention: Scaling Benchmark (Seq=4096)", "[ai][attn][bench][scale]")
     BENCHMARK("LowRank Attention (O(N)) - Long Context") {
         layers::LayerConfig cfg;
         cfg.adapterType = adapters::AdapterType::LowRank;
-        layers::AttentionLayer attn(D, cfg);
+        layers::AttentionLayer attn(static_cast<int>(D), cfg);
         attn.forward(*ctx.pool, input, output, ws);
         return outputData[0];
     };
@@ -233,21 +212,11 @@ TEST_CASE("Attention: Scaling Benchmark (Seq=4096)", "[ai][attn][bench][scale]")
     BENCHMARK("Dense Attention - Long Context") {
         layers::LayerConfig cfg;
         cfg.adapterType = adapters::AdapterType::Dense;
-        layers::AttentionLayer attn(D, cfg);
+        layers::AttentionLayer attn(static_cast<int>(D), cfg);
         attn.forward(*ctx.pool, input, output, ws);
         return outputData[0];
     };
 
-    /*
-    BENCHMARK("Flash Attention - Long Context") {
-        layers::AttentionConfig cfg;
-        cfg.adapterType = adapters::AdapterType::Flash;
-        layers::Attention attn(cfg, D);
-        attn.forward(*ctx.pool, input, output);
-        return outputData[0];
-    };
-    */
+    // TODO: add all the rest of the adapters
 }
-
 #endif
-

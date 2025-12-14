@@ -7,6 +7,8 @@
 #include <numeric>
 #include <vector>
 #include <type_traits>
+#include <array>
+
 
 #include "extents.h"
 #include "view_iter.h"
@@ -60,11 +62,7 @@ public:
 
     [[nodiscard]] std::size_t size() const noexcept
     {
-        if (m_extent.empty())
-            return 0;
-
-        return std::accumulate(m_extent.begin(), m_extent.end(),
-                               std::size_t{1}, std::multiplies<std::size_t>());
+        return m_extent.volume();
     }
 
     [[nodiscard]] T_View &operator[](std::size_t view)
@@ -133,7 +131,7 @@ public:
 
     [[nodiscard]] View<T_View> reshape(const Extent &newExtent) const
     {
-        assert(volume(newExtent) == size());
+        assert(newExtent.volume() == size());
         return View<T_View>(m_view, newExtent);
     }
 
@@ -149,6 +147,7 @@ public:
 
     [[nodiscard]] std::uint32_t stride(size_t dim) const
     {
+        assert(dim < rank());
         return m_strides[dim];
     }
 
@@ -164,27 +163,21 @@ public:
     }
 
 protected:
-    T_View  *m_view{nullptr};
-    Extent  m_extent;
-    Extent  m_strides;
+    T_View                          *m_view{nullptr};
+    Extent                          m_extent;
+    std::array<std::uint32_t, 4>    m_strides{};
 
     void calculateStrides()
     {
         if (m_extent.empty())
             return;
 
-        std::uint32_t stride = 1;
+        std::uint32_t stride = 1;// Err me no understand math like me want to
         // Row-major: last dimension changes fastest
         for (int i = static_cast<int>(m_extent.size()) - 1; i >= 0; --i) {
             m_strides[i] = stride;
             stride *= m_extent[i];
         }
-    }
-
-    static std::size_t volume(const Extent &extent)
-    {
-        return std::accumulate(extent.begin(), extent.end(),
-                               std::size_t{1}, std::multiplies<std::size_t>());
     }
 };
 

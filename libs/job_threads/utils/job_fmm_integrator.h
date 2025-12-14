@@ -145,7 +145,7 @@ private:
                 int sourceIdx = stack[--stackPtr];
                 const Node &source = m_nodes[sourceIdx];
 
-                // We do *not* skip target == source; we just treat it as near-field
+                // We do *not* skip target == source - just treat it as near-field
                 if (FmmTopology<T_Vec, T_Scalar>::isWellSeparated(target, source, m_params.theta)) {
                     // FAR FIELD -> M2L
                     T_Vec r = target.center - source.center; // target − source
@@ -211,10 +211,9 @@ private:
             int sourceIdx = stack[--stackPtr];
             const Node &source = m_nodes[sourceIdx];
 
-            if (FmmTopology<T_Vec, T_Scalar>::isWellSeparated(target, source, m_params.theta)) {
-                // Far-field already handled in runFarFieldPass via M2L
+            // Far-field already handled in runFarFieldPass via M2L
+            if (FmmTopology<T_Vec, T_Scalar>::isWellSeparated(target, source, m_params.theta))
                 continue;
-            }
 
             // Near-field (including self)
             if (source.isLeaf()) {

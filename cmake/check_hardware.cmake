@@ -11,13 +11,12 @@ add_compile_definitions(JOB_AI_BLOCK_COLS=128)
 # "standard" transformer size
 add_compile_definitions(JOB_AI_HEAD_DIM=64)
 
-
-
 check_cxx_compiler_flag("-march=native" COMPILER_SUPPORTS_MARCH_NATIVE)
 if(COMPILER_SUPPORTS_MARCH_NATIVE)
     message(STATUS "Enabling host architecture tuning (-march=native)")
     add_compile_options($<$<CONFIG:Release>:-march=native>)
     add_compile_options($<$<CONFIG:RelWithDebInfo>:-march=native>)
+    add_compile_options($<$<CONFIG:Debug>:-march=native>)
 endif()
 
 check_cxx_compiler_flag("-ffast-math" CXX_SUPPORTS_FAST_MATH_FLAG)
@@ -25,6 +24,7 @@ if(CXX_SUPPORTS_FAST_MATH_FLAG)
     list(APPEND JOB_CXX_FLAGS "-ffast-math")
     add_compile_options($<$<CONFIG:Release>:-ffast-math>)
     add_compile_options($<$<CONFIG:RelWithDebInfo>:-ffast-math>)
+    add_compile_options($<$<CONFIG:Debug>:-ffast-math>)
 endif()
 
 
@@ -33,6 +33,7 @@ if(CXX_SUPPORTS_AVX_TWO_FLAG)
     list(APPEND JOB_CXX_FLAGS "-mavx2")
     add_compile_options($<$<CONFIG:Release>:-mavx2>)
     add_compile_options($<$<CONFIG:RelWithDebInfo>:-mavx2>)
+    add_compile_options($<$<CONFIG:Debug>:-mavx2>)
 endif()
 
 check_cxx_compiler_flag("-mfma" CXX_SUPPORTS_FMATH_FLAG)
@@ -40,6 +41,7 @@ if(CXX_SUPPORTS_FMATH_FLAG)
     list(APPEND JOB_CXX_FLAGS "-mfma")
     add_compile_options($<$<CONFIG:Release>:-mfma>)
     add_compile_options($<$<CONFIG:RelWithDebInfo>:-mfma>)
+    add_compile_options($<$<CONFIG:Debug>:-mavx2>)
 endif()
 
 

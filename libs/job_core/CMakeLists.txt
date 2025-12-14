@@ -17,6 +17,7 @@ set(JOBCORE_HEADERS
     job_logger.h     ## logger clas
     job_timer.h
     job_permissions.h
+    job_assert.h
 )
 
 add_library(JosephsOddBuilder_Core SHARED

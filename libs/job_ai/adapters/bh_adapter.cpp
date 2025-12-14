@@ -68,6 +68,7 @@ void BhAdapter::adapt(
 
         std::vector<BhTraits::Vec3> forces;
         // builds tree -> calculates center of mass -> computes forces
+        // This is AVX ready FIXME
         solver.calculate_forces(bodies, forces);
         for (int i = 0; i < S; ++i) {
             int idx = i * D;

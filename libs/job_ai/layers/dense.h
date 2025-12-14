@@ -45,25 +45,32 @@ public:
     void forward(job::threads::ThreadPool &pool,
                  const cords::ViewR &input,
                  cords::ViewR &output,
-                 [[maybe_unused]] infer::Workspace &workspace) override
+                 [[maybe_unused]]infer::Workspace &workspace) override
     {
-        // flatten in
-        std::size_t rows;
-        std::size_t inFeatures = flattenInput(input, &rows);
+        assert(isCompactRowMajor(input) && "DenseLayer::forward currently requires compact row-major input");
+        std::size_t rows = 0;
+        std::size_t inFeatures = 0;
+        inferDenseShape(input, rows, inFeatures);
+        assert(inFeatures == static_cast<std::size_t>(m_cfg.inputs) && "DenseLayer: input feature dim != m_cfg.inputs");
 
-        size_t flops = rows * static_cast<size_t>(m_cfg.inputs) * m_cfg.outputs;
-        constexpr size_t kMinFlopsForParallel = 16384;
+        const std::size_t outFeatures = static_cast<std::size_t>(m_cfg.outputs);
 
-        cords::Matrix A(input.data(), rows, inFeatures);
+        const std::size_t flops = rows * inFeatures * outFeatures;
+        constexpr std::size_t kMinFlopsForParallel = 16384;
+
+        // Treat input as [rows, inFeatures] matrix (row-major)
+        cords::Matrix A(const_cast<float*>(input.data()), rows, inFeatures);
         cords::Matrix W(m_weightsPtr, m_cfg.inputs, m_cfg.outputs);
+
+
+
+        // Output buffer must at least hold [rows * outFeatures] contiguous floats.
         cords::Matrix C(output.data(), rows, m_cfg.outputs);
 
         if (flops < kMinFlopsForParallel) {
-            // SERIAL PATH
             comp::sgemm(A, W, C);
             handleBiasAndActivation(pool, output.data(), rows, m_cfg.outputs, false);
         } else {
-            // RUN FOREST RUN !@!!!!!!!
             comp::sgemm_parallel(pool, A, W, C);
             handleBiasAndActivation(pool, output.data(), rows, m_cfg.outputs, true);
         }
@@ -102,9 +109,12 @@ public:
         if (inputShape.rank() == 3)
             return { inputShape[0], inputShape[1], static_cast<uint32_t>(m_cfg.outputs) };
 
-        return { inputShape[0], static_cast<uint32_t>(m_cfg.outputs) };
-    }
+        if (inputShape.rank() == 2)
+            return { inputShape[0], static_cast<uint32_t>(m_cfg.outputs) };
 
+        // rank == 1 -> treat as [1, D]
+        return { 1u, static_cast<uint32_t>(m_cfg.outputs) };
+    }
 
 private:
 

@@ -14,6 +14,8 @@ using namespace job::ai;
 using namespace job::ai::adapters;
 using namespace job::ai::cords;
 using namespace job::threads;
+using job::ai::cords::makeBSD;
+
 
 TEST_CASE("Verlet Adapter: Kinematics (Drift)", "[ai][verlet][usage]") {
     JobStealerCtx ctx(4);
@@ -29,8 +31,8 @@ TEST_CASE("Verlet Adapter: Kinematics (Drift)", "[ai][verlet][usage]") {
     std::vector<float> data(D, 0.0f);
     data[3] = 10.0f; // Vx
 
-    ViewR view(data.data(), ViewR::Extent{1, 1});
-    AttentionShape shape{1, 1, 6, 1};
+    ViewR view(data.data(), makeBSD(1u, 1u, static_cast<uint32_t>(D)));
+    AttentionShape shape{1u, 1u, static_cast<uint32_t>(D), 1u};
     AdapterCtx aCtx;
 
     adapter.adapt(*ctx.pool, shape, view, view, view, view, aCtx);
@@ -59,14 +61,13 @@ TEST_CASE("Verlet Adapter: N-Body Gravity", "[ai][verlet][usage]") {
     data[D + 0] = 1.0f;
     data[D + 6] = 1000.0f; // Heavy Mass
 
-    ViewR view(data.data(), ViewR::Extent{1, 2});
-    AttentionShape shape{1, 2, static_cast<uint32_t>(D), 1};
+    ViewR view(data.data(), makeBSD(1u, static_cast<uint32_t>(S), static_cast<uint32_t>(D)));
+    AttentionShape shape{1u, static_cast<uint32_t>(S), static_cast<uint32_t>(D), 1u};
     AdapterCtx aCtx;
 
     // Run 10 steps
-    for(int i=0; i<10; ++i) {
+    for(int i=0; i<10; ++i)
         adapter.adapt(*ctx.pool, shape, view, view, view, view, aCtx);
-    }
 
     // Check convergence
     // P1 should move Right (> -1.0)
@@ -97,10 +98,22 @@ TEST_CASE("Verlet Adapter: Throughput (N-Body O(N^2))", "[ai][verlet][bench]") {
     // Random initialization
     std::mt19937 gen(42);
     std::uniform_real_distribution<float> dist(-100.0f, 100.0f);
-    for(auto& x : data) x = dist(gen);
+    for(auto &x : data)
+        x = dist(gen);
 
-    cords::ViewR view(data.data(), cords::ViewR::Extent{static_cast<uint32_t>(B), static_cast<uint32_t>(S)});
-    cords::AttentionShape shape{static_cast<uint32_t>(B), static_cast<uint32_t>(S), static_cast<uint32_t>(D), 1};
+    cords::ViewR view(
+        data.data(),
+        makeBSD(static_cast<uint32_t>(B),
+                static_cast<uint32_t>(S),
+                static_cast<uint32_t>(D))
+        );
+
+    cords::AttentionShape shape{
+        static_cast<uint32_t>(B),
+        static_cast<uint32_t>(S),
+        static_cast<uint32_t>(D),
+        1u
+    };
 
     BENCHMARK("Verlet Step (N=1024)") {
         adapter.adapt(*ctx.pool, shape, view, view, view, view, aCtx);

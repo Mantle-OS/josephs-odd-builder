@@ -242,15 +242,15 @@ TEST_CASE("AI Genome IPC: Zero-Copy Serialization", "[ai][ipc][genome]")
         const auto bytes = bSer.bytesWritten();
 
         ssize_t w = 0;
-        while ((w = writer.write(packetBuf, bytes)) == 0) {
+        while ((w = writer.write(packetBuf, bytes)) == 0)
             std::this_thread::yield(); // Backpressure: Let reader run
-        }
+
 
         char recvBuf[8192]; // Stack allocation (L1 Cache hot)
         ssize_t r = 0;
-        while ((r = reader.read(recvBuf, sizeof(recvBuf))) <= 0) {
+        while ((r = reader.read(recvBuf, sizeof(recvBuf))) <= 0)
             std::this_thread::yield(); // Backpressure: Let writer run
-        }
+
         Genome bG;
         GenomeDeserializer bDes(recvBuf, static_cast<size_t>(r));
         bDes.read(bG);

@@ -27,6 +27,7 @@ void Rk4Adapter::adapt(
     const AdapterCtx &ctx
     )
 {
+
     const int B = static_cast<int>(shape.batch);
     const int S = static_cast<int>(shape.seq);
     const int D = static_cast<int>(shape.dim);
@@ -85,9 +86,7 @@ void Rk4Adapter::adapt(
         };
 
 
-        JobRK4Integrator<Particle, Vec3, float> integrator(
-            poolPtr, &bodies, getPos, getVel, getAcc, calcForces, false
-            );
+        JobRK4Integrator<Particle, Vec3, float> integrator(poolPtr, &bodies, getPos, getVel, getAcc, calcForces, false);
 
         float dt = (ctx.dt > 0.0f) ? ctx.dt : m_cfg.dt;
         integrator.step_n(m_cfg.steps, dt);

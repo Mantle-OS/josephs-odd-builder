@@ -47,8 +47,8 @@ TEST_CASE("RK4 Adapter: Two-Body Interaction (Repulsion Check)", "[ai][rk4][usag
     data[p2 + 0] = 1.0f;
     data[p2 + 6] = 100.0f;
 
-    ViewR view(data.data(), ViewR::Extent{1, (uint32_t)S});
-    ViewR out(data.data(), ViewR::Extent{1, (uint32_t)S});
+    ViewR view(data.data(), makeBSD((uint32_t)B, (uint32_t)S, (uint32_t)D));
+    ViewR out (data.data(), makeBSD((uint32_t)B, (uint32_t)S, (uint32_t)D));
 
     AttentionShape shape{ (uint32_t)B, (uint32_t)S, (uint32_t)D, 1 };
     AdapterCtx aCtx;
@@ -89,10 +89,14 @@ TEST_CASE("RK4 Adapter: Low Dimension Ignore", "[ai][rk4][edge]")
     Rk4Adapter adapter(Rk4Config{});
 
     std::vector<float> data(10, 1.0f);
-    ViewR view(data.data(), ViewR::Extent{1, 5});
+    const uint32_t B = 1;
+    const uint32_t S = 5;
+    const uint32_t D = 2;
+
+    ViewR view(data.data(), makeBSD(B, S, D));
 
     // Shape with Dim = 2
-    AttentionShape shape{1, 5, 2, 1};
+    AttentionShape shape{B, S, D, 1};
     AdapterCtx aCtx;
 
     adapter.adapt(*ctx.pool, shape, view, view, view, view, aCtx);
@@ -116,6 +120,7 @@ TEST_CASE("RK4 Adapter: Inertia (Zero Gravity)", "[ai][rk4][edge]")
     cfg.steps = 1;
     Rk4Adapter adapter(cfg);
 
+    int B = 1;
     int S = 1;
     int D = 7;
     std::vector<float> data(S * D, 0.0f);
@@ -125,8 +130,8 @@ TEST_CASE("RK4 Adapter: Inertia (Zero Gravity)", "[ai][rk4][edge]")
     // Mass 0 to prevent self-gravity weirdness (though 1 particle has no gravity)
     data[6] = 0.0f;
 
-    ViewR view(data.data(), ViewR::Extent{1, 1});
-    AttentionShape shape{1, 1, (uint32_t)D, 1};
+    ViewR view(data.data(), makeBSD((uint32_t)B, (uint32_t)S, (uint32_t)D));
+    AttentionShape shape{(uint32_t)B, (uint32_t)S, (uint32_t)D, 1};
     AdapterCtx aCtx;
 
     adapter.adapt(*ctx.pool, shape, view, view, view, view, aCtx);
@@ -154,9 +159,17 @@ TEST_CASE("RK4 Adapter: Throughput", "[ai][rk4][bench]")
         size_t total = static_cast<size_t>(batch) * seq * dim;
         std::vector<float> data(total, 0.5f);
 
-        // Use B in Extent and Shape
-        ViewR view(data.data(), ViewR::Extent{(uint32_t)batch, (uint32_t)seq});
-        AttentionShape shape{(uint32_t)batch, (uint32_t)seq, (uint32_t)dim, 1};
+        ViewR view(data.data(), makeBSD(
+                                    static_cast<uint32_t>(batch),
+                                    static_cast<uint32_t>(seq),
+                                    static_cast<uint32_t>(dim)
+                                    ));
+        AttentionShape shape{
+            static_cast<uint32_t>(batch),
+            static_cast<uint32_t>(seq),
+            static_cast<uint32_t>(dim),
+            1
+        };
 
         adapter.adapt(*ctx.pool, shape, view, view, view, view, aCtx);
     };

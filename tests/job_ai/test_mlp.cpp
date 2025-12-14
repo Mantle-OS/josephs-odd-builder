@@ -1,3 +1,4 @@
+#include "job_stealing_ctx.h"
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/benchmark/catch_benchmark.hpp>
 #include <catch2/catch_approx.hpp>
@@ -85,10 +86,9 @@ TEST_CASE("MLP: Correctness vs Naive", "[ai][mlp][correctness]")
     std::fill(Out_Ref.begin(), Out_Ref.end(), 0.0f);
     mlpNaive(B, D, H, X.data(), W1.data(), W2.data(), Out_Ref.data());
 
-    auto sched = std::make_shared<FifoScheduler>();
-    auto pool = ThreadPool::create(sched, 8);
+    JobStealerCtx ctx(8);
 
-    mlpForward(*pool, B, D, H, X.data(), W1.data(), W2.data(),
+    mlpForward(*ctx.pool, B, D, H, X.data(), W1.data(), W2.data(),
                 HiddenBuf.data(), Out_Opt.data(), ActivationType::ReLU);
 
     for(size_t i = 0; i < Out_Ref.size(); ++i)
@@ -111,8 +111,7 @@ TEST_CASE("MLP: Benchmark Standard (GPT-3 Medium Sized ReLU)", "[ai][mlp][bench]
     std::vector<float, Alloc> Hidden(B * H);
     std::vector<float, Alloc> Out(B * D);
 
-    auto sched = std::make_shared<FifoScheduler>();
-    auto pool = ThreadPool::create(sched, 8);
+    JobStealerCtx ctx(8);
 
     // FLOP Calculation:
     // 1. GEMM 1: 2 * B * D * H
@@ -120,7 +119,7 @@ TEST_CASE("MLP: Benchmark Standard (GPT-3 Medium Sized ReLU)", "[ai][mlp][bench]
     // Total Ops per run ~= 4 * 32 * 1024 * 4096 ~= 536 Million Ops
 
     BENCHMARK("MLP Forward (ReLU)") {
-        mlpForward(*pool, B, D, H, X.data(), W1.data(), W2.data(),
+        mlpForward(*ctx.pool, B, D, H, X.data(), W1.data(), W2.data(),
                     Hidden.data(), Out.data(), ActivationType::ReLU);
         return Out[0];
     };
@@ -147,15 +146,14 @@ TEST_CASE("MLP: Benchmark Gated (Swish)", "[ai][mlp][bench][gated]")
     std::vector<float, Alloc> ValBuf(B * H);
     std::vector<float, Alloc> Out(B * D);
 
-    auto sched = std::make_shared<FifoScheduler>();
-    auto pool = ThreadPool::create(sched, 8);
+    JobStealerCtx ctx(8);
 
     // 3 GEMMs instead of 2.
     // Ops ~= 6 * B * D * H
     // ~= 6 * 16 * 4096 * 12288 ~= 4.8 Billion FLOPs per run
 
     BENCHMARK("Gated MLP Forward (Swish)") {
-        gatedMlpForward(*pool, B, D, H,
+        gatedMlpForward(*ctx.pool, B, D, H,
                           X.data(), W_gate.data(), W_val.data(), W_proj.data(),
                           GateBuf.data(), ValBuf.data(), Out.data(),
                           ActivationType::Swish);
@@ -177,8 +175,8 @@ TEST_CASE("MLP: The Show down", "[ai][mlp][bench][compare]")
     std::vector<float, Alloc> Hidden(B * H);
     std::vector<float, Alloc> Out(B * D);
 
-    auto sched = std::make_shared<FifoScheduler>();
-    auto pool = ThreadPool::create(sched, 8);
+
+    JobStealerCtx ctx(8);
 
     BENCHMARK("Naive") {
         mlpNaive(B, D, H, X.data(), W1.data(), W2.data(), Out.data());
@@ -186,19 +184,19 @@ TEST_CASE("MLP: The Show down", "[ai][mlp][bench][compare]")
     };
 
     BENCHMARK("ReLU (The Speed Demon)") {
-        mlpForward(*pool, B, D, H, X.data(), W1.data(), W2.data(),
+        mlpForward(*ctx.pool, B, D, H, X.data(), W1.data(), W2.data(),
                     Hidden.data(), Out.data(), ActivationType::ReLU);
         return Out[0];
     };
 
     BENCHMARK("GELU (The Transformer Standard)") {
-        mlpForward(*pool, B, D, H, X.data(), W1.data(), W2.data(),
+        mlpForward(*ctx.pool, B, D, H, X.data(), W1.data(), W2.data(),
                     Hidden.data(), Out.data(), ActivationType::GELU);
         return Out[0];
     };
 
     BENCHMARK("Swish (The LLaMA Style)") {
-        mlpForward(*pool, B, D, H, X.data(), W1.data(), W2.data(),
+        mlpForward(*ctx.pool, B, D, H, X.data(), W1.data(), W2.data(),
                     Hidden.data(), Out.data(), ActivationType::Swish);
         return Out[0];
     };

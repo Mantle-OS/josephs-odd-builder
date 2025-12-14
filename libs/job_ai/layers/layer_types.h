@@ -42,23 +42,43 @@ enum LayerFlags : uint8_t {
     HasBias   = 1u << 2,
 };
 
-inline constexpr std::size_t flattenInput(const cords::ViewR &input, std::size_t *rows)
+
+
+inline void inferDenseShape(const cords::ViewR &input,
+                            std::size_t &rows,
+                            std::size_t &inFeatures)
 {
-    if (input.rank() >= 3) {
-        // [Batch, Seq, Dim] -> [Batch*Seq, Dim]
-        *rows = input.extent()[0] * input.extent()[1];
-        return input.extent()[2];
-    }
-    else {
-        // [Rows, Dim] or [Batch, Dim]
-        *rows = input.extent()[0];
-        // Handle rank 1 case? [Dim] -> [1, Dim]
-        if (input.rank() == 1)
-            return input.extent()[0];
-        return input.extent()[1];
-    }
+    const auto &ext = input.extent();
+    const auto rank = ext.rank();
+    assert(rank >= 1 && "inferDenseShape: rank must be >= 1");
+
+    // Last dimension is the feature dimension
+    inFeatures = ext[rank - 1];
+
+    // All preceding dims are “batch-ish” -> multiply them into rows
+    std::size_t outer = 1;
+    for (std::size_t i = 0; i + 1 < rank; ++i)
+        outer *= ext[i];
+
+    rows = outer;
 }
 
+inline bool isCompactRowMajor(const cords::ViewR &v)
+{
+    const auto &ext = v.extent();
+    const auto rank = ext.rank();
+    if (rank == 0)
+        return true;
+
+    // Recompute what row-major strides *should* be
+    std::uint32_t expected = 1;
+    for (int i = static_cast<int>(rank) - 1; i >= 0; --i) {
+        if (v.stride(static_cast<std::size_t>(i)) != expected)
+            return false;
+        expected *= ext[static_cast<std::size_t>(i)];
+    }
+    return true;
+}
 
 
 } // namespace job::ai::layers

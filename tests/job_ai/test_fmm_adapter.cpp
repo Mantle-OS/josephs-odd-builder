@@ -54,12 +54,7 @@ TEST_CASE("FMM Adapter: Semantic Gravity (Attraction)", "[ai][fmm][usage]") {
 
     int B = 1;
     int S = 2;
-    int D = 4; // Use 4th dim for mass if needed, but Adapter currently uses 1.0 or heuristic
-
-    // me cave man me mad .... hack the Mass heuristic in the adapter or just rely on Density.
-    // Current FMM adapter hardcodes p.mass = 1.0f. :(
-    // So Force = G * 1 * 1 / r^2.
-    // r = 2. F = 1/4 = 0.25.
+    int D = 4;
 
     std::vector<float> inputData(B * S * D, 0.0f);
     std::vector<float> outputData(B * S * D, 0.0f);
@@ -68,11 +63,10 @@ TEST_CASE("FMM Adapter: Semantic Gravity (Attraction)", "[ai][fmm][usage]") {
     // Token B (2,0,0)
     inputData[1 * D + 0] = 2.0f;
 
-    ViewR input(inputData.data(), ViewR::Extent{1, 2});
-    ViewR output(outputData.data(), ViewR::Extent{1, 2});
+    ViewR input(inputData.data(), makeBSD((uint32_t)B, (uint32_t)S, (uint32_t)D));
+    ViewR output(outputData.data(), makeBSD((uint32_t)B, (uint32_t)S, (uint32_t)D));
 
-    // pass input as both Sources (K) and Targets (Q) for Self-Attention/Gravity
-    AttentionShape shape{1, 2, static_cast<uint32_t>(D), 1};
+    AttentionShape shape{(uint32_t)B, (uint32_t)S, (uint32_t)D, 1};
     AdapterCtx aCtx;
     aCtx.embedDim = D;
 
@@ -89,9 +83,9 @@ TEST_CASE("FMM Adapter: Semantic Gravity (Attraction)", "[ai][fmm][usage]") {
     INFO("Force on B (should be negative): " << fx_b);
 
     // Physics Checks
-    CHECK(fx_a > 0.2f);  // Should be ~0.25
-    CHECK(fx_b < -0.2f); // Should be ~-0.25
-    CHECK(fy_a == Approx(0.0f)); // No Y force
+    CHECK(fx_a > 0.2f);                 // Should be ~0.25
+    CHECK(fx_b < -0.2f);                // Should be ~-0.25
+    CHECK(fy_a == Approx(0.0f));        // No Y force
 
     // Newton's 3rd Law: Forces should be equal and opposite
     CHECK(fx_a == Approx(-fx_b).margin(0.001f));
@@ -104,19 +98,22 @@ TEST_CASE("FMM Adapter: The Singularity (Overlapping Tokens)", "[ai][fmm][edge]"
     // Implementation should be robust (softening parameter or skip self).
 
     FmmTestCtx ctx;
-    std::vector<float> inputData(16 * 4, 0.0f); // 16 tokens at origin
-    std::vector<float> outputData(16 * 4);
 
-    ViewR input(inputData.data(), ViewR::Extent{1, 16});
-    ViewR output(outputData.data(), ViewR::Extent{1, 16});
-    AttentionShape shape{1, 16, 4, 1};
+    int B = 1;
+    int S = 16;
+    int D = 4;
+
+    std::vector<float> inputData(B * S * D, 0.0f);
+    std::vector<float> outputData(B * S * D, 0.0f);
+
+    ViewR input(inputData.data(), makeBSD((uint32_t)B, (uint32_t)S, (uint32_t)D));
+    ViewR output(outputData.data(), makeBSD((uint32_t)B, (uint32_t)S, (uint32_t)D));
+
+    AttentionShape shape{(uint32_t)B, (uint32_t)S, (uint32_t)D, 1};
     AdapterCtx aCtx;
 
-    // Should not segfault or hang
     ctx.adapter.adapt(*ctx.threadCtx.pool, shape, input, input, input, output, aCtx);
 
-    // Forces should ideally be 0 (symmetry) or NaN if broken
-    // Check for NaN
     CHECK(is_finite_safe(outputData[0]));
     CHECK(outputData[0] == Approx(0.0f).margin(0.1f));
 }
@@ -127,7 +124,7 @@ TEST_CASE("FMM Adapter: Scaling Benchmark (O(N) Proof)", "[ai][fmm][bench]") {
     // N = 4096 (Standard Transformer Context)
     // N = 16384 (Long Context)
 
-    JobStealerCtx ctx(16); // Give it threads
+    JobStealerCtx ctx(8); // Steal so that the pool does not hate us.
 
     // Config: Allow somewhat large leaves to speed up tree build
     FmmConfig cfg;
@@ -139,7 +136,10 @@ TEST_CASE("FMM Adapter: Scaling Benchmark (O(N) Proof)", "[ai][fmm][bench]") {
     aCtx.embedDim = D;
 
     auto run_bench = [&](int seq_len) {
-        std::vector<float> data(seq_len * D);
+        int B = 1;
+        int S = seq_len;
+
+        std::vector<float> data(B * S * D);
         // Random uniform distribution in 100x100x100 box
         // To prevent clustering at 0
         std::mt19937 gen(42);
@@ -147,8 +147,8 @@ TEST_CASE("FMM Adapter: Scaling Benchmark (O(N) Proof)", "[ai][fmm][bench]") {
         for(auto &x : data)
             x = dist(gen);
 
-        ViewR view(data.data(), ViewR::Extent{1, static_cast<uint32_t>(seq_len)});
-        AttentionShape shape{1, static_cast<uint32_t>(seq_len), static_cast<uint32_t>(D), 1};
+        ViewR view(data.data(), makeBSD((uint32_t)B, (uint32_t)S, (uint32_t)D));
+        AttentionShape shape{(uint32_t)B, (uint32_t)S, (uint32_t)D, 1};
 
         adapter.adapt(*ctx.pool, shape, view, view, view, view, aCtx);
     };
@@ -158,6 +158,6 @@ TEST_CASE("FMM Adapter: Scaling Benchmark (O(N) Proof)", "[ai][fmm][bench]") {
 
     // If it was O(N^2), 4096 would be 16x slower than 1024.
     // With O(N), it should be ~4x slower.
-    // Check console output to verify linear scaling.
+    //Need to look at linear scaling.
 }
 #endif

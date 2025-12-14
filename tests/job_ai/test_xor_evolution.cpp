@@ -137,6 +137,7 @@ TEST_CASE("ESCoach: Masters CartPole", "[ai][coach][es][cartpole]")
     float bestFit = 0.0f;
     int solvedGen = -1;
 
+    JOB_LOG_INFO("CartPole Starteed");
     for(int i = 0; i < 100; ++i) { // Give it 100 gens
         coach.coach((i == 0) ? parent : coach.bestGenome());
 

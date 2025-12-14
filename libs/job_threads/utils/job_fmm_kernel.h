@@ -252,6 +252,7 @@ struct FmmKernels {
 
         // gradient !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         local.dipole = local.dipole + g1 + g2 + g3 + g4;
+
     }
 
     static void L2L(Coeffs &localChild, const Coeffs &localParent, const T_Vec &shift)

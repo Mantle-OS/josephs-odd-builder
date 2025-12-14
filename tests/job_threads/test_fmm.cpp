@@ -8,7 +8,7 @@
 
 using namespace job::threads;
 
-// Old lets let this burn up in a .....
+// Old lets let this burn up in a star .....
 // struct TestBody {
 //     Vec3f pos;
 //     float mass;
@@ -126,7 +126,7 @@ TEST_CASE("FMM Kernel Integrity (P=3 Octupole)", "[fmm][kernel][math]")
     // Truncation error is ~6e-6.
     // We should easily pass 0.01% (1e-4).
 
-    REQUIRE_THAT(relError, Catch::Matchers::WithinAbs(0.0f, 0.0001f)); // bad now that I tried to make into Particle
+    REQUIRE_THAT(relError, Catch::Matchers::WithinAbs(0.0f, 0.0001f));
 }
 
 TEST_CASE("FMM Kernel Integrity (P2M -> M2L)", "[fmm][kernel]")
@@ -244,4 +244,6 @@ TEST_CASE("FMM translation invariance (P=3)", "[fmm][invariance]")
     pool->shutdown();
 }
 
+
+//TODO add benchmarks later
 

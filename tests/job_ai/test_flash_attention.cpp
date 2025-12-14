@@ -1,4 +1,3 @@
-#include "job_fifo_scheduler.h"
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/benchmark/catch_benchmark.hpp>
 
@@ -7,7 +6,8 @@
 #include <cmath>
 #include <random>
 
-#include <job_thread_pool.h>
+
+#include <job_stealing_ctx.h>
 #include <flash_attention.h>
 
 using namespace job::ai::comp;
@@ -76,9 +76,10 @@ TEST_CASE("FlashAttention Correctness", "[ai][att][correctness]") {
     naiveAttention(N, d, Q.data(), K.data(), V.data(), O_ref.data(), scale);
 
     // flash
-    auto sched = std::make_shared<FifoScheduler>();
-    auto pool = ThreadPool::create(sched, 8);
-    flashAttentionForward(*pool, N, d, Q.data(), K.data(), V.data(), O_flash.data(), scale);
+
+
+    JobStealerCtx ctx(8);
+    flashAttentionForward(*ctx.pool, N, d, Q.data(), K.data(), V.data(), O_flash.data(), scale);
 
     for(int i=0; i<N*d; ++i)
         REQUIRE_THAT(O_flash[i], Catch::Matchers::WithinRel(O_ref[i], 0.001f));
@@ -96,11 +97,10 @@ TEST_CASE("FlashAttention Benchmark", "[ai][att][bench]") {
     std::vector<float> V(N*d, 0.5f);
     std::vector<float> O(N*d);
 
-    auto sched = std::make_shared<FifoScheduler>();
-    auto pool = ThreadPool::create(sched, 8);
+    JobStealerCtx ctx(8);
 
     BENCHMARK("FlashAttention Forward (N=2048)") {
-        flashAttentionForward(*pool, N, d, Q.data(), K.data(), V.data(), O.data(), scale);
+        flashAttentionForward(*ctx.pool, N, d, Q.data(), K.data(), V.data(), O.data(), scale);
         return O[0];
     };
 }
@@ -116,11 +116,10 @@ TEST_CASE("The Showdown FlashAttention Benchmark", "[ai][att][bench]") {
     std::vector<float> V(N*d, 0.5f);
     std::vector<float> O(N*d);
 
-    auto sched = std::make_shared<FifoScheduler>();
-    auto pool = ThreadPool::create(sched, 8);
+    JobStealerCtx ctx(8);
 
     BENCHMARK("FlashAttention Forward (N=512 dim=64)") {
-        flashAttentionForward(*pool, N, d, Q.data(), K.data(), V.data(), O.data(), scale);
+        flashAttentionForward(*ctx.pool, N, d, Q.data(), K.data(), V.data(), O.data(), scale);
         return O[0];
     };
 

@@ -5,6 +5,7 @@
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
+#include <stdexcept>
 
 #include <initializer_list>
 
@@ -34,31 +35,33 @@ public:
     }
 
     template<typename It>
-        requires (!std::is_integral_v<It>)
-    constexpr Extents(It first, It last)
+        requires (!std::is_integral_v<It>) // iterator ctor
+    constexpr Extents(It first, It last) :
+        m_size(0)
     {
-        const auto count = static_cast<std::size_t>(std::distance(first, last));
-        if (count > MaxRank)
-            throw std::length_error("Extents: too many dimensions");
-        else
-            m_size = count;
+        // m_data is already zero-initialized by the class member definition
+        while (first != last) {
+            if (m_size >= MaxRank)
+                throw std::length_error("Extents: too many dimensions");
 
-        std::size_t i = 0;
-        for (; first != last && i < MaxRank; ++first, ++i)
-            m_data[i] = static_cast<std::uint32_t>(*first);
+            m_data[m_size] = static_cast<std::uint32_t>(*first);
 
-        for (; i < MaxRank; ++i)
-            m_data[i] = 0;
+            ++m_size;
+            ++first;
+        }
+        // No need to zero-fill the rest; m_data{} did it for us ! Nice !
     }
 
 
     [[nodiscard]] constexpr std::uint32_t operator[](std::size_t i) const
     {
+        assert(i < m_size && "Extents index out of logical range");
         return m_data[i];
     }
 
     [[nodiscard]] constexpr std::uint32_t &operator[](std::size_t i)
     {
+        assert(i < m_size && "Extents index out of logical range");
         return m_data[i];
     }
 
@@ -142,5 +145,21 @@ private:
     std::array<std::uint32_t, MaxRank>  m_data{};
     std::size_t                         m_size;
 };
+
+using Extent = Extents<4>;
+[[nodiscard]] constexpr Extent makeBS(std::uint32_t B, std::uint32_t S) noexcept
+{
+    return Extent{B, S};
+}
+
+[[nodiscard]] constexpr Extent makeBSD(std::uint32_t B, std::uint32_t S, std::uint32_t D) noexcept
+{
+    return Extent{B, S, D};
+}
+
+[[nodiscard]] constexpr Extent makeBSDH(std::uint32_t B, std::uint32_t S, std::uint32_t D, std::uint32_t H) noexcept
+{
+    return Extent{B, S, D, H};
+}
 
 } // namespace job::ai::cords
