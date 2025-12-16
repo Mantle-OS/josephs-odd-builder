@@ -2,7 +2,7 @@
 #if defined(HAS_AVX)
 #include <immintrin.h>
 #include "simd_avx.h"
-namespace job::ai::comp {
+namespace job::simd  {
 using SIMD = AVX_F;
 }
 #elif defined(__ARM_NEON) || defined(__aarch64__)

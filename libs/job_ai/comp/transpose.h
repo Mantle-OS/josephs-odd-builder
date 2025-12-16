@@ -1,9 +1,10 @@
 #pragma once
 
-#include "simd_provider.h"
 #include <algorithm>
 
+#include <simd_provider.h>
 namespace job::ai::comp {
+using namespace job::simd;
 
 __attribute__((always_inline))
 inline void transpose_kernel_8x8(const float* __restrict__ src, size_t src_stride,

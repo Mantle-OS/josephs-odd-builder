@@ -51,5 +51,42 @@ T parallel_reduce(ThreadPool &pool, It first, It last, T init,
     return result;
 }
 
+template <typename Index, typename T, typename MapFn, typename ReduceFn>
+T parallel_reduce_ref(ThreadPool &pool, Index first, Index last, T init,
+                  MapFn map_fn, ReduceFn reduce_fn,
+                  int priority = 0, std::size_t grain = 0)
+{
+    if (last <= first)
+        return init;
+
+    const std::size_t n = static_cast<std::size_t>(last - first);
+    const std::size_t hw = std::max<std::size_t>(1, pool.workerCount());
+    const std::size_t g = (grain == 0) ?
+                              std::max<std::size_t>(1, n / (hw * 4)) :
+                              grain;
+
+    std::vector<std::future<T>> partials;
+    partials.reserve(n / g + 1);
+
+    for (Index i = first; i < last;) {
+        Index chunk_end = static_cast<Index>(std::min<std::size_t>(i + g, last));
+        partials.emplace_back(pool.submit(priority, [=]{
+            T acc = init;
+            for (Index j = i; j < chunk_end; ++j) {
+                // Pass INDEX 'j' to map_fn, not dereferenced iterator
+                acc = reduce_fn(acc, map_fn(j));
+            }
+            return acc;
+        }));
+        i = chunk_end;
+    }
+
+    T result = init;
+    for (auto &fu : partials)
+        result = reduce_fn(result, fu.get());
+
+    return result;
+}
+
 } // namespace job::threads
-// CHECKPOINT: v1.0
+

@@ -1,6 +1,7 @@
 #pragma once
 #include "simd_provider.h"
-namespace job::ai::comp {
+
+namespace job::simd  {
 #if defined(__AVX2__)
 enum class RoundingMode : int {
     Nearest  = _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC, // 0x08

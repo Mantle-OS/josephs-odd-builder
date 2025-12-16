@@ -4,8 +4,9 @@
 #include <algorithm>
 #include <type_traits>
 
+#include <job_logger.h>
+
 #include "activation_types.h"
-#include "job_logger.h"
 
 namespace job::ai::comp {
 

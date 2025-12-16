@@ -29,7 +29,7 @@ public:
         m_mutator()
     {
 
-        m_guiLearner = learn::makeLearner(m_config.taskType, m_pool);
+        m_guiLearner = learn::makeLearner(m_config.envConfig, m_pool);
         resizePopulation(cfg.populationSize);
     }
 
@@ -80,7 +80,7 @@ evo::Genome coach(const evo::Genome &parent) override
             resizePopulation(popSize);
 
         threads::parallel_for(*m_pool, size_t{0}, popSize, [&](size_t i) {
-            learn::ILearn* worker = getLearnerForThread();
+            learn::ILearn *worker = getLearnerForThread();
             float score = -1000.0f;
             if (worker) {
                 evo::Genome &mutant = m_population.genome(i);
@@ -90,7 +90,7 @@ evo::Genome coach(const evo::Genome &parent) override
                 localMutator.seed(m_generation * popSize + i);
                 localMutator.perturb(mutant, m_config.sigma);
 
-                score = worker->learn(mutant, m_config.memLimitMB);
+                score = worker->learn(mutant);
             }
             m_population.setFitness(i, score);
         });
@@ -141,7 +141,7 @@ private:
         if (it != m_registry.end())
             return it->second.get();
 
-        auto newLearner = learn::makeLearner(m_config.taskType, m_pool);
+        auto newLearner = learn::makeLearner(m_config.envConfig, m_pool);
         learn::ILearn* ptr = newLearner.get();
         m_registry[id] = std::move(newLearner);
         return ptr;

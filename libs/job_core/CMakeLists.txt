@@ -18,6 +18,7 @@ set(JOBCORE_HEADERS
     job_timer.h
     job_permissions.h
     job_assert.h
+    split_mix64.h
 )
 
 add_library(JosephsOddBuilder_Core SHARED

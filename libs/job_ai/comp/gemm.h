@@ -7,14 +7,13 @@
 #include <job_thread_pool.h>
 #include <job_parallel_for.h>
 
-#include "simd_provider.h"
+#include <simd_provider.h>
 
 #include "matrix.h"
 
 namespace job::ai::comp {
 using namespace job::ai::cords;
-
-using SMID = AVX_F;
+using namespace job::simd;
 
 constexpr int kMicroM = 8;
 constexpr int kMicroN = 8;
@@ -27,32 +26,32 @@ inline void microKernel8x8(int K, float alpha,
                const float* __restrict__ B, int ldb,
                float* __restrict__ C, int ldc)
 {
-    f32 c0 = SMID::zero();
-    f32 c1 = SMID::zero();
-    f32 c2 = SMID::zero();
-    f32 c3 = SMID::zero();
-    f32 c4 = SMID::zero();
-    f32 c5 = SMID::zero();
-    f32 c6 = SMID::zero();
-    f32 c7 = SMID::zero();
+    f32 c0 = SIMD::zero();
+    f32 c1 = SIMD::zero();
+    f32 c2 = SIMD::zero();
+    f32 c3 = SIMD::zero();
+    f32 c4 = SIMD::zero();
+    f32 c5 = SIMD::zero();
+    f32 c6 = SIMD::zero();
+    f32 c7 = SIMD::zero();
 
     for (int p = 0; p < K; ++p) {
-        f32 b_row = SMID::pull(B + p * ldb);
-        c0 = SMID::mul_plus(SMID::set1(A[0 * lda + p]), b_row, c0);
-        c1 = SMID::mul_plus(SMID::set1(A[1 * lda + p]), b_row, c1);
-        c2 = SMID::mul_plus(SMID::set1(A[2 * lda + p]), b_row, c2);
-        c3 = SMID::mul_plus(SMID::set1(A[3 * lda + p]), b_row, c3);
-        c4 = SMID::mul_plus(SMID::set1(A[4 * lda + p]), b_row, c4);
-        c5 = SMID::mul_plus(SMID::set1(A[5 * lda + p]), b_row, c5);
-        c6 = SMID::mul_plus(SMID::set1(A[6 * lda + p]), b_row, c6);
-        c7 = SMID::mul_plus(SMID::set1(A[7 * lda + p]), b_row, c7);
+        f32 b_row = SIMD::pull(B + p * ldb);
+        c0 = SIMD::mul_plus(SIMD::set1(A[0 * lda + p]), b_row, c0);
+        c1 = SIMD::mul_plus(SIMD::set1(A[1 * lda + p]), b_row, c1);
+        c2 = SIMD::mul_plus(SIMD::set1(A[2 * lda + p]), b_row, c2);
+        c3 = SIMD::mul_plus(SIMD::set1(A[3 * lda + p]), b_row, c3);
+        c4 = SIMD::mul_plus(SIMD::set1(A[4 * lda + p]), b_row, c4);
+        c5 = SIMD::mul_plus(SIMD::set1(A[5 * lda + p]), b_row, c5);
+        c6 = SIMD::mul_plus(SIMD::set1(A[6 * lda + p]), b_row, c6);
+        c7 = SIMD::mul_plus(SIMD::set1(A[7 * lda + p]), b_row, c7);
     }
 
-    f32 alpha_vec = SMID::set1(alpha);
+    f32 alpha_vec = SIMD::set1(alpha);
 
 #define UPDATE_REG(reg, row_idx) \
-    reg = SMID::mul_plus(reg, alpha_vec, SMID::pull(C + (row_idx) * ldc)); \
-        SMID::mov(C + (row_idx) * ldc, reg)
+    reg = SIMD::mul_plus(reg, alpha_vec, SIMD::pull(C + (row_idx) * ldc)); \
+        SIMD::mov(C + (row_idx) * ldc, reg)
 
 
     UPDATE_REG(c0, 0);
@@ -110,10 +109,12 @@ inline void sgemm_raw(int M, int N, int K,
 {
     // beta scaling
     if (beta == 0.0f) {
-        for(int i=0; i<M; ++i) std::memset(C + i * ldc, 0, N * sizeof(float));
+        for(int i=0; i<M; ++i)
+            std::memset(C + i * ldc, 0, N * sizeof(float));
     } else if (beta != 1.0f) {
         for(int i=0; i<M; ++i)
-            for(int j=0; j<N; ++j) C[i * ldc + j] *= beta;
+            for(int j=0; j<N; ++j)
+                C[i * ldc + j] *= beta;
     }
 
     // Tiling

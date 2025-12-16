@@ -77,6 +77,9 @@ public:
         return dist(engine());
     }
 
+
+
+
 private:
     inline static std::atomic<bool>          m_useRandomGlobalSeed;
     inline static std::atomic<std::uint64_t> m_globalRandomSeed;

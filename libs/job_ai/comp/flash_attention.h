@@ -5,13 +5,16 @@
 #include <algorithm>
 #include <cstring>
 
-#include "simd_provider.h"
+// #include <simd_provider.h>
 
 
 #include <job_parallel_for.h>
 #include <job_logger.h>
 
 namespace job::ai::comp {
+
+
+// using namespace job::simd;
 
 // IMPORANT !! Assumes row-major layout. this implementation is "Single-Head".  I guess later I will "Batched/Multi-head" that wraps this.
 // Inputs: Q: [SeqLen, HeadDim] | K: [SeqLen, HeadDim] | V: [SeqLen, HeadDim]

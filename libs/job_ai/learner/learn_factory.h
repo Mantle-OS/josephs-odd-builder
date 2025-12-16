@@ -11,15 +11,16 @@
 
 namespace job::ai::learn {
 
-[[nodiscard]] inline std::unique_ptr<ILearn> makeLearner(LearnType type, threads::ThreadPool::Ptr pool)
+[[nodiscard]] inline std::unique_ptr<ILearn> makeLearner(const LearnConfig &cfg, threads::ThreadPool::Ptr pool)
 {
+    LearnType type = cfg.type;
     switch (type) {
     case LearnType::XOR:
-        return XORLearn::create(std::move(pool));
+        return XORLearn::create(cfg, std::move(pool));
     case LearnType::CartPole:
-        return CartPoleLearn::create(std::move(pool));
+        return CartPoleLearn::create(cfg, std::move(pool));
     case LearnType::Bard:
-        return BardLearn::create(std::move(pool));
+        return BardLearn::create(cfg, std::move(pool));
 
     default:
         JOB_LOG_ERROR("Unknown Learner Type: {}", static_cast<uint8_t>(type));

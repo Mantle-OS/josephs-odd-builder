@@ -26,7 +26,6 @@ set(JOBAI_ADAPTERS_HEADERS
     adapters/stencil_adapter.h
     adapters/rk4_config.h
     adapters/rk4_adapter.h
-
     # LLM style adapter's
     adapters/flash_adapter.h
     adapters/lowrank_config.h
@@ -139,7 +138,6 @@ set(JOBAI_ROUTER_HEADERS
     router/router_expert.h
     router/router_configs.h
     router/router_plan.h
-
     router/router_impl.h
 
 )
@@ -152,13 +150,33 @@ set(JOBAI_ROUTER_SOURCES
 set(JOBAI_LEARNER_HEADERS
     learner/learn_concept.h
     learner/ilearn.h
+    learner/learn_config.h
     learner/learn_type.h
     learner/learn_xor.h
     learner/learn_cart_pole.h
+    learner/learn_bard.h
     learner/learn_factory.h
 )
 set(JOBAI_LEARNER_SOURCES)
 
+
+
+set(JOBAI_TOKEN_HEADERS
+    token/itoken.h              # the interface
+    token/lattice_kernel.h
+    token/unicode_lattice.h     # the Unicode lattice
+
+    token/token_type.h          # enums of the token type plugins
+
+    token/ascii_token.h
+    token/char_token.h          # the Gen 0-50
+    token/corpus_chemist.h
+    token/motif_token.h         # Gen 50+:
+    token/bpe_token.h           # compare against me
+
+    token/token_factory.h       # the facory go get aq uniq pointer of the plugin type
+)
+set(JOBAI_TOKEN_SOURCES)
 
 #######################
 # NOT SUBSYSTEMS !
@@ -169,10 +187,10 @@ set(JOBAI_BASE_HEADERS
 set(JOBAI_BASE_SOURCES)
 
 # comp
+
+
 set(JOBAI_COMP_HEADERS
-    comp/rounding_mode.h
     comp/noise_table.h
-    comp/simd_provider.h
     comp/transpose.h
     comp/activation_functors.h
     comp/activate_parallel.h
@@ -188,11 +206,6 @@ set(JOBAI_COMP_HEADERS
 )
 set(JOBAI_COMP_SOURCES)
 
-if(HAS_AVX)
-    list(APPEND  JOBAI_COMP_HEADERS comp/simd_avx.h)
-elseif(HAS_NEON)
-    list(APPEND  JOBAI_COMP_HEADERS comp/simd_arm.h)
-endif()
 
 
 # evo
@@ -248,6 +261,7 @@ add_library(JosephsOddBuilder_Ai SHARED
     ${JOBAI_LEARNER_HEADERS}    ${JOBAI_LEARNER_SOURCES}
     ${JOBAI_MOE_HEADERS}        ${JOBAI_MOE_SOURCES}
     ${JOBAI_ROUTER_HEADERS}     ${JOBAI_ROUTER_SOURCES}
+    ${JOBAI_TOKEN_HEADER}       ${JOBAI_TOKEN_SOURCES}
     # non modules
     # ${JOBAI_BASE_HEADERS}       ${JOBAI_BASE_SOURCES}
     ${JOBAI_COMP_HEADERS}       ${JOBAI_COMP_SOURCES}
@@ -268,7 +282,9 @@ target_link_libraries(JosephsOddBuilder_Ai PUBLIC
     Threads::Threads
     atomic
     JosephsOddBuilder_Core
+    JosephsOddBuilder_Ansi
     JosephsOddBuilder_Threads
+    JosephsOddBuilder_Simd
     JosephsOddBuilder_Crypto
     JosephsOddBuilder_Net
     JosephsOddBuilder_Science
@@ -284,6 +300,7 @@ target_include_directories(JosephsOddBuilder_Ai PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/learner>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/moe>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/router>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/token>
     ## non modules
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/base>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/comp>
@@ -291,7 +308,7 @@ target_include_directories(JosephsOddBuilder_Ai PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/infer>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/cache>
     # INSTALL PATHS
-    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobai/>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobai>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobai/adapters>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobai/coach>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobai/cords>
@@ -299,6 +316,7 @@ target_include_directories(JosephsOddBuilder_Ai PUBLIC
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobai/learner>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobai/moe>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobai/router>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobai/token>
     ## non modules
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobai/base>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobai/comp>
@@ -313,9 +331,11 @@ install(FILES ${JOBAI_ADAPTERS_HEADERS} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/
 install(FILES ${JOBAI_COACH_HEADERS}    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobai/coach)
 install(FILES ${JOBAI_CORDS_HEADERS}    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobai/cords)
 install(FILES ${JOBAI_LAYERS_HEADERS}   DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobai/layers)
-install(FILES ${JOBAI_LEARNER_HEADERS}   DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobai/learner)
+install(FILES ${JOBAI_LEARNER_HEADERS}  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobai/learner)
 install(FILES ${JOBAI_MOE_HEADERS}      DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobai/moe)
 install(FILES ${JOBAI_MOE_HEADERS}      DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobai/router)
+install(FILES ${JOBAI_TOKEN_HEADER}     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobai/token)
+
 
 ## NON Module HEADERS  install
 install(FILES ${JOBAI_BASE_HEADERS}     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobai/base)

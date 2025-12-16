@@ -98,8 +98,3 @@ add_subdirectory(tests)
 ##############################
 add_subdirectory(docs)
 
-
-
-# CHECKPOINT: v1.1
-
-

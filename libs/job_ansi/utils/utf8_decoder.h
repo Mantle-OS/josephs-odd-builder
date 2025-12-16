@@ -41,12 +41,13 @@ public:
     // Static decode of a full UTF-8 byte stream into a sequence of codepoints
     [[nodiscard]] static std::vector<char32_t> decodeUtf8Stream(std::string_view bytes);
 
+    [[nodiscard]] static std::size_t determineLength(unsigned char firstByte);
+    [[nodiscard]] bool isComplete() const;
+    [[nodiscard]] static bool validateUtf8Sequence(const unsigned char* data, std::size_t len, char32_t &outChar);
+    [[nodiscard]] static bool isValid(std::string_view str);
 private:
     std::string m_buffer;
     std::size_t m_expectedLength = 0;
 
-    [[nodiscard]] bool isComplete() const;
-    [[nodiscard]] static std::size_t determineLength(unsigned char firstByte);
-    [[nodiscard]] static bool validateUtf8Sequence(const unsigned char* data, std::size_t len, char32_t &outChar);
 };
 }

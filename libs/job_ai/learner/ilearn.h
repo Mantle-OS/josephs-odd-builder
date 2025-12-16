@@ -16,7 +16,7 @@ public:
     // 1. Load Genome (Flywheel)
     // 2. Run Simulation (Physics + Inference)
     // 3. Return Fitness Score (Higher is better)
-    [[nodiscard]] virtual float learn(const evo::Genome &genome, uint8_t initWsMb = 1)  = 0;
+    [[nodiscard]] virtual float learn(const evo::Genome &genome)  = 0;
 
     // Optional: Returns the input dimension required by this environment
     [[nodiscard]] virtual uint32_t inputDimension() const noexcept = 0;
@@ -24,7 +24,7 @@ public:
     // Optional: Returns the output/action dimension required
     [[nodiscard]] virtual uint32_t outputDimension() const noexcept = 0;
 
-    // [[nodiscard]] virtual std::string_view &name() const = 0; // NEW
+    virtual void onTokenTime([[maybe_unused]]uint64_t generation, [[maybe_unused]]uint64_t seed) {}
 };
 
 } // namespace job::ai::learner

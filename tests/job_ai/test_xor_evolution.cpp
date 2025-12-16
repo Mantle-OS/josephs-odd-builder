@@ -103,8 +103,8 @@ TEST_CASE("ESCoach: Solves XOR", "[ai][coach][es][xor]")
     cfg.populationSize = 128;
     cfg.sigma = 0.1f;
     cfg.decay = 0.99f;
-    cfg.taskType = LearnType::XOR;
-    cfg.memLimitMB = 1;
+    cfg.envConfig.type = LearnType::XOR;
+    cfg.envConfig.initWsMb = 1;
 
     ESCoach coach(ctx.pool, cfg);
 
@@ -129,8 +129,8 @@ TEST_CASE("ESCoach: Masters CartPole", "[ai][coach][es][cartpole]")
     cfg.populationSize = 128; // Decent population size
     cfg.sigma = 0.2f;         // HIGHER SIGMA to break out of "suicide" mode
     cfg.decay = 0.99f;        // Anneal gently
-    cfg.taskType = LearnType::CartPole;
-    cfg.memLimitMB = 1;
+    cfg.envConfig.type = LearnType::CartPole;
+    cfg.envConfig.initWsMb = 1;
 
     ESCoach coach(ctx.pool, cfg);
 
@@ -155,8 +155,8 @@ TEST_CASE("ESCoach: Masters CartPole", "[ai][coach][es][cartpole]")
         JOB_LOG_WARN("CartPole Best Run: {}", bestFit);
     }
 
-    // Even if not perfect 500, it should be well above random (20)
-    REQUIRE(bestFit > 100.0f);
+    // Even if not perfect 100, it should be well above random (20)
+    REQUIRE(bestFit >= 99.9f);
 }
 TEST_CASE("Evolution: Edge Cases (Single Thread / Pop 1)", "[coach][edge]")
 {
@@ -165,7 +165,8 @@ TEST_CASE("Evolution: Edge Cases (Single Thread / Pop 1)", "[coach][edge]")
     ESCoach::Config cfg;
     cfg.populationSize = 1;
     cfg.sigma = 0.5f;
-    cfg.taskType = LearnType::XOR;
+    cfg.envConfig.type = LearnType::XOR;
+
 
     ESCoach coach(ctx.pool, cfg);
     Genome seed = buildXORGenome();
@@ -188,7 +189,7 @@ TEST_CASE("Evolution: Flywheel Throughput", "[coach][benchmark]")
     BENCHMARK("XOR (Pop=4096)") {
         ESCoach::Config cfg;
         cfg.populationSize = 4096;
-        cfg.taskType = LearnType::XOR;
+        cfg.envConfig.type = LearnType::XOR;
         ESCoach coach(ctx.pool, cfg);
         return coach.coach(xorSeed);
     };
@@ -198,7 +199,7 @@ TEST_CASE("Evolution: Flywheel Throughput", "[coach][benchmark]")
     BENCHMARK("CartPole (Pop=1024)") {
         ESCoach::Config cfg;
         cfg.populationSize = 1024;
-        cfg.taskType = LearnType::CartPole;
+        cfg.envConfig.type  = LearnType::CartPole;
         ESCoach coach(ctx.pool, cfg);
         return coach.coach(cartSeed);
     };

@@ -4,7 +4,7 @@
 #include <cmath>
 #include "rounding_mode.h"
 
-namespace job::ai::comp {
+namespace job::smid {
 inline constexpr int kBlockSize = JOB_BLOCK_SIZE;
 
 using f32 = float32x4_t;

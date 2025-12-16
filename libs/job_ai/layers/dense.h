@@ -67,12 +67,18 @@ public:
         // Output buffer must at least hold [rows * outFeatures] contiguous floats.
         cords::Matrix C(output.data(), rows, m_cfg.outputs);
 
-        if (flops < kMinFlopsForParallel) {
-            comp::sgemm(A, W, C);
-            handleBiasAndActivation(pool, output.data(), rows, m_cfg.outputs, false);
-        } else {
+        bool worthParallelizing = (rows > 1) && (flops > kMinFlopsForParallel);
+
+        if (worthParallelizing) {
+            // CORRECTED: Use parallel when it IS worth it
+
             comp::sgemm_parallel(pool, A, W, C);
             handleBiasAndActivation(pool, output.data(), rows, m_cfg.outputs, true);
+        } else {
+            // CORRECTED: Use serial when it is NOT worth it
+            // This keeps small tasks off the thread pool, preventing the starvation deadlock
+            comp::sgemm(A, W, C);
+            handleBiasAndActivation(pool, output.data(), rows, m_cfg.outputs, false);
         }
     }
 

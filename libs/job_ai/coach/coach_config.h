@@ -1,54 +1,69 @@
 #pragma once
-#include "learn_type.h"
 #include <cstddef>
 #include <cstdint>
+#include <learn_config.h>
 
 namespace job::ai::coach {
 
 struct ESConfig {
-    size_t              populationSize      = 64;                       // Matches thread count usually
-    float               sigma               = 0.02f;                    // Mutation strength (Learning Rate)
-    float               decay               = 0.99f;                    // Sigma decay per generation (Annealing)
-    uint64_t            seed                = 0;                        // 0 = Random Device
-    learn::LearnType    taskType            = learn::LearnType::XOR;    // What type od learner the Coach is going to use
-    uint8_t             memLimitMB          = 1;                        // The MB for the wordkspace when creating the leaner for the runner.
+    learn::LearnConfig envConfig;
+    size_t      populationSize  = 64;           // 8 bytes
+    uint64_t    coachSeed       = 0;            // 8 bytes (Mutator Seed, 0=Random)
+    float       sigma           = 0.02f;        // 4 bytes (Learning Rate)
+    float       decay           = 0.99f;        // 4 bytes (Annealing)
 
-    [[nodiscard]] inline bool validate(const ESConfig &cfg) noexcept
+    [[nodiscard]] static bool validate(const ESConfig &cfg) noexcept
     {
-        if (cfg.populationSize == 0)
-            return false;
+        if (cfg.populationSize == 0) return false;
+        if (cfg.sigma <= 0.0f) return false;
+        if (cfg.decay <= 0.0f || cfg.decay > 1.0f) return false;
 
-        if (cfg.sigma <= 0.0f)
-            return false;
-
-        if (cfg.decay <= 0.0f || cfg.decay > 1.0f)
-            return false;
+        // We could also validate the envConfig if needed
+        // if (cfg.envConfig.initWsMb == 0) return false;
 
         return true;
     }
-
 };
+
+// Ensure tight packing
+static_assert(sizeof(ESConfig) == 56, "ESConfig has padding holes!");
 
 namespace CoachPresets {
 
+// Quick XOR Test
 static constexpr ESConfig kFastTest {
-    .populationSize     = 8,
-    .sigma              = 0.1f,
-    .seed               = 42
+    .envConfig      = learn::LearnPresets::XORConfig(), // Nested Designated Init works in C++20!
+    .populationSize = 8,
+    .coachSeed      = 42,
+    .sigma          = 0.1f,
+    .decay          = 0.95f
 };
 
+// Standard XOR Training
 static constexpr ESConfig kStandard {
-    .populationSize     = 64,
-    .sigma              = 0.02f,
-    .decay              = 0.999f,
-    .seed               = 0
+    .envConfig      = learn::LearnPresets::XORConfig(),
+    .populationSize = 64,
+    .coachSeed      = 0,
+    .sigma          = 0.05f,
+    .decay          = 0.995f
 };
 
-static constexpr ESConfig kDeepSearch {
-    .populationSize     = 1024, // Requires cluster
-    .sigma              = 0.05f,
-    .decay              = 0.9999f,
-    .seed               = 0
+// CartPole Physics
+static constexpr ESConfig kPhysics {
+    .envConfig      = learn::LearnPresets::CartPoleConfig(500),
+    .populationSize = 64,
+    .coachSeed      = 123,
+    .sigma          = 0.1f,     // Physics needs more exploration
+    .decay          = 0.99f
+};
+
+// The Drunk Bard (Needs defaults, user usually overrides corpus)
+static constexpr ESConfig kBard {
+    .envConfig      = learn::LearnPresets::BardConfig(),
+    .populationSize = 32,       // Smaller pop due to memory/CPU cost
+    .coachSeed      = 0,
+    .sigma          = 0.10f,    // High volatility for creative writing
+    .decay          = 0.999f
 };
 
 } // namespace CoachPresets

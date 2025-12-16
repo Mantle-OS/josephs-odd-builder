@@ -94,8 +94,7 @@ char32_t Utf8Decoder::takeChar()
         const auto *s = reinterpret_cast<const unsigned char *>(m_buffer.data());
         bool ok = validateUtf8Sequence(s, m_buffer.size(), result);
         if (!ok) {
-            // Log or debug-assert if desired
-            // std::cerr << "Invalid UTF-8 sequence in buffer\n";
+            // JOB _LOG_ERROR("Invalid UTF-8 sequence in buffer\n");
         }
     }
 
@@ -173,6 +172,27 @@ bool Utf8Decoder::validateUtf8Sequence(const unsigned char *data, std::size_t le
     default:
         return false;
     }
+}
+
+bool Utf8Decoder::isValid(std::string_view str)
+{
+    const auto *data = reinterpret_cast<const unsigned char *>(str.data());
+    std::size_t len = str.size();
+    std::size_t i = 0;
+    char32_t dummy;
+
+    while (i < len) {
+        std::size_t seqLen = determineLength(data[i]);
+        if (seqLen == 0 || i + seqLen > len)
+            return false;
+
+        if (!validateUtf8Sequence(data + i, seqLen, dummy))
+            return false;
+
+        i += seqLen;
+    }
+
+    return true;
 }
 
 }

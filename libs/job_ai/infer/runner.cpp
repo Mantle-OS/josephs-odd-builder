@@ -67,7 +67,8 @@ cords::ViewR Runner::run(const cords::ViewR &input, uint8_t wsMB)
 {
     cords::ViewR::Extent shape = input.extent();
     size_t totalRows = shape[0];
-    if (shape.rank() >= 3) totalRows *= shape[1];
+    if (shape.rank() >= 3)
+        totalRows *= shape[1];
 
     // IO Buffer Size (Floats)
     size_t ioFloats = totalRows * m_maxLayerDim;
@@ -75,6 +76,12 @@ cords::ViewR Runner::run(const cords::ViewR &input, uint8_t wsMB)
     ioFloats = (ioFloats + 15) & ~15;
 
     size_t scratchBytes = size_t(wsMB) * 1024 * 1024;
+
+    size_t minSafeScratch = m_maxLayerDim * sizeof(float) * 4; // Minimal sanity buffer
+    if (scratchBytes < minSafeScratch) {
+        // Auto-expand or clamp if the config is suicidally small
+        scratchBytes = std::max(scratchBytes, minSafeScratch);
+    }
 
     // Total Bytes Needed
     size_t totalBytes = (ioFloats * 2 * sizeof(float)) + scratchBytes;

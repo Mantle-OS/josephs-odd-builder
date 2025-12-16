@@ -83,10 +83,10 @@ int main() {
         job::threads::JobStealerCtx ctx(8);
 
         job::ai::coach::ESCoach::Config cfg;
-        cfg.taskType = job::ai::learn::LearnType::CartPole;
+        cfg.envConfig.type  = job::ai::learn::LearnType::CartPole;
         cfg.populationSize = 128;
         cfg.sigma = 0.5f; // Good noise level
-        cfg.memLimitMB = 1;
+        cfg.envConfig.initWsMb = 1;
 
         job::ai::coach::ESCoach coach(ctx.pool, cfg);
 

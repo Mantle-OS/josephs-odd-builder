@@ -2,10 +2,10 @@
 #include <cmath>
 #include <algorithm>
 
-#include "simd_provider.h"
+#include <simd_provider.h>
 
 namespace job::ai::comp {
-
+using namespace job::simd;
 struct FastMath {
 
     // ME: Hey there Johann Von Schraudolph
@@ -69,71 +69,75 @@ struct FastMath {
 };
 
 struct FunctorIdentity {
-    static inline f32 apply(f32 x)
+    static inline f32 apply(f32 x, [[maybe_unused]] float alpha)
     {
         return x;
     }
 
-    static inline float apply_s(float x)
+    static inline float apply_s(float x, [[maybe_unused]] float alpha)
     {
         return x;
     }
 };
 
 struct FunctorReLU {
-    static inline f32 apply(f32 x)
+    static inline f32 apply(f32 x,[[maybe_unused]] float alpha)
     {
         return SIMD::max(x, SIMD::zero());
     }
 
-    static inline float apply_s(float x)
+    static inline float apply_s(float x, [[maybe_unused]] float alpha)
     {
         return std::max(0.0f, x);
     }
 };
 
 struct FunctorLeakyReLU {
-    static inline f32 apply(f32 x)
+    static inline f32 apply(f32 x, float alpha)
     {
-        // x > 0 ? x : 0.01x
+        // x > 0 ? x : alpha * x
         auto zero = SIMD::zero();
-        auto alpha = SIMD::set1(0.01f);
+        auto v_alpha = SIMD::set1(alpha); // Broadcast alpha
         auto mask = SIMD::gt_ps(x, zero);
-        auto scaled = SIMD::mul(x, alpha);
+        auto scaled = SIMD::mul(x, v_alpha);
         return SIMD::blendv(scaled, x, mask);
     }
 
-    static inline float apply_s(float x)
+    static inline float apply_s(float x, float alpha)
     {
-        return x > 0.0f ? x : 0.01f * x;
+        return x > 0.0f ? x : alpha * x;
     }
 };
 
 struct FunctorSwish {
-    static inline f32 apply(f32 x)
+    static inline f32 apply(f32 x, float alpha)
     {
-        // Swish = x * sigmoid(x)
-        return SIMD::mul(x, FastMath::sigmoid_fast(x));
+        // Swish = x * sigmoid(alpha * x)
+        // Note: Standard Swish/SiLU is alpha=1.0
+        auto v_alpha = SIMD::set1(alpha);
+        auto inner = SIMD::mul(x, v_alpha);
+        return SIMD::mul(x, FastMath::sigmoid_fast(inner));
     }
 
-    static inline float apply_s(float x)
+    static inline float apply_s(float x, float alpha)
     {
-        return x / (1.0f + std::exp(-x));
+        return x / (1.0f + std::exp(-(alpha * x)));
     }
 };
 
 struct FunctorGELU {
-
-    static inline f32 apply(f32 x)
+    static inline f32 apply(f32 x, [[maybe_unused]] float alpha)
     {
         // x * sigmoid(1.702 * x) approximation
+        // GELU typically doesn't use alpha, but we keep the signature consistent
         auto coeff = SIMD::set1(1.702f);
         auto inner = SIMD::mul(x, coeff);
         return SIMD::mul(x, FastMath::sigmoid_fast(inner));
     }
 
-    static inline float apply_s(float x)
+    static inline float apply_s(float x, [[maybe_unused]] float alpha)
     {
+        // Exact GELU (tanh approximation)
         return 0.5f * x * (1.0f + std::tanh(0.7978845608f * (x + 0.044715f * x * x * x)));
     }
 };

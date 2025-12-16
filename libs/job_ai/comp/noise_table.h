@@ -6,12 +6,12 @@
 #include <algorithm>
 #include <cstdint>
 
+#include <simd_provider.h>
+
 #include "aligned_allocator.h"
 
-#include "simd_provider.h"
-
 namespace job::ai::comp {
-
+using namespace job::simd;
 class NoiseTable final {
 public:
 

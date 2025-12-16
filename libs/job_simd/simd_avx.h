@@ -3,7 +3,7 @@
 #include <immintrin.h>
 #include "rounding_mode.h"
 
-namespace job::ai::comp {
+namespace job::simd  {
 
 using f32 = __m256;
 using i32 = __m256i;
@@ -144,7 +144,6 @@ struct AVX_F {
         return _mm256_blendv_ps(a, b, mask);
     }
 
-
     // Or
     static inline f32 or_ps(f32 reg_a, f32 reg_b)
     {
@@ -222,4 +221,4 @@ struct AVX_F {
 
 };
 
-} // namespace job::ai::comp
+}
