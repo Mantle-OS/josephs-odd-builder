@@ -1,8 +1,10 @@
 #pragma once
 #include <cstdint>
 #include <bit>
+#include <type_traits>
 
 namespace job::core {
+
 // DONT USE THIS FOR CRYPTOGRAPHY !!!!
 // Why did SplitMix64 get kicked out of the random number generator support group?
 // Because it kept saying "I'm not like those other PRNGs - I'm just here for initialization!"
@@ -15,7 +17,6 @@ struct SplitMix64 {
     constexpr explicit SplitMix64(uint64_t seedIndex) :
         m_state(seedIndex)
     {
-
     }
 
     constexpr uint64_t next()
@@ -35,7 +36,6 @@ struct SplitMix64 {
 
     [[nodiscard]] constexpr double nextDouble()
     {
-        // Generate double in [0, 1) using full 64 bits
         uint64_t val = next();
         val = (val >> 12) | 0x3FF0000000000000ULL;
         return std::bit_cast<double>(val) - 1.0;
@@ -51,22 +51,49 @@ struct SplitMix64 {
         return min + nextDouble() * (max - min);
     }
 
-    [[nodiscard]] constexpr uint64_t range(uint64_t min, uint64_t max)
+    // Uniform integer in [0, maxExclusive). If maxExclusive==0, returns 0.
+    [[nodiscard]] constexpr uint64_t rangeIndex(uint64_t maxExclusive)
     {
-        // Unbiased integer range using Lemire's method
-        uint64_t range_size = max - min + 1;
+        if (maxExclusive == 0)
+            return 0;
+
+        // Lemire: uniform in [0, maxExclusive)
         uint64_t x = next();
-        __uint128_t m = static_cast<__uint128_t>(x) * range_size;
+        __uint128_t m = static_cast<__uint128_t>(x) * maxExclusive;
         uint64_t l = static_cast<uint64_t>(m);
-        if (l < range_size) {
-            uint64_t t = -range_size % range_size;
+
+        if (l < maxExclusive) {
+            const uint64_t t = (0ull - maxExclusive) % maxExclusive;
             while (l < t) {
                 x = next();
-                m = static_cast<__uint128_t>(x) * range_size;
+                m = static_cast<__uint128_t>(x) * maxExclusive;
                 l = static_cast<uint64_t>(m);
             }
         }
-        return min + static_cast<uint64_t>(m >> 64);
+        return static_cast<uint64_t>(m >> 64);
+    }
+
+    // Uniform integer in [min, max]. If max < min, returns min.
+    [[nodiscard]] constexpr uint64_t range(uint64_t min, uint64_t max)
+    {
+        if (max < min)
+            return min;
+
+        // Handle full-range case without (max-min+1) overflow.
+        // If min==0 && max==UINT64_MAX, every uint64_t is valid: return next().
+        if (min == 0 && max == UINT64_MAX)
+            return next();
+
+        const uint64_t span = (max - min) + 1; // safe now (not full range)
+        return min + rangeIndex(span);
+    }
+
+    template <typename UInt>
+    [[nodiscard]] constexpr UInt range(UInt min, UInt max)
+        requires (std::is_unsigned_v<UInt> && !std::is_same_v<UInt, uint64_t>)
+    {
+        return static_cast<UInt>(range(static_cast<uint64_t>(min), static_cast<uint64_t>(max)));
     }
 };
+
 } // namespace job::core

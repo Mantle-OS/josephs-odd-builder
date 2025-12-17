@@ -52,7 +52,7 @@ set(JOBTHREADS_UTILS_HEADERS
     utils/job_branch_and_bound.h
 
     # utils/job_monte_carlo_concept.h
-    # utils/job_monte_carlo.h
+    utils/job_monte_carlo.h
     #
     utils/job_fmm_utils.h #new
     utils/job_fmm_concepts.h # new

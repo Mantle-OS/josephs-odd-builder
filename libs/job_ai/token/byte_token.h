@@ -8,11 +8,8 @@
 
 namespace job::ai::token {
 
-class AsciiToken final : public IToken {
+class ByteToken final : public IToken {
 public:
-    static constexpr uint8_t kAsciiMin = 32;  // ' '
-    static constexpr uint8_t kAsciiMax = 126; // '~'
-
     std::size_t encode(std::span<const uint8_t> input,
                 std::span<ByteLattice> output,
                 float mass = 1.0f) override
@@ -22,20 +19,6 @@ public:
         ByteLatticeKernel::batchEncode(input.first(n),
                                        output.first(n),
                                        mass);
-
-        // ASCII policy: clamp produced atoms to printable range.
-        for (size_t i = 0; i < n; ++i) {
-            uint8_t b = ByteLattice::decode(output[i]);
-
-            if (b < kAsciiMin)
-                b = kAsciiMin;
-
-            if (b > kAsciiMax)
-                b = kAsciiMax;
-
-            output[i] = ByteLattice::encode(b, output[i].mass);
-        }
-
         return n;
     }
 
@@ -46,26 +29,12 @@ public:
 
         ByteLatticeKernel::batchDecode(input.first(n),
                                        output.first(n));
-
-        // ASCII policy: clamp produced bytes to printable range.
-        for (size_t i = 0; i < n; ++i) {
-            uint8_t b = output[i];
-
-            if (b < kAsciiMin)
-                b = kAsciiMin;
-
-            if (b > kAsciiMax)
-                b = kAsciiMax;
-
-            output[i] = b;
-        }
-
         return n;
     }
 
     void mutate(uint64_t) override
     {
-        // ASCII doesn't mutate.
+        // Bytes don't mutate. They just exist.
     }
 };
 

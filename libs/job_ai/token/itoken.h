@@ -1,11 +1,10 @@
 #pragma once
 
+#include <cstdint>
 #include <memory>
-#include <vector>
-#include <string>
-#include <string_view>
+#include <span>
 
-#include "unicode_lattice.h"
+#include "byte_lattice.h"
 
 namespace job::ai::token {
 
@@ -15,9 +14,18 @@ public:
     using UPtr = std::unique_ptr<IToken>;
 
     virtual ~IToken() = default;
-    virtual std::vector<UnicodeLattice> encode(std::string_view text, float mass = 1.0f) = 0;
-    [[nodiscard]] virtual std::string decode(const std::vector<UnicodeLattice> &tokens) = 0;
+
+    // Bytes -> atoms. Caller owns memory.
+    virtual std::size_t encode(std::span<const uint8_t> input,
+                        std::span<ByteLattice> output,
+                        float mass = 1.0f) = 0;
+
+    // Atoms -> bytes. Caller owns memory.
+    virtual std::size_t decode(std::span<const ByteLattice> input,
+                        std::span<uint8_t> output) = 0;
+
+    // Evolution knob.
     virtual void mutate(uint64_t seed) = 0;
 };
 
-} // namespace
+} // namespace job::ai::token

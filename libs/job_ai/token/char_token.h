@@ -1,36 +1,97 @@
 #pragma once
 
+#include <cstdint>
+#include <span>
+
 #include <utils/utf8_decoder.h>
 
 #include "itoken.h"
-#include "lattice_kernel.h"
-
+#include "byte_lattice_kernel.h"
 
 namespace job::ai::token {
 
 class CharToken final : public IToken {
 public:
-    [[nodiscard]] std::vector<UnicodeLattice> encode(std::string_view text, [[maybe_unused]]float mass = 1.0f) override
+    // Bytes -> atoms (normalized UTF-8 bytes).
+    [[nodiscard]] std::size_t encode(std::span<const uint8_t> input,
+                                     std::span<ByteLattice> output,
+                                     float mass = 1.0f) override
     {
-        std::vector<char32_t> atoms = ansi::utils::Utf8Decoder::decodeUtf8Stream(text);
-        std::vector<UnicodeLattice> ret;
-        LatticeKernel::batchEncode(atoms, ret);
-        return ret;
+        uint8_t tmp[256 * 3] = {};
+        std::size_t outAtoms = 0;
+        std::size_t i = 0;
+
+        while (i < input.size() && outAtoms < output.size()) {
+            const std::size_t inRemain = input.size() - i;
+            const std::size_t inChunk  = (inRemain > 256) ? 256 : inRemain;
+
+            const auto inSpan = input.subspan(i, inChunk);
+            const auto outByteCap = (output.size() - outAtoms);
+
+            // tmp capacity needs to fits in final output
+            const std::size_t tmpCap = std::min<std::size_t>(sizeof(tmp), outByteCap);
+
+            auto result = ansi::utils::Utf8Decoder::normalizeUtf8To(inSpan, std::span<uint8_t>(tmp, tmpCap));
+            // you eat to much and are now full
+            if (result.bytesWritten == 0)
+                break;
+
+            // normalized
+            ByteLatticeKernel::batchEncode(std::span<const uint8_t>(tmp, result.bytesWritten),
+                                           output.subspan(outAtoms, result.bytesWritten),
+                                           mass);
+
+            // consumed/produced
+            outAtoms += result.bytesWritten;
+            i += result.bytesRead;
+        }
+
+        return outAtoms;
     }
 
-    [[nodiscard]] std::string decode(const std::vector<UnicodeLattice> &tokens) override
+    // Atoms -> bytes (decode lattice to bytes, then normalize UTF-8 bytes).
+    [[nodiscard]] std::size_t decode(std::span<const ByteLattice> input,
+                                     std::span<uint8_t> output) override
     {
-        std::string ret;
-        std::vector<char32_t> atoms;
-        LatticeKernel::batchDecode(tokens, atoms);
-        ret.reserve(atoms.size()); // Approx
-        for(char32_t c : atoms)
-            ansi::utils::Utf8Decoder::encodeTo(c, ret);
-        return ret;
+        uint8_t tmp[256] = {};
+        std::size_t outBytes = 0;
+        std::size_t i = 0;
+
+        while (i < input.size() && outBytes < output.size()) {
+            const std::size_t inRemain = input.size() - i;
+
+            // Only decode what can fit in 'tmp'.
+            // Note: If 'output' is near full,  we might decode 256 lattices but only consume 5 bytes. The next loop will re-decode the rest... whatever.
+            // This is intentional. Batch decoding is faster than fine-grained checks
+            const std::size_t inChunk = (inRemain > sizeof(tmp)) ? sizeof(tmp) : inRemain;
+
+            // lattice -> bytes
+            ByteLatticeKernel::batchDecode(input.subspan(i, inChunk),
+                                           std::span<uint8_t>(tmp, inChunk));
+
+            // bytes -> output
+            auto result = ansi::utils::Utf8Decoder::normalizeUtf8To(
+                std::span<const uint8_t>(tmp, inChunk),
+                output.subspan(outBytes)
+                );
+
+            if (result.bytesRead == 0 || result.bytesWritten == 0)
+                break;
+
+            outBytes += result.bytesWritten;
+
+            // advance lattice cursor
+            // !!!! SAFETY !!!  relies on 1 lattice == 1 byte invariant.
+            i += result.bytesRead;
+        }
+
+        return outBytes;
     }
 
-    void mutate(uint64_t /*seed*/) override {}
-
+    void mutate(uint64_t) override
+    {
+        // Characters don't mutate. The world does.
+    }
 };
 
-} // namespace
+} // namespace job::ai::token

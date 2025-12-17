@@ -41,4 +41,4 @@ struct alignas(16) UnicodeLattice {
     }
 };
 
-} // namespace
+}

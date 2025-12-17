@@ -29,7 +29,6 @@ endif()
 
 include(CheckCXXCompilerFlag)
 
-
 add_compile_options(
     $<$<CONFIG:Release>:-O3>
     $<$<CONFIG:Release>:-funroll-loops>
@@ -37,7 +36,6 @@ add_compile_options(
 )
 
 add_compile_options(-Wall -Wextra -Wpedantic -Werror)
-
 include(cmake/check_hardware.cmake)
 
 ##############################

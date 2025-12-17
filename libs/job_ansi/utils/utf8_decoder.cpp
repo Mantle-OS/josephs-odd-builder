@@ -29,6 +29,8 @@ void Utf8Decoder::encodeTo(char32_t ch, std::string &out)
 }
 
 
+
+
 char32_t Utf8Decoder::decodeUtf8(std::string_view bytes)
 {
     if (bytes.empty() || bytes.size() > 4)
@@ -70,6 +72,135 @@ std::vector<char32_t> Utf8Decoder::decodeUtf8Stream(std::string_view bytes)
     }
 
     return result;
+}
+
+std::size_t Utf8Decoder::encodeTo(char32_t ch, std::span<char> output)
+{
+
+    if (ch >= 0xD800 && ch <= 0xDFFF)
+        ch = U'\uFFFD';
+
+    if (ch <= 0x7F) {
+        if (output.size() < 1)
+            return 0;
+
+        output[0] = static_cast<char>(ch);
+        return 1;
+    }
+
+    if (ch <= 0x7FF) {
+        if (output.size() < 2)
+            return 0;
+
+        output[0] = static_cast<char>(0xC0 | ((ch >> 6) & 0x1F));
+        output[1] = static_cast<char>(0x80 | (ch & 0x3F));
+        return 2;
+    }
+
+    if (ch <= 0xFFFF) {
+        if (output.size() < 3)
+            return 0;
+
+        output[0] = static_cast<char>(0xE0 | ((ch >> 12) & 0x0F));
+        output[1] = static_cast<char>(0x80 | ((ch >> 6) & 0x3F));
+        output[2] = static_cast<char>(0x80 | (ch & 0x3F));
+        return 3;
+    }
+
+    if (ch <= 0x10FFFF) {
+        if (output.size() < 4)
+            return 0;
+
+        output[0] = static_cast<char>(0xF0 | ((ch >> 18) & 0x07));
+        output[1] = static_cast<char>(0x80 | ((ch >> 12) & 0x3F));
+        output[2] = static_cast<char>(0x80 | ((ch >> 6) & 0x3F));
+        output[3] = static_cast<char>(0x80 | (ch & 0x3F));
+        return 4;
+    }
+
+    // Invalid input fallback
+    if (output.size() < 3)
+        return 0;
+
+    output[0] = static_cast<char>(0xEF);
+    output[1] = static_cast<char>(0xBF);
+    output[2] = static_cast<char>(0xBD);
+    return 3;
+}
+
+std::size_t Utf8Decoder::decodeUtf8StreamTo(std::string_view bytes, std::span<char32_t> output)
+{
+    // Decode a UTF-8 byte stream into codepoints.
+    // Returns codepoints written. Stops early if output is full.
+    // Invalid sequences emit U+FFFD and advance by 1 byte.
+    const auto *s = reinterpret_cast<const unsigned char *>(bytes.data());
+    const std::size_t len = bytes.size();
+
+    std::size_t i = 0;
+    std::size_t outCount = 0;
+
+    while (i < len && outCount < output.size()) {
+        std::size_t cpLen = determineLength(s[i]);
+
+        if (cpLen == 0 || i + cpLen > len) {
+            output[outCount++] = U'\uFFFD';
+            ++i;
+            continue;
+        }
+
+        char32_t ch = 0;
+        if (validateUtf8Sequence(s + i, cpLen, ch)) {
+            output[outCount++] = ch;
+            i += cpLen;
+        } else {
+            output[outCount++] = U'\uFFFD';
+            ++i;
+        }
+    }
+
+    return outCount;
+}
+
+NormUtf8Result Utf8Decoder::normalizeUtf8To(std::span<const uint8_t> input, std::span<uint8_t> output)
+{
+    const auto *s = reinterpret_cast<const unsigned char *>(input.data());
+    const std::size_t len = input.size();
+
+    std::size_t i = 0;
+    std::size_t outCount = 0;
+
+    static constexpr uint8_t kFFFD[3] = { 0xEF, 0xBF, 0xBD };
+
+    while (i < len && outCount < output.size()) {
+        std::size_t cpLen = determineLength(s[i]);
+        char32_t ch = 0;
+
+        // PATH 1: Valid Sequence
+        if (cpLen > 0 && i + cpLen <= len && validateUtf8Sequence(s + i, cpLen, ch)) {
+            // no room for you
+            if (outCount + cpLen > output.size())
+                break;
+
+            for (std::size_t k = 0; k < cpLen; ++k)
+                output[outCount++] = s[i + k];
+
+            i += cpLen;
+        } else {
+            if (outCount + 3 > output.size())
+                break;
+
+            output[outCount + 0] = kFFFD[0];
+            output[outCount + 1] = kFFFD[1];
+            output[outCount + 2] = kFFFD[2];
+            outCount += 3;
+
+            // Skip the 1 bad byte
+            ++i;
+        }
+    }
+
+    // tells the caller: "I stopped at index i, so start there next time."
+    return { i, outCount };
 }
 
 void Utf8Decoder::appendByte(char byte)
@@ -148,13 +279,17 @@ bool Utf8Decoder::validateUtf8Sequence(const unsigned char *data, std::size_t le
                   (data[1] & 0x3F);
         return outChar >= 0x80;
 
-    case 3:
+    case 3:        
         if ((data[1] & 0xC0) != 0x80 || (data[2] & 0xC0) != 0x80)
             return false;
 
         outChar = ((data[0] & 0x0F) << 12) |
                   ((data[1] & 0x3F) << 6) |
                   (data[2] & 0x3F);
+
+        if (outChar >= 0xD800 && outChar <= 0xDFFF)
+            return false;
+
         return outChar >= 0x800;
 
     case 4:

@@ -104,16 +104,6 @@ set(JOBAI_LAYERS_SOURCES
 )
 
 
-# learner
-set(JOBAI_LEARNER_HEADERS
-    learner/learn_concept.h
-    learner/learn_type.h
-    learner/learn_xor.h
-    learner/learn_cart_pole.h
-    learner/learn_bard.h
-)
-set(JOBAI_LEARNER_SOURCES)
-
 # mixure of experts
 set(JOBAI_MOE_HEADERS
     moe/imoe.h
@@ -162,19 +152,26 @@ set(JOBAI_LEARNER_SOURCES)
 
 
 set(JOBAI_TOKEN_HEADERS
-    token/itoken.h              # the interface
-    token/lattice_kernel.h
+    token/byte_lattice_kernel.h ## Empty
+    token/byte_lattice.h        ## Donish
+
+    token/unicode_lattice_kernel.h  ## just finished
     token/unicode_lattice.h     # the Unicode lattice
 
     token/token_type.h          # enums of the token type plugins
 
-    token/ascii_token.h
-    token/char_token.h          # the Gen 0-50
-    token/corpus_chemist.h
-    token/motif_token.h         # Gen 50+:
-    token/bpe_token.h           # compare against me
+    token/token_concept.h
+    token/itoken.h              # the interface refactor slash donish
 
-    token/token_factory.h       # the facory go get aq uniq pointer of the plugin type
+    token/token_safety_dance.h
+
+    token/byte_token.h
+    token/ascii_token.h         # refactor slash donish
+    token/char_token.h          # the Gen 0-50 (refactor slash donish)
+    token/corpus_chemist.h      # refactor slash donish
+    token/motif_token.h         # Gen 50+: (refactor slash donish)
+    # token/bpe_token.h           # compare against me EMPTY
+    token/token_factory.h       # the facory go get aq uniq pointer of the plugin type refactor slash donish
 )
 set(JOBAI_TOKEN_SOURCES)
 
@@ -250,18 +247,16 @@ set(JOBAI_CACHE_SOURCES)
 
 ################### END IMP,DECL ################################
 
-add_compile_options(-mavx -mavx2 -mfma)
-
 add_library(JosephsOddBuilder_Ai SHARED
     # modules
     ${JOBAI_ADAPTERS_HEADERS}   ${JOBAI_ADAPTERS_SOURCES}
     ${JOBAI_COACH_HEADERS}      ${JOBAI_COACH_SOURCES}
-    ${JOBAI_CORDS_HEADERS}      ${JOBAI_CORDS_HEADERS}
+    ${JOBAI_CORDS_HEADERS}      ${JOBAI_CORDS_SOURCES}
     ${JOBAI_LAYERS_HEADERS}     ${JOBAI_LAYERS_SOURCES}
     ${JOBAI_LEARNER_HEADERS}    ${JOBAI_LEARNER_SOURCES}
     ${JOBAI_MOE_HEADERS}        ${JOBAI_MOE_SOURCES}
     ${JOBAI_ROUTER_HEADERS}     ${JOBAI_ROUTER_SOURCES}
-    ${JOBAI_TOKEN_HEADER}       ${JOBAI_TOKEN_SOURCES}
+    ${JOBAI_TOKEN_HEADERS}      ${JOBAI_TOKEN_SOURCES}
     # non modules
     # ${JOBAI_BASE_HEADERS}       ${JOBAI_BASE_SOURCES}
     ${JOBAI_COMP_HEADERS}       ${JOBAI_COMP_SOURCES}
@@ -333,8 +328,8 @@ install(FILES ${JOBAI_CORDS_HEADERS}    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/
 install(FILES ${JOBAI_LAYERS_HEADERS}   DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobai/layers)
 install(FILES ${JOBAI_LEARNER_HEADERS}  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobai/learner)
 install(FILES ${JOBAI_MOE_HEADERS}      DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobai/moe)
-install(FILES ${JOBAI_MOE_HEADERS}      DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobai/router)
-install(FILES ${JOBAI_TOKEN_HEADER}     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobai/token)
+install(FILES ${JOBAI_ROUTER_HEADERS}   DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobai/router)
+install(FILES ${JOBAI_TOKEN_HEADERS}    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobai/token)
 
 
 ## NON Module HEADERS  install
