@@ -10,8 +10,10 @@ namespace job::ai::token {
 
 class AsciiToken final : public IToken {
 public:
-    static constexpr uint8_t kAsciiMin = 32;  // ' '
-    static constexpr uint8_t kAsciiMax = 126; // '~'
+    static constexpr uint8_t    kAsciiMin   = 32;  // ' '
+    static constexpr uint8_t    kAsciiMax   = 126; // '~'
+    static constexpr uint8_t    kAsciiVocab = 95;
+
 
     std::size_t encode(std::span<const uint8_t> input,
                 std::span<ByteLattice> output,

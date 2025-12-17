@@ -55,6 +55,7 @@ Genome buildAsciiBardGenome(uint32_t inputSize, uint32_t outputSize)
 TEST_CASE("Bard Ascii: Trains the Ascii Bard", "[ai][coach][bard]")
 {
     JobStealerCtx ctx(8);
+    // first 6 are the "context window"
     std::string finalWords = "JOSEPHJosephs Odd Builder!";
 
     auto learnCfg = LearnPresets::BardConfig(
@@ -62,6 +63,7 @@ TEST_CASE("Bard Ascii: Trains the Ascii Bard", "[ai][coach][bard]")
         job::ai::token::TokenType::Ascii
         );
     learnCfg.contextLen = 6;
+    learnCfg.corpusLen  = finalWords.size();
     learnCfg.seed       = 42;
     learnCfg.initWsMb   = 1;
     learnCfg.type       = LearnType::Bard;
@@ -80,11 +82,13 @@ TEST_CASE("Bard Ascii: Trains the Ascii Bard", "[ai][coach][bard]")
 
     const uint32_t inDim  = bard->inputDimension();
     const uint32_t outDim = bard->outputDimension();
+    REQUIRE(outDim == 95);
+
 
     Genome bestGenome = buildAsciiBardGenome(inDim, outDim);
     float bestFitness = 0.0f;
 
-    const int cadence = std::max<int>(finalWords.size(), 1);
+    // const int cadence = std::max<int>(finalWords.size(), 1);
 
     JOB_LOG_INFO("[Drunk Bard Integration] Starts drinking...");
 
@@ -94,16 +98,16 @@ TEST_CASE("Bard Ascii: Trains the Ascii Bard", "[ai][coach][bard]")
         bestFitness = coach.currentBestFitness();
         bestGenome  = survivor;
 
-        if (gen % cadence == 0) {
+        if (gen %  learnCfg.corpusLen  == 0) {
             (void)bard->learn(survivor);
-            std::string thought = bard->hallucinate(60);
+            std::string thought = bard->hallucinate(learnCfg.corpusLen);
             if (bestFitness > 96.0f)
                 break;
         }
     }
 
     (void)bard->learn(coach.bestGenome());
-    std::string finalThought = bard->hallucinate((int)(finalWords.size() -6));
+    std::string finalThought = bard->hallucinate((int)(learnCfg.corpusLen - learnCfg.contextLen));
 
     JOB_LOG_INFO("[Drunk Bard Integration] Final: {}", finalThought);
     REQUIRE(bestFitness > 80);

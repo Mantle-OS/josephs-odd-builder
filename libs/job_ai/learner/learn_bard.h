@@ -35,11 +35,12 @@ public:
         m_tokenizer = token::makeTokenizer(m_cfg.tokenType);
         switch (m_cfg.tokenType) {
         case token::TokenType::Byte:
-        case token::TokenType::Ascii:
         case token::TokenType::Char:
             m_outputDim = kByteVocab;
             break;
-
+        case token::TokenType::Ascii:
+            m_outputDim = token::AsciiToken::kAsciiVocab;
+            break;
         case token::TokenType::Motif:
             m_outputDim = kByteVocab + token::MotifToken::kMaxCapacity;
             break;
@@ -270,32 +271,48 @@ private:
 
     uint32_t latticeToIndex(const token::ByteLattice &p) const noexcept
     {
-        if (p.z > 0.0f) {
-            // Motif
-            return kByteVocab + motifLatticeToId(p);
+        const uint8_t b = token::ByteLattice::decode(p);
+
+        switch (m_cfg.tokenType) {
+        case token::TokenType::Ascii: {
+            uint8_t bb = b;
+            if (bb < token::AsciiToken::kAsciiMin) bb = (uint8_t)token::AsciiToken::kAsciiMin;
+            if (bb > token::AsciiToken::kAsciiMax) bb = (uint8_t)token::AsciiToken::kAsciiMax;
+            return uint32_t(bb - token::AsciiToken::kAsciiMin); // 0..94
         }
-        // Raw byte
-        return token::ByteLattice::decode(p);
+        case token::TokenType::Motif:
+            if (p.z > 0.0f)
+                return kByteVocab + motifLatticeToId(p);
+            return uint32_t(b);
+
+        default:
+            return uint32_t(b);
+        }
     }
 
     token::ByteLattice indexToLattice(uint32_t idx) const noexcept
     {
-        if (idx < kByteVocab) {
-            return token::ByteLattice::encode(
-                static_cast<uint8_t>(idx), 1.0f);
+        switch (m_cfg.tokenType) {
+        case token::TokenType::Ascii: {
+            if (idx >= token::AsciiToken::kAsciiVocab) idx = token::AsciiToken::kAsciiVocab - 1;
+            return token::ByteLattice::encode(uint8_t(token::AsciiToken::kAsciiMin + idx), 1.0f);
+        }
+        case token::TokenType::Motif:
+            if (idx < kByteVocab)
+                return token::ByteLattice::encode(uint8_t(idx), 1.0f);
+            break;
+
+        default:
+            if (idx < kByteVocab)
+                return token::ByteLattice::encode(uint8_t(idx), 1.0f);
+            break;
         }
 
-        // Motif
+        // motif branch
         const uint32_t id = idx - kByteVocab;
-        const float x = (float)(id & 0x7F);
-        const float y = (float)((id >> 7) & 0x7F);
-
-        return {
-            (x * 0.015625f) - 1.0f,
-            (y * 0.015625f) - 1.0f,
-            1.0f,
-            1.0f
-        };
+        const float x = float(id & 0x7F);
+        const float y = float((id >> 7) & 0x7F);
+        return { (x * 0.015625f) - 1.0f, (y * 0.015625f) - 1.0f, 1.0f, 1.0f };
     }
 
 private:
