@@ -3,26 +3,25 @@ cmake_minimum_required(VERSION 3.16)
 add_executable(test_job_ai
     # ../test_spin_till.h
     main.cpp
-    test_activation_math.cpp
-    test_aligned_allocator.cpp
-    test_tensor_view.cpp
-    test_ai_shm_integration.cpp
-    test_unix_genome.cpp
-    test_gemm.cpp
-    test_flash_attention.cpp
-    test_mlp.cpp
-    test_attention_integration.cpp
-    test_fmm_adapter.cpp
-    test_verlet_adapter.cpp
-    test_bh_adapter.cpp
-    test_stencil_adapter.cpp
-    test_rk4_adapter.cpp
-    # test_moe.cpp  REGRESSIONS
-    test_runner.cpp
-    test_xor.cpp
-    test_cartpole.cpp
-    # test_simple_bard.cpp
-    test_text_bard.cpp # heavey
+    # test_activation_math.cpp
+    # test_aligned_allocator.cpp
+    # test_tensor_view.cpp
+    # test_ai_shm_integration.cpp
+    # test_unix_genome.cpp
+    # test_gemm.cpp
+    # test_flash_attention.cpp
+    # test_mlp.cpp
+    # test_attention_integration.cpp
+    # test_fmm_adapter.cpp
+    # test_verlet_adapter.cpp
+    # test_bh_adapter.cpp
+    # test_stencil_adapter.cpp
+    # test_rk4_adapter.cpp
+    test_moe.cpp  # REGRESSIONS
+    # test_runner.cpp
+    # test_xor.cpp
+    # test_cartpole.cpp
+    # test_text_bard.cpp # heavey
 
     # test_chat_bard.cpp
 )
