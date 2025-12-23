@@ -15,14 +15,13 @@ public:
         m_cfg{cfg},
         m_alpha(alpha)
     {
-
     }
 
     virtual ~AbstractLayer() = default;
     AbstractLayer(const AbstractLayer&) = delete;
-    AbstractLayer& operator=(const AbstractLayer&) = delete;
+    AbstractLayer &operator=(const AbstractLayer&) = delete;
     AbstractLayer(AbstractLayer&&) noexcept = default;
-    AbstractLayer& operator=(AbstractLayer&&) noexcept = default;
+    AbstractLayer &operator=(AbstractLayer&&) noexcept = default;
 
     /////////////////////////////////////////
     // Start virtual functions
@@ -80,9 +79,7 @@ public:
         return m_alpha;
     }
 
-
-
-
+    // WARNING: Default implementation assumes Standard Dense topology (In * Out [+ Bias]).
     [[nodiscard]] virtual  std::size_t parameterCount() const noexcept override
     {
         size_t total = m_cfg.inputs * m_cfg.outputs;

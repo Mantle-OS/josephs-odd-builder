@@ -6,7 +6,7 @@
 namespace job::ai::layers {
 
 enum class LayerType : uint8_t {
-    Input       = 0,    // Input data bro...
+    Input       = 0,    // Input.
     Dense       = 1,    // Standard Linear
     SparseMoE   = 2,    // Mixture of Experts
     Attention   = 3,    // Self/Cross Attention
@@ -14,9 +14,9 @@ enum class LayerType : uint8_t {
     LayerNorm   = 5,    // Normalization
     RMSNorm     = 6,    // LLaMA style norm
     Residual    = 7,    // Add
-    LinearLoRA  = 8,    // Meh whatever
-    Output      = 9,     // Logits
-    Abstract     = 254
+    LinearLoRA  = 8,    // Add
+    Output      = 9,    // Logits
+    Abstract     = 254  // Unknown slash bad layer type
 };
 
 // Initializer types for weights
@@ -42,8 +42,7 @@ enum LayerFlags : uint8_t {
     HasBias   = 1u << 2,
 };
 
-
-
+// HACK for Dense layer to check if the dimension is 2D or 3D
 inline void inferDenseShape(const cords::ViewR &input,
                             std::size_t &rows,
                             std::size_t &inFeatures)
@@ -71,7 +70,7 @@ inline bool isCompactRowMajor(const cords::ViewR &v)
         return true;
 
     // Recompute what row-major strides *should* be
-    std::uint32_t expected = 1;
+    std::size_t expected = 1;
     for (int i = static_cast<int>(rank) - 1; i >= 0; --i) {
         if (v.stride(static_cast<std::size_t>(i)) != expected)
             return false;

@@ -5,124 +5,177 @@
 #include <algorithm>
 #include <cstring>
 
-// #include <simd_provider.h>
-
-
 #include <job_parallel_for.h>
 #include <job_logger.h>
 
+// Assuming these are defined elsewhere, otherwise define defaults:
+#ifndef JOB_AI_BLOCK_ROWS
+#define JOB_AI_BLOCK_ROWS 64
+#endif
+#ifndef JOB_AI_BLOCK_COLS
+#define JOB_AI_BLOCK_COLS 128
+#endif
+
+// Threshold for stack allocation.
+// 64 rows * 256 dim * 4 bytes = 64KB.
+// This covers 99% of your "everything else" cases without touching the heap.
+#ifndef JOB_AI_MAX_STACK_DIM
+#define JOB_AI_MAX_STACK_DIM 256
+#endif
+
 namespace job::ai::comp {
-
-
-// using namespace job::simd;
-
-// IMPORANT !! Assumes row-major layout. this implementation is "Single-Head".  I guess later I will "Batched/Multi-head" that wraps this.
-// Inputs: Q: [SeqLen, HeadDim] | K: [SeqLen, HeadDim] | V: [SeqLen, HeadDim]
-// Output: O: [SeqLen, HeadDim]
-inline void flashAttentionForward(
-    job::threads::ThreadPool& pool,
-    int N,      // seq Length
-    int d,      // head dimension (must be <= JOB_AI_HEAD_DIM for this optimized "kernel"(sorry linus not sure why these math folks call it this))
-    const float* __restrict__ Q,
-    const float* __restrict__ K,
-    const float* __restrict__ V,
-    float* __restrict__ O,
-    float scale = 1.0f) // usually 1/sqrt(d) ???
+inline void flashForward(int N, // seq Length
+                         int d, // head dimension (Dynamic!)
+                         const float* __restrict__ Q,
+                         const float* __restrict__ K,
+                         const float* __restrict__ V,
+                         float* __restrict__ O,
+                         int br_idx,
+                         float scale)
 {
-    job::threads::parallel_for(pool, size_t{0}, size_t((N + JOB_AI_BLOCK_ROWS - 1) / JOB_AI_BLOCK_ROWS), [&](size_t br_idx) {
+    int i_start = br_idx * JOB_AI_BLOCK_ROWS;
+    int i_end = std::min(i_start + JOB_AI_BLOCK_ROWS, N);
+    int rows = i_end - i_start;
 
-        int i_start = br_idx * JOB_AI_BLOCK_ROWS;
-        int i_end = std::min(i_start + JOB_AI_BLOCK_ROWS, N);
-        int rows = i_end - i_start;
+    //Dynamic Accumulator Allocation ---
+    // Goal: O_local [rows x d]
+    // Strategy: Try stack first (fast), fallback to heap (safe)
 
-        // O_local: Accumulates weighted sum of V
-        float O_local[JOB_AI_BLOCK_ROWS][JOB_AI_HEAD_DIM] = {{0}};
+    float stack_buf[JOB_AI_BLOCK_ROWS * JOB_AI_MAX_STACK_DIM];
+    std::vector<float> heap_buf; // Keep this in scope!
+    float* O_local_flat;
 
-        // l_local: Running sum of exponentials (denominator)
-        float l_local[JOB_AI_BLOCK_ROWS] = {0};
+    if (d <= JOB_AI_MAX_STACK_DIM) {
+        O_local_flat = stack_buf;
+    } else {
+        // "Resize or do something" -> We resize.
+        // This handles your char/motif embeddings if they are huge (e.g. 256/512)
+        heap_buf.resize(rows * d);
+        O_local_flat = heap_buf.data();
+    }
 
-        // m_local: Running max score (for numerical stability)
-        float m_local[JOB_AI_BLOCK_ROWS];
-        std::fill_n(m_local, JOB_AI_BLOCK_ROWS, -1e9f); // Init with -inf
+    // Initialize Accumulator to 0
+    std::memset(O_local_flat, 0, rows * d * sizeof(float));
 
-        // Buffer for Scores (Q * K^T) | Size: [Rows x Cols] = 32 * 128 = 4096 float's = 16KB -> L1
-        float S_local[JOB_AI_BLOCK_ROWS][JOB_AI_BLOCK_COLS];
 
-        // iterate over key/value blocks
-        for (int j_start = 0; j_start < N; j_start += JOB_AI_BLOCK_COLS) {
-            int j_end = std::min(j_start + JOB_AI_BLOCK_COLS, N);
-            int cols = j_end - j_start;
+    // l_local: Running sum of exponentials (denominator)
+    float l_local[JOB_AI_BLOCK_ROWS] = {0};
 
-            // S = Q_tile * K_tile^T
-            // Q tile: [rows, d] | K tile: [cols, d] | S tile: [rows, cols]
-            for (int r = 0; r < rows; ++r) {
-                const float *q_ptr = Q + (i_start + r) * d;
+    // m_local: Running max score
+    float m_local[JOB_AI_BLOCK_ROWS];
+    std::fill_n(m_local, JOB_AI_BLOCK_ROWS, -1e9f);
 
-                for (int c = 0; c < cols; ++c) {
-                    const float *k_ptr = K + (j_start + c) * d;
+    // Buffer for Scores (Q * K^T)
+    // This is size [Rows x Cols], independent of 'd'. Safe to keep fixed.
+    float S_local[JOB_AI_BLOCK_ROWS][JOB_AI_BLOCK_COLS];
 
-                    // Dot Product (AVX2-friendly loop)
-                    float score = 0.0f;
-                    for (int x = 0; x < d; ++x)
-                        score += q_ptr[x] * k_ptr[x];
+    for (int j_start = 0; j_start < N; j_start += JOB_AI_BLOCK_COLS) {
+        int j_end = std::min(j_start + JOB_AI_BLOCK_COLS, N);
+        int cols = j_end - j_start;
 
-                    S_local[r][c] = score * scale;
-                }
-            }
-
-            // online softmax & accumulation
-            for (int r = 0; r < rows; ++r) {
-                // Find max in this new chunk
-                float m_prev = m_local[r];
-                float m_curr = m_prev;
-
-                for (int c = 0; c < cols; ++c)
-                    m_curr = std::max(m_curr, S_local[r][c]);
-
-                // calculate correction factors if new max, shrink the old accumulations
-                float correction = std::exp(m_prev - m_curr);
-                m_local[r] = m_curr;
-
-                // update running denominator || l_new = l_prev * exp(m_prev - m_curr) + sum(exp(S_new - m_curr))
-                float l_prev = l_local[r];
-                float p_sum = 0.0f;
-
-                // temporary row buffer for p (probabilities) to avoid re-exp-ing
-                float P_row[JOB_AI_BLOCK_COLS];
-
-                for (int c = 0; c < cols; ++c) {
-                    float p = std::exp(S_local[r][c] - m_curr);
-                    P_row[c] = p;
-                    p_sum += p;
-                }
-
-                l_local[r] = (l_prev * correction) + p_sum;
-
-                // update output accumulator
-                // O_new = O_prev * correction + P * V | First, apply correction to existing O
-                for (int x = 0; x < d; ++x)
-                    O_local[r][x] *= correction;
-
-                // accumulate new weighted values
-                for (int c = 0; c < cols; ++c) {
-                    const float *v_ptr = V + (j_start + c) * d;
-                    float p = P_row[c];
-
-                    // vector-scalar mul-add
-                    for (int x = 0; x < d; ++x)
-                        O_local[r][x] += p * v_ptr[x];
-                }
-            }
-        }
-
-        // final normalization | O = O_accum / l_accum
+        // Compute Scores Tile: S = Q_tile * K_tile^T
         for (int r = 0; r < rows; ++r) {
-            float inv_l = 1.0f / l_local[r];
-            float *o_ptr = O + (i_start + r) * d;
+            const float *q_ptr = Q + (i_start + r) * d;
 
-            for (int x = 0; x < d; ++x)
-                o_ptr[x] = O_local[r][x] * inv_l;
+            for (int c = 0; c < cols; ++c) {
+                const float *k_ptr = K + (j_start + c) * d;
+
+                // Dot Product
+                // Note: If you have SIMD::dot(ptr, ptr, size), use it here!
+                float score = 0.0f;
+                for (int x = 0; x < d; ++x)
+                    score += q_ptr[x] * k_ptr[x];
+
+                S_local[r][c] = score * scale;
+            }
         }
+
+        // Online Softmax Update
+        for (int r = 0; r < rows; ++r) {
+            // Access the correct row in our flat O_local buffer
+            float *o_local_row = O_local_flat + (r * d);
+
+            float m_prev = m_local[r];
+            float m_curr = m_prev;
+
+            // Find max
+            for (int c = 0; c < cols; ++c)
+                m_curr = std::max(m_curr, S_local[r][c]);
+
+            // Correction factor
+            float correction = std::exp(m_prev - m_curr);
+            m_local[r] = m_curr;
+
+            // Update denominator
+            float l_prev = l_local[r];
+            float p_sum = 0.0f;
+
+            // Temp P buffer // I hate all this but whatever ....... FIXME LATER
+            float P_row[JOB_AI_BLOCK_COLS];
+            for (int c = 0; c < cols; ++c) {
+                float p = std::exp(S_local[r][c] - m_curr);
+                P_row[c] = p;
+                p_sum += p;
+            }
+
+            l_local[r] = (l_prev * correction) + p_sum;
+
+            // Update Output Accumulator
+            // Rescale existing O_local
+            for (int x = 0; x < d; ++x)
+                o_local_row[x] *= correction;
+
+            // Accumulate P * V_new
+            for (int c = 0; c < cols; ++c) {
+                const float *v_ptr = V + (j_start + c) * d;
+                float p = P_row[c];
+
+                // Vector-Scalar FMA
+                for (int x = 0; x < d; ++x)
+                    o_local_row[x] += p * v_ptr[x];
+            }
+        }
+    }
+
+
+    for (int r = 0; r < rows; ++r) {
+        float* o_local_row = O_local_flat + (r * d);
+
+        float inv_l = (l_local[r] == 0.0f) ? 0.0f : (1.0f / l_local[r]);
+        float *o_ptr = O + (i_start + r) * d;
+
+        for (int x = 0; x < d; ++x)
+            o_ptr[x] = o_local_row[x] * inv_l;
+    }
+}
+// Single Threaded Wrapper
+inline void flashAttentionForward(int N,
+                                  int d,
+                                  const float* __restrict__ Q,
+                                  const float* __restrict__ K,
+                                  const float* __restrict__ V,
+                                  float* __restrict__ O,
+                                  float scale)
+{
+    size_t num_blocks = (N + JOB_AI_BLOCK_ROWS - 1) / JOB_AI_BLOCK_ROWS;
+    for(size_t i = 0; i < num_blocks; ++i)
+        flashForward(N, d, Q, K, V, O, i, scale);
+}
+
+// Parallel Wrapper
+inline void flashParallelAttentionForward(job::threads::ThreadPool &pool,
+                                          int N,
+                                          int d,
+                                          const float* __restrict__ Q,
+                                          const float* __restrict__ K,
+                                          const float* __restrict__ V,
+                                          float* __restrict__ O,
+                                          float scale)
+{
+    size_t num_blocks = (N + JOB_AI_BLOCK_ROWS - 1) / JOB_AI_BLOCK_ROWS;
+
+    job::threads::parallel_for(pool, size_t{0}, num_blocks, [&](size_t br_idx) {
+        flashForward(N, d, Q, K, V, O, br_idx, scale);
     });
 }
 

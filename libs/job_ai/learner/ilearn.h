@@ -1,11 +1,8 @@
 #pragma once
-
 #include <memory>
-
+#include <atomic>
 #include "genome.h"
-
 namespace job::ai::learn {
-
 class ILearn {
 public:
     using Ptr   = std::shared_ptr<ILearn>;
@@ -15,7 +12,8 @@ public:
     // The Core Loop:
     // 1. Load Genome (Flywheel)
     // 2. Run Simulation (Physics + Inference)
-    // 3. Return Fitness Score (Higher is better)
+    // 3. Update the m_fitness
+    // 4. Return m_fitness Higher is better at 100%
     [[nodiscard]] virtual float learn(const evo::Genome &genome)  = 0;
 
     // Optional: Returns the input dimension required by this environment
@@ -25,6 +23,12 @@ public:
     [[nodiscard]] virtual uint32_t outputDimension() const noexcept = 0;
 
     virtual void onTokenTime([[maybe_unused]]uint64_t generation, [[maybe_unused]]uint64_t seed) {}
-};
 
-} // namespace job::ai::learner
+    float constexpr fitness() const noexcept{return m_fitness;}
+    bool  constexpr done() const noexcept{ return m_done.load(std::memory_order_acquire);}
+
+protected:
+    float              m_fitness = 0.0f;
+    std::atomic<bool>   m_done{false};
+};
+}

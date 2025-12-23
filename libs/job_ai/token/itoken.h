@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <memory>
 #include <span>
+#include <fstream>
 
 #include "byte_lattice.h"
 
@@ -26,6 +27,9 @@ public:
 
     // Evolution knob.
     virtual void mutate(uint64_t seed) = 0;
+
+    virtual bool save([[maybe_unused]]std::ostream &os) const { return true; }
+    virtual bool load([[maybe_unused]]std::istream &is) { return true; }
 };
 
 } // namespace job::ai::token

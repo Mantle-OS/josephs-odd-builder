@@ -65,8 +65,22 @@ inline void microKernel8x8(int K, float alpha,
 #undef UPDATE_REG
 }
 
+inline void maskedStore(float* ptr, int valid_n, f32 val) {
+    if (valid_n >= 8) {
+        SIMD::mov(ptr, val); // Full store
+    } else {
+        // Create a mask for valid lanes
+        // Note: Faster to use a jump table or pre-computed masks,
+        // but this illustrates the logic using your existing provider.
+        alignas(32) float temp[8];
+        SIMD::mov(temp, val);
+        for (int i = 0; i < valid_n; ++i) {
+            ptr[i] = temp[i];
+        }
+    }
+}
 
-inline void compute_tile(int M, int N, int K, float alpha,
+inline void computeTile(int M, int N, int K, float alpha,
                          const float *A, int lda,
                          const float *B, int ldb,
                          float *C, int ldc,
@@ -78,34 +92,101 @@ inline void compute_tile(int M, int N, int K, float alpha,
     for (int mi = 0; mi < M_curr; mi += kMicroM) {
         for (int ni = 0; ni < N_curr; ni += kMicroN) {
 
+            // perfect 8x8 Block (Hot Path)
             if (mi + kMicroM <= M_curr && ni + kMicroN <= N_curr) {
                 microKernel8x8(K, alpha,
                                &A[(start_m + mi) * lda], lda,
                                &B[(start_n + ni)], ldb,
                                &C[(start_m + mi) * ldc + (start_n + ni)], ldc);
-            } else {
-                // Scalar Fallback for Edges
-                int m_limit = std::min(kMicroM, M_curr - mi);
-                int n_limit = std::min(kMicroN, N_curr - ni);
-                for (int row = 0; row < m_limit; ++row) {
-                    for (int col = 0; col < n_limit; ++col) {
-                        float sum = 0.0f;
-                        for (int p = 0; p < K; ++p) {
-                            sum += A[(start_m + mi + row) * lda + p] * B[p * ldb + (start_n + ni + col)];
-                        }
-                        C[(start_m + mi + row) * ldc + (start_n + ni + col)] += alpha * sum;
+            }  else {
+                int m_limit = std::min(kMicroM, M_curr - mi); // How many rows are valid?
+                int n_limit = std::min(kMicroN, N_curr - ni); // How many cols are valid?
+
+                [[maybe_unused]]f32 c[8];
+                for(int i=0; i<8; ++i)
+                    c[i] = SIMD::zero();
+
+                // Registers
+                f32 acc[8];
+                for(int i=0; i<8; ++i) acc[i] = SIMD::zero();
+
+                for (int p = 0; p < K; ++p) {
+                    f32 b_row;
+                    if (n_limit >= 8) {
+                        b_row = SIMD::pull(B + p * ldb + (start_n + ni));
+                    } else {
+                        alignas(32) float tmp_b[8] = {0};
+                        for(int k=0; k<n_limit; ++k)
+                            tmp_b[k] = B[p * ldb + (start_n + ni) + k];
+
+                        b_row = SIMD::pull(tmp_b);
                     }
+
+                    // Only iterate valid rows
+                    for (int i = 0; i < m_limit; ++i) {
+                        f32 a_val = SIMD::set1(A[(start_m + mi + i) * lda + p]);
+                        acc[i] = SIMD::mul_plus(a_val, b_row, acc[i]);
+                    }
+                }
+
+                // Update C (Masked Store)
+                f32 v_alpha = SIMD::set1(alpha);
+                for (int i = 0; i < m_limit; ++i) {
+                    float* c_ptr = &C[(start_m + mi + i) * ldc + (start_n + ni)];
+
+                    // Load existing C (Masked)
+                    f32 c_curr;
+                    if (n_limit >= 8) {
+                        c_curr = SIMD::pull(c_ptr);
+                    } else {
+                        alignas(32) float tmp_c[8] = {0};
+                        for(int k=0; k<n_limit; ++k) tmp_c[k] = c_ptr[k];
+                        c_curr = SIMD::pull(tmp_c);
+                    }
+
+                    // acc = alpha * acc + C
+                    acc[i] = SIMD::mul_plus(acc[i], v_alpha, c_curr);
+
+                    // Store back
+                    maskedStore(c_ptr, n_limit, acc[i]);
                 }
             }
         }
     }
 }
 
-// low-level raw pointer sgemm (useful for batched operations on raw buffers)
-inline void sgemm_raw(int M, int N, int K,
-                      float alpha, const float *A, int lda,
-                      const float *B, int ldb,
-                      float beta, float *C, int ldc)
+
+// Pure scalar tile computation (No SIMD, No MicroKernels, Just Math)
+inline void computeTileNaive(int M, int N, int K, float alpha,
+                               const float *A, int lda,
+                               const float *B, int ldb,
+                               float *C, int ldc,
+                               int start_m, int start_n, int block_size)
+{
+    int M_curr = std::min(block_size, M - start_m);
+    int N_curr = std::min(block_size, N - start_n);
+
+    // Simple triple loop for the block
+    for (int i = 0; i < M_curr; ++i) {
+        for (int j = 0; j < N_curr; ++j) {
+            float sum = 0.0f;
+            // K-dimension dot product
+            for (int p = 0; p < K; ++p) {
+                sum += A[(start_m + i) * lda + p] * B[p * ldb + (start_n + j)];
+            }
+            // Accumulate: C = alpha*sum + C (Beta handled in outer loop)
+            C[(start_m + i) * ldc + (start_n + j)] += alpha * sum;
+        }
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////
+
+// Raw pointer sgemm with tile
+inline void sgemm(int M, int N, int K,
+                  float alpha, const float *A, int lda,
+                  const float *B, int ldb,
+                  float beta, float *C, int ldc)
 {
     // beta scaling
     if (beta == 0.0f) {
@@ -120,11 +201,37 @@ inline void sgemm_raw(int M, int N, int K,
     // Tiling
     for (int i = 0; i < M; i += JOB_BLOCK_SIZE)
         for (int j = 0; j < N; j += JOB_BLOCK_SIZE)
-            compute_tile(M, N, K, alpha, A, lda, B, ldb, C, ldc, i, j, JOB_BLOCK_SIZE);
+            computeTile(M, N, K, alpha, A, lda, B, ldb, C, ldc, i, j, JOB_BLOCK_SIZE);
 }
 
+
+// Naive sgemm (useful for benchmarks) (FIXME computeTileNaive)
+inline void sgemmNaive(int M, int N, int K,
+                       float alpha,
+                       const float *A, int lda,
+                       const float *B, int ldb,
+                       float beta,
+                       float *C, int ldc)
+{
+    if (beta == 0.0f) {
+        for(int i=0; i<M; ++i)
+            std::memset(C + i * ldc, 0, N * sizeof(float));
+    } else if (beta != 1.0f) {
+        for(int i=0; i<M; ++i)
+            for(int j=0; j<N; ++j)
+                C[i * ldc + j] *= beta;
+    }
+
+    for (int i = 0; i < M; i += JOB_BLOCK_SIZE) {
+        for (int j = 0; j < N; j += JOB_BLOCK_SIZE) {
+            computeTileNaive(M, N, K, alpha, A, lda, B, ldb, C, ldc, i, j, JOB_BLOCK_SIZE);
+        }
+    }
+}
+
+
 // low-level raw pointer parallel sgemm
-inline void sgemm_parallel_raw(job::threads::ThreadPool& pool,
+inline void sgemmParallel(job::threads::ThreadPool &pool,
                                int M, int N, int K,
                                float alpha, const float *A, int lda,
                                const float *B, int ldb,
@@ -151,11 +258,51 @@ inline void sgemm_parallel_raw(job::threads::ThreadPool& pool,
         int i = chunk_m * JOB_BLOCK_SIZE;
         int j = chunk_n * JOB_BLOCK_SIZE;
 
-        compute_tile(M, N, K, alpha, A, lda, B, ldb, C, ldc, i, j, JOB_BLOCK_SIZE);
+        computeTile(M, N, K, alpha, A, lda, B, ldb, C, ldc, i, j, JOB_BLOCK_SIZE);
     }, 0, 1); // grain size 1 to prevent timeouts
 }
 
-inline void sgemm_strided_batched(job::threads::ThreadPool& pool,
+
+///////////////////////////////////////////////////////////////////////////////////////////////
+
+
+
+// FIXME SWAP OUT THE job::threads::parallel_for for serial for loop
+inline void sgemmStridedBatched(int batchCount,
+                                int M, int N, int K,
+                                float alpha,
+                                const float *A, int strideA, int lda,
+                                const float *B, int strideB, int ldb,
+                                float beta,
+                                float *C, int strideC, int ldc)
+{
+    for (int i = 0; i < batchCount; ++i) {
+        const float *a_ptr = A + (i * strideA);
+        const float *b_ptr = B + (i * strideB);
+        float *c_ptr       = C + (i * strideC);
+        sgemm(M, N, K, alpha, a_ptr, lda, b_ptr, ldb, beta, c_ptr, ldc);
+    }
+}
+
+
+// FIXME SWAP OUT THE job::threads::parallel_for for serial for loop
+inline void sgemmNaiveStridedBatched( int batchCount,
+                                int M, int N, int K,
+                                float alpha,
+                                const float *A, int strideA, int lda,
+                                const float *B, int strideB, int ldb,
+                                float beta,
+                                float *C, int strideC, int ldc)
+{
+    for (int i = 0; i < batchCount; ++i) {
+        const float *a_ptr = A + (i * strideA);
+        const float *b_ptr = B + (i * strideB);
+        float *c_ptr       = C + (i * strideC);
+        sgemmNaive(M, N, K, alpha, a_ptr, lda, b_ptr, ldb, beta, c_ptr, ldc);
+    }
+}
+
+inline void sgemmParallelStridedBatched(job::threads::ThreadPool &pool,
                                   int batchCount,
                                   int M, int N, int K,
                                   float alpha,
@@ -168,50 +315,135 @@ inline void sgemm_strided_batched(job::threads::ThreadPool& pool,
         const float *a_ptr = A + (i * strideA);
         const float *b_ptr = B + (i * strideB);
         float *c_ptr       = C + (i * strideC);
-        sgemm_raw(M, N, K, alpha, a_ptr, lda, b_ptr, ldb, beta, c_ptr, ldc);
+        sgemm(M, N, K, alpha, a_ptr, lda, b_ptr, ldb, beta, c_ptr, ldc);
     });
 }
 
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////
+
 // serial sgemm with matrix objects
-inline void sgemm(const Matrix &A, const Matrix &B, Matrix &C,
+inline void sgemmMatrix(const Matrix &A, const Matrix &B, Matrix &C,
                   float alpha = 1.0f, float beta = 0.0f)
 {
     assert(A.cols() == B.rows() && "Inner dimensions must match (K)");
     assert(C.rows() == A.rows() && "Output rows must match A rows");
     assert(C.cols() == B.cols() && "Output cols must match B cols");
 
-    sgemm_raw(A.rows(), B.cols(), A.cols(),
+    sgemm(A.rows(), B.cols(), A.cols(),
               alpha, A.data(), A.extent()[1], // lda = K
               B.data(), B.extent()[1],        // ldb = N
               beta, C.data(), C.extent()[1]); // ldc = N
 }
 
+// navie sgemm with matrix objects
+inline void sgemmNavieMatrix(const Matrix &A, const Matrix &B, Matrix &C,
+                        float alpha = 1.0f, float beta = 0.0f)
+{
+    assert(A.cols() == B.rows() && "Inner dimensions must match (K)");
+    assert(C.rows() == A.rows() && "Output rows must match A rows");
+    assert(C.cols() == B.cols() && "Output cols must match B cols");
+
+    sgemmNaive(A.rows(), B.cols(), A.cols(),
+               alpha, A.data(), A.extent()[1], // lda = K
+               B.data(), B.extent()[1],        // ldb = N
+               beta, C.data(), C.extent()[1]); // ldc = N
+}
+
+
 // parallel sgemm with matrix objects
-inline void sgemm_parallel(job::threads::ThreadPool &pool,
+inline void sgemmParallelMatrix(job::threads::ThreadPool &pool,
                            const Matrix &A, const Matrix &B, Matrix &C,
                            float alpha = 1.0f, float beta = 0.0f)
 {
     assert(A.cols() == B.rows());
     assert(C.rows() == A.rows());
     assert(C.cols() == B.cols());
-    sgemm_parallel_raw(pool,
-                       A.rows(), B.cols(), A.cols(),
-                       alpha, A.data(), A.extent()[1],
-                       B.data(), B.extent()[1],
-                       beta, C.data(), C.extent()[1]);
+    sgemmParallel(pool,
+                  A.rows(), B.cols(), A.cols(),
+                  alpha, A.data(), A.extent()[1],
+                  B.data(), B.extent()[1],
+                  beta, C.data(), C.extent()[1]);
 }
 
-/* FIXME later
-inline void sgemm_parallel(job::threads::ThreadPool &pool,
-                           const ViewR &A, const ViewR &B, ViewR &C,
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// serial sgemm with ViewR objects
+inline void sgemmView(const ViewR &A, const ViewR &B, ViewR &C,
+                      float alpha = 1.0f, float beta = 0.0f)
+{
+    // Safety Checks
+    assert(A.rank() == 2 && B.rank() == 2 && C.rank() == 2 && "Input views must be 2D");
+    assert(A.extent()[1] == B.extent()[0] && "Inner dimensions (K) must match");
+    assert(C.extent()[0] == A.extent()[0] && "C rows must match A rows (M)");
+    assert(C.extent()[1] == B.extent()[1] && "C cols must match B cols (N)");
+
+    // Extract Dimensions
+    int M = static_cast<int>(A.extent()[0]);
+    int N = static_cast<int>(B.extent()[1]);
+    int K = static_cast<int>(A.extent()[1]);
+
+    // Call Raw Kernel
+    // stride(0) corresponds to the 'width' (LDA/LDB/LDC) in this dense View implementation
+    sgemm(M, N, K,
+          alpha,
+          A.data(), static_cast<int>(A.stride(0)),
+          B.data(), static_cast<int>(B.stride(0)),
+          beta,
+          C.data(), static_cast<int>(C.stride(0)));
+}
+
+// naive sgemm with ViewR objects
+inline void sgemmNavieView(const ViewR &A, const ViewR &B, ViewR &C,
                            float alpha = 1.0f, float beta = 0.0f)
 {
-    sgemm_parallel_raw(pool,
-                       A.size(), B.size(), C.size(),
-                       alpha, A.data(), A.extent()[1],
-                       B.data(), B.extent()[1], beta,
-                       C.data(), C.extent()[1]);
+    assert(A.rank() == 2 && B.rank() == 2 && C.rank() == 2 && "Input views must be 2D");
+    assert(A.extent()[1] == B.extent()[0] && "Inner dimensions (K) must match");
+    assert(C.extent()[0] == A.extent()[0] && "C rows must match A rows (M)");
+    assert(C.extent()[1] == B.extent()[1] && "C cols must match B cols (N)");
+
+    int M = static_cast<int>(A.extent()[0]);
+    int N = static_cast<int>(B.extent()[1]);
+    int K = static_cast<int>(A.extent()[1]);
+
+    sgemmNaive(M, N, K,
+               alpha,
+               A.data(), static_cast<int>(A.stride(0)),
+               B.data(), static_cast<int>(B.stride(0)),
+               beta,
+               C.data(), static_cast<int>(C.stride(0)));
 }
-*/
+
+
+// parallel sgemm with ViewR objects
+inline void sgemmParallelView(job::threads::ThreadPool &pool,
+                              const ViewR &A, const ViewR &B, ViewR &C,
+                              float alpha = 1.0f, float beta = 0.0f)
+{
+    assert(A.rank() == 2 && B.rank() == 2 && C.rank() == 2 && "Input views must be 2D");
+    assert(A.extent()[1] == B.extent()[0] && "Inner dimensions (K) must match");
+    assert(C.extent()[0] == A.extent()[0] && "C rows must match A rows (M)");
+    assert(C.extent()[1] == B.extent()[1] && "C cols must match B cols (N)");
+
+    int M = static_cast<int>(A.extent()[0]);
+    int N = static_cast<int>(B.extent()[1]);
+    int K = static_cast<int>(A.extent()[1]);
+
+    sgemmParallel(pool,
+                  M, N, K,
+                  alpha,
+                  A.data(), static_cast<int>(A.stride(0)),
+                  B.data(), static_cast<int>(B.stride(0)),
+                  beta,
+                  C.data(), static_cast<int>(C.stride(0)));
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+
+
 
 } // namespace job::ai::comp

@@ -6,6 +6,7 @@ enum class AdapterType : uint8_t {
     Dense       = 1,    // "Golden” O(N²) attention using (GEMM + softmax helpers).
     Flash       = 2,    // flash_attention_forward
     LowRank     = 3,    // LoRA / SVD based approximation
+    // --- Physics / Simulation Adapters ---
     FMM         = 4,    // Fast Multipole Method (Gravity/Electrostatics)
     BarnesHut   = 5,    // Tree-code (Gravity)
     Verlet      = 6,    // Velocity Verlet (Dynamics)

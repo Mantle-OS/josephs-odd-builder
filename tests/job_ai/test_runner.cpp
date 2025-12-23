@@ -1,6 +1,10 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
+#ifdef JOB_TEST_BENCHMARKS
+#include <catch2/benchmark/catch_benchmark.hpp>
+#endif
+
 #include <vector>
 #include <random>
 #include <numeric>
@@ -12,6 +16,7 @@
 #include <layer_types.h>
 #include <adapter_types.h>
 #include <router_types.h>
+#include <layers/attention.h>
 
 #include <runner.h>
 
@@ -19,6 +24,22 @@ using namespace job::ai;
 using namespace job::ai::infer;
 using namespace job::ai::evo;
 using namespace job::threads;
+
+static void randomizeAttBuffer(float *ptr, size_t count)
+{
+    static std::mt19937 gen(123);
+    static std::uniform_real_distribution<float> dist(-1.0f, 1.0f);
+    for (size_t i = 0; i < count; ++i)
+        ptr[i] = dist(gen);
+}
+
+static void randomizeLayerParams(layers::AbstractLayer &layer)
+{
+    auto p = layer.parameters();
+    randomizeAttBuffer(p.data(), p.extent().volume());
+}
+
+
 
 void addDenseGene(Genome &genome, int input, int output, comp::ActivationType act)
 {
@@ -42,12 +63,16 @@ void addDenseGene(Genome &genome, int input, int output, comp::ActivationType ac
         genome.weights.push_back(dist(gen));
 }
 
-void addAttentionGene(Genome &genome, int dim, int heads) {
+
+
+
+
+void addAttentionGene(Genome &genome, int dim, int heads, adapters::AdapterType type = adapters::AdapterType::Flash) {
     LayerGene gene{};
     gene.type = layers::LayerType::Attention;
     gene.inputs = dim;
     gene.outputs = heads;
-    gene.auxiliaryData = static_cast<uint32_t>(adapters::AdapterType::Flash); // Use Flash
+    gene.auxiliaryData = static_cast<uint32_t>(type); // Use Flash
 
     // 4 matrices (Q,K,V,O) + bias's
     size_t count = 4 * (size_t(dim) * dim) + 4 * dim;
@@ -95,7 +120,12 @@ TEST_CASE("Runner: End-to-End Pipeline Smoke Test", "[runner][integration]") {
     const int Classes = 10;
 
     addDenseGene(genome, D, Hidden, comp::ActivationType::Swish);
-    addAttentionGene(genome, Hidden, 4); // 4 heads
+    addAttentionGene(genome, Hidden, 4, adapters::AdapterType::Flash);              // 4 heads
+    addAttentionGene(genome, Hidden, 4, adapters::AdapterType::LowRank);            // 4 heads
+    addAttentionGene(genome, Hidden, 4, adapters::AdapterType::FMM);                // 4 heads
+    addAttentionGene(genome, Hidden, 4, adapters::AdapterType::BarnesHut);          // 4 heads
+    addAttentionGene(genome, Hidden, 4, adapters::AdapterType::Verlet);             // 4 heads
+    addAttentionGene(genome, Hidden, 4, adapters::AdapterType::Stencil); // 4 heads
     addMoEGene(genome, Hidden, 8, 2);    // 8 experts, top-2
     addDenseGene(genome, Hidden, Classes, comp::ActivationType::Identity);
 
@@ -161,3 +191,64 @@ TEST_CASE("Runner: Genome Ownership Safety", "[runner][safety]") {
     cords::ViewR out = runner->run(inView);
     REQUIRE(out.size() == 16);
 }
+
+
+#ifdef JOB_TEST_BENCHMARKS
+TEST_CASE("Runner Bench: Attention adapters scaling", "[bench][attn]") {
+    JobStealerCtx ctx(16);
+
+    const uint32_t B = 1;
+    const uint32_t D = 128;
+
+    // Two regimes: short and long context
+    const uint32_t S_short = 256;
+    const uint32_t S_long  = 4096;
+
+    auto run_one = [&](uint32_t S, adapters::AdapterType type, const char* name) {
+        infer::Workspace ws(1024 * 1024 * 1024); // 1GB scratch (big enough for dense @ 4096)
+        std::vector<float> in(size_t(B) * S * D);
+        std::vector<float> out(size_t(B) * S * D);
+
+        randomizeAttBuffer(in.data(), in.size());
+
+        cords::ViewR input(in.data(), cords::makeBSD(B, S, D));
+        cords::ViewR output(out.data(), cords::makeBSD(B, S, D));
+
+        layers::LayerConfig cfg = layers::LayerPresets::AttentionConfig();
+        cfg.adapterType = type;
+        cfg.numHeads = 8;
+
+        layers::AttentionLayer attn(int(D), cfg);
+        randomizeLayerParams(attn);
+
+        BENCHMARK(name) {
+            attn.forward(*ctx.pool, input, output, ws);
+            return output.data()[0];
+        };
+    };
+
+    SECTION("Short context (S=256)") {
+        run_one(S_short, adapters::AdapterType::Dense,     "Runner Attn Dense  S=256");
+        run_one(S_short, adapters::AdapterType::Flash,     "Runner Attn Flash  S=256");
+        run_one(S_short, adapters::AdapterType::LowRank,   "Runner Attn LowRank S=256");
+        run_one(S_short, adapters::AdapterType::FMM,       "Runner Attn FMM    S=256");
+        run_one(S_short, adapters::AdapterType::BarnesHut, "Runner Attn BarnesHut S=256");
+        run_one(S_short, adapters::AdapterType::Verlet,    "Runner Attn Verlet S=256");
+    }
+
+    SECTION("Long context (S=4096)") {
+        // Dense/Flash may be slow or memory-heavy here; keep it if you want the “dies here” reference point.
+        run_one(S_long,  adapters::AdapterType::LowRank,   "Runner Attn LowRank S=4096");
+        run_one(S_long,  adapters::AdapterType::FMM,       "Runner Attn FMM    S=4096");
+        run_one(S_long,  adapters::AdapterType::BarnesHut, "Runner Attn BarnesHut S=4096");
+        run_one(S_long,  adapters::AdapterType::Verlet,    "Runner Attn Verlet S=4096");
+
+        // Optional “reference cliff”
+        // run_one(S_long, AdapterType::Dense,   "Attn Dense  S=4096 (O(N^2) ref)");
+        // run_one(S_long, AdapterType::Flash,   "Attn Flash  S=4096 (ref)");
+    }
+}
+#endif
+
+
+

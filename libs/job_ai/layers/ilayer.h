@@ -38,7 +38,7 @@ public:
     // Flat parameter count (total number of floats this layer owns).
     [[nodiscard]] virtual std::size_t parameterCount() const noexcept = 0;
 
-    // Whatever when this is needed it is needed when it is not it is not
+    // Used(Sometimes) when calling the activation function. This sets (if needed) and returns the new value
     [[nodiscard]] virtual float alpha(float alpha) noexcept = 0;
 };
 

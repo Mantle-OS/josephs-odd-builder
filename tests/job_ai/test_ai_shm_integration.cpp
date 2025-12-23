@@ -15,9 +15,9 @@ using namespace job::ai::comp;
 using namespace job::ai::evo;
 using namespace job::ai::layers;
 
-class GenomeSerializer {
+class GenomeLocalSerializer {
 public:
-    GenomeSerializer(char *buffer, size_t cap):
+    GenomeLocalSerializer(char *buffer, size_t cap):
         m_ptr(buffer),
         m_cap(cap),
         m_offset(0)
@@ -81,9 +81,9 @@ private:
     size_t m_offset;
 };
 // copy paste time
-class GenomeDeserializer {
+class GenomeLocalDeserializer {
 public:
-    GenomeDeserializer(const char *buffer, size_t size):
+    GenomeLocalDeserializer(const char *buffer, size_t size):
         m_ptr(buffer),
         m_size(size),
         m_offset(0)
@@ -205,7 +205,7 @@ TEST_CASE("AI Genome IPC: Zero-Copy Serialization", "[ai][ipc][genome]")
     // Serialize -> Ring Buffer
     // write into a scratch buffer first to mimic packet assembly
     char packetBuf[8192];
-    GenomeSerializer ser(packetBuf, sizeof(packetBuf));
+    GenomeLocalSerializer ser(packetBuf, sizeof(packetBuf));
     REQUIRE(ser.write(original));
 
     ssize_t sent = writer.write(ser.bytesWritten() > 0 ?
@@ -219,7 +219,7 @@ TEST_CASE("AI Genome IPC: Zero-Copy Serialization", "[ai][ipc][genome]")
     REQUIRE(recvd == sent);
 
     Genome received;
-    GenomeDeserializer des(recvBuf, static_cast<size_t>(recvd));
+    GenomeLocalDeserializer des(recvBuf, static_cast<size_t>(recvd));
     REQUIRE(des.read(received));
 
     // do the damn tests
@@ -237,7 +237,7 @@ TEST_CASE("AI Genome IPC: Zero-Copy Serialization", "[ai][ipc][genome]")
 
     // BENCHMARK: Throughput of Genome Transfer
     BENCHMARK("Genome Roundtrip (Serialize+Transfer+Deserialize)") {
-        GenomeSerializer bSer(packetBuf, sizeof(packetBuf));
+        GenomeLocalSerializer bSer(packetBuf, sizeof(packetBuf));
         bSer.write(original); // Assume success for speed
         const auto bytes = bSer.bytesWritten();
 
@@ -252,7 +252,7 @@ TEST_CASE("AI Genome IPC: Zero-Copy Serialization", "[ai][ipc][genome]")
             std::this_thread::yield(); // Backpressure: Let writer run
 
         Genome bG;
-        GenomeDeserializer bDes(recvBuf, static_cast<size_t>(r));
+        GenomeLocalDeserializer bDes(recvBuf, static_cast<size_t>(r));
         bDes.read(bG);
 
         return bG.header.uuid;

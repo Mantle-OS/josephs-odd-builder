@@ -26,7 +26,7 @@ public:
     static constexpr size_t kMask = kSize - 1; // for fast wrapping
     static_assert((kSize & kMask) == 0, "kSize must be a power-of-two.");
 
-    static NoiseTable& instance()
+    static NoiseTable &instance()
     {
         static NoiseTable inst;
         return inst;
@@ -70,7 +70,7 @@ public:
         }
     }
 
-    [[nodiscard]] const float* data() const
+    [[nodiscard]] const float *data() const
     {
         return m_data.data();
     }

@@ -1,43 +1,40 @@
+// kv_cache.h
 #pragma once
-
-#include <cstdint>
 #include <vector>
+#include <cstdint>
 
-#include "view.h"
+namespace job::ai::cache {
 
-#include "kv_key.h"
-
-namespace job::ai::kv {
-
-class Cache {
-public:
-    // Pre-allocate the memory arena.
-    // This is critical: We allocate ONCE at startup to avoid malloc during inference.
-    void init(uint32_t maxLayers, uint32_t maxHeads, uint32_t maxSeq, uint32_t dim);
-
-    // Store K,V at step t
-    // k, v inputs are usually [1, Dim] (the current token's projection)
-    void save(const CacheKey &key, uint32_t t,
-              const cords::ViewR &k,
-              const cords::ViewR &v);
-
-    // Load all past up to t
-    // kOut, vOut are views into the internal storage [t+1, Dim]
-    // This allows the Attention kernel to read history without copying.
-    void load(const CacheKey &key, uint32_t t,
-              cords::ViewR &kOut,
-              cords::ViewR &vOut);
-
-private:
-         // Memory Layout Strategy (Future):
-         // 1. Contiguous Slab: [Layers, Heads, MaxSeq, Dim]
-         //    - Fast, simple stride math.
-         //    - Wastes memory if seq_len is short.
-         // 2. PagedAttention (vLLM style): Block tables.
-         //    - Complex software MMU.
-         //    - Zero fragmentation.
-
-    // For V1, we likely stick to Contiguous or a vector of vectors pre-sized.
+struct LayerCache {
+    // Layout: [MaxSeq, Heads, HeadDim] (flat buffer)
+    // or simplified: [MaxSeq, EmbedDim] per layer if fused
+    std::vector<float> k_data;
+    std::vector<float> v_data;
 };
 
-} // namespace job::ai::kv
+struct KVCache {
+    int max_seq_len = 0;
+    int current_pos = 0; // The "Cursor"
+    int embed_dim = 0;
+
+    // One cache entry per Attention Layer
+    std::vector<LayerCache> layers;
+
+    void resize(int num_layers, int max_seq, int dim) {
+        layers.resize(num_layers);
+        max_seq_len = max_seq;
+        embed_dim = dim;
+        current_pos = 0;
+
+        for(auto& l : layers) {
+            l.k_data.resize(size_t(max_seq) * dim, 0.0f);
+            l.v_data.resize(size_t(max_seq) * dim, 0.0f);
+        }
+    }
+
+    void reset() {
+        current_pos = 0;
+    }
+};
+
+} // namespace

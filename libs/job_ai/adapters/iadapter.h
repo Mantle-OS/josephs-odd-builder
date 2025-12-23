@@ -15,13 +15,20 @@ public:
     [[nodiscard]] virtual AdapterType type() const = 0;
     [[nodiscard]] virtual std::string name() const = 0;
 
-    virtual void adapt(job::threads::ThreadPool &pool,
+    virtual void adaptParallel(job::threads::ThreadPool &pool,
                        const cords::AttentionShape &shape,
                        const cords::ViewR &sources,
                        const cords::ViewR &targets,
                        const cords::ViewR &values,
                        cords::ViewR &output,
                        [[maybe_unused]] const AdapterCtx &ctx) = 0;
+
+    virtual void adapt(job::threads::ThreadPool &pool,
+                       const cords::AttentionShape &shape, const cords::ViewR &sources, const cords::ViewR &targets, const cords::ViewR &values,
+                       cords::ViewR &output,
+                       [[maybe_unused]] const AdapterCtx &ctx
+                       ) = 0;
+
 };
 } // namespace job::ai::adapters
 

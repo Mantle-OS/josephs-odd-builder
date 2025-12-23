@@ -193,7 +193,7 @@ TEST_CASE("Attention: Scaling Benchmark (Seq=4096)", "[ai][attn][bench][scale]")
         );
 
     // Only run the scalable ones to save time in test suite
-    BENCHMARK("FMM Attention (O(N)) - Long Context") {
+    BENCHMARK("FMM Attention (O(N) Seq=4096)) - Long Context") {
         layers::LayerConfig cfg;
         cfg.adapterType = adapters::AdapterType::FMM;
         layers::AttentionLayer attn(static_cast<int>(D), cfg);
@@ -201,7 +201,7 @@ TEST_CASE("Attention: Scaling Benchmark (Seq=4096)", "[ai][attn][bench][scale]")
         return outputData[0];
     };
 
-    BENCHMARK("LowRank Attention (O(N)) - Long Context") {
+    BENCHMARK("LowRank Attention (O(N) Seq=4096)) - Long Context") {
         layers::LayerConfig cfg;
         cfg.adapterType = adapters::AdapterType::LowRank;
         layers::AttentionLayer attn(static_cast<int>(D), cfg);
@@ -209,7 +209,7 @@ TEST_CASE("Attention: Scaling Benchmark (Seq=4096)", "[ai][attn][bench][scale]")
         return outputData[0];
     };
 
-    BENCHMARK("Dense Attention - Long Context") {
+    BENCHMARK("Dense Attention Seq=4096) - Long Context") {
         layers::LayerConfig cfg;
         cfg.adapterType = adapters::AdapterType::Dense;
         layers::AttentionLayer attn(static_cast<int>(D), cfg);
@@ -217,6 +217,5 @@ TEST_CASE("Attention: Scaling Benchmark (Seq=4096)", "[ai][attn][bench][scale]")
         return outputData[0];
     };
 
-    // TODO: add all the rest of the adapters
 }
 #endif

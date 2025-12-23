@@ -70,7 +70,7 @@ TEST_CASE("FMM Adapter: Semantic Gravity (Attraction)", "[ai][fmm][usage]") {
     AdapterCtx aCtx;
     aCtx.embedDim = D;
 
-    ctx.adapter.adapt(*ctx.threadCtx.pool, shape, input, input, input, output, aCtx);
+    ctx.adapter.adaptParallel(*ctx.threadCtx.pool, shape, input, input, input, output, aCtx);
 
     // Analyze Force on Token A
     float fx_a = outputData[0];
@@ -112,7 +112,7 @@ TEST_CASE("FMM Adapter: The Singularity (Overlapping Tokens)", "[ai][fmm][edge]"
     AttentionShape shape{(uint32_t)B, (uint32_t)S, (uint32_t)D, 1};
     AdapterCtx aCtx;
 
-    ctx.adapter.adapt(*ctx.threadCtx.pool, shape, input, input, input, output, aCtx);
+    ctx.adapter.adaptParallel(*ctx.threadCtx.pool, shape, input, input, input, output, aCtx);
 
     CHECK(is_finite_safe(outputData[0]));
     CHECK(outputData[0] == Approx(0.0f).margin(0.1f));
@@ -150,7 +150,7 @@ TEST_CASE("FMM Adapter: Scaling Benchmark (O(N) Proof)", "[ai][fmm][bench]") {
         ViewR view(data.data(), makeBSD((uint32_t)B, (uint32_t)S, (uint32_t)D));
         AttentionShape shape{(uint32_t)B, (uint32_t)S, (uint32_t)D, 1};
 
-        adapter.adapt(*ctx.pool, shape, view, view, view, view, aCtx);
+        adapter.adaptParallel(*ctx.pool, shape, view, view, view, view, aCtx);
     };
 
     BENCHMARK("FMM N=1024") { run_bench(1024); };

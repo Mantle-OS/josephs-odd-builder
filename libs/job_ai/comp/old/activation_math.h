@@ -11,13 +11,13 @@
 namespace job::ai::comp {
 
 // Magic numbers from the Self-Normalizing Neural Networks paper
-inline constexpr float kSeluAlpha        = 1.6732632423543772848170429916717f;
-inline constexpr float kSeluScale        = 1.0507009873554804934193349852946f;
-inline constexpr float kApproxGeluCoeff  = 0.044715f;
-inline constexpr float kSqrt2V           = 1.41421356237309504880f;
-inline constexpr float kInvSqrt2         = 0.70710678118654752440f;                         // 1 / sqrt(2)
-inline constexpr float kSqrt2DivPi       = 0.79788456080286535587989f;                      // sqrt(2 / pi)
-inline constexpr float pi                = 3.141592653589793238462643383279502884L;
+// inline constexpr float kSeluAlpha        = 1.6732632423543772848170429916717f;
+// inline constexpr float kSeluScale        = 1.0507009873554804934193349852946f;
+// inline constexpr float kApproxGeluCoeff  = 0.044715f;
+// inline constexpr float kSqrt2V           = 1.41421356237309504880f;
+// inline constexpr float kInvSqrt2         = 0.70710678118654752440f;                         // 1 / sqrt(2)
+// inline constexpr float kSqrt2DivPi       = 0.79788456080286535587989f;                      // sqrt(2 / pi)
+// inline constexpr float pi                = 3.141592653589793238462643383279502884L;
 
 
 [[nodiscard]] inline float sigmoid(float x) noexcept
@@ -168,6 +168,7 @@ template <class It>
         break;
     case ActivationType::GDN:
         JOB_LOG_ERROR("[ActivationMath]: Please use job::ai::comp::rrelu(x, config)"); // I guess we could call this as well now
+
         break;
     default:
         return x;
@@ -175,4 +176,87 @@ template <class It>
     return x;
 }
 
+inline void activate_buffer_serial(float *buffer, size_t count, ActivationType type, float alpha = 0.0f)
+{
+    // If alpha is 0.0f, set sensible defaults for parameterized activations
+    const float param = alpha;
+
+    switch (type) {
+    case ActivationType::Identity:
+        return; // No-op
+    case ActivationType::Sigmoid:
+        for (size_t i = 0; i < count; ++i) buffer[i] =
+                sigmoid(buffer[i]);
+        break;
+    case ActivationType::Tanh:
+        for (size_t i = 0; i < count; ++i)
+            buffer[i] = tanhAct(buffer[i]);
+        break;
+    case ActivationType::HardTanh:
+        for (size_t i = 0; i < count; ++i)
+            buffer[i] = hTanh(buffer[i]);
+        break;
+    case ActivationType::ReLU:
+        for (size_t i = 0; i < count; ++i)
+            buffer[i] = relu(buffer[i]);
+        break;
+    case ActivationType::LeakyReLU: {
+        const float a = (param != 0.0f) ? param : 0.01f;
+        for (size_t i = 0; i < count; ++i)
+            buffer[i] = leakyRelu(buffer[i], a);
+        break;
+    }
+    case ActivationType::PReLU:
+        for (size_t i = 0; i < count; ++i)
+            buffer[i] = prelu(buffer[i], param);
+        break;
+    case ActivationType::ELU:
+        for (size_t i = 0; i < count; ++i)
+            buffer[i] = elu(buffer[i], param);
+        break;
+    case ActivationType::SELU:
+        for (size_t i = 0; i < count; ++i)
+            buffer[i] = selu(buffer[i]);
+        break;
+    case ActivationType::GELU:
+        for (size_t i = 0; i < count; ++i)
+            buffer[i] = gelu(buffer[i]);
+        break;
+    case ActivationType::AproxGELU:
+        for (size_t i = 0; i < count; ++i)
+            buffer[i] = approxGelu(buffer[i]);
+        break;
+    case ActivationType::Swish: {
+        const float beta = (param != 0.0f) ? param : 1.0f;
+        for (size_t i = 0; i < count; ++i)
+            buffer[i] = swish(buffer[i], beta);
+        break;
+    }
+    case ActivationType::HSwish:
+        for (size_t i = 0; i < count; ++i)
+            buffer[i] = hSwish(buffer[i]);
+        break;
+    case ActivationType::Mish:
+        for (size_t i = 0; i < count; ++i)
+            buffer[i] = mish(buffer[i]);
+        break;
+    case ActivationType::HMish:
+        for (size_t i = 0; i < count; ++i)
+            buffer[i] = hMish(buffer[i]);
+        break;
+    case ActivationType::Softplus:
+        for (size_t i = 0; i < count; ++i)
+            buffer[i] = softplus(buffer[i]);
+        break;
+    case ActivationType::RReLU:
+        for (size_t i = 0; i < count; ++i)
+            buffer[i] = rRelu(buffer[i], param);
+        break;
+    default:
+        // Fallback to scalar switch if needed, though usually covered
+        for (size_t i = 0; i < count; ++i)
+            buffer[i] = activate(type, buffer[i], param);
+        break;
+    }
+}
 } // namespace job::ai::comp

@@ -105,13 +105,14 @@ public:
     void setTaskRange(int min, int max);
     void waitForIdle(std::chrono::milliseconds pollInterval = std::chrono::milliseconds(10)) const;
 
+    static bool inWorkerThread() noexcept;
 protected:
     ThreadPool(ISchedPolicy::Ptr scheduler, size_t threadCount = std::thread::hardware_concurrency(),
                const JobThreadOptions &options = JobThreadOptions::normal());
 
     void workerLoop(std::stop_token token, uint32_t worker_id);
-
 private:
+
 
     static constexpr size_t kShardCount = 64;
 

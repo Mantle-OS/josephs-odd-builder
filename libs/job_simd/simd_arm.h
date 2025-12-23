@@ -203,6 +203,21 @@ struct NEON_F {
 
     static inline i32 cvt_f32_i32(f32 reg) { return vcvtq_s32_f32(reg); }
     static inline f32 cvt_i32_f32(i32 reg) { return vcvtq_f32_s32(reg); }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 };
 
 } // namespace job::ai::comp

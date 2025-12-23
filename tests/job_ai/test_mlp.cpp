@@ -88,7 +88,7 @@ TEST_CASE("MLP: Correctness vs Naive", "[ai][mlp][correctness]")
 
     JobStealerCtx ctx(8);
 
-    mlpForward(*ctx.pool, B, D, H, X.data(), W1.data(), W2.data(),
+    mlpParallelForward(*ctx.pool, B, D, H, X.data(), W1.data(), W2.data(),
                 HiddenBuf.data(), Out_Opt.data(), ActivationType::ReLU);
 
     for(size_t i = 0; i < Out_Ref.size(); ++i)
@@ -119,7 +119,7 @@ TEST_CASE("MLP: Benchmark Standard (GPT-3 Medium Sized ReLU)", "[ai][mlp][bench]
     // Total Ops per run ~= 4 * 32 * 1024 * 4096 ~= 536 Million Ops
 
     BENCHMARK("MLP Forward (ReLU)") {
-        mlpForward(*ctx.pool, B, D, H, X.data(), W1.data(), W2.data(),
+        mlpParallelForward(*ctx.pool, B, D, H, X.data(), W1.data(), W2.data(),
                     Hidden.data(), Out.data(), ActivationType::ReLU);
         return Out[0];
     };
@@ -127,39 +127,47 @@ TEST_CASE("MLP: Benchmark Standard (GPT-3 Medium Sized ReLU)", "[ai][mlp][bench]
 
 
 // BENCHMARK: Gated MLP (LLaMA / PaLM Style)
-TEST_CASE("MLP: Benchmark Gated (Swish)", "[ai][mlp][bench][gated]")
-{
-    const int B = 16;     // Tokens
-    const int D = 4096;   // Input
-    const int H = 12288;  // Hidden (3x expansion is common in Swish)
+// TEST_CASE("MLP: Benchmark Gated (Swish)", "[ai][mlp][bench][gated]")
+// {
+//     const int B = 16;     // Tokens
+//     const int D = 4096;   // Input
+//     const int H = 12288;  // Hidden (3x expansion is common in Swish)
 
-    using Alloc = AlignedAllocator<float, 64>;
-    std::vector<float, Alloc> X(B * D, 0.1f);
+//     using Alloc = AlignedAllocator<float, 64>;
+//     std::vector<float, Alloc> X(B * D, 0.1f);
 
-    // gated uses 3 matrices
-    std::vector<float, Alloc> W_gate(D * H, 0.01f);
-    std::vector<float, Alloc> W_val(D * H, 0.01f);
-    std::vector<float, Alloc> W_proj(H * D, 0.01f);
+//     // gated uses 3 matrices
+//     std::vector<float, Alloc> W_gate(D * H, 0.01f);
+//     std::vector<float, Alloc> W_val(D * H, 0.01f);
+//     std::vector<float, Alloc> W_proj(H * D, 0.01f);
 
-    // Needs 2 hidden buffers
-    std::vector<float, Alloc> GateBuf(B * H);
-    std::vector<float, Alloc> ValBuf(B * H);
-    std::vector<float, Alloc> Out(B * D);
+//     // Needs 2 hidden buffers
+//     std::vector<float, Alloc> GateBuf(B * H);
+//     std::vector<float, Alloc> ValBuf(B * H);
+//     std::vector<float, Alloc> Out(B * D);
 
-    JobStealerCtx ctx(8);
+//     JobStealerCtx ctx(8);
 
-    // 3 GEMMs instead of 2.
-    // Ops ~= 6 * B * D * H
-    // ~= 6 * 16 * 4096 * 12288 ~= 4.8 Billion FLOPs per run
+//     // 3 GEMMs instead of 2.
+//     // Ops ~= 6 * B * D * H
+//     // ~= 6 * 16 * 4096 * 12288 ~= 4.8 Billion FLOPs per run
 
-    BENCHMARK("Gated MLP Forward (Swish)") {
-        gatedMlpForward(*ctx.pool, B, D, H,
-                          X.data(), W_gate.data(), W_val.data(), W_proj.data(),
-                          GateBuf.data(), ValBuf.data(), Out.data(),
-                          ActivationType::Swish);
-        return Out[0];
-    };
-}
+//     BENCHMARK("Gated MLP Forward (Swish)") {
+//         mlpParallelForward(*ctx.pool,
+//                            B,
+//                            D,
+//                            H,
+//                            X.data(),
+//                            W_gate.data(),
+//                            W_val.data(),
+//                            W_proj.data(),
+//                            GateBuf.data(),
+//                            ValBuf.data(),
+//                            Out.data(),
+//                            ActivationType::Swish);
+//         return Out[0];
+//     };
+// }
 
 TEST_CASE("MLP: The Show down", "[ai][mlp][bench][compare]")
 {
@@ -184,19 +192,19 @@ TEST_CASE("MLP: The Show down", "[ai][mlp][bench][compare]")
     };
 
     BENCHMARK("ReLU (The Speed Demon)") {
-        mlpForward(*ctx.pool, B, D, H, X.data(), W1.data(), W2.data(),
+        mlpParallelForward(*ctx.pool, B, D, H, X.data(), W1.data(), W2.data(),
                     Hidden.data(), Out.data(), ActivationType::ReLU);
         return Out[0];
     };
 
     BENCHMARK("GELU (The Transformer Standard)") {
-        mlpForward(*ctx.pool, B, D, H, X.data(), W1.data(), W2.data(),
+        mlpParallelForward(*ctx.pool, B, D, H, X.data(), W1.data(), W2.data(),
                     Hidden.data(), Out.data(), ActivationType::GELU);
         return Out[0];
     };
 
     BENCHMARK("Swish (The LLaMA Style)") {
-        mlpForward(*ctx.pool, B, D, H, X.data(), W1.data(), W2.data(),
+        mlpParallelForward(*ctx.pool, B, D, H, X.data(), W1.data(), W2.data(),
                     Hidden.data(), Out.data(), ActivationType::Swish);
         return Out[0];
     };

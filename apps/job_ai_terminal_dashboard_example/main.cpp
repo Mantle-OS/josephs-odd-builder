@@ -90,7 +90,6 @@ int main() {
 
         job::ai::coach::ESCoach coach(ctx.pool, cfg);
 
-        // *** CRITICAL FIX: Pass the Architecture here! ***
         coach.coach(buildNetwork());
 
         while(true) {

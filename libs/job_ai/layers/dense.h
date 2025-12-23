@@ -2,19 +2,20 @@
 
 #include <vector>
 
+#include <simd_provider.h>
+
+#include "activation.h"
 #include "abstract_layer.h"
 #include "layer_config.h"
 #include "matrix.h"
 #include "aligned_allocator.h"
-#include "gemm.h"
-#include "activate_parallel.h"
 
 
 namespace job::ai::layers {
 
 class DenseLayer final : public AbstractLayer {
 public:
-    DenseLayer(uint32_t input, uint32_t output,LayerConfig cfg = LayerPresets::DenseConfig(), float alpha = 0.0f) :
+    DenseLayer(uint32_t input, uint32_t output, LayerConfig cfg = LayerPresets::DenseConfig(), float alpha = 0.0f) :
         AbstractLayer(cfg, alpha)
     {
         m_cfg.inputs = input;
@@ -47,41 +48,46 @@ public:
                  cords::ViewR &output,
                  [[maybe_unused]]infer::Workspace &workspace) override
     {
-        assert(isCompactRowMajor(input) && "DenseLayer::forward currently requires compact row-major input");
+        assert(isCompactRowMajor(input) && "DenseLayer: non-compact input");
+
         std::size_t rows = 0;
         std::size_t inFeatures = 0;
         inferDenseShape(input, rows, inFeatures);
-        assert(inFeatures == static_cast<std::size_t>(m_cfg.inputs) && "DenseLayer: input feature dim != m_cfg.inputs");
 
-        const std::size_t outFeatures = static_cast<std::size_t>(m_cfg.outputs);
+        assert(inFeatures == static_cast<std::size_t>(m_cfg.inputs));
 
-        const std::size_t flops = rows * inFeatures * outFeatures;
-        constexpr std::size_t kMinFlopsForParallel = 16384;
+        // Pointers
+        const float* A_ptr = input.data();
+        const float* W_ptr = m_weightsPtr;
+        const float* B_ptr = m_cfg.hasBias() ? m_biasPtr : nullptr;
+        float* O_ptr = output.data();
 
-        // Treat input as [rows, inFeatures] matrix (row-major)
-        cords::Matrix A(const_cast<float*>(input.data()), rows, inFeatures);
-        cords::Matrix W(m_weightsPtr, m_cfg.inputs, m_cfg.outputs);
+        // Dimensions
+        int M = static_cast<int>(rows);
+        int K = static_cast<int>(inFeatures);
+        int N = static_cast<int>(m_cfg.outputs);
 
+        // Heuristic
+        const std::size_t flops = rows * inFeatures * static_cast<std::size_t>(m_cfg.outputs);
+        constexpr std::size_t kMinFlopsForParallel = 32768; // Bumped up slightly for overhead
 
+        bool runParallel = (rows > 1) && (flops > kMinFlopsForParallel);
 
-        // Output buffer must at least hold [rows * outFeatures] contiguous floats.
-        cords::Matrix C(output.data(), rows, m_cfg.outputs);
-
-        bool worthParallelizing = (rows > 1) && (flops > kMinFlopsForParallel);
-
-        if (worthParallelizing) {
-            // CORRECTED: Use parallel when it IS worth it
-
-            comp::sgemm_parallel(pool, A, W, C);
-            handleBiasAndActivation(pool, output.data(), rows, m_cfg.outputs, true);
+        if (runParallel) {
+            comp::activateDenseParallel<false>(
+                pool,
+                A_ptr, W_ptr, B_ptr, O_ptr,
+                M, K, N,
+                m_cfg.activation, m_cfg.hasBias(), m_alpha
+                );
         } else {
-            // CORRECTED: Use serial when it is NOT worth it
-            // This keeps small tasks off the thread pool, preventing the starvation deadlock
-            comp::sgemm(A, W, C);
-            handleBiasAndActivation(pool, output.data(), rows, m_cfg.outputs, false);
+            comp::activateDense<false>(
+                A_ptr, W_ptr, B_ptr, O_ptr,
+                M, K, N,
+                m_cfg.activation, m_cfg.hasBias(), m_alpha
+                );
         }
     }
-
     [[nodiscard]] cords::ViewR parameters() noexcept override
     {
         return cords::ViewR(m_storage.data(), cords::ViewR::Extent((uint32_t)m_storage.size()));
@@ -124,36 +130,47 @@ public:
 
 private:
 
-    static inline void addBiasRow(float *row, const float *bias, size_t count)
-    {
-        using SIMD = job::ai::comp::SIMD;
-        constexpr int K = SIMD::width();
-        size_t j = 0;
-        for (; j + K <= count; j += K) {
-            auto v = SIMD::add(SIMD::pull(row + j), SIMD::pull(bias + j));
-            SIMD::mov(row + j, v);
-        }
-        for (; j < count; ++j)
-            row[j] += bias[j];
-    }
+    // static inline void addBiasRow(float *row, const float *bias, size_t count)
+    // {
+    //     using SIMD = job::ai::comp::SIMD;
+    //     constexpr int K = SIMD::width();
 
-    void handleBiasAndActivation(job::threads::ThreadPool &pool, float *outData,
-                                 size_t rows, size_t cols, bool parallel)
-    {
-        if (m_cfg.hasBias()) {
-            float *biasPtr = m_biasPtr;
-            if (parallel) {
-                job::threads::parallel_for(pool, size_t{0}, rows, [outData, biasPtr, cols](size_t i) {
-                    addBiasRow(outData + i*cols, biasPtr, cols);
-                });
-            } else {
-                for(size_t i=0; i<rows; ++i)
-                    addBiasRow(outData + i*cols, biasPtr, cols);
-            }
-        }
-        // RUN FOREST RUN !!!!@!@!@!
-        comp::activate_buffer(pool, outData, rows * cols, m_cfg.activation, m_alpha);
-    }
+    //     size_t j = 0;
+    //     for (; j + K <= count; j += K) {
+    //         auto v = SIMD::add(SIMD::pull(row + j), SIMD::pull(bias + j));
+    //         SIMD::mov(row + j, v);
+    //     }
+    //     for (; j < count; ++j)
+    //         row[j] += bias[j];
+    // }
+
+    // void handleBiasAndActivation(job::threads::ThreadPool &pool, float *outData,
+    //                              size_t rows, size_t cols, bool parallel)
+    // {
+    //     if (m_cfg.hasBias()) {
+    //         float *biasPtr = m_biasPtr;
+    //         if (parallel) {
+    //             job::threads::parallel_for(pool, size_t{0}, rows, [outData, biasPtr, cols](size_t i) {
+    //                 addBiasRow(outData + i*cols, biasPtr, cols);
+    //             });
+    //         } else {
+    //             for(size_t i=0; i<rows; ++i)
+    //                 addBiasRow(outData + i*cols, biasPtr, cols);
+    //         }
+    //     }
+
+    //     const size_t totalElements = rows * cols;
+
+    //     if (parallel) {
+    //         comp::activate_buffer(pool, outData, totalElements, m_cfg.activation, m_alpha);
+    //     } else {
+    //         // Fallback to serial activation to prevent starvation
+    //         comp::activate_buffer_serial(outData, totalElements, m_cfg.activation, m_alpha);
+    //     }
+
+    //     // RUN FOREST RUN !!!!@!@!@!
+    //     // comp::activate_buffer(pool, outData, rows * cols, m_cfg.activation, m_alpha);
+    // }
 
     std::vector<float, cords::AlignedAllocator<float, 64>>      m_storage;
     float                                                       *m_weightsPtr{nullptr};

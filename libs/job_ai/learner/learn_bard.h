@@ -28,7 +28,7 @@ public:
     static constexpr float      kNegHuge        = -1.0e30f;
 
     explicit BardLearn(const LearnConfig &cfg = LearnPresets::BardConfig(),
-                       threads::ThreadPool::Ptr pool = nullptr):
+                        threads::ThreadPool::Ptr pool = nullptr):
         m_pool(std::move(pool)),
         m_cfg(cfg)
     {
@@ -65,7 +65,7 @@ public:
         if (auto *motif = dynamic_cast<token::MotifToken*>(m_tokenizer.get()))
             motif->setCorpus(m_corpus, m_pool);
 
-         // Buffers
+        // Buffers
         m_inputBuffer.resize(m_cfg.contextLen * kParticleDim);
         m_window.resize(m_cfg.contextLen);
         m_tmpDecode.resize(4096);
@@ -73,7 +73,7 @@ public:
 
     // Token evolution hook
     void onTokenTime([[maybe_unused]] uint64_t generation,
-                     uint64_t seed) override
+                        uint64_t seed) override
     {
         if (m_tokenizer)
             m_tokenizer->mutate(seed);
@@ -130,8 +130,7 @@ public:
             auto output = m_runner->run(inputView, wsSize);
             const float *logits = output.data();
 
-            const token::ByteLattice &targetP =
-                m_atoms[i + m_cfg.contextLen];
+            const token::ByteLattice &targetP = m_atoms[i + m_cfg.contextLen];
 
             uint32_t targetIdx = latticeToIndex(targetP);
 
@@ -163,100 +162,40 @@ public:
         if (samplesProcessed == 0)
             return 0.0f;
 
-        const float avgNLL  = totalNLL / samplesProcessed;
+        const float avgNLL = totalNLL / samplesProcessed;
         const float baseline = std::log((float)m_outputDim);
-        const float norm     = avgNLL / baseline;
-
-        return m_cfg.targetFitness / (1.0f + norm);
+        const float norm = avgNLL / baseline;
+        m_fitness = m_cfg.targetFitness / (1.0f + norm);
+        return m_fitness;
     }
 
-
-    // Text generation
-    [[nodiscard]] std::string hallucinate(int length)
+    // API for applciations to call hallucinate.
+    [[nodiscard]] std::string say(std::size_t targetBytes, const evo::Genome &genome)
     {
-        if (!m_runner)
-            return "I have no brain yet...";
-
-        // Seed context
-        m_atoms.resize(m_corpusBytes.size());
-        const std::size_t atomCount =
-            m_tokenizer->encode(
-                m_corpusBytes,
-                m_atoms,
-                1.0f);
-
-        if (atomCount < m_cfg.contextLen)
-            return "Not enough data...";
-
-        std::copy_n(m_atoms.begin(),
-                    m_cfg.contextLen,
-                    m_window.begin());
-
-        std::string result;
-
-        const uint32_t flatInputSize =
-            m_cfg.contextLen * kParticleDim;
-        auto inputShape = cords::makeBS(1u, flatInputSize);
-
-        for (int step = 0; step < length; ++step) {
-
-            for (uint32_t c = 0; c < m_cfg.contextLen; ++c) {
-                const auto &p = m_window[c];
-                const std::size_t off = c * kParticleDim;
-                m_inputBuffer[off + 0] = p.x;
-                m_inputBuffer[off + 1] = p.y;
-                m_inputBuffer[off + 2] = p.z;
-                m_inputBuffer[off + 3] = p.mass;
-            }
-
-            cords::ViewR inputView(m_inputBuffer.data(), inputShape);
-            auto output = m_runner->run(inputView, m_cfg.initWsMb);
-            const float *logits = output.data();
-
-            uint32_t bestIdx = 0;
-            float bestVal =  kNegHuge; //-std::numeric_limits<float>::infinity();
-            for (uint32_t v = 0; v < m_outputDim; ++v) {
-                if (logits[v] > bestVal) {
-                    bestVal = logits[v];
-                    bestIdx = v;
-                }
-            }
-
-            token::ByteLattice nextP = indexToLattice(bestIdx);
-
-            // Slide window
-            std::move(m_window.begin() + 1,
-                      m_window.end(),
-                      m_window.begin());
-            m_window.back() = nextP;
-
-            // Decode single atom
-            const std::size_t written =
-                m_tokenizer->decode(
-                    std::span<const token::ByteLattice>(&nextP, 1),
-                    std::span<uint8_t>(m_tmpDecode));
-
-            result.append(reinterpret_cast<const char*>(m_tmpDecode.data()),
-                          written);
+        auto fit = learn(genome);
+        if(m_lastFitness < fit){
+            m_lastFitness = fit;
+            if(m_lastFitness >= m_cfg.targetFitness)
+                m_done.store(true, std::memory_order_relaxed);
         }
-
-        return result;
+        return hallucinate(targetBytes);
     }
 
     [[nodiscard]] uint32_t inputDimension() const noexcept override
     {
-        return m_cfg.contextLen * kParticleDim;
+    return m_cfg.contextLen * kParticleDim;
     }
 
     [[nodiscard]] uint32_t outputDimension() const noexcept override
     {
-        return m_outputDim;
+    return m_outputDim;
     }
 
     [[nodiscard]] static std::unique_ptr<ILearn> create(const LearnConfig &cfg, threads::ThreadPool::Ptr pool)
     {
-        return std::make_unique<BardLearn>(cfg, std::move(pool));
+    return std::make_unique<BardLearn>(cfg, std::move(pool));
     }
+    token::IToken *tokenizer() {return m_tokenizer.get();}
 
 private:
     // Lattice <-> index mapping
@@ -274,20 +213,20 @@ private:
         const uint8_t b = token::ByteLattice::decode(p);
 
         switch (m_cfg.tokenType) {
-        case token::TokenType::Ascii: {
-            uint8_t bb = b;
-            if (bb < token::AsciiToken::kAsciiMin) bb = (uint8_t)token::AsciiToken::kAsciiMin;
-            if (bb > token::AsciiToken::kAsciiMax) bb = (uint8_t)token::AsciiToken::kAsciiMax;
-            return uint32_t(bb - token::AsciiToken::kAsciiMin); // 0..94
-        }
-        case token::TokenType::Motif:
-            if (p.z > 0.0f)
-                return kByteVocab + motifLatticeToId(p);
-            return uint32_t(b);
+            case token::TokenType::Ascii: {
+                uint8_t bb = b;
+                if (bb < token::AsciiToken::kAsciiMin) bb = (uint8_t)token::AsciiToken::kAsciiMin;
+                if (bb > token::AsciiToken::kAsciiMax) bb = (uint8_t)token::AsciiToken::kAsciiMax;
+                return uint32_t(bb - token::AsciiToken::kAsciiMin); // 0..94
+            }
+            case token::TokenType::Motif:
+                if (p.z > 0.0f)
+                   return kByteVocab + motifLatticeToId(p);
+                return uint32_t(b);
 
-        default:
-            return uint32_t(b);
-        }
+            default:
+                return uint32_t(b);
+            }
     }
 
     token::ByteLattice indexToLattice(uint32_t idx) const noexcept
@@ -315,24 +254,102 @@ private:
         return { (x * 0.015625f) - 1.0f, (y * 0.015625f) - 1.0f, 1.0f, 1.0f };
     }
 
-private:
-    threads::ThreadPool::Ptr           m_pool;
-    std::unique_ptr<infer::Runner>     m_runner;
+    [[nodiscard]] std::string hallucinate(std::size_t targetBytes)
+    {
+        if (!m_runner)
+            return "I have no brain yet...";
 
-    LearnConfig                        m_cfg;
+        if (m_atoms.empty()) {
+            m_atoms.resize(m_corpusBytes.size());
+            const std::size_t atomCount = m_tokenizer->encode(
+                m_corpusBytes, m_atoms, 1.0f);
+            m_atoms.resize(atomCount);
+        }
 
-    std::string                        m_corpus;
-    std::vector<uint8_t>               m_corpusBytes;
+        if (m_atoms.size() < m_cfg.contextLen)
+            return "Not enough data...";
 
-    std::unique_ptr<token::IToken>     m_tokenizer;
+        // Seed context from the start of the known universe
+        std::copy_n(m_atoms.begin(), m_cfg.contextLen, m_window.begin());
 
-    std::vector<token::ByteLattice>    m_atoms;
-    std::vector<token::ByteLattice>    m_window;
+        std::string result;
+        result.reserve(targetBytes); // Optimization: Prevent re-allocs
 
-    std::vector<float>                 m_inputBuffer;
-    std::vector<uint8_t>               m_tmpDecode;
+        // PREPARE INPUT SHAPES ONCE
+        const uint32_t flatInputSize = m_cfg.contextLen * kParticleDim;
+        auto inputShape = cords::makeBS(1u, flatInputSize);
 
-    uint32_t                           m_outputDim = 0;
+        // LIMITER: Stop when we hit the byte target (or a safety limit of steps)
+        int safetySteps = 0;
+        const int maxSafetySteps = targetBytes * 2;
+
+        while (result.size() < targetBytes && safetySteps++ < maxSafetySteps) {
+
+            // Fill buffer from window
+            for (uint32_t c = 0; c < m_cfg.contextLen; ++c) {
+                const auto &p = m_window[c];
+                const std::size_t off = c * kParticleDim;
+                m_inputBuffer[off + 0] = p.x;
+                m_inputBuffer[off + 1] = p.y;
+                m_inputBuffer[off + 2] = p.z;
+                m_inputBuffer[off + 3] = p.mass;
+            }
+
+            cords::ViewR inputView(m_inputBuffer.data(), inputShape);
+            auto output = m_runner->run(inputView, m_cfg.initWsMb); // Reuse WS size
+            const float *logits = output.data();
+
+            // Greedy Search
+            uint32_t bestIdx = 0;
+            float bestVal = -1e9f;
+            for (uint32_t v = 0; v < m_outputDim; ++v) {
+                if (logits[v] > bestVal) { bestVal = logits[v]; bestIdx = v; }
+            }
+
+            token::ByteLattice nextP = indexToLattice(bestIdx);
+
+            // Slide window
+            std::move(m_window.begin() + 1, m_window.end(), m_window.begin());
+            m_window.back() = nextP;
+
+            // Decode
+            const std::size_t written = m_tokenizer->decode(
+                std::span<const token::ByteLattice>(&nextP, 1),
+                std::span<uint8_t>(m_tmpDecode));
+
+            result.append(reinterpret_cast<const char*>(m_tmpDecode.data()), written);
+        }
+
+        // Exact trim if we overshot due to a long motif
+        if (result.size() > targetBytes)
+            result.resize(targetBytes);
+
+        //local fit
+
+        return result;
+    }
+
+
+    threads::ThreadPool::Ptr            m_pool;
+    std::unique_ptr<infer::Runner>      m_runner;
+
+    LearnConfig                         m_cfg;
+
+    std::string                         m_corpus;
+    std::vector<uint8_t>                m_corpusBytes;
+
+    std::unique_ptr<token::IToken>      m_tokenizer;
+
+    std::vector<token::ByteLattice>     m_atoms;
+    std::vector<token::ByteLattice>     m_window;
+
+    std::vector<float>                  m_inputBuffer;
+    std::vector<uint8_t>                m_tmpDecode;
+
+    uint32_t                            m_outputDim = 0;
+    float                               m_lastFitness = 0.0f;
+    std::atomic<bool>                   m_done{false};
+
 };
 
 } // namespace job::ai::learn

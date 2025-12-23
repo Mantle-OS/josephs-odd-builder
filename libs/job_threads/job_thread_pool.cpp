@@ -2,6 +2,7 @@
 #include <utility>
 
 namespace job::threads {
+thread_local bool kInWorker = false;
 
 ThreadPool::Ptr ThreadPool::create(ISchedPolicy::Ptr scheduler, size_t threadCount, const JobThreadOptions &options)
 {
@@ -37,6 +38,9 @@ ThreadPool::ThreadPool( ISchedPolicy::Ptr scheduler, size_t threadCount, const J
         }
     }
     m_watcher->start();
+
+
+
 }
 
 ThreadPool::~ThreadPool()
@@ -134,8 +138,11 @@ void ThreadPool::waitForIdle(std::chrono::milliseconds pollInterval) const
     }
 }
 
+bool ThreadPool::inWorkerThread() noexcept {return kInWorker;}
+
 void ThreadPool::workerLoop(std::stop_token token, uint32_t worker_id)
 {
+    kInWorker = true;
     while (!token.stop_requested()) {
         auto r = m_workSemaphore.wait();
         if (r != JobSemRet::OK) {
@@ -185,6 +192,7 @@ void ThreadPool::workerLoop(std::stop_token token, uint32_t worker_id)
             m_scheduler->complete(task_id, success);
         }
     }
+    kInWorker = false;
 }
 
 } // job::threads

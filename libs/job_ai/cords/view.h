@@ -55,9 +55,9 @@ public:
         return m_extent;
     }
 
-    [[nodiscard]] std::uint32_t rank() const noexcept
+    [[nodiscard]] std::size_t rank() const noexcept
     {
-        return static_cast<std::uint32_t>(m_extent.size());
+        return m_extent.size();
     }
 
     [[nodiscard]] std::size_t size() const noexcept
@@ -145,7 +145,7 @@ public:
         return View<T_View>(newData, newExtent);
     }
 
-    [[nodiscard]] std::uint32_t stride(size_t dim) const
+    [[nodiscard]] std::size_t stride(size_t dim) const
     {
         assert(dim < rank());
         return m_strides[dim];
@@ -165,15 +165,17 @@ public:
 protected:
     T_View                          *m_view{nullptr};
     Extent                          m_extent;
-    std::array<std::uint32_t, 4>    m_strides{};
+    std::array<std::size_t, 4>      m_strides{};
 
     void calculateStrides()
     {
         if (m_extent.empty())
             return;
 
-        std::uint32_t stride = 1;// Err me no understand math like me want to
+        std::uint32_t stride = 1;
+
         // Row-major: last dimension changes fastest
+        // iterate backwards from the last dimension
         for (int i = static_cast<int>(m_extent.size()) - 1; i >= 0; --i) {
             m_strides[i] = stride;
             stride *= m_extent[i];

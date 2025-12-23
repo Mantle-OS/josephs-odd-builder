@@ -189,17 +189,37 @@ set(JOBAI_BASE_SOURCES)
 set(JOBAI_COMP_HEADERS
     comp/noise_table.h
     comp/transpose.h
-    comp/activation_functors.h
-    comp/activate_parallel.h
+    comp/atomic_math.h
+
     #
-    comp/rrelu_config.h
-    comp/gdn_params.h
-    comp/activation_types.h
-    comp/activation_math.h
     comp/gemm.h
     comp/mlp.h
     comp/flash_attention.h
-    comp/atomic_math.h
+
+    #
+    comp/gdn_params.h
+    comp/rrelu_config.h
+
+
+    comp/activation_types.h
+    comp/elu.h
+    comp/gelu.h
+    comp/identity.h
+    comp/mish.h
+    comp/relu.h
+    comp/sigmoid.h
+    comp/softplus.h
+    comp/special.h
+    comp/swish.h
+    comp/tanh.h
+
+    comp/activation.h
+
+    ## OLD
+    # comp/iactivation.h
+    # comp/fast_math.h
+    # comp/activation_math.h
+    # comp/activation_functors.h
 )
 set(JOBAI_COMP_SOURCES)
 

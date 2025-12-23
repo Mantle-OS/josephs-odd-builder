@@ -54,7 +54,7 @@ TEST_CASE("RK4 Adapter: Two-Body Interaction (Repulsion Check)", "[ai][rk4][usag
     AdapterCtx aCtx;
 
     // Run Physics
-    adapter.adapt(*ctx.pool, shape, view, view, view, out, aCtx);
+    adapter.adaptParallel(*ctx.pool, shape, view, view, view, out, aCtx);
 
     float p1_new_x = data[p1 + 0];
     float p2_new_x = data[p2 + 0];
@@ -99,7 +99,7 @@ TEST_CASE("RK4 Adapter: Low Dimension Ignore", "[ai][rk4][edge]")
     AttentionShape shape{B, S, D, 1};
     AdapterCtx aCtx;
 
-    adapter.adapt(*ctx.pool, shape, view, view, view, view, aCtx);
+    adapter.adaptParallel(*ctx.pool, shape, view, view, view, view, aCtx);
 
     // Should remain exactly 1.0f (touched nothing)
     for(float f : data) {
@@ -134,7 +134,7 @@ TEST_CASE("RK4 Adapter: Inertia (Zero Gravity)", "[ai][rk4][edge]")
     AttentionShape shape{(uint32_t)B, (uint32_t)S, (uint32_t)D, 1};
     AdapterCtx aCtx;
 
-    adapter.adapt(*ctx.pool, shape, view, view, view, view, aCtx);
+    adapter.adaptParallel(*ctx.pool, shape, view, view, view, view, aCtx);
 
     // New Pos = Old Pos + Vel * dt
     // 0 + 1.0 * 1.0 = 1.0
@@ -171,7 +171,7 @@ TEST_CASE("RK4 Adapter: Throughput", "[ai][rk4][bench]")
             1
         };
 
-        adapter.adapt(*ctx.pool, shape, view, view, view, view, aCtx);
+        adapter.adaptParallel(*ctx.pool, shape, view, view, view, view, aCtx);
     };
 
     BENCHMARK("RK4 N-Body B=1 S=256 (Small)") {

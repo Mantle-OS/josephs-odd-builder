@@ -1,4 +1,5 @@
 #pragma once
+
 #include <cstdint>
 #include <string_view>
 #include <array>
@@ -74,9 +75,7 @@ struct LayerConfig {
 };
 
 
-
 namespace LayerPresets{
-
 
 [[nodiscard]] inline LayerConfig DenseConfig(
     std::string_view name       = "Dense",
@@ -95,27 +94,25 @@ namespace LayerPresets{
 
 [[nodiscard]] inline LayerConfig AttentionConfig(
     std::string_view    name    = "Attention",
-    uint32_t            experts = 8,
-    uint32_t            topK    = 2
+    uint32_t            heads   = 8,
+    bool                causal  = true
     )
 {
     LayerConfig cfg;
     cfg.type = LayerType::Attention;
     cfg.setName(name);
     cfg.adapterType = adapters::AdapterType::Flash;
-    cfg.setHasRouter(true);
-    cfg.numExperts = experts;
-    cfg.numHeads = 8;
-    cfg.setCausal(true);
+    cfg.setHasRouter(false);
+    cfg.numHeads = heads;
+    cfg.setCausal(causal);
     cfg.setHasBias(false);
-    cfg.topK = topK;
     return cfg;
 }
 
 [[nodiscard]] inline LayerConfig MoEConfig(
     uint32_t experts = 8,
     uint32_t topK = 2,
-    std::string_view name = "GenericMoeLayer\n"
+    std::string_view name = "GenericMoeLayer"
     )
 {
     LayerConfig cfg;

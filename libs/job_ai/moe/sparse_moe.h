@@ -33,7 +33,7 @@
 // Compute
 #include "noise_table.h"
 #include "gemm.h"
-#include "activation_math.h"
+// #include "activation_math.h"
 #include "atomic_math.h"
 
 namespace job::ai::moe {
@@ -76,7 +76,7 @@ public:
         m_routerCfg.type = type;
     }
 
-    router::RouterPlan route(job::threads::ThreadPool &pool,
+    router::RouterPlan route([[maybe_unused]]job::threads::ThreadPool &pool,
                              const cords::ViewR &input,
                              infer::Workspace &ws,
                              std::vector<float> *maybeGateLogits) override
@@ -129,7 +129,7 @@ public:
             cords::Matrix W(m_gateWeightsPtr, dim, experts);
 
             cords::Matrix G(logitsPtr, batch, experts);
-            comp::sgemm_parallel(pool, A, W, G);
+            comp::sgemmParallelMatrix(pool,A, W, G);
 
             if (!m_routerCfg.deterministic) {
                 uint64_t fastSeed = (uint64_t)input.data() ^ 0xDEADBEEF;
@@ -227,7 +227,8 @@ public:
 
         // CSR: Histogram -> Prefix Sum -> Index Fill
         std::vector<uint32_t> counts(E, 0);
-        for (uint32_t t = 0; t < T; ++t) counts[(uint32_t)plan.tokens[t].expert]++;
+        for (uint32_t t = 0; t < T; ++t)
+            counts[(uint32_t)plan.tokens[t].expert]++;
 
         std::vector<uint32_t> expertBase(E + 1, 0);
         for (uint32_t e = 0; e < E; ++e)

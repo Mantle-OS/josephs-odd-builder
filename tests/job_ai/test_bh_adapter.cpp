@@ -42,7 +42,7 @@ TEST_CASE("Barnes-Hut Adapter: Basic Gravity", "[ai][bh][usage]") {
     AdapterCtx aCtx;
 
     // self-attention style: K=Q=V=positions+mass
-    adapter.adapt(*ctx.pool, shape, src, src, src, dst, aCtx);
+    adapter.adaptParallel(*ctx.pool, shape, src, src, src, dst, aCtx);
 
     // Same physics as FMM: Force ~ 0.25
     CHECK(outputData[0] > 0.2f);
@@ -81,7 +81,7 @@ TEST_CASE("Barnes-Hut Adapter: Scaling Benchmark", "[ai][bh][bench]") {
             1
         };
 
-        adapter.adapt(*ctx.pool, shape, view, view, view, out, aCtx);
+        adapter.adaptParallel(*ctx.pool, shape, view, view, view, out, aCtx);
     };
 
     BENCHMARK("BH N=1024")  { run_bench(1024);  };

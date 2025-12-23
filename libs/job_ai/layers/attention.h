@@ -162,9 +162,9 @@ public:
         cords::Matrix WV(m_wv, D, D);
         cords::Matrix WO(m_wo, D, D);
 
-        comp::sgemm_parallel(pool, X, WQ, Q);
-        comp::sgemm_parallel(pool, X, WK, K);
-        comp::sgemm_parallel(pool, X, WV, V);
+        comp::sgemmMatrix( X, WQ, Q);
+        comp::sgemmMatrix(X, WK, K);
+        comp::sgemmMatrix(X, WV, V);
 
         if (m_cfg.hasBias()) {
             size_t total = elementsPerBuffer;
@@ -174,7 +174,7 @@ public:
             float *vp = V.data(); const float *bv = m_bv;
 
             // Simple parallel for loop to add bias vector to every row
-            job::threads::parallel_for(pool, size_t{0}, total, [=](size_t i) {
+            threads::parallel_for(pool, size_t{0}, total, [=](size_t i) {
                 int col = i % D;
                 qp[i] += bq[col];
                 kp[i] += bk[col];
@@ -196,16 +196,16 @@ public:
         shape.numHeads = static_cast<uint32_t>(m_cfg.numHeads);
 
         // K -> Sources, Q -> Targets, V -> Values
-        m_adapter->adapt(pool, shape, K, Q, V, A_Out, ctx);
+        m_adapter->adaptParallel(pool, shape, K, Q, V, A_Out, ctx);
 
-        comp::sgemm_parallel(pool, A_Out, WO, Final_Out);
+        comp::sgemmMatrix(A_Out, WO, Final_Out);
 
         if (m_cfg.hasBias()) {
             float *out = Final_Out.data();
             const float* bo = m_bo;
             size_t total = elementsPerBuffer;
 
-            job::threads::parallel_for(pool, size_t{0}, total, [=](size_t i) {
+            threads::parallel_for(pool, size_t{0}, total, [=](size_t i) {
                 out[i] += bo[i % D];
             });
         }

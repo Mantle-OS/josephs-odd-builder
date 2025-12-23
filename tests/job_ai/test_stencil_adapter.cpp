@@ -44,7 +44,7 @@ TEST_CASE("Stencil Adapter: Heat Diffusion (3x3 Grid)", "[ai][stencil][usage]")
     AttentionShape shape{B, S, D, 1};
     AdapterCtx aCtx;
 
-    adapter.adapt(*ctx.pool, shape, view, view, view, out, aCtx);
+    adapter.adaptParallel(*ctx.pool, shape, view, view, view, out, aCtx);
 
     // Index helper: (s, d) in [B=1] layout
     auto at = [&](int s, int d = 0) -> float& {
@@ -92,7 +92,7 @@ TEST_CASE("Stencil Adapter: Dimension Isolation", "[ai][stencil][edge]")
     AttentionShape shape{B, S, D, 1};
     AdapterCtx aCtx;
 
-    adapter.adapt(*ctx.pool, shape, view, view, view, out, aCtx);
+    adapter.adaptParallel(*ctx.pool, shape, view, view, view, out, aCtx);
 
     for (uint32_t i = 0; i < S; ++i) {
         CHECK(data[i * D + 0] == Catch::Approx(100.0f)); // uniform field -> no change
@@ -123,7 +123,7 @@ TEST_CASE("Stencil Adapter: Zero Rate (Identity)", "[ai][stencil][edge]")
     AttentionShape shape{B, S, D, 1};
     AdapterCtx aCtx;
 
-    adapter.adapt(*ctx.pool, shape, view, view, view, out, aCtx);
+    adapter.adaptParallel(*ctx.pool, shape, view, view, view, out, aCtx);
 
     for (uint32_t i = 0; i < S; ++i)
         CHECK(data[i * D + 0] == static_cast<float>(i));
@@ -159,7 +159,7 @@ TEST_CASE("Stencil Adapter: Throughput", "[ai][stencil][bench]")
 
         AttentionShape shape{B, S, D, 1};
 
-        adapter.adapt(*ctx.pool, shape, view, view, view, out, aCtx);
+        adapter.adaptParallel(*ctx.pool, shape, view, view, view, out, aCtx);
     };
 
     BENCHMARK("Stencil S=256 D=64 (Small)") {

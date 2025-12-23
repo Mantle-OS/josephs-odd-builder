@@ -79,7 +79,7 @@ TEST_CASE("FlashAttention Correctness", "[ai][att][correctness]") {
 
 
     JobStealerCtx ctx(8);
-    flashAttentionForward(*ctx.pool, N, d, Q.data(), K.data(), V.data(), O_flash.data(), scale);
+    flashParallelAttentionForward(*ctx.pool, N, d, Q.data(), K.data(), V.data(), O_flash.data(), scale);
 
     for(int i=0; i<N*d; ++i)
         REQUIRE_THAT(O_flash[i], Catch::Matchers::WithinRel(O_ref[i], 0.001f));
@@ -100,7 +100,7 @@ TEST_CASE("FlashAttention Benchmark", "[ai][att][bench]") {
     JobStealerCtx ctx(8);
 
     BENCHMARK("FlashAttention Forward (N=2048)") {
-        flashAttentionForward(*ctx.pool, N, d, Q.data(), K.data(), V.data(), O.data(), scale);
+        flashParallelAttentionForward(*ctx.pool, N, d, Q.data(), K.data(), V.data(), O.data(), scale);
         return O[0];
     };
 }
@@ -118,14 +118,15 @@ TEST_CASE("The Showdown FlashAttention Benchmark", "[ai][att][bench]") {
 
     JobStealerCtx ctx(8);
 
-    BENCHMARK("FlashAttention Forward (N=512 dim=64)") {
-        flashAttentionForward(*ctx.pool, N, d, Q.data(), K.data(), V.data(), O.data(), scale);
-        return O[0];
-    };
-
     BENCHMARK("Naive Attention (N=512 dim=64)") {
         naiveAttention(N, d, Q.data(), K.data(), V.data(), O.data(), scale);
         return O[0];
     };
+
+    BENCHMARK("FlashAttention Forward (N=512 dim=64)") {
+        flashParallelAttentionForward(*ctx.pool, N, d, Q.data(), K.data(), V.data(), O.data(), scale);
+        return O[0];
+    };
+
 }
 #endif

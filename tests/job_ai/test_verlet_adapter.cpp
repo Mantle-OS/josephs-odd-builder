@@ -35,7 +35,7 @@ TEST_CASE("Verlet Adapter: Kinematics (Drift)", "[ai][verlet][usage]") {
     AttentionShape shape{1u, 1u, static_cast<uint32_t>(D), 1u};
     AdapterCtx aCtx;
 
-    adapter.adapt(*ctx.pool, shape, view, view, view, view, aCtx);
+    adapter.adaptParallel(*ctx.pool, shape, view, view, view, view, aCtx);
 
     CHECK(data[0] == Catch::Approx(10.0f)); // X moved
     CHECK(data[3] == Catch::Approx(10.0f)); // Vx preserved
@@ -67,7 +67,7 @@ TEST_CASE("Verlet Adapter: N-Body Gravity", "[ai][verlet][usage]") {
 
     // Run 10 steps
     for(int i=0; i<10; ++i)
-        adapter.adapt(*ctx.pool, shape, view, view, view, view, aCtx);
+        adapter.adaptParallel(*ctx.pool, shape, view, view, view, view, aCtx);
 
     // Check convergence
     // P1 should move Right (> -1.0)
@@ -116,7 +116,7 @@ TEST_CASE("Verlet Adapter: Throughput (N-Body O(N^2))", "[ai][verlet][bench]") {
     };
 
     BENCHMARK("Verlet Step (N=1024)") {
-        adapter.adapt(*ctx.pool, shape, view, view, view, view, aCtx);
+        adapter.adaptParallel(*ctx.pool, shape, view, view, view, view, aCtx);
         return data[0]; // Output dependency
     };
 }
