@@ -1,7 +1,6 @@
 #pragma once
 #if defined(HAS_AVX)
 #include <immintrin.h>
-
 #if defined(__AVX512F__)
 #include "simd_avx512.h" // 16 width floats
 #elif defined(__AVX2__)
@@ -17,5 +16,5 @@ namespace job::ai::comp {
 using SIMD = NEON_F;
 }
 #else
-  #error "JobAi requires AVX2 or NEON support. Please check your compiler flags."
+  #error "JobAi requires AVX2 AVX512F or NEON support. Please check your compiler flags."
 #endif
