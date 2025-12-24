@@ -22,13 +22,15 @@
 namespace job::ai::comp {
 using namespace job::simd;
 
+
 // Helper: Masked Load (Prevents reading garbage/segfaults at edge of W)
 static inline f32 maskedLoad(const float* ptr, int count) {
     if (count >= SIMD::width()) {
         return SIMD::pull(ptr);
     } else {
-        alignas(32) float tmp[8] = {0}; // Ensure zero-pad
-        for (int i = 0; i < count; ++i) tmp[i] = ptr[i];
+        alignas(sizeof(float) * SIMD::width()) float tmp[SIMD::width()] = {};
+        for (int i = 0; i < count; ++i)
+            tmp[i] = ptr[i];
         return SIMD::pull(tmp);
     }
 }
@@ -38,81 +40,245 @@ static inline void maskedStore(float* ptr, f32 val, int count) {
     if (count >= SIMD::width()) {
         SIMD::mov(ptr, val);
     } else {
-        alignas(32) float tmp[8];
+        alignas(sizeof(float) * SIMD::width()) float tmp[SIMD::width()] = {};
         SIMD::mov(tmp, val);
-        for (int i = 0; i < count; ++i) ptr[i] = tmp[i];
+        for (int i = 0; i < count; ++i)
+            ptr[i] = tmp[i];
     }
 }
 
 template <typename OP, bool UseBias>
+inline void microKernel1xXMasked(
+    int K,
+    const float* __restrict__ A,                // Single row of A
+    const float* __restrict__ W, int ldw,       // W ptr
+    const float* __restrict__ B,                // Bias ptr
+    float* __restrict__ O,                      // Single row output
+    float actAlpha,
+    int maskWidth = SIMD::width()               // If < 8, use masked load/store
+    ) {
+    f32 acc;
+
+    // accumulator
+    if (UseBias)
+        acc = maskedLoad(B, maskWidth);
+    else
+        acc = SIMD::zero();
+
+    // Compute
+    for (int k = 0; k < K; ++k) {
+        auto in_val = SIMD::set1(A[k]);
+        auto w_vec = maskedLoad(W + k * ldw, maskWidth);
+        acc = SIMD::mul_plus(in_val, w_vec, acc);
+    }
+
+    // Activation
+    acc = OP::apply(acc, actAlpha);
+
+    // store
+    maskedStore(O, acc, maskWidth);
+}
+#if defined(__AVX512F__)
+template <typename OP, bool UseBias>
+__attribute__((always_inline))
+inline void microKernel16xX(int K,
+               const float* __restrict__ A, int lda,       // A points to A[row, 0]
+               const float* __restrict__ W, int ldw,       // W points to W[0, col]
+               const float* __restrict__ B,                // B points to B[col]
+               float* __restrict__ O, int ldo,             // O points to O[row, col]
+               float actAlpha)
+{
+
+    f32 b_vec = UseBias ? SIMD::pull(B) : SIMD::zero();
+
+    f32 acc0  = b_vec; // Row 0
+    f32 acc1  = b_vec; // Row 1
+    f32 acc2  = b_vec; // ...
+    f32 acc3  = b_vec;
+    f32 acc4  = b_vec;
+    f32 acc5  = b_vec;
+    f32 acc6  = b_vec;
+    f32 acc7  = b_vec;
+    f32 acc8  = b_vec;
+    f32 acc9  = b_vec;
+    f32 acc10 = b_vec;
+    f32 acc11 = b_vec;
+    f32 acc12 = b_vec;
+    f32 acc13 = b_vec;
+    f32 acc14 = b_vec;
+    f32 acc15 = b_vec;
+
+    // unroll slightly to hide latency if needed, but 8x16 is register heavy already.
+    for (int k = 0; k < K; ++k) {
+        f32 w_vec = SIMD::pull(W + k * ldw);
+        acc0  = SIMD::mul_plus(SIMD::set1(A[0  * lda + k]), w_vec, acc0);
+        acc1  = SIMD::mul_plus(SIMD::set1(A[1  * lda + k]), w_vec, acc1);
+        acc2  = SIMD::mul_plus(SIMD::set1(A[2  * lda + k]), w_vec, acc2);
+        acc3  = SIMD::mul_plus(SIMD::set1(A[3  * lda + k]), w_vec, acc3);
+        acc4  = SIMD::mul_plus(SIMD::set1(A[4  * lda + k]), w_vec, acc4);
+        acc5  = SIMD::mul_plus(SIMD::set1(A[5  * lda + k]), w_vec, acc5);
+        acc6  = SIMD::mul_plus(SIMD::set1(A[6  * lda + k]), w_vec, acc6);
+        acc7  = SIMD::mul_plus(SIMD::set1(A[7  * lda + k]), w_vec, acc7);
+        acc8  = SIMD::mul_plus(SIMD::set1(A[8  * lda + k]), w_vec, acc8);
+        acc9  = SIMD::mul_plus(SIMD::set1(A[9  * lda + k]), w_vec, acc9);
+        acc10 = SIMD::mul_plus(SIMD::set1(A[10 * lda + k]), w_vec, acc10);
+        acc11 = SIMD::mul_plus(SIMD::set1(A[11 * lda + k]), w_vec, acc11);
+        acc12 = SIMD::mul_plus(SIMD::set1(A[12 * lda + k]), w_vec, acc12);
+        acc13 = SIMD::mul_plus(SIMD::set1(A[13 * lda + k]), w_vec, acc13);
+        acc14 = SIMD::mul_plus(SIMD::set1(A[14 * lda + k]), w_vec, acc14);
+        acc15 = SIMD::mul_plus(SIMD::set1(A[15 * lda + k]), w_vec, acc15);
+    }
+
+    // Activation & Store
+    SIMD::mov(O + 0  * ldo, OP::apply(acc0, actAlpha));
+    SIMD::mov(O + 1  * ldo, OP::apply(acc1, actAlpha));
+    SIMD::mov(O + 2  * ldo, OP::apply(acc2, actAlpha));
+    SIMD::mov(O + 3  * ldo, OP::apply(acc3, actAlpha));
+    SIMD::mov(O + 4  * ldo, OP::apply(acc4, actAlpha));
+    SIMD::mov(O + 5  * ldo, OP::apply(acc5, actAlpha));
+    SIMD::mov(O + 6  * ldo, OP::apply(acc6, actAlpha));
+    SIMD::mov(O + 7  * ldo, OP::apply(acc7, actAlpha));
+    SIMD::mov(O + 8  * ldo, OP::apply(acc8, actAlpha));
+    SIMD::mov(O + 9  * ldo, OP::apply(acc9, actAlpha));
+    SIMD::mov(O + 10 * ldo, OP::apply(acc10, actAlpha));
+    SIMD::mov(O + 11 * ldo, OP::apply(acc11, actAlpha));
+    SIMD::mov(O + 12 * ldo, OP::apply(acc12, actAlpha));
+    SIMD::mov(O + 13 * ldo, OP::apply(acc13, actAlpha));
+    SIMD::mov(O + 14 * ldo, OP::apply(acc14, actAlpha));
+    SIMD::mov(O + 15 * ldo, OP::apply(acc15, actAlpha));
+}
+#elif defined(__AVX2__) || defined(__ARM_NEON) || defined(__aarch64__) || defined(__AVX512F__)
+template <typename OP, bool UseBias>
+__attribute__((always_inline))
+inline void microKernel8xX(int K,
+               const float* __restrict__ A, int lda,       // A points to A[row, 0]
+               const float* __restrict__ W, int ldw,       // W points to W[0, col]
+               const float* __restrict__ B,                // B points to B[col]
+               float* __restrict__ O, int ldo,             // O points to O[row, col]
+               float actAlpha)
+{
+    // Initialize Accumulators
+    // If Bias is used, we load it once and set accs to it.  Otherwise zero.
+    f32 b_vec = UseBias ? SIMD::pull(B) : SIMD::zero();
+
+    f32 acc0 = b_vec;
+    f32 acc1 = b_vec;
+    f32 acc2 = b_vec;
+    f32 acc3 = b_vec;
+    f32 acc4 = b_vec;
+    f32 acc5 = b_vec;
+    f32 acc6 = b_vec;
+    f32 acc7 = b_vec;
+
+    // unroll slightly to hide latency if needed, but 8x8 is register heavy already.
+    for (int k = 0; k < K; ++k) {
+        // Load 1 row of weights (8 columns) -> Reused 8 times!
+        f32 w_vec = SIMD::pull(W + k * ldw);
+
+        // Broadcast A scalars for the 8 rows
+        // FMA: acc += A[r, k] * W[k, c..c+7]
+        acc0 = SIMD::mul_plus(SIMD::set1(A[0 * lda + k]), w_vec, acc0);
+        acc1 = SIMD::mul_plus(SIMD::set1(A[1 * lda + k]), w_vec, acc1);
+        acc2 = SIMD::mul_plus(SIMD::set1(A[2 * lda + k]), w_vec, acc2);
+        acc3 = SIMD::mul_plus(SIMD::set1(A[3 * lda + k]), w_vec, acc3);
+        acc4 = SIMD::mul_plus(SIMD::set1(A[4 * lda + k]), w_vec, acc4);
+        acc5 = SIMD::mul_plus(SIMD::set1(A[5 * lda + k]), w_vec, acc5);
+        acc6 = SIMD::mul_plus(SIMD::set1(A[6 * lda + k]), w_vec, acc6);
+        acc7 = SIMD::mul_plus(SIMD::set1(A[7 * lda + k]), w_vec, acc7);
+    }
+
+    // Activation & Store
+    SIMD::mov(O + 0 * ldo, OP::apply(acc0, actAlpha));
+    SIMD::mov(O + 1 * ldo, OP::apply(acc1, actAlpha));
+    SIMD::mov(O + 2 * ldo, OP::apply(acc2, actAlpha));
+    SIMD::mov(O + 3 * ldo, OP::apply(acc3, actAlpha));
+    SIMD::mov(O + 4 * ldo, OP::apply(acc4, actAlpha));
+    SIMD::mov(O + 5 * ldo, OP::apply(acc5, actAlpha));
+    SIMD::mov(O + 6 * ldo, OP::apply(acc6, actAlpha));
+    SIMD::mov(O + 7 * ldo, OP::apply(acc7, actAlpha));
+}
+#endif
+
+
+template <typename OP, bool UseBias>
 void fusedDenseKernel(
-    const float* __restrict__ A,       // Input [Rows x InFeatures]
-    const float* __restrict__ W,       // Weights [InFeatures x OutFeatures]
-    const float* __restrict__ B,       // Bias [OutFeatures]
-    float* __restrict__ output,        // Output [Rows x OutFeatures]
+    const float* __restrict__ A,
+    const float* __restrict__ W,
+    const float* __restrict__ B,
+    float* __restrict__ O,
     int rows,
-    int in_features,
-    int out_features,
+    int inFeatures,
+    int outFeatures,
     float alpha)
 {
-    constexpr int Step = SIMD::width(); // 8 for AVX2
+    constexpr int VECLEN = SIMD::width();   // 8 on AVX2, 16 on AVX512
+    constexpr int MR = 8;                   // Row Blocking Factor  8
+    constexpr int NR = VECLEN;              // Col Blocking Factor (SIMD Width)
 
-    for (int r = 0; r < rows; ++r) {
-        const float *row_input = A + (r * in_features);
-        float *row_out = output + (r * out_features);
+    int rb = 0;
 
-        int c = 0;
-        for (; c <= out_features - Step; c += Step) {
+    // process 8 rows at a time
+    for (; rb <= rows - MR; rb += MR) {
+        int cb = 0;
 
-            // initialize accumulator (Bias or Zero)
-            auto acc = (UseBias) ? SIMD::pull(B + c) : SIMD::zero();
-
-            // dot product - fused register
-            for (int k = 0; k < in_features; ++k) {
-                // input scalar: A[r, k]
-                auto in_val = SIMD::set1(row_input[k]);
-
-                // load weight vector: W[k, c...c+7]
-                auto w_vec = SIMD::pull(W + k * out_features + c);
-
-                // FMA: acc += in * w
-                acc = SIMD::mul_plus(in_val, w_vec, acc);
-            }
-
-            // activation while still in register -> fast exp_estrin/schraudolph logic
-            acc = OP::apply(acc, alpha);
-
-            // write to memory
-            SIMD::mov(row_out + c, acc);
+        // 8xX Blockswhere X is SIMD::width
+        for (; cb <= outFeatures - NR; cb += NR) {
+            microKernel8xX<OP, UseBias>(
+                inFeatures,                                 // make sure this is 8 ?
+                A + rb * inFeatures, inFeatures,            // A ptr, stride
+                W + cb, outFeatures,                        // W ptr, stride
+                B + cb,                                     // Bias ptr
+                O + rb * outFeatures + cb, outFeatures,     // Out ptr, stride
+                alpha
+                );
         }
 
-        if (c < out_features) {
-            int rem = out_features - c;
-
-            // masked bias load
-            auto acc = (UseBias) ? maskedLoad(B + c, rem) : SIMD::zero();
-
-            // masked dot product
-            for (int k = 0; k < in_features; ++k) {
-                auto in_val = SIMD::set1(row_input[k]);
-
-                // Masked Weight Load (Safety Dance first lol!)
-                auto w_vec = maskedLoad(W + k * out_features + c, rem);
-                acc = SIMD::mul_plus(in_val, w_vec, acc);
+        // Right Edge Remaining Columns 1xX where X is SIMD::width
+        if (cb < outFeatures) {
+            int rem = outFeatures - cb;
+            // Fallback: Loop over the 8 rows, handle the tail columns for each
+            for (int r = 0; r < MR; ++r) {
+                microKernel1xXMasked<OP, UseBias>(
+                    inFeatures,
+                    A + (rb + r) * inFeatures,
+                    W + cb, outFeatures,
+                    B + cb,
+                    O + (rb + r) * outFeatures + cb,
+                    alpha,
+                    rem // Pass mask width
+                    );
             }
+        }
+    }
 
-            // fast activation
-            acc = OP::apply(acc, alpha);
-
-            // masked store
-            maskedStore(row_out + c, acc, rem);
+    // Bottom Edge: Process remaining rows (1..7) each remaining row as a 1xN GEMV
+    for (; rb < rows; ++rb) {
+        int cb = 0;
+        for (; cb <= outFeatures - NR; cb += NR) {
+            microKernel1xXMasked<OP, UseBias>(
+                inFeatures,
+                A + rb * inFeatures,
+                W + cb, outFeatures,
+                B + cb,
+                O + rb * outFeatures + cb,
+                alpha,
+                SIMD::width() // Full width
+                );
+        }
+        // right edge of bottom rows
+        if (cb < outFeatures) {
+            microKernel1xXMasked<OP, UseBias>(
+                inFeatures,
+                A + rb * inFeatures,
+                W + cb, outFeatures,
+                B + cb,
+                O + rb * outFeatures + cb,
+                alpha,
+                outFeatures - cb
+                );
         }
     }
 }
-
-
-
-
 
 template<bool T_ESTRIN>
 inline void activateDense(
@@ -228,9 +394,9 @@ inline void activateDenseParallel(
 
 template<bool T_ESTRIN>
 inline void activateDense(float* __restrict__ data,
-                     size_t size,
-                     ActivationType type,
-                     float alpha = 1.0f) // We can get rid of smooth then go through these calls fixing the
+                          size_t size,
+                          ActivationType type,
+                          float alpha = 1.0f) // We can get rid of smooth then go through these calls fixing the
 {
     switch (type) {
     case ActivationType::Identity:
@@ -378,8 +544,8 @@ inline void activate(float* __restrict__ data,
 
 template<bool T_ESTRIN>
 inline f32 activateSingle(float* __restrict__ data,
-                     ActivationType type,
-                     float alpha = 1.0f)
+                          ActivationType type,
+                          float alpha = 1.0f)
 {
     switch (type) {
     case ActivationType::Identity:

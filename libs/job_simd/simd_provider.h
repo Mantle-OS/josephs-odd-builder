@@ -1,7 +1,12 @@
 #pragma once
 #if defined(HAS_AVX)
 #include <immintrin.h>
-#include "simd_avx.h" // immintrin
+
+#if defined(__AVX512F__)
+#include "simd_avx512.h" // 16 width floats
+#elif defined(__AVX2__)
+#include "simd_avx.h" // 8 width floats
+#endif
 namespace job::simd  {
 using SIMD = AVX_F;
 }

@@ -8,10 +8,10 @@ add_executable(test_job_ai
     # test_tensor_view.cpp
     # test_ai_shm_integration.cpp
     # test_unix_genome.cpp
-    # test_gemm.cpp
+    test_gemm.cpp
     # test_flash_attention.cpp
     # test_mlp.cpp
-    # test_attention_integration.cpp
+    test_attention_integration.cpp
     # test_fmm_adapter.cpp
     # test_verlet_adapter.cpp
     # test_bh_adapter.cpp

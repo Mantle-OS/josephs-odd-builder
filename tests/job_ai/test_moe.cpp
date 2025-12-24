@@ -208,20 +208,22 @@ TEST_CASE("SparseMoE: Throughput Benchmark (LLaMA-Small Scale)", "[ai][moe][benc
     // simulating a small moe layer
     const int B = 128;
     const int D = 1024;
-    const int E = 8;
-    const int K = 2;
+    const int experts = 8;
+    const int topK = 2;
 
-    JobStealerCtx ctx(16); // me cave man me give THREADS!
+    JobStealerCtx ctx(8); // me cave man me give THREADS!
     Workspace ws(256 * 1024 * 1024); // Give it a real workspace (256MB)
 
-    SparseMoE moe(D, E, K);
+    LayerConfig lcfg = LayerPresets::MoEConfig(experts, topK, "my_moe");
+    SparseMoE moe(D, experts, topK, lcfg, 1.0f);
 
-    // auto den_cfg = LayerPresets::DenseConfig();
-    // den_cfg.activation = comp::ActivationType::GELU;
+    auto den_cfg = LayerPresets::DenseConfig("mod_dense", true, comp::ActivationType::GELU);
+    den_cfg.numExperts = experts;
 
     // populate experts with real dense layers
-    for(int i = 0; i < E; ++i)
-        moe.addExpert(i, std::make_shared<DenseLayer>(D, D /*, den_cfg*/));
+    for(int i = 0; i < experts; ++i){
+        moe.addExpert(i, std::make_shared<DenseLayer>(D, D , den_cfg));
+    }
 
     using Alloc = cords::AlignedAllocator<float, 64>;
     std::vector<float, Alloc> input(B * D, 0.1f);

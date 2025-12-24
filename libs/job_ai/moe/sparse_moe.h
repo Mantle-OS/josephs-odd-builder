@@ -127,8 +127,8 @@ public:
 
             // USE THE HOT POINTER
             cords::Matrix W(m_gateWeightsPtr, dim, experts);
-
             cords::Matrix G(logitsPtr, batch, experts);
+
             comp::sgemmParallelMatrix(pool,A, W, G);
 
             if (!m_routerCfg.deterministic) {
