@@ -10,20 +10,20 @@ namespace job::science::data {
 
 // Core physical force models for protoplanetary sorting
 struct Forces final {
-    static constexpr core::real_t G       = core::real_t(6.67430e-11);    // Gravitational constant
-    static constexpr core::real_t M_sun   = core::real_t(1.98847e30);     // Solar mass (kg)
-    static constexpr core::real_t c_light = core::real_t(2.99792458e8);   // Speed of light (m/s)
-    static constexpr core::real_t Q_pr    = core::real_t(1.0);            // Radiation pressure coefficient
+    static constexpr float G       = 6.67430e-11f;    // Gravitational constant
+    static constexpr float M_sun   = 1.98847e30f;     // Solar mass (kg)
+    static constexpr float c_light = 2.99792458e8f;   // Speed of light (m/s)
+    static constexpr float Q_pr    = 1.0f;            // Radiation pressure coefficient
 
     // Gravitational acceleration toward the central star
     [[nodiscard]] static constexpr Vec3f gravity(const Particle &p, const DiskModel &disk) noexcept
     {
-        const core::real_t r_m_sq = p.position.lengthSq(); // r² in meters
-        if (r_m_sq <= core::real_t(1e-9))
+        const float r_m_sq = p.position.lengthSq(); // r² in meters
+        if (r_m_sq <= 1e-9f)
             return kEmptyVec3F;
 
-        const core::real_t M = disk.stellarMass * M_sun;
-        const core::real_t mag_accel = G * M / r_m_sq;
+        const float M = disk.stellarMass * M_sun;
+        const float mag_accel = G * M / r_m_sq;
 
         // Direction is opposite to position (inward)
         return p.position.normalize() * -mag_accel;
@@ -34,16 +34,16 @@ struct Forces final {
                                                            const DiskModel &disk,
                                                            const Composition &comp) noexcept
     {
-        const core::real_t r_m_sq = p.position.lengthSq();
-        if (r_m_sq <= core::real_t(1e-9) || p.mass <= core::real_t(0.0))
+        const float r_m_sq = p.position.lengthSq();
+        if (r_m_sq <= float(1e-9) || p.mass <= float(0.0))
             return kEmptyVec3F;
 
-        const core::real_t L_star = disk.stellarLuminosity * core::real_t(3.828e26);    // (W)
-        const core::real_t area   = ParticleUtil::surfaceArea(p);                 // m²
-        const core::real_t m      = p.mass;
-        const core::real_t F_mag = (Q_pr * area * L_star) / (core::real_t(4.0) * core::real_t(core::piToTheFace) * r_m_sq * c_light);
-        const core::real_t a_mag = F_mag / m;
-        const core::real_t final_accel = a_mag * disk.radiationPressureCoeff * comp.absorptivity;
+        const float L_star = disk.stellarLuminosity * 3.828e26f;    // (W)
+        const float area   = ParticleUtil::surfaceArea(p);                 // m²
+        const float m      = p.mass;
+        const float F_mag = (Q_pr * area * L_star) / (4.0f * core::piToTheFace * r_m_sq * c_light);
+        const float a_mag = F_mag / m;
+        const float final_accel = a_mag * disk.radiationPressureCoeff * comp.absorptivity;
 
         // outward
         return p.position.normalize() * final_accel;
@@ -52,19 +52,19 @@ struct Forces final {
     // Photophoretic force (Rohatschek 1995 form, scaled radially)
     [[nodiscard]] static constexpr Vec3f photophoretic(const Particle &p, const DiskModel &disk, const Composition &comp) noexcept
     {
-        const core::real_t r_m = p.position.length(); // r in meters
-        if (r_m <= core::real_t(1e-9))
+        const float r_m = p.position.length(); // r in meters
+        if (r_m <= float(1e-9))
             return kEmptyVec3F;
 
-        const core::real_t r_au  = DiskModelUtil::metersToAU(r_m);
-        const core::real_t T     = DiskModelUtil::temperature(disk, r_au);
-        const core::real_t rho   = DiskModelUtil::gasDensity(disk, r_au);
+        const float r_au  = DiskModelUtil::metersToAU(r_m);
+        const float T     = DiskModelUtil::temperature(disk, r_au);
+        const float rho   = DiskModelUtil::gasDensity(disk, r_au);
 
         // (requires detailed gas constants for full form)
-        const core::real_t Kn = core::real_t(1e-2) / (rho * p.radius + core::real_t(1e-9));
+        const float Kn = float(1e-2) / (rho * p.radius + float(1e-9));
 
-        const core::real_t C_ph_base = (comp.absorptivity * T * T * Kn) / (p.radius * rho + core::real_t(1e-12));
-        const core::real_t a_mag = C_ph_base * core::real_t(1e-18);
+        const float C_ph_base = (comp.absorptivity * T * T * Kn) / (p.radius * rho + float(1e-12));
+        const float a_mag = C_ph_base * float(1e-18);
 
         //  outward
         return p.position.normalize() * a_mag;
@@ -72,17 +72,17 @@ struct Forces final {
 
     [[nodiscard]] static constexpr Vec3f gasDrag(const Particle &p, const DiskModel &disk) noexcept
     {
-        const core::real_t r_au    = DiskModelUtil::metersToAU(p.position.length());
-        const core::real_t rho_gas = DiskModelUtil::gasDensity(disk, r_au);
-        const core::real_t c_s     = DiskModelUtil::soundSpeed(disk, r_au);
-        const core::real_t A       = ParticleUtil::surfaceArea(p);
-        const core::real_t m       = p.mass;
+        const float r_au    = DiskModelUtil::metersToAU(p.position.length());
+        const float rho_gas = DiskModelUtil::gasDensity(disk, r_au);
+        const float c_s     = DiskModelUtil::soundSpeed(disk, r_au);
+        const float A       = ParticleUtil::surfaceArea(p);
+        const float m       = p.mass;
 
-        if (m <= core::real_t(0.0))
+        if (m <= float(0.0))
             return kEmptyVec3F;
 
-        const core::real_t v_mag = p.velocity.length();
-        const core::real_t a_drag_mag = (-rho_gas * c_s * A * v_mag) / (m + core::real_t(1e-9));
+        const float v_mag = p.velocity.length();
+        const float a_drag_mag = (-rho_gas * c_s * A * v_mag) / (m + float(1e-9));
 
         // Direction is opposite to velocity
         return p.velocity.normalize() * a_drag_mag;
@@ -114,13 +114,13 @@ struct Forces final {
                     continue;
 
                 Vec3f r = particles[j].position - particles[i].position;
-                core::real_t distSq = r.x * r.x + r.y * r.y + r.z * r.z;
+                float distSq = r.x * r.x + r.y * r.y + r.z * r.z;
 
-                if (distSq <= core::real_t(1e-12))
+                if (distSq <= 1e-12f)
                     continue;
 
-                core::real_t invDist  = core::real_t(1) / std::sqrt(distSq);
-                core::real_t invDist3 = invDist * invDist * invDist;
+                float invDist  = 1.0f / std::sqrt(distSq);
+                float invDist3 = invDist * invDist * invDist;
 
                 Vec3f f = r * (particles[j].mass * invDist3); // Mass of *other*
                 particles[i].acceleration = particles[i].acceleration + f;
@@ -136,12 +136,12 @@ struct Forces final {
         for (const auto &s : sources) {
             Vec3f dr = s.position - target.position; // source - target
 
-            core::real_t r2 = dr.x * dr.x + dr.y * dr.y + dr.z * dr.z;
-            if (r2 <= core::real_t(1e-12))
+            float r2 = dr.x * dr.x + dr.y * dr.y + dr.z * dr.z;
+            if (r2 <= 1e-12f)
                 continue;
 
-            core::real_t invR  = core::real_t(1) / std::sqrt(r2);
-            core::real_t invR3 = invR * invR * invR;
+            float invR  = 1.0f / std::sqrt(r2);
+            float invR3 = invR * invR * invR;
 
             exact = exact + dr * (s.mass * invR3);
         }
@@ -151,10 +151,10 @@ struct Forces final {
 
 
     // Inflatable bounce castle with blower
-    inline void springForce(const Particles &particles,
+    static void springForce(const Particles &particles,
                             std::vector<Vec3f> &out_forces)
     {
-        const core::real_t k = core::real_t(1.0);
+        const float k = 1.0f;
         const size_t n = particles.size();
         out_forces.resize(n);
 
@@ -163,11 +163,11 @@ struct Forces final {
     }
 
     // Its wet here ... Damped spring: F = -k x - c v
-    inline void dampedSpringForce(const Particles &particles,
+    static void dampedSpringForce(const Particles &particles,
                                   std::vector<Vec3f> &out_forces)
     {
-        const core::real_t k = core::real_t(1.0);
-        const core::real_t c = core::real_t(0.5); // lightly squishy
+        const float k = 1.0f;
+        const float c = 0.5f; // lightly squishy
         const size_t n = particles.size();
         out_forces.resize(n);
 
@@ -176,6 +176,57 @@ struct Forces final {
             Vec3f drag   = particles[i].velocity * -c;
             out_forces[i] = spring + drag;
         }
+    }
+
+    // A heavier deterministic force so integrator+adapter overhead is visible.
+    // This avoids random noise and avoids N^2, but creates meaningful CPU load.
+    static void expensiveSpringForce(const std::vector<Particle>& ps, std::vector<Vec3f>& out_forces)
+    {
+        const float k = 1.0f;
+        const size_t n = ps.size();
+        if (out_forces.size() != n)
+            out_forces.resize(n);
+
+        for (size_t i = 0; i < n; ++i) {
+            const auto& p = ps[i];
+            const float x = p.position.x;
+            const float y = p.position.y;
+            const float z = p.position.z;
+
+            float fx = -k * x;
+            float fy = -k * y;
+            float fz = -k * z;
+
+            // Burn a bit of predictable compute per particle.
+            // (fast-math will make this cheaper but still stable)
+            for (int j = 0; j < 8; ++j) {
+                fx += std::sin(x + float(j)) * 0.01f;
+                fy += std::cos(y + float(j)) * 0.01f;
+                fz += std::sin(z + float(j)) * 0.01f;
+            }
+
+            out_forces[i] = { fx, fy, fz };
+        }
+    }
+
+
+    // Calculate Total Energy (E = K + U) for simple spring (U = 0.5 * k * x^2)
+    static double calculateTotalEnergy(const std::vector<Particle> &particles, float k_spring)
+    {
+        double total_E = 0.0;
+        for (const auto &p : particles) {
+            // Kinetic Energy: K = 0.5 * m * v^2
+            double v_sq = p.velocity.lengthSq();
+            double K = 0.5 * p.mass * v_sq;
+
+            // Potential Energy (Spring): U = 0.5 * k * x^2 (assuming origin is equilibrium)
+            // Note: position is Vec3f, so x^2 is lengthSq()
+            double dist_sq = p.position.lengthSq();
+            double U = 0.5 * k_spring * dist_sq;
+
+            total_E += (K + U);
+        }
+        return total_E;
     }
 
 };

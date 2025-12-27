@@ -3,7 +3,7 @@
 namespace job::ai::adapters {
 
 struct BhTraits {
-    using Vec3 = job::science::data::Vec3f;
+    using Vec3 = science::data::Vec3f;
     using Real = float;
     struct Body {
         Vec3 position;

@@ -1,4 +1,5 @@
 #pragma once
+#include <cassert>
 #include <cmath>
 #include <cstdint>
 #include <vector>
@@ -97,9 +98,29 @@ struct Zones final {
 /////////////////////////////////////////////
 #pragma pack(push, 1)
 struct Vec3f final {
+
     float x{0.0f};
     float y{0.0f};
     float z{0.0f};
+
+    // Read/Write access (Reference)
+    [[nodiscard]] float &operator[](size_t i) noexcept
+    {
+        assert(i < 3 && "Vec3f index out of bounds");
+        if(i == 0) return x;
+        if(i == 1) return y;
+        return z;
+    }
+
+    // Read-only access (Value is fine for scalars, or const ref)
+    [[nodiscard]] float operator[](size_t i) const noexcept
+    {
+        assert(i < 3 && "Vec3f index out of bounds");
+        if(i == 0) return x;
+        if(i == 1) return y;
+        return z;
+    }
+
 
     [[nodiscard]] constexpr Vec3f operator+(const Vec3f &o) const noexcept
     {
@@ -158,16 +179,63 @@ struct Particle final {
 #pragma pack(pop)
 
 
-// Inflatable bounce castle with blower
-inline void springForce(const std::vector<Particle> &particles,
-                        std::vector<Vec3f> &out_forces)
+// Deterministic particle initialization
+std::vector<Particle> genParticles(size_t n)
+{
+    std::vector<Particle> ps(n);
+    for (size_t i = 0; i < n; ++i) {
+        Particle p;
+        p.id = i;
+        p.position = { float(i) * 0.001f, float(i) * 0.002f, float(i) * 0.0005f };
+        p.velocity = { 0.0f, 0.0f, 0.0f };
+        p.acceleration = { 0.0f, 0.0f, 0.0f };
+        p.mass = 1.0f;
+        ps[i] = p;
+    }
+    return ps;
+}
+
+
+
+// A heavier deterministic force so integrator+adapter overhead is visible.
+// This avoids random noise and avoids N^2, but creates meaningful CPU load.
+void expensiveSpringForce(const std::vector<Particle>& ps, std::vector<Vec3f>& out_forces)
 {
     const float k = 1.0f;
-    const size_t n = particles.size();
-    out_forces.resize(n);
+    const size_t n = ps.size();
+    if (out_forces.size() != n)
+        out_forces.resize(n);
 
-    for (size_t i = 0; i < n; ++i)
-        out_forces[i] = particles[i].position * -k;
+    for (size_t i = 0; i < n; ++i) {
+        const auto& p = ps[i];
+        const float x = p.position.x;
+        const float y = p.position.y;
+        const float z = p.position.z;
+
+        float fx = -k * x;
+        float fy = -k * y;
+        float fz = -k * z;
+
+        // Burn a bit of predictable compute per particle.
+        // (fast-math will make this cheaper but still stable)
+        for (int j = 0; j < 8; ++j) {
+            fx += std::sin(x + float(j)) * 0.01f;
+            fy += std::cos(y + float(j)) * 0.01f;
+            fz += std::sin(z + float(j)) * 0.01f;
+        }
+
+        out_forces[i] = { fx, fy, fz };
+    }
+}
+
+// Inflatable bounce castle with blower
+inline void springForce(const std::vector<Particle> &particles,
+                        std::vector<Vec3f> &outForces)
+{
+    for (size_t i = 0; i < particles.size(); ++i){
+        const auto &particle = particles[i];
+        outForces[i] = particle.position * -1.0f;
+    }
 }
 
 // Its wet here ... Damped spring: F = -k x - c v

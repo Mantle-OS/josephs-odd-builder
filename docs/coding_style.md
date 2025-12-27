@@ -350,8 +350,7 @@ TEST_CASE("some benchmark", "[module][some_feature][some_scope][benchmark]")
 * Use Catch2 test names and tags that describe behavior:
 
 ```cpp
-TEST_CASE("JobThreadGraph fan-in waits for all prerequisites",
-          "[threading][graph][fanin]")
+TEST_CASE("JobThreadGraph fan-in waits for all prerequisites", "[threading][graph][fanin]")
 { /* ... */ }
 ```
 

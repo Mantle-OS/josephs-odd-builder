@@ -129,7 +129,7 @@ public:
             cords::Matrix W(m_gateWeightsPtr, dim, experts);
             cords::Matrix G(logitsPtr, batch, experts);
 
-            comp::sgemmParallelMatrix(pool,A, W, G);
+            comp::sgemmParallelMatrix(pool,A, W, G); // HERE IS WHAT UPDATED
 
             if (!m_routerCfg.deterministic) {
                 uint64_t fastSeed = (uint64_t)input.data() ^ 0xDEADBEEF;

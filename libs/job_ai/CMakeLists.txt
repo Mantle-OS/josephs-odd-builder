@@ -77,6 +77,7 @@ set(JOBAI_CORDS_HEADERS
     cords/tile4.h
     cords/tile8.h
     cords/tile16.h
+    cords/ml_particle.h
 )
 set(JOBAI_CORDS_SOURCES)
 

@@ -4,72 +4,50 @@ project(JosephsOddBuilderThreads
     LANGUAGES CXX
 )
 
-#########################
 # CORE
-#########################
-
 set(JOBTHREADS_HEADERS
     job_thread.h
     job_thread_pool.h
     job_thread_watcher.h
     job_semaphore.h
 )
-
 set(JOBTHREADS_SOURCES
     job_thread.cpp
     job_thread_pool.cpp
     job_thread_watcher.cpp
 )
 
-#########################
-# UTILS
-#########################
 
+# UTILS
 set(JOBTHREADS_UTILS_HEADERS
     utils/job_thread_options.h
     utils/job_thread_args.h
     utils/job_thread_metrics.h
     utils/job_parallel_for.h
     utils/job_parallel_reduce.h
+
     utils/job_thread_node.h
     utils/job_thread_graph.h
     utils/job_thread_actor.h
-    utils/job_verlet_concepts.h
-    utils/job_verlet_adapters.h
-    utils/job_verlet_integrator.h
-    utils/job_barnes_hut_tree.h
-    utils/job_barnes_hut_calculator.h
-    utils/job_stencil_boundary.h
-    utils/job_stencil_grid_2D.h
-    utils/job_stencil_grid_3D.h
+
     utils/job_pipeline_sink.h
     utils/job_pipeline_stage.h
     utils/job_pipeline.h
-    utils/job_rk4_integrator.h
-    utils/job_euler_integrator.h
+
     utils/job_parallel_bfs.h
     utils/job_parallel_dijkstra.h
+
     utils/job_branch_and_bound.h
 
     # utils/job_monte_carlo_concept.h
     utils/job_monte_carlo.h
-    #
-    utils/job_fmm_utils.h #new
-    utils/job_fmm_concepts.h # new
-    utils/job_fmm_kernel.h # new
-    utils/job_fmm_integrator.h # new
-
-    # utils/job_fmm_tree.h # old going away
 )
-
 set(JOBTHREADS_UTILS_SOURCES
     utils/job_thread_graph.cpp
 )
 
-#########################
-# QUEUE's
-#########################
 
+# QUEUE's
 set(JOBTHREADS_QUEUE_HEADERS
     queue/job_task_queue.h
     queue/job_mcmp_queue.h
@@ -78,10 +56,8 @@ set(JOBTHREADS_QUEUE_SOURCES
     queue/job_task_queue.cpp
 )
 
-#########################
-# Scheduler's
-#########################
 
+# Scheduler's
 set(JOBTHREADS_SCHED_HEADERS
     sched/job_isched_policy.h
     sched/job_fifo_scheduler.h
@@ -97,24 +73,19 @@ set(JOBTHREADS_SCHED_SOURCES
     sched/job_sporadic_scheduler.cpp
 )
 
-#########################
-# Descriptor's
-#########################
 
+# Descriptor's
 set(JOBTHREADS_DESCR_HEADERS
     descr/job_idescriptor.h
     descr/job_task_descriptor.h
     descr/job_sporadic_descriptor.h
 )
-
 set(JOBTHREADS_DESCR_SOURCES
     descr/job_idescriptor.cpp
 )
 
-#########################
-# ASYNC IO
-#########################
 
+# ASYNC IO
 set(JOBTHREADS_IO_HEADERS
     io/job_async_event_loop.h
     io/job_io_async_thread.h
@@ -124,16 +95,15 @@ set(JOBTHREADS_IO_SOURCES
     io/job_io_async_thread.cpp
 )
 
+
+# Ctx Api
 set(JOBTHREADS_CTX_HEADERS
     ctx/job_fifo_ctx.h
     ctx/job_rr_ctx.h
     ctx/job_sporadic_ctx.h
     ctx/job_stealing_ctx.h
 )
-
-set(JOBTHREADS_CTX_SOURCES
-
-)
+set(JOBTHREADS_CTX_SOURCES)
 
 
 add_library(JosephsOddBuilder_Threads SHARED
@@ -183,33 +153,13 @@ install(TARGETS JosephsOddBuilder_Threads
     INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 )
 
-install(FILES ${JOBTHREADS_HEADERS}
-    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobthreads
-)
-
-install(FILES ${JOBTHREADS_UTILS_HEADERS}
-    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobthreads/utils
-)
-
-install(FILES ${JOBTHREADS_QUEUE_HEADERS}
-    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobthreads/queue
-)
-
-install(FILES ${JOBTHREADS_SCHED_HEADERS}
-    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobthreads/sched
-)
-
-install(FILES ${JOBTHREADS_DESCR_HEADERS}
-    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobthreads/descr
-)
-
-install(FILES ${JOBTHREADS_IO_HEADERS}
-    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobthreads/io
-)
-
-install(FILES ${JOBTHREADS_CTX_HEADERS}
-    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobthreads/ctx
-)
+install(FILES ${JOBTHREADS_HEADERS}         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobthreads )
+install(FILES ${JOBTHREADS_UTILS_HEADERS}   DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobthreads/utils )
+install(FILES ${JOBTHREADS_QUEUE_HEADERS}   DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobthreads/queue )
+install(FILES ${JOBTHREADS_SCHED_HEADERS}   DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobthreads/sched )
+install(FILES ${JOBTHREADS_DESCR_HEADERS}   DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobthreads/descr )
+install(FILES ${JOBTHREADS_IO_HEADERS}      DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobthreads/io )
+install(FILES ${JOBTHREADS_CTX_HEADERS}     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobthreads/ctx )
 
 
 set(PKGCONFIG_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/pkgconfig")
@@ -228,4 +178,3 @@ install(EXPORT JosephsOddBuilderThreadsTargets
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/JosephsOddBuilderThreads
 )
 
-# CHECKPOINT: v1.5

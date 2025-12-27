@@ -1,6 +1,10 @@
-#include <catch2/benchmark/catch_benchmark.hpp>
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
+
+#ifdef JOB_TEST_BENCHMARKS
+#include <catch2/benchmark/catch_benchmark.hpp>
+#endif
+
 #include <vector>
 #include <random>
 

@@ -56,12 +56,12 @@ void StencilAdapter::adaptParallel(threads::ThreadPool &pool,
 
         float *channelData = scratch.data() + (b * elementsPerBatch) + (d * S);
 
-        threads::JobStencilGrid2D<float> grid(pool, width, height, false);
+        science::JobStencilGrid2D<float> grid(pool, width, height, false);
 
         std::memcpy(grid.data(), channelData, S * sizeof(float));
 
         float rate = m_cfg.diffusionRate;
-        auto realKernel = [rate, this](int x, int y, threads::GridReader2D<float> view) -> float {
+        auto realKernel = [rate, this](int x, int y, science::GridReader2D<float> view) -> float {
             float center = view(x, y);
             float sum = 0.0f;
             sum += view.at(x + 1, y, m_cfg.boundary);
@@ -103,7 +103,7 @@ void StencilAdapter::adapt(threads::ThreadPool &pool,
 
     // FIXME: In v3, ask Workspace for this buffer to avoid malloc.
     cords::AiWeights scratch(B * elementsPerBatch);
-    for(size_t b = 0; b <= size_t(B); ++b){
+    for(size_t b = 0; b < size_t(B); ++b){
         const float *srcBatch = sources.data() + (b * elementsPerBatch);
         float *scratchBatch   = scratch.data() + (b * elementsPerBatch);
         comp::transpose(srcBatch, scratchBatch, S, D);
@@ -117,12 +117,12 @@ void StencilAdapter::adapt(threads::ThreadPool &pool,
 
         float *channelData = scratch.data() + (b * elementsPerBatch) + (d * S);
 
-        threads::JobStencilGrid2D<float> grid(pool, width, height, false);
+        science::JobStencilGrid2D<float> grid(pool, width, height, false);
 
         std::memcpy(grid.data(), channelData, S * sizeof(float));
 
         float rate = m_cfg.diffusionRate;
-        auto realKernel = [rate, this](int x, int y, threads::GridReader2D<float> view) -> float {
+        auto realKernel = [rate, this](int x, int y, science::GridReader2D<float> view) -> float {
             float center = view(x, y);
             float sum = 0.0f;
             sum += view.at(x + 1, y, m_cfg.boundary);

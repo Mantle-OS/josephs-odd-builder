@@ -17,10 +17,10 @@ struct Particle final {
     Vec3f               position{};                     // meters, disc-centric coordinates
     Vec3f               velocity{};                     // m/s
     Vec3f               acceleration{};                 // current accumulated accel (photophoresis + gravity)
-    core::real_t        radius{core::real_t(0.0)};            // meters
-    core::real_t        mass{core::real_t(0.0)};              // kg (derived)
-    core::real_t        temperature{core::real_t(0.0)};       // Kalvin
-    Composition         composition;                    // Composition holds density, heat capacity, emissivity, etc.
+    float               radius{0.0f};                   // meters
+    float               mass{0.0f};                     // kg (derived)
+    float               temperature{0.0f};              // Kalvin
+    Composition         composition{};                  // Composition holds density, heat capacity, emissivity, etc.
     DiskZone            zone{DiskZone::Inner_Disk};     // where in the disk the partical is.
     uint8_t             flags{0};                       // reserved bits for simulation states
 };
@@ -29,33 +29,39 @@ struct Particle final {
 using Particles = std::vector<Particle>;
 
 struct ParticleUtil final {
-    [[nodiscard]] static constexpr bool isValid(const Particle &p) noexcept
+    [[nodiscard]] static constexpr bool isValid(const Particle& p) noexcept
     {
-        return std::isfinite(p.radius) && p.radius > core::real_t(0.0);
+        if (!(p.radius > 0.0f))
+            return false;
+#if !defined(__FAST_MATH__)
+        if (!std::isfinite(p.radius))
+            return false;
+#endif
+        return true;
     }
 
-    [[nodiscard]] static constexpr core::real_t volume(const Particle &p) noexcept
+    [[nodiscard]] static constexpr float volume(const Particle &p) noexcept
     {
-        return (core::real_t(4.0) / core::real_t(3.0)) * core::real_t(core::piToTheFace) * p.radius * p.radius * p.radius;
+        return (4.0f / 3.0f) * core::piToTheFace * p.radius * p.radius * p.radius;
     }
 
-    [[nodiscard]] static constexpr core::real_t surfaceArea(const Particle &p) noexcept
+    [[nodiscard]] static constexpr float surfaceArea(const Particle &p) noexcept
     {
-        return core::real_t(4.0) * core::real_t(core::piToTheFace) * p.radius * p.radius;
+        return 4.0f * core::piToTheFace * p.radius * p.radius;
     }
 
-    [[nodiscard]] static constexpr core::real_t density(const Particle &p) noexcept
+    [[nodiscard]] static constexpr float density(const Particle &p) noexcept
     {
         return p.composition.density;
     }
 
     // test particle
-    [[nodiscard]] static constexpr Particle createTestParticle(core::real_t r_au, core::real_t radius, const Composition &comp) noexcept
+    [[nodiscard]] static constexpr Particle createTestParticle(float r_au, float radius, const Composition &comp) noexcept
     {
         Particle p{};
         // (X=r/sqrt(2), Y=r/sqrt(2))
-        const core::real_t r_m = r_au * DiskModelUtil::auToMeters(core::real_t(1.0));
-        const core::real_t r_m_comp = r_m / std::sqrt(core::real_t(2.0));
+        const float r_m = r_au * DiskModelUtil::auToMeters(1.0f);
+        const float r_m_comp = r_m / std::sqrt(2.0f);
         p.position.x = r_m_comp;
         p.position.y = r_m_comp;
 
@@ -67,7 +73,24 @@ struct ParticleUtil final {
         p.velocity = kEmptyVec3F;
         return p;
     }
-    [[nodiscard]] static constexpr Particle createDragParticle(core::real_t r_au, core::real_t radius, core::real_t vy, const Composition &comp) noexcept
+
+    // Deterministic particle initialization
+    static constexpr Particles genParticles(size_t n) noexcept
+    {
+        Particles ps(n);
+        for (size_t i = 0; i < n; ++i) {
+            Particle p;
+            p.id = i;
+            p.position = { float(i) * 0.001f, float(i) * 0.002f, float(i) * 0.0005f };
+            p.velocity = { 0.0f, 0.0f, 0.0f };
+            p.acceleration = { 0.0f, 0.0f, 0.0f };
+            p.mass = 1.0f;
+            ps[i] = p;
+        }
+        return ps;
+    }
+
+    [[nodiscard]] static constexpr Particle createDragParticle(float r_au, float radius, float vy, const Composition &comp) noexcept
     {
         Particle p = ParticleUtil::createTestParticle(r_au, radius, comp);
         p.velocity.y = vy;

@@ -6,7 +6,6 @@
 namespace job::ai::adapters {
 
 using namespace job::ai::cords;
-using namespace job::threads;
 
 BhAdapter::BhAdapter(BhConfig cfg) :
     m_cfg(cfg)
@@ -24,7 +23,7 @@ std::string BhAdapter::name() const
 }
 
 void BhAdapter::adaptParallel(
-    job::threads::ThreadPool &pool,
+    threads::ThreadPool &pool,
     const AttentionShape &shape,
     const ViewR &sources,
     [[maybe_unused]] const ViewR &targets,
@@ -58,7 +57,7 @@ void BhAdapter::apply(threads::ThreadPool &pool, const cords::AttentionShape &sh
     const int S = static_cast<int>(shape.seq);
     const int D = static_cast<int>(shape.dim);
 
-    std::shared_ptr<ThreadPool> poolPtr(&pool, [](void*){});
+    std::shared_ptr<threads::ThreadPool> poolPtr(&pool, [](void*){});
     std::vector<BhTraits::Body> bodies(S);
     const float *k_ptr = sources.data() + (i * S * D);
     float *out_ptr     = output.data()  + (i * S * D);

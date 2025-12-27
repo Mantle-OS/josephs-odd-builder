@@ -9,6 +9,7 @@ if(MSGPACK_BINDINGS)
     add_subdirectory(job_serializer_msgpack)
 endif()
 
+add_subdirectory(job_science)
 add_subdirectory(job_ai)
 
 # CHECKPOINT: v1.0

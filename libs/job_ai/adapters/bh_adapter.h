@@ -4,7 +4,6 @@
 #include <string>
 
 #include <job_barnes_hut_calculator.h>
-#include <job_scheduler_types.h>
 
 #include <vec3f.h>
 
@@ -17,7 +16,7 @@ namespace job::ai::adapters {
 
 class BhAdapter : public IAdapter {
 public:
-    using Solver = threads::BarnesHutForceCalculator<BhTraits::Body, BhTraits::Vec3, BhTraits::Real>;
+    using Solver = science::BarnesHutForceCalculator<BhTraits::Body, BhTraits::Vec3, BhTraits::Real>;
 
     static std::unique_ptr<BhAdapter> unique(BhConfig cfg = {})
     {

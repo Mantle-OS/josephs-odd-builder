@@ -1,7 +1,14 @@
 #include "rk4_adapter.h"
+#include "ml_particle.h"
+// #include "ml_particle.h"
+
+#include <particle.h>
+#include <vec3f.h>
+
 namespace job::ai::adapters {
 
 using namespace job::ai::cords;
+using namespace job::science::data;
 using namespace job::threads;
 
 Rk4Adapter::Rk4Adapter(Rk4Config cfg) :
@@ -20,26 +27,23 @@ std::string Rk4Adapter::name() const
     return "RK4 (Runge-Kutta 4th Order)";
 }
 
-void Rk4Adapter::adaptParallel(
-    job::threads::ThreadPool &pool,
-    const AttentionShape &shape,
-    const ViewR &sources, [[maybe_unused]] const ViewR &targets, [[maybe_unused]] const ViewR &values, ViewR &output,
-    const AdapterCtx &ctx
-    )
+void Rk4Adapter::adaptParallel( job::threads::ThreadPool &pool,
+                               const AttentionShape &shape,
+                               const ViewR &sources, [[maybe_unused]] const ViewR &targets, [[maybe_unused]] const ViewR &values, ViewR &output,
+                               const AdapterCtx &ctx)
 {
-
-    const int B = static_cast<int>(shape.batch);
-    const int S = static_cast<int>(shape.seq);
-    const int D = static_cast<int>(shape.dim);
+    const size_t batch = static_cast<size_t>(shape.batch);
+    const int seq = static_cast<int>(shape.seq);
+    const int dim = static_cast<int>(shape.dim);
 
     // SHIT FIXME
-    if (D < 3)
+    if (dim < 3)
         return;
 
     ThreadPool::Ptr poolPtr(&pool, [](void*){});
 
-    job::threads::parallel_for(pool, size_t{0}, size_t(B), [&](size_t b) {
-        apply(S, D, poolPtr, sources, output, ctx, b);
+    job::threads::parallel_for(pool, size_t{0}, size_t(batch), [&](size_t b) {
+        apply(seq, dim, poolPtr, sources, output, ctx, b);
     });
 }
 
@@ -50,97 +54,91 @@ void Rk4Adapter::adapt(
     const AdapterCtx &ctx
     )
 {
-    const size_t B = static_cast<size_t>(shape.batch);
-    const int S = static_cast<int>(shape.seq);
-    const int D = static_cast<int>(shape.dim);
+    const size_t batch = static_cast<size_t>(shape.batch);
+    const int seq = static_cast<int>(shape.seq);
+    const int dim = static_cast<int>(shape.dim);
 
     // SHIT FIXME
-    if (D < 3)
+    if (dim < 3)
         return;
 
     ThreadPool::Ptr poolPtr(&pool, [](void*){});
-    for(size_t i = 0 ; i <= B; ++i)
-        apply(S, D, poolPtr, sources, output, ctx, i);
+    for(size_t i = 0 ; i < batch; ++i)
+        apply(seq, dim, poolPtr, sources, output, ctx, i);
 }
 
 
 
-void Rk4Adapter::apply(int S, int D,
-    ThreadPool::Ptr pool,
-    const ViewR &sources, ViewR &output,
-    const AdapterCtx &ctx,
-    size_t size
-    )
+void Rk4Adapter::apply(int seq, int dim,
+                       ThreadPool::Ptr pool,
+                       const ViewR &sources, ViewR &output,
+                       const AdapterCtx &ctx,
+                       size_t size
+                       )
 
 {
-    std::vector<Particle> bodies(S);
-    const float *in_ptr = sources.data() + (size * S * D);
-    float *out_ptr      = output.data()  + (size * S * D);
+    std::vector<Particle> bodies(seq);
+    const float *in_ptr = sources.data() + (size * seq * dim);
+    float *out_ptr      = output.data()  + (size * seq * dim);
 
-    for (int i = 0; i < S; ++i) {
+    for (int i = 0; i < seq; ++i) {
         auto &p = bodies[i];
-        int idx = i * D;
+        int idx = i * dim;
 
         // Map Position
-        p.pos.x = in_ptr[idx + m_cfg.dim_mapping[0]];
-        p.pos.y = in_ptr[idx + m_cfg.dim_mapping[1]];
-        p.pos.z = in_ptr[idx + m_cfg.dim_mapping[2]];
+        p.position[0] = in_ptr[idx + m_cfg.dim_mapping[0]];
+        p.position[1] = in_ptr[idx + m_cfg.dim_mapping[1]];
+        p.position[2] = in_ptr[idx + m_cfg.dim_mapping[2]];
 
         // Map Velocity (if dims exist)
-        if (D >= 6) {
-            p.vel.x = in_ptr[idx + m_cfg.dim_mapping[3]];
-            p.vel.y = in_ptr[idx + m_cfg.dim_mapping[4]];
-            p.vel.z = in_ptr[idx + m_cfg.dim_mapping[5]];
+        if (dim >= 6) {
+            p.position[0] = in_ptr[idx + m_cfg.dim_mapping[3]];
+            p.position[1] = in_ptr[idx + m_cfg.dim_mapping[4]];
+            p.position[2] = in_ptr[idx + m_cfg.dim_mapping[5]];
         } else {
-            p.vel = {0,0,0};
+            p.position = {0,0,0};
         }
 
         // Map Mass
-        if (D >= 7) {
+        if (dim >= 7) {
             p.mass = std::abs(in_ptr[idx + m_cfg.dim_mapping[6]]);
             if (p.mass < 1e-5f)
                 p.mass = 1.0f;
         } else {
             p.mass = 1.0f;
         }
-        p.acc = {0,0,0};
+        p.acceleration = {0,0,0};
     }
 
-    auto getPos = [](Particle& p) -> Vec3& {
-        return p.pos;
-    };
-    auto getVel = [](Particle& p) -> Vec3& {
-        return p.vel;
-    };
-    auto getAcc = [](Particle& p) -> Vec3& {
-        return p.acc;
-    };
 
-    auto calcForces = [](std::vector<Particle>& ps) {
-        computeNbodyForces(ps);
-    };
+    // auto calcForces = [](std::vector<Particle>& ps) { computeNbodyForces(ps); };
 
-    JobRK4Integrator<Particle, Vec3, float> integrator(pool, &bodies, getPos, getVel, getAcc, calcForces, false);
+    Solver integrator(pool, &bodies,
+                      [](Particle &p) -> Vec3f& { return p.position; },
+                      [](Particle &p) -> Vec3f& { return p.velocity; },
+                      [](Particle &p) -> Vec3f& { return p.acceleration; },
+                      [](std::vector<Particle> &ps) { computeNbodyForces(ps);},
+                      false);
 
     float dt = (ctx.dt > 0.0f) ? ctx.dt : m_cfg.dt;
     integrator.step_n(m_cfg.steps, dt);
 
-    for (int i = 0; i < S; ++i) {
-        int idx = i * D;
+    for (int i = 0; i < seq; ++i) {
+        int idx = i * dim;
         const auto &p = bodies[i];
 
-        out_ptr[idx + m_cfg.dim_mapping[0]] = p.pos.x;
-        out_ptr[idx + m_cfg.dim_mapping[1]] = p.pos.y;
-        out_ptr[idx + m_cfg.dim_mapping[2]] = p.pos.z;
+        out_ptr[idx + m_cfg.dim_mapping[0]] = p.position.x;
+        out_ptr[idx + m_cfg.dim_mapping[1]] = p.position.y;
+        out_ptr[idx + m_cfg.dim_mapping[2]] = p.position.z;
 
-        if (D >= 6) {
-            out_ptr[idx + m_cfg.dim_mapping[3]] = p.vel.x;
-            out_ptr[idx + m_cfg.dim_mapping[4]] = p.vel.y;
-            out_ptr[idx + m_cfg.dim_mapping[5]] = p.vel.z;
+        if (dim >= 6) {
+            out_ptr[idx + m_cfg.dim_mapping[3]] = p.velocity.x;
+            out_ptr[idx + m_cfg.dim_mapping[4]] = p.velocity.y;
+            out_ptr[idx + m_cfg.dim_mapping[5]] = p.velocity.z;
         }
 
-        if (D > 6)
-            std::memcpy(out_ptr + idx + 6, in_ptr + idx + 6, (D - 6) * sizeof(float));
+        if (dim > 6)
+            std::memcpy(out_ptr + idx + 6, in_ptr + idx + 6, (dim - 6) * sizeof(float));
     }
 
 }

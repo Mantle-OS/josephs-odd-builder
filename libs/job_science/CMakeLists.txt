@@ -75,31 +75,49 @@ set(JOB_SCIENCE_DATA_SOURCES
 #     # engine/integrator_strategy.h
 # )
 
-# set(JOB_SCIENCE_SOLVERS_SOURCES
-#     solvers/bnh.cpp
-#     solvers/dijkstra.cpp
-#     solvers/euler.cpp
-#     solvers/factory.cpp
-#     solvers/fmm.cpp
-#     solvers/rk4.cpp
-#     solvers/vv.cpp
-# )
 
-# set(JOB_SCIENCE_SOLVERS_HEADERS
-#     solvers/bnh.h
-#     solvers/dijkstra.h
-#     solvers/euler.h
-#     solvers/factory.h
-#     solvers/fmm.h
-#     solvers/rk4.h
-#     solvers/vv.h
+
+
+# set(JOB_SCIENCE_INTEGRATORS_HEADERS
+#     integrators/iintegrator.h
 # )
+# set(JOB_SCIENCE_INTEGRATORS_SOURCES)
+
+
+
+set(JOB_SCIENCE_SOLVERS_SOURCES)
+
+set(JOB_SCIENCE_SOLVERS_HEADERS
+    solvers/job_verlet_concepts.h
+    solvers/job_verlet_adapters.h
+    solvers/job_verlet_integrator.h
+
+    solvers/job_barns_hut_concept.h
+    solvers/job_barnes_hut_tree.h
+    solvers/job_barnes_hut_calculator.h
+
+    solvers/job_stencil_boundary.h
+    solvers/job_stencil_grid_2D.h
+    solvers/job_stencil_grid_3D.h
+
+    solvers/job_rk4_integrator.h
+
+    solvers/job_euler_integrator.h
+
+    #
+    solvers/job_fmm_utils.h #new
+    solvers/job_fmm_concepts.h # new
+    solvers/job_fmm_kernel.h # new
+    solvers/job_fmm_integrator.h # new
+)
 
 add_library(JosephsOddBuilder_Science SHARED
-    ${JOB_SCIENCE_DATA_HEADERS}        ${JOB_SCIENCE_DATA_SOURCES}
+    ${JOB_SCIENCE_DATA_HEADERS}         ${JOB_SCIENCE_DATA_SOURCES}
+    ${JOB_SCIENCE_SOLVERS_HEADERS}      ${JOB_SCIENCE_SOLVERS_SOURCES}
+    # ${JOB_SCIENCE_INTEGRATORS_HEADERS}  ${JOB_SCIENCE_INTEGRATORS_SOURCES}
+
     # ${JOB_SCIENCE_FRAMES_HEADERS}      ${JOB_SCIENCE_FRAMES_SOURCES}
     # ${JOB_SCIENCE_ENGINE_HEADERS}      ${JOB_SCIENCE_ENGINE_SOURCES}
-    # ${JOB_SCIENCE_INTEGRATORS_HEADERS} ${JOB_SCIENCE_INTEGRATORS_SOURCES}
  )
 
 set_target_properties(JosephsOddBuilder_Science PROPERTIES
@@ -117,15 +135,19 @@ target_link_libraries(JosephsOddBuilder_Science PUBLIC
     JosephsOddBuilder_Crypto
 )
 target_include_directories(JosephsOddBuilder_Science PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/data>
     # $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/engine>
     # $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/frames>
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/data>
     # $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/integrators>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/solvers>
     ## install paths
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobscience>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobscience/data>
     # $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobscience/engine>
     # $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobscience/frames>
-    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobscience/data>
     # $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobscience/integrators>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobscience/solvers>
 )
 
 install(TARGETS JosephsOddBuilder_Science
@@ -136,21 +158,11 @@ install(TARGETS JosephsOddBuilder_Science
     INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 )
 
-install(FILES ${JOB_SCIENCE_DATA_HEADERS}
-    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobscience/data
-)
-
-# install(FILES ${JOB_SCIENCE_FRAMES_HEADERS}
-#     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobscience/frames
-# )
-
-# install(FILES ${JOB_SCIENCE_ENGINE_HEADERS}
-#     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobscience/engine
-# )
-
-# install(FILES ${JOB_SCIENCE_INTEGRATORS_HEADERS}
-#     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobscience/integrators
-# )
+install(FILES ${JOB_SCIENCE_DATA_HEADERS}           DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobscience/data )
+# install(FILES ${JOB_SCIENCE_FRAMES_HEADERS}         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobscience/frames)
+# install(FILES ${JOB_SCIENCE_ENGINE_HEADERS}         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobscience/engine)
+# install(FILES ${JOB_SCIENCE_INTEGRATORS_HEADERS}    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobscience/integrators)
+install(FILES ${JOB_SCIENCE_SOLVERS_HEADERS}        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobscience/solvers)
 
 set(PKGCONFIG_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/pkgconfig")
 set(PKGCONFIG_FILE "${CMAKE_CURRENT_BINARY_DIR}/jobscience.pc")

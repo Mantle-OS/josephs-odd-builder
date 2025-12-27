@@ -4,7 +4,7 @@ namespace job::ai::adapters {
 struct StencilConfig {
     int                         steps           = 1;                                // Simulation steps
     float                       diffusionRate   = 0.1f;                             // Rate
-    threads::BoundaryMode       boundary        = threads::BoundaryMode::Wrap;
+    science::BoundaryMode       boundary        = science::BoundaryMode::Wrap;
 };
 
 }

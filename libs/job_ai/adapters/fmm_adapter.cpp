@@ -9,7 +9,7 @@
 namespace job::ai::adapters {
 
 using namespace job::ai::cords;
-using namespace job::threads;
+using namespace job::science;
 
 FmmAdapter::FmmAdapter(FmmConfig cfg) :
     m_cfg(cfg)
@@ -26,7 +26,7 @@ std::string FmmAdapter::name() const
     return "FMM (Fast Multipole Method)";
 }
 
-void FmmAdapter::adaptParallel(job::threads::ThreadPool &pool,
+void FmmAdapter::adaptParallel(threads::ThreadPool &pool,
     const AttentionShape &shape,
     const ViewR &sources,                       // Keys (The Mass Sources)
     [[maybe_unused]] const ViewR &targets,      // Queries (The Test Particles)
@@ -42,7 +42,7 @@ void FmmAdapter::adaptParallel(job::threads::ThreadPool &pool,
 }
 
 
-void FmmAdapter::adapt(job::threads::ThreadPool &pool,
+void FmmAdapter::adapt(threads::ThreadPool &pool,
                                const AttentionShape &shape,
                                const ViewR &sources,                       // Keys (The Mass Sources)
                                [[maybe_unused]] const ViewR &targets,      // Queries (The Test Particles)
