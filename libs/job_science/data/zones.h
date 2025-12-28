@@ -63,7 +63,7 @@ struct ZonesUtil final {
     // snow-line(T = 170 K)
     [[nodiscard]] static constexpr float snowLineAU(const DiskModel &disk) noexcept
     {
-        return std::pow(float(170.0) / disk.T0, float(1.0) / disk.tempExponent);
+        return std::pow(170.0f / disk.T0, 1.0f / disk.tempExponent);
     }
 
     [[nodiscard]] static constexpr bool nearBoundary(const Zones &in,
@@ -125,5 +125,6 @@ constexpr Zones coldExtendedDisk() noexcept {
     };
 }
 
-}
+} // SciencePresets
+
 }

@@ -53,9 +53,6 @@ set(JOBAI_COACH_HEADERS
     coach/coach_config.h
     coach/genetic_coach.h
     coach/es_coach.h
-    coach/fitness_evaluator.h
-    coach/portal_evaluator.h
-
 )
 set(JOBAI_COACH_SOURCES)
 

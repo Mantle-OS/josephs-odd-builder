@@ -4,12 +4,10 @@
 #include <chrono>
 #include <cstring>
 
-
 #include <job_logger.h>
 
-
-#include "frames/crc32.h"
-#include "frames/endian_utils.h"
+#include <crc32.h>
+#include <endian_utils.h>
 
 namespace job::science::frames {
 
@@ -29,9 +27,7 @@ bool FrameSerializer::writeFrame(std::uint64_t    frameId,
                                  const Zones     &zones)
 {
     if (!m_sink || !m_sink->isReady()) {
-#ifdef ENABLE_LOGGING
         JOB_LOG_WARN("[FrameSerializer] writeFrame called with no open sink");
-#endif
         return false;
     }
 
@@ -68,10 +64,10 @@ bool FrameSerializer::writeFrame(std::uint64_t    frameId,
         totalPayloadSize);
 
     // Magic is stored little-endian on disk
-    header.magic = toLE32(FrameHeader::kMagic);
+    header.magic = job::core::toLE32(FrameHeader::kMagic);
 
     // CRC over the payload
-    header.crc32 = Crc32::compute(
+    header.crc32 = job::core::Crc32::compute(
         reinterpret_cast<const std::uint8_t *>(buffer.data()),
         static_cast<std::size_t>(header.byteLength));
 

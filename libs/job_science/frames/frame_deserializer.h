@@ -39,12 +39,9 @@ public:
                                  Particles &particlesOut);
 
     [[nodiscard]] bool isReady() const noexcept;
-    void               reset();
+    void reset();
 
-    [[nodiscard]] IFrameSource::Ptr source() const noexcept
-    {
-        return m_source;
-    }
+    [[nodiscard]] IFrameSource::Ptr source() const noexcept;
 
 private:
     static bool decodePayload(const FrameHeader                  &hdr,

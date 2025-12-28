@@ -34,46 +34,45 @@ set(JOB_SCIENCE_DATA_SOURCES
     data/composition.cpp
 )
 
-# set(JOB_SCIENCE_FRAMES_HEADERS
-#     frames/frame_header.h
-#     # frames/frame_replay.h
+set(JOB_SCIENCE_FRAMES_HEADERS
+    frames/frame_header.h
+    # frames/frame_replay.h
 
-#     frames/iframe_sink.h
-#     frames/frame_sink_io.h
-#     frames/frame_sink_net.h
-#     frames/frame_serializer.h
+    frames/iframe_sink.h
+    frames/frame_sink_io.h
+    frames/frame_sink_net.h
+    frames/frame_serializer.h
 
-#     frames/iframe_source.h
-#     frames/frame_source_io.h
-#     frames/frame_source_net.h
-#     frames/frame_deserializer.h
-
-
-# )
-# set(JOB_SCIENCE_FRAMES_SOURCES
-#     frames/frame_header.cpp #// DEAD
-
-#     frames/frame_sink_io.cpp
-#     frames/frame_sink_net.cpp
-#     frames/frame_serializer.cpp
-
-#     frames/frame_source_io.cpp
-#     frames/frame_source_net.cpp
-#     frames/frame_deserializer.cpp
-
-#     # frames/frame_replay.cpp
-# )
+    frames/iframe_source.h
+    frames/frame_source_io.h
+    frames/frame_source_net.h
+    frames/frame_deserializer.h
 
 
-## MOVE ALL THE THINGSD FROM THRREADS TO HERE
-# set(JOB_SCIENCE_ENGINE_SOURCES
-#     engine/engine.cpp
-# )
-# set(JOB_SCIENCE_ENGINE_HEADERS
-#     engine/engine_config.h
-#     engine/engine.h
-#     # engine/integrator_strategy.h
-# )
+)
+set(JOB_SCIENCE_FRAMES_SOURCES
+    frames/frame_header.cpp #// DEAD
+
+    frames/frame_sink_io.cpp
+    frames/frame_sink_net.cpp
+    frames/frame_serializer.cpp
+
+    frames/frame_source_io.cpp
+    frames/frame_source_net.cpp
+    frames/frame_deserializer.cpp
+
+    # frames/frame_replay.cpp
+)
+
+
+set(JOB_SCIENCE_ENGINE_SOURCES
+    engine/engine.cpp
+)
+set(JOB_SCIENCE_ENGINE_HEADERS
+    engine/engine_config.h
+    engine/engine.h
+    # engine/integrator_strategy.h
+)
 
 
 
@@ -114,9 +113,9 @@ set(JOB_SCIENCE_SOLVERS_HEADERS
 add_library(JosephsOddBuilder_Science SHARED
     ${JOB_SCIENCE_DATA_HEADERS}         ${JOB_SCIENCE_DATA_SOURCES}
     ${JOB_SCIENCE_SOLVERS_HEADERS}      ${JOB_SCIENCE_SOLVERS_SOURCES}
+    ${JOB_SCIENCE_FRAMES_HEADERS}      ${JOB_SCIENCE_FRAMES_SOURCES}
     # ${JOB_SCIENCE_INTEGRATORS_HEADERS}  ${JOB_SCIENCE_INTEGRATORS_SOURCES}
 
-    # ${JOB_SCIENCE_FRAMES_HEADERS}      ${JOB_SCIENCE_FRAMES_SOURCES}
     # ${JOB_SCIENCE_ENGINE_HEADERS}      ${JOB_SCIENCE_ENGINE_SOURCES}
  )
 
@@ -138,14 +137,14 @@ target_include_directories(JosephsOddBuilder_Science PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/data>
     # $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/engine>
-    # $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/frames>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/frames>
     # $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/integrators>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/solvers>
     ## install paths
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobscience>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobscience/data>
     # $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobscience/engine>
-    # $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobscience/frames>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobscience/frames>
     # $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobscience/integrators>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobscience/solvers>
 )
@@ -159,7 +158,7 @@ install(TARGETS JosephsOddBuilder_Science
 )
 
 install(FILES ${JOB_SCIENCE_DATA_HEADERS}           DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobscience/data )
-# install(FILES ${JOB_SCIENCE_FRAMES_HEADERS}         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobscience/frames)
+install(FILES ${JOB_SCIENCE_FRAMES_HEADERS}         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobscience/frames)
 # install(FILES ${JOB_SCIENCE_ENGINE_HEADERS}         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobscience/engine)
 # install(FILES ${JOB_SCIENCE_INTEGRATORS_HEADERS}    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobscience/integrators)
 install(FILES ${JOB_SCIENCE_SOLVERS_HEADERS}        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobscience/solvers)

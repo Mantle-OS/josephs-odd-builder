@@ -31,13 +31,7 @@ using Particles = std::vector<Particle>;
 struct ParticleUtil final {
     [[nodiscard]] static constexpr bool isValid(const Particle& p) noexcept
     {
-        if (!(p.radius > 0.0f))
-            return false;
-#if !defined(__FAST_MATH__)
-        if (!std::isfinite(p.radius))
-            return false;
-#endif
-        return true;
+        return job::core::isSafeFinite(p.radius ) && p.radius > 0.0f;
     }
 
     [[nodiscard]] static constexpr float volume(const Particle &p) noexcept
@@ -56,7 +50,7 @@ struct ParticleUtil final {
     }
 
     // test particle
-    [[nodiscard]] static constexpr Particle createTestParticle(float r_au, float radius, const Composition &comp) noexcept
+    [[nodiscard]] static constexpr Particle createTestParticle(float r_au, float radius, const Composition &comp = SciencePresets::rocky()) noexcept
     {
         Particle p{};
         // (X=r/sqrt(2), Y=r/sqrt(2))
@@ -96,6 +90,16 @@ struct ParticleUtil final {
         p.velocity.y = vy;
         return p;
     }
+
+    [[nodiscard]] static constexpr Particle particleAtRadiusAU(float rAU) noexcept
+    {
+        Particle p{};
+        p.position.x = DiskModelUtil::auToMeters(rAU);  // store meters
+        p.position.y = 0.0f;
+        p.position.z = 0.0f;
+        return p;
+    }
+
 
 };
 

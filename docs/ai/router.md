@@ -1,64 +1,69 @@
-# job::ai::router
+# Job AI Router
 
-> **"The Switchboard of the Mind."**
+Routing layer for MoE in Job.
 
-The `router` module determines how information flows through the sparse network. It decouples the *decision* of where to send data from the *execution* of that data.
+`job::ai::router` turns “batch rows” into a routing plan:
+- which expert(s) each row goes to
+- with what weight
+- and what adapter type to run for that expert
 
-## 1. The Taxonomy: `RouterType`
-* **`TopK`:** The standard Learned Gating. A dense layer predicts which $K$ experts are best for a given token.
-* **`Hash`:** Deterministic, fixed routing. Fast and requires no weights, but cannot "learn" specialization.
-* **`Spatial`:** Manifold-based routing. Tokens are routed based on their coordinates in the semantic geometry (The Portal), effectively mapping specific regions of thought to specific experts (e.g., "The Crust" vs "The Core").
-* **`State`:** Finite-State Machine routing. Useful for sequence-dependent logic (e.g., "If we are in the header, use Parser Expert; if in the body, use Semantic Expert").
+The router stays planning only. Execution happens in the MoE layer.
 
-## 2. The Traffic Laws: `LoadBalanceStrategy`
-* **`TokenDropping`:** Hard constraints. If an expert's buffer is full, excess tokens are discarded. Guarantees memory limits and latency but risks information loss.
-* **`Overflow`:** Soft constraints. Excess tokens are spilled to a secondary or shared expert.
-* **`AuxLoss`:** (Training) Adds a penalty term to the loss function to encourage the router to distribute work evenly.
+## Output: RouterPlan / RouterToken
 
----
+Routing output is a flat list of tokens.
 
-## 3. The Definition: `ExpertConfig`
-Standard MoEs assume all experts are identical Feed-Forward Networks. `job_ai` supports **Heterogeneous Experts**.
+Each `RouterToken` is one assignment:
+- `row`     : batch row index
+- `expert`  : expert index
+- `weight`  : gate weight (prob-like)
+- `adapter` : adapter type selected from the expert config
 
-* **`adapter`:** Each expert defines its own compute kernel via `AdapterType`.
-    * *Example:* Expert A runs `Dense` (Logic), while Expert B runs `FMM` (Gravity/Physics).
-* **`id`:** Unique identifier for routing tables.
+`RouterPlan` is just metadata + a non-owning pointer to the token buffer:
+- `batchSize`
+- `numExperts`
+- `tokens` + `tokenCount`
 
-## 4. The Rules: `RouterConfig`
-Configures the global behavior of the dispatch system.
+The token buffer is typically carved out of an inference workspace.
 
-* **`type`:** The algorithm used to route tokens (TopK, Hash, Spatial).
-* **`spatialRadius`:** (Spatial Router) Defines the "catchment area" in the semantic manifold. Tokens falling within this radius trigger the associated expert.
-* **`loadBalance`:** Strategy for handling congestion (Token Dropping vs Overflow).
-* **Presets:**
-    * `TopK(N, k=2)`: Standard MoE setup. Routes to the 2 best experts.
-    * `Hash(N)`: Deterministic, non-learned routing. Fast and statistically balanced.
+## Config: RouterConfig / RouterExpertConfig
 
----
+`RouterConfig` holds:
+- router type (`RouterType`)
+- load-balance strategy enum (`LoadBalanceStrategy`) (carried in config)
+- `experts[]` : per-expert config
+- `topK` : number of assignments per row
+- extra knobs (hash temperature, spatial radius, deterministic flag)
 
-## 5. The Manifest: `RouterPlan`
-The data structure that decouples the **Decision** from the **Execution**.
+`RouterExpertConfig` holds:
+- `id`
+- `adapter` (`adapters::AdapterType`)
 
-* **`RouterToken`:** A dispatch ticket containing:
-    * **Source:** The batch index (Row).
-    * **Destination:** The Expert ID.
-    * **Weight:** The gating signal strength (used for weighted averaging of outputs).
-    * **Kernel:** The `AdapterType` (Dense, Flash, FMM), allowing per-token compute heterogeneity.
-* **`RouterPlan`:** A lightweight view over a buffer of `RouterTokens`. It represents the complete set of instructions for the MoE layer for the current batch.
+Adapter type is attached into each `RouterToken` during planning so the MoE layer can run heterogeneous experts.
 
----
+## Router types (current behavior)
 
-## 6. The Execution: `router_impl`
-Implements the dispatch logic.
+### TopK
+Learned gating mode.
 
-* **Zero-Allocation Top-K:**
-    * Uses a stack-based Min-Heap to find the $K$ largest logits.
-    * Avoids sorting the entire expert list ($O(N \log N)$) in favor of partial selection ($O(N \log K)$).
-* **Deterministic Hashing:**
-    * Samples a subset of input dimensions (strided) to compute a stable hash.
-    * Ensures that the same token always routes to the same expert, even without learned weights.
-* **Adapter Tagging:**
-    * Every `RouterToken` is tagged with the target expert's `AdapterType` (e.g., Dense vs. Flash), enabling the MoE layer to dispatch to different compute kernels dynamically.
+Input is a dense logit matrix (batch x experts) produced by the MoE layer.
+Routing selects the top-K experts per row and normalizes weights across those K.
 
----
+### Hash
+Deterministic assignment mode.
+
+Produces K assignments per row with uniform weights.
+Expert indices are currently assigned in a simple repeating pattern.
+
+### Spatial
+Deterministic assignment mode with “spatial” label.
+
+Produces K assignments per row with uniform weights.
+Expert indices are currently assigned in a simple repeating pattern.
+
+### State
+Deterministic assignment mode with “state” label.
+
+Produces K assignments per row with uniform weights.
+Expert indices are currently derived from the row index (rotating window across experts).
 

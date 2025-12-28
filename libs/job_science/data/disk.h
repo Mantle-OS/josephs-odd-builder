@@ -6,25 +6,25 @@
 namespace job::science::data {
 
 enum class DiskZone : uint8_t {
-    Inner_Disk = 0,
-    Mid_Disk,
-    Outer_Disk
+    Inner_Disk  = 0,
+    Mid_Disk    = 1,
+    Outer_Disk  = 2
 };
 
 #pragma pack(push, 1)
 struct DiskModel final {
-    float stellarMass{1.0f};               // Solar masses
-    float stellarLuminosity{1.0f};         // Solar luminosities
-    float stellarTemp{5778.0f};            // K, for solar-type star
-    float innerRadius{0.05f};              // AU, sublimation limit (~1200 K)
-    float outerRadius{100.0f};             // AU, cutoff for gas disk
-    float scaleHeight{0.05f};              // AU at 1 AU, pressure scale height
-    float T0{280.0f};                      // K, midplane temperature at 1 AU
-    float rho0{1e-9f};                    // kg/m³, gas density at 1 AU
-    float pressure0{1e-3f};               // Pa, midplane gas pressure at 1 AU
-    float tempExponent{-0.5f};             // T ∝ r^tempExponent
-    float densityExponent{-2.75f};         // ρ ∝ r^densityExponent
-    float radiationPressureCoeff{   1.0f};    // scaling factor for radiation effects
+    float stellarMass{1.0f};                // Solar masses
+    float stellarLuminosity{1.0f};          // Solar luminosities
+    float stellarTemp{5778.0f};             // K, for solar-type star
+    float innerRadius{0.05f};               // AU, sublimation limit (~1200 K)
+    float outerRadius{100.0f};              // AU, cutoff for gas disk
+    float scaleHeight{0.05f};               // AU at 1 AU, pressure scale height
+    float T0{280.0f};                       // K, midplane temperature at 1 AU
+    float rho0{1e-9f};                      // kg/m³, gas density at 1 AU
+    float pressure0{1e-3f};                 // Pa, midplane gas pressure at 1 AU
+    float tempExponent{-0.5f};              // T ∝ r^tempExponent
+    float densityExponent{-2.75f};          // ρ ∝ r^densityExponent
+    float radiationPressureCoeff{   1.0f};  // scaling factor for radiation effects
 };
 #pragma pack(pop)
 

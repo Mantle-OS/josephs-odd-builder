@@ -11,8 +11,7 @@
 
 #include <data/forces.h>
 
-// WARNING BAD CODE
-// Put togeather real quick for juat a demo and to get stuff on the screen
+// WARNING BAD CODE Put togeather real quick for juat a demo and to get stuff on the screen
 namespace job::science::engine {
 using namespace job::science::data;
 using namespace job::threads;
@@ -24,22 +23,22 @@ void initialize_particles(Particles &particles, const DiskModel &disk, const Zon
 
     std::mt19937 rng{1337};
 
-    real_t innerR = disk.innerRadius;
-    real_t outerR = disk.outerRadius;
+    float innerR = disk.innerRadius;
+    float outerR = disk.outerRadius;
 
-    std::uniform_real_distribution<real_t> radiusLog(std::log(innerR), std::log(outerR));
-    std::uniform_real_distribution<real_t> angle(0.0f, 2.0f * static_cast<real_t>(piToTheFace));
-    std::uniform_real_distribution<real_t> grainRadius(1e-6f, 1e-3f);
+    std::uniform_real_distribution<float> radiusLog(std::log(innerR), std::log(outerR));
+    std::uniform_real_distribution<float> angle(0.0f, 2.0f * job::core::piToTheFace);
+    std::uniform_real_distribution<float> grainRadius(1e-6f, 1e-3f);
 
     for (uint64_t i = 0; i < count; i++) {
         auto &p = particles[i];
-        real_t r_au = std::exp(radiusLog(rng));
-        real_t theta = angle(rng);
-        real_t radius = grainRadius(rng);
+        float r_au = std::exp(radiusLog(rng));
+        float theta = angle(rng);
+        float radius = grainRadius(rng);
 
-        real_t r_m = DiskModelUtil::auToMeters(r_au);
-        real_t omega = DiskModelUtil::keplerianOmega(disk, r_au);
-        real_t v_kep = omega * r_m; // Keplerian orbital speed
+        float r_m = DiskModelUtil::auToMeters(r_au);
+        float omega = DiskModelUtil::keplerianOmega(disk, r_au);
+        float v_kep = omega * r_m; // Keplerian orbital speed
 
         p.id = i;
         p.radius = radius;
@@ -70,15 +69,18 @@ void Engine::runLoop()
     }
 }
 
-Engine::Engine(const DiskModel &diskModel,
+Engine::Engine(threads::ThreadPool::Ptr pool,
+            const DiskModel &diskModel,
                const Zones &zones,
                size_t particleCount) :
-    m_pool(ThreadPool::create()),
+    m_pool(std::move(pool)),
     m_prev_accel(particleCount, Vec3f{}),
     m_disk(diskModel),
     m_zones(zones)
 {
 
+    if(!m_pool)
+        JOB_LOG_WARN("Simulation Engine has no pool !");
     m_particles.reserve(particleCount);
     initialize_particles(m_particles, m_disk, m_zones);
     m_writer = std::make_shared<FrameSerializer>(m_pool);
@@ -147,10 +149,10 @@ bool Engine::play() noexcept
     return false;
 }
 
-bool Engine::ffwd(real_t multiplier) noexcept
+bool Engine::ffwd(float multiplier) noexcept
 {
-    if (multiplier > static_cast<real_t>(0.0f)) {
-        // Here, we would update the m_dt for the simulation.
+    if (multiplier > 0.0f) {
+        // Here, update the m_dt for the simulation.
         // For now, we will leave the timestep constant and update the UI pacing externally.
         // If we wanted to adjust simulation speed, we would adjust m_dt.
         return true;
@@ -158,7 +160,7 @@ bool Engine::ffwd(real_t multiplier) noexcept
     return false;
 }
 
-bool Engine::rwd([[maybe_unused]] real_t multiplier) noexcept
+bool Engine::rwd([[maybe_unused]] float multiplier) noexcept
 {
     // HACK: Reversing simulation time is complex and requires full state history.for now, this is a stub.
     return false;
@@ -217,12 +219,12 @@ void Engine::setZonesCallback(EngineCallback cb)
     m_zonesCallback = std::move(cb);
 }
 
-real_t Engine::timeStep() const noexcept
+float Engine::timeStep() const noexcept
 {
     return m_dt;
 }
 
-void Engine::setTimeStep(real_t dt_s) noexcept
+void Engine::setTimeStep(float dt_s) noexcept
 {
     m_dt = dt_s;
 }
@@ -233,7 +235,7 @@ void Engine::calculateForces(Particle &p)
 }
 
 
-void Engine::step(real_t dt_s)
+void Engine::step(float dt_s)
 {
     std::vector<std::future<void>> futures;
     futures.reserve(m_particles.size());
@@ -244,7 +246,7 @@ void Engine::step(real_t dt_s)
         futures.push_back(m_pool->submit(
             0,
             [&p, this, i, dt_s]() {
-                p.velocity = p.velocity + m_prev_accel[i] * (dt_s * static_cast<real_t>(0.5f));
+                p.velocity = p.velocity + m_prev_accel[i] * (dt_s * 0.5f);
                 calculateForces(p);
             }
             ));
@@ -258,9 +260,9 @@ void Engine::step(real_t dt_s)
         Particle &p = m_particles[i];
 
         p.position = p.position + p.velocity * dt_s;
-        p.velocity = p.velocity + p.acceleration * (dt_s * static_cast<real_t>(0.5f));
+        p.velocity = p.velocity + p.acceleration * (dt_s * 0.5f);
         m_prev_accel[i] = p.acceleration;
-        real_t r_au = DiskModelUtil::metersToAU(p.position.length());
+        float r_au = DiskModelUtil::metersToAU(p.position.length());
         p.temperature = DiskModelUtil::temperature(m_disk, r_au);
         p.zone = ZonesUtil::classify(m_zones, p, m_disk);
     }
@@ -269,7 +271,7 @@ void Engine::step(real_t dt_s)
 }
 
 
-// void Engine::integrateParticle(Particle &p, real_t dt_s)
+// void Engine::integrateParticle(Particle &p, float dt_s)
 // {
 //     // This function is kept as a stub since all integration is now performed in step()
 //     // due to the index-based Velocity Verlet requirement.

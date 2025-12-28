@@ -36,9 +36,9 @@ public:
 private:
     [[nodiscard]] bool readExact(std::uint8_t *dst, std::size_t size);
 
-    Socket                    m_socket;
-    std::optional<FrameHeader> m_lastHeader;
-    std::size_t               m_payloadRemaining{0};
+    Socket                      m_socket;
+    std::optional<FrameHeader>  m_lastHeader;
+    std::size_t                 m_payloadRemaining{0};
 };
 
 } // namespace job::science::frames

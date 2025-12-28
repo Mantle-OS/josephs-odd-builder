@@ -109,8 +109,6 @@ public:
             return init;
 
         const std::size_t hw = std::max<std::size_t>(1, m_pool->workerCount());
-
-        // Grain here means "samples per block". If caller doesn't specify, pick a sane chunk.
         const std::size_t g = (grain == 0) ?
                                   std::max<std::size_t>(1024, samples / (hw * 8)) :
                                   grain;

@@ -1,57 +1,142 @@
-# job::ai::layers
+# Job AI Layers
 
-> **"The Organs of the Organism."**
+Layer stack for `job::ai`.
 
-While `comp` handles the math and `evo` handles the DNA, `layers` defines the functional units that process information. It strictly separates **Architecture** (State) from **Execution** (Forward Pass).
+Things that run:
+- layer configs + enums
+- base layer interfaces
+- a few concrete layers (Dense / Attention / SparseMoE)
+- a small factory that builds layers from `evo::LayerGene`
 
----
+job:
+- `job::ai::layers` = layer objects + configs
+- `job::ai::comp` = math kernels used by layers (sgemm, attention forward, activations)
+- `job::ai::infer` = workspace + runner that calls `forward(...)`
+- `job::ai::router` = routing plan used by MoE
+- `job::threads` = ThreadPool used for parallel passes
 
-## 1. The Contract: `ILayer`
-The abstract base class that all neural modules must implement.
 
-* **Static Analysis:** `getOutputShape()` allows the engine to pre-calculate memory requirements for the entire graph before inference begins.
-* **Zero-Allocation:** The `forward()` method requires an `infer::Workspace`. Layers are forbidden from allocating heap memory themselves during inference; they must request scratch space from the workspace.
-* **Introspection:** All layers implement `IParamGroup`, exposing a semantic map of their weights (e.g., "attn.wq", "ffn.bias") to optimizers and debuggers.
+## Types / config
+### LayerType
+Enum for the layer kind:
+- Input / Dense / SparseMoE / Attention / Embedding / (LayerNorm / RMSNorm / Residual) / LinearLoRA / Output
 
----
+Only a subset has real implementations in this snapshot (Dense, Attention, SparseMoE).
 
-## 2. The Arena: `Workspace`
-A static, pre-allocated memory arena used for all intermediate tensor storage.
+### LayerMode
+Training vs Inference switch carried in config.
 
-* **Ping-Pong Buffering:**
-    * The workspace is divided into `BufferA` and `BufferB`.
-    * Sequential layers toggle between these buffers to avoid allocation overhead.
-* **Alignment:** Uses `AlignedAllocator` (64-byte) to ensure compatibility with `comp` AVX kernels.
-* **Persistence:** The arena grows to fit the largest model and never shrinks, preventing heap fragmentation.
+### LayerFlags
+Bit flags used by some layers:
+- causal
+- has router
+- has bias
 
----
+### LayerConfig
+Small “one struct” config used by `AbstractLayer`:
+- name (short fixed char array)
+- inputs / outputs
+- attention knobs: maxSequence, numHeads
+- MoE knobs: numExperts, topK
+- adapterType (engine choice)
+- activation type
+- flags (causal/router/bias)
 
-## 3. The Components
 
-### The Taxonomy (`LayerType`)
-A 1-byte enum defining the supported blocks:
-* **Core:** `Dense`, `Embedding`, `Residual`.
-* **Transformer:** `Attention`, `RMSNorm`, `LayerNorm`.
-* **Sparse:** `SparseMoE` (Mixture of Experts).
+## Base interfaces
 
-### The Workhorse (`Dense`)
-The standard linear layer ($y = \sigma(xW + b)$).
-* **Storage:** Weights and Biases are packed into a single contiguous aligned buffer.
-* **Hybrid Scheduling:** Small layers run serially (fused GEMM+Bias+Act); large layers dispatch to the thread pool.
-* **SIMD Bias:** Uses vectorized intrinsics to broadcast bias additions.
+### ILayer
+The small metadata + parameters interface:
+- layer type + name
+- mode setter
+- flat parameter view (non-owning)
+- parameter count
+- alpha knob (used by some activation paths)
 
-### The Eye (`Attention`)
-Implements Multi-Head Attention using the **Adapter Pattern**.
-* **Delegation:** The layer manages projections ($W_Q, W_K, W_V$); the actual attention mechanism is delegated to an `IAdapter` (FlashAttention, Barnes-Hut, etc.).
-* **Flexibility:** Supports both Batched Training inputs `[B, S, D]` and Flattened Inference inputs `[Tokens, D]`.
+### AbstractLayer
+The base used by the runner:
+- forward pass over `cords::ViewR` buffers
+- load weights from a flat float block
+- scratch sizing (workspace planning)
+- output shape (extent in/out)
 
----
+base type returned by `LayerFactory`.
 
-## 4. The Builder: `LayerFactory`
-Hydrates a flat `Genome` into live `ILayer` objects.
 
-* **Interpretation:** Overloads `LayerGene` fields based on context (e.g., reusing `auxiliaryData` to store `AdapterType` or `TopK`).
-* **Hydration:** Performs the critical copy from the Evolutionary storage (flat vector) to the Compute storage (aligned vector).
-* **Safety:** Validates gene offsets against the genome size to prevent memory violations from corrupted DNA.
+## Parameter grouping (inspection)
 
----
+### IParamGroup
+Optional interface that exposes named parameter groups.
+
+Used for things like:
+- splitting weights vs bias
+- surfacing gate/router weights (MoE)
+- surfacing sub-layer params inside a composite layer
+
+### ParamGroupType
+Buckets:
+- Weights
+- Bias
+- GateWeights
+- ExpertWeights
+- RouterState
+- Other
+
+slices of the flat param blob with labels.
+
+## Concrete layers
+
+### DenseLayer
+Standard linear projection:
+- input [rows, inputs] to output [rows, outputs]
+- optional bias add
+- optional activation
+- switches to threaded loops when the matrix is big enough
+
+This layer owns its weight/bias pointers (into a flat storage block loaded via `loadWeights`).
+
+### AttentionLayer
+Attention block built from projections + an adapter:
+- projects X into Q/K/V (matrix multiply)
+- optional bias add to Q/K/V/O paths
+- runs an attention adapter (engine selected by config)
+- writes back into the output buffer
+
+Also exposes parameter groups for:
+- Wq/Wk/Wv/Wo
+- optional bq/bk/bv/bo
+
+### SparseMoE
+Mixture of Experts layer:
+- gate weights produce logits for routing (TopK mode)
+- router produces a token list `(row, expert, weight, adapter)`
+- input rows are packed per-expert into contiguous blocks (gather)
+- each expert runs on its packed block (forward pass)
+- results are scattered back into output with per-token weight (weighted sum)
+
+Workspace usage is explicit:
+- routing logits + routing tokens live at the front
+- packed expert input/output buffers follow
+- scratch is carved per expert
+
+Parameter groups include:
+- gate weights as `GateWeights`
+- optional groups forwarded from experts that implement `IParamGroup`
+
+## LinearLoRA
+### Alpha not done
+Low-rank adapter layer (separate from `AbstractLayer` in this snapshot):
+- holds low-rank A and B matrices (rank r)
+- applies the LoRA update using GEMM kernels
+- can reference a shared “frozen weights” block (external storage)
+
+currently its own ILayer ...
+
+## Factory
+
+### LayerFactory
+Builds an `AbstractLayer` from `evo::LayerGene`.
+Implemented paths in this snapshot:
+- Dense
+- Attention
+- SparseMoE (also builds a set of Dense experts and sets router type)

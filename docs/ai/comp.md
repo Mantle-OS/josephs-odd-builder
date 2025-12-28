@@ -1,99 +1,94 @@
-# job::ai::comp (compilation)
+# Job AI Comp
 
-> **"The math doesn't care about the silicon. The compiler does."**
+Compute kernels for `job::ai`.
 
-The `comp` namespace is the muscle of the engine. It provides a unified, zero-overhead interface to CPU vector intrinsics, manages the "Reactor" (GEMM), and handles the non-linear forces (Activations).
+math:
+- GEMM (float32)
+- activations
+- MLP glue (gate/value/proj)
+- attention forward (CPU)
+- transpose helper
+- a few small support pieces (atomic add, noise table, config structs)
 
-It is built on a **Zero-Overhead Hardware Abstraction Layer (HAL)** that compiles down to raw assembly instructions.
+job:
+- `job::ai::comp` = kernels
+- `job::simd` = backend selection (AVX/NEON)
+- `job::threads` = `ThreadPool` + `parallel_for` for the parallel wrappers
+- `job::ai::cords` = matrix / tensor views used by some helpers
 
----
+## Activation
 
-## 1. The Hardware Handshake
-Before code compiles, `check_hardware.cmake` inspects the silicon to tune the physics engine.
+Activation functions live as small “functors” with:
+- SIMD path
+- scalar path
 
-* **Flags:** Enforces `-ffast-math`, `-mavx2`, and `-mfma` for maximum throughput.
-* **Cache Tuning:**
-    * **64MB Mode:** Assumes 64MB L3 Cache (`JOB_BLOCK_SIZE_256`).
-    * **Standard Mode:** Assumes 32MB L3 Cache.
-* **Block Sizes:** Hard-codes tiling constants (e.g., `32x128`) to perfectly fit L1/L2 caches.
+The activation set in-tree covers the usual suspects:
+- Identity
+- Sigmoid / Tanh
+- ReLU family (plain/leaky/etc)
+- ELU
+- GELU
+- Swish
+- Softplus
+- Mish
 
----
+etc
 
-## 2. The Atoms: `simd_provider`
-We do not write raw intrinsics. We write to the `SIMD` interface, which maps to the optimal backend at compile time.
+`activation.h` also contains fused paths where activation is applied as part of a larger kernel.
 
-* **Backends:** `AVX_F` (256-bit YMM) or `NEON_F` (128-bit).
-* **Core Op:** `mul_plus` (Fused Multiply-Add). This is the heartbeat of the engine, performing $(A \times B) + C$ in a single cycle.
 
----
+## GEMM
+`gemm.h` is float32 matrix multiply plus wrappers.
 
-## 3. The Fuel: `NoiseTable`
-Evolutionary strategies require billions of random numbers. Generating them at runtime is too slow.
+Shape:
+- naive reference multiply
+- SIMD tiled kernel path
+- parallel wrappers using `job::threads::parallel_for`
+- convenience wrappers for `cords::Matrix` and `cords::ViewR`
+- strided batched variants (same idea, repeated with offsets)
 
-* **Mechanism:** A 16MB/32MB buffer of pre-computed Gaussian noise pinned to the L3 cache.
-* **Infinite Tape:** Uses bitwise masking to treat the buffer as an infinite loop of deterministic entropy.
-* **Mutation:** `w += noise * sigma` is executed via vectorized FMA.
+base for most of the layer math in other folders.
 
----
 
-## 4. The Gymnast: `Transpose`
-SIMD requires contiguous memory. `transpose.h` reorients data to optimize memory access patterns.
+## MLP
 
-* **Kernel:** In-Register 8x8 Transpose.
-* **Performance:** Swaps rows and columns of a 64-float block entirely within CPU registers using bitwise shuffles (`unpack`, `permute`), never touching L1 cache until the flip is complete.
+`mlp.h`:
+- gate projection
+- value projection
+- activation on the gate side
+- elementwise multiply (gate * value)
+- projection back to model width
 
----
+Has a direct path and a parallel path (activation/multiply chunking on the hidden buffer).
 
-## 5. The Alchemist: Activations
-We trade negligible precision for massive speed using integer bit-hacks.
+## Attention (forward)
 
-### The Functors (`activation_functors.h`)
-* **Schraudolph's Exponential:** Approximates $e^x$ by manipulating IEEE 754 integer exponent bits. Used for fast Sigmoid/Swish.
-* **Horner's Scheme:** Polynomial approximation for cases requiring smoother gradients.
+`flash_attention.h` is a CPU forward attention kernel:
+- blocked by row/col tiles
+- stable softmax per row (tracks local max + running sum)
+- writes output tile as it goes
 
-### The Registry (`activation_types.h`)
-A 1-byte enum identifier for all supported non-linearities, ranging from the standard (`ReLU`, `GELU`) to the biological (`GDN`, `Maxout`).
+Also includes a parallel wrapper that splits work by row-blocks over a `ThreadPool`.
 
-### The Dispatcher (`activate_parallel.h`)
-* **Thresholding:** Tensors $<16k$ are processed on the calling thread.
-* **Tiling:** Larger tensors are sliced into 4KB tiles and distributed to the thread pool.
-* **Zero-Branching:** The switch statement happens *once per tile*, not once per element.
 
----
+## Transpose
+`transpose.h` contains a SIMD-friendly 8x8 transpose kernel.
+Used as a helper for layout flip work around GEMM / attention.
 
-## 6. The Reactor: `GEMM`
-The General Matrix Multiply kernel. The engine of the AI.
 
-* **Micro-Kernel (8x8):** Accumulates a tile of C entirely in registers using Outer Product accumulation.
-* **Tiling:** Loops over matrices in `JOB_BLOCK_SIZE` chunks to maintain L1 locality.
-* **Parallelism:** Flattens the 2D tile grid into a 1D task list for the work-stealing scheduler.
+## Noise
 
----
+`noise_table.h` is a prebuilt aligned table of Gaussian floats.
+Deterministic seed. Used as a cheap noise source without re-running RNG every call.
 
-## 7. The Synapse: `MLP`
-Combines GEMM and Activations into neural structures.
+## Atomic math
 
-* **Contract:** Zero-Allocation. Caller provides all scratch buffers (`HiddenBuf`).
-* **Supported Architectures:**
-    * Standard MLP ($W_2(\sigma(W_1 x))$).
-    * Gated MLP / SwiGLU ($W_{proj}(\sigma(W_{gate} x) \odot (W_{val} x))$).
-* **Fusion:** Supports fusing Residual Addition directly into the final projection.
+`atomic_math.h` provides `atomicAdd(float)` using `std::atomic_ref<float>`.
+Used for sum into a shared buffer cases
 
----
 
-## 8. The Lens: `FlashAttention`
-Calculates the "Metric of the Portal" without $O(N^2)$ memory cost.
+## Small config structs
 
-* **Tiling:** Computes attention scores in 16KB L1-sized blocks.
-* **Online Softmax:** Rescales partial accumulators on-the-fly to ensure numerical stability without multiple passes.
-* **Result:** Allows long-context inference on CPU.
+- `rrelu_config.h` holds the RReLU configuration (alpha range + training flag).
+- `gdn_params.h` holds GDN parameter storage (beta/gamma shapes).
 
----
-
-## 9. The Collider: `AtomicMath`
-The safety valve for Sparse Intelligence (MoE).
-
-* **Mechanism:** Lock-free `atomicAdd` for floats using C++20 `std::atomic_ref`.
-* **Usage:** Allows multiple experts to write to the same output buffer simultaneously without mutex contention or memory allocation for reduction buffers.
-
----

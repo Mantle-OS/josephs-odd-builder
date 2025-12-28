@@ -56,7 +56,7 @@ TEST_CASE("Barnes-Hut matches direct force for 2-body with tiny theta", "[barnes
 {
     auto sched = JobSporadicCtx(1);
 
-    std::vector<Particle> ps(2);
+    Particles ps(2);
 
     ps[0].id        = 1;
     ps[0].position  = Vec3f{ -1.0f, 0.0f, 0.0f };

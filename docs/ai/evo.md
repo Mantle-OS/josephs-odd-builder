@@ -1,80 +1,86 @@
-# job::ai::evo (evolution)
+# Job AI Evo
 
-> **"Code that evolves code."**
+Population utilities for `job::ai`.
 
-The `evo` namespace manages the genetic lifecycle of the AI. It decouples the **Genotype** (the blueprint) from the **Phenotype** (the running network), enabling high-throughput evolutionary strategies (ES) and neuro-evolution (NEAT) without the overhead of object-oriented graph traversal.
+weights evolve layer:
+- a `Genome` type (architecture + weight blob + binary save/load)
+- `Mutator` (noise on weights)
+- `Crossover` (mix weights between two parents)
+- `Population` (elitism + simple selection + offspring loop)
+- a stub `SpeciationEngine` + `Species` structs (not active)
 
----
+job:
+- `job::ai::layers` + `job::ai::comp` provide enums used by `LayerGene`
+- `job::crypto` provides RNG (`job_random.h`) used by population/mutation
 
-## 1. The DNA: `Genome`
-The Genome is a flat, serializable representation of a Neural Network, optimized for genetic operators.
 
-### `LayerGene` (The Gene)
-A struct that describes a single layer's topology.
-* **Cache Aligned:** Explicitly padded to **32 bytes**. Exactly two genes fit in a standard 64-byte CPU cache line.
-* **Relocatable:** Uses *offsets* into the weight buffer rather than pointers. A Genome can be `memcpy`'d to another machine or thread without serialization logic.
+## Genome
 
-### `Genome` (The Chromosome)
-* **Architecture:** A vector of `LayerGenes` describing the topology.
-* **Weights:** A single contiguous `std::vector<float>` containing all parameters (weights + biases) for the entire network.
-    * *Benefit:* Mutation and Crossover become $O(N)$ vector operations on a flat buffer, maximizing memory bandwidth.
+### LayerGene
+One layer description used inside a genome:
+- `type` (layer enum)
+- `activation` (activation enum)
+- `inputs`, `outputs`
+- `weightOffset`, `weightCount`
+- `biasOffset`, `biasCount`
+- `auxiliaryData` (misc knob storage)
 
----
+Size is fixed (static assert) and padding is explicit (zeroed).
 
-## 2. The Agent of Chaos: `Mutator`
-Manages the perturbation of Genomes using a deterministic Random Number Generator (RNG).
+### GenomeHeader
+Header fields used for bookkeeping:
+- magic/uuid/parentId
+- generation
+- fitness
+- layerCount
+- weight blob size
 
-### Modes of Operation
-1.  **Dense Mutation (Fast Path):**
-    * **Trigger:** `weightMutationProb >= 1.0`.
-    * **Mechanism:** Delegates to `comp::NoiseTable` (L3-pinned entropy).
-    * **Performance:** Uses AVX2 Fused Multiply-Add (`mul_plus`) to perturb millions of weights in microseconds without generating new random numbers.
-2.  **Sparse Mutation (Slow Path):**
-    * **Trigger:** `weightMutationProb < 1.0`.
-    * **Mechanism:** Iterates per-weight using scalar `std::normal_distribution` to apply sparse changes.
+### Genome
+The actual payload:
+- `header`
+- `tested` flag
+- `architecture` (vector of `LayerGene`)
+- `weights` (flat float blob)
 
-### Determinism
-The Mutator holds its own `std::mt19937_64` state and can be explicitly seeded. This ensures that even "random" evolutionary runs are fully deterministic and replayable for debugging.
+Binary save/load exists:
+- file magic `"GENO"`
+- fields are written explicitly (not `sizeof(struct)` dumps)
 
----
+## Mutation
 
-## 3. The Recombination: `Crossover`
-Mechanisms for combining two parent Genomes into a child.
+### Mutator
+Weight noise engine.
 
-### Strategies
-* **Uniform:** Stochastic mixing. Each gene is independently selected from Parent A or Parent B based on a probability (default 50%). Maximizes diversity.
-* **Arithmetic:** Linear interpolation (`Child = αA + (1-α)B`). Uses vectorized math to blend parents, useful for fine-tuning in convex loss landscapes.
+Current behavior:
+- perturb(genome) walks the weight blob
+- each weight is mutated with probability weightMutationProb
+- mutation is additive Gaussian noise with sigma `weightSigma`
+- optional `seed(...)` for deterministic runs
 
-*Note: Currently requires Isomorphic Genomes (identical topology). Mismatched parents result in cloning the first parent.*
 
----
+### Crossover
+Combines two parent genomes into a child.
 
-## 4. The Society: `Population`
-A container for the current generation of individuals.
+Current behavior is weight-blob mixing:
+- parents must have the same weight count (guarded)
+- child starts as a clone, then weights are mixed according to `CrossoverType`
 
-### Data Layout (SoA)
-Genomes and Fitness scores are stored in separate vectors (`m_genomes`, `m_fitness`).
-* **Ranking:** Sorting is performed on a lightweight list of *indices*, minimizing data movement of heavy Genome objects.
+Implemented modes:
+- None
+- OnePoint / TwoPoint
+- Uniform
+- Arithmetic
 
-### Lifecycle (`evolveNextGeneration`)
-1.  **Elitism:** The top $N$ individuals are copied unchanged to the next generation. This guarantees the best solution is never lost to destructive mutation.
-2.  **Truncation Selection:** Parents are chosen uniformly at random from the **Top 50%** of the population. The bottom 50% are discarded.
-3.  **Reproduction:** Winners breed (via Crossover) and their children are mutated to fill the remaining slots.
+### Population
+Small generation loop around `Genome` + fitness array.
 
----
+Current flow:
+- fitness values are stored alongside the genomes
+- genomes are sorted by fitness (higher is better)
+- elites are copied into the next generation (`eliteCount` capped to population size)
+- the mating pool is the top half of the population
+- parents are selected uniformly from that pool
+- offspring is produced via `Crossover` then `Mutator`
+- next generation replaces current population, and fitness is reset
 
-## 5. The Tribes: `Speciation` (NEAT)
-*(Prototype Phase)*
-
-To prevent premature convergence, `evo` protects novel structural mutations by grouping similar individuals into **Species**.
-
-### The Distance Metric
-Genomes are compared using the NEAT metric:
-$$\delta = \frac{c_1 E}{N} + \frac{c_2 D}{N} + c_3 \cdot \bar{W}$$
-* **Excess ($E$) / Disjoint ($D$):** Measures topological distance (structural differences).
-* **Weight Difference ($\bar{W}$):** Measures parameter distance.
-
-### Protection
-Individuals compete primarily within their own Species. This allows a "weird" new topology (which may perform poorly at first) to optimize its own weights without being crushed by the dominant, optimized species.
-
----
+PopulationConfig holds population size, elite count, and the crossover/mutator configs.

@@ -47,9 +47,15 @@ if(JOB_CORE_USE_DOUBLE)
     add_compile_definitions(JOB_CORE_USE_DOUBLE)
 endif()
 
+
 option(JOB_TEST_BENCHMARKS "build and run the benchhmarks in the tests" ON)
-if(JOB_TEST_BENCHMARKS)
+if(CMAKE_BUILD_TYPE STREQUAL "Release" AND JOB_TEST_BENCHMARKS)
+    message("Building benchmarks into tests")
     add_compile_definitions(JOB_TEST_BENCHMARKS)
+elseif(NOT CMAKE_BUILD_TYPE STREQUAL "Release" AND JOB_TEST_BENCHMARKS)
+    message("Invaild Build type for for benchmarks")
+else()
+    message("Not adding tests for benchmarks")
 endif()
 
 ##############################

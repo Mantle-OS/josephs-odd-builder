@@ -1,106 +1,95 @@
-# `job::ai::cords`
+# Job AI Cords
 
-> **"Memory is flat. Intelligence is geometric."**
+Views and Extents for `job::ai`.
 
-The `cords` (Coordinates) namespace is the **Physics Engine of Memory** for `job_ai`. 
-It defines how raw bytes are aligned, shaped, viewed, and sliced without incurring copy 
-overhead.
+Small header-only layer: extents + row-major views + a few convenience wrappers (1D..4D).
+No ownership here, just pointers + shape.
 
-It is built on three strict laws:
+job:
+- `job::ai::cords` = extents + views + aligned weights container
+- `job::science::data` = used by `ml_particle.h` (Vec3 bridge)
 
-1.  **Alignment:** All memory is 64-byte aligned (AVX-512 ready).
-2.  **Locality:** Shapes (`Extents`) live on the stack; Views slice without copying.
-3.  **Tiling:** Math is blocked at compile-time to saturate CPU registers.
+## Extents
 
------
+`Extents<MaxRank>` holds shape with a logical size (`rank`) up to 4.
 
-## 1\. The Substrate: `AlignedAllocator`
+- stores dims in a fixed array (zero-filled)
+- `rank()` / `size()` is the number of active dims
+- `volume()` is the product of active dims (0-safe cases exist)
 
-Standard vectors break SIMD optimization because they do not guarantee alignment. `cords` enforces it.
+Small helpers exist for common AI shapes:
+- BS, BSD, BSDH
 
-  * **Law:** Alignment is **64 bytes** (Cache Line size).
-  * **Effect:** Prevents false sharing and enables AVX-512 / aligned AVX2 loads.
-  * **Key Type:** `AiWeights` (A `std::vector` that plays nice with physics).
+## View
+`View<T>` is a non-owning row-major view over contiguous storage.
 
-```cpp
-using AiWeights = std::vector<float, AlignedAllocator<float, 64>>;
-```
+Holds:
+- `T *data`
+- `Extent` (rank up to 4)
+- computed strides (last dimension contiguous)
 
------
+Core:
+- linear access by flat index
+- N-D access with bounds checks (asserts)
+- `reshape()` keeps the same storage and changes the shape (volume must match)
+- `slice(i)` drops the first dimension and returns a view into the i-th slab
 
-## 2\. The Form: `Extents`
 
-A tensor's shape is purely metadata. It should never trigger a heap allocation.
+## View iteration
+`ViewIter` walks slices along the first dimension.
 
-  * **Law:** Max Rank is 4 (Batch, Channel, Height, Width).
-  * **Implementation:** `std::array` on the stack. `constexpr` everywhere.
-  * **Performance:** Passing a Shape is as cheap as passing a struct.
+- `begin()/end()` on a view returns slices
+- free helpers `beginSlices()/endSlices()` exist too
+- each deref returns a lightweight `View` (copy of pointer + new extent)
 
-```cpp
-// A 4D shape defined entirely on the stack
-constexpr Extents<4> shape(32, 3, 224, 224);
-```
+convenience for “batch” style loops.
 
------
+## Named wrappers
 
-## 3\. The Lens: `View` & `ViewIter`
+Thin wrappers around `ViewR` for common ranks:
 
-We distinguish between **Owning** memory (`AiWeights`) and **Viewing** memory.
+- `Fiber`  : rank 1
+- `Matrix` : rank 2
+- `Volume` : rank 3
+- `Batch`  : rank 4
 
-  * **Law:** A `View` is a lightweight window (Pointer + Shape + Strides).
-  * **Mechanism:**
-      * **Striding:** Row-Major by default for CPU prefetcher efficiency.
-      * **Slicing:** `view.slice(i)` returns a sub-view (N-1 dimension) without copying data.
-      * **Iteration:** `ViewIter` descends the dimensional ladder (4D -\> 3D -\> 2D -\> 1D).
+These add small rank-checked helpers (`rows/cols`, etc) and keep the intent readable.
 
------
+There is also a templated `Rank<N>` wrapper for “pick rank at compile time”.
 
-## 4\. The Semantics: Wrappers
 
-To prevent "index soup," we strictly type our Views.
+## Layout helpers
 
-| Class | Rank | Role |
-| :--- | :--- | :--- |
-| **`Fiber`** | 1 | A vector/strand. Optimized for dot products. |
-| **`Matrix`** | 2 | A table. Optimized for GEMM. |
-| **`Volume`** | 3 | A 3D block. |
-| **`Batch`** | 4 | The full NCHW stack. |
+`layout.h` defines a `LayoutType` enum and a tiny `offset2D` helper for:
+- row-major
+- column-major
 
-*Safety:* A function expecting a `Matrix` will fail to compile if passed a `Volume`.
+Strided/tiled layouts are declared but not implemented in the 2D helper (asserts).
 
------
+## Aligned weights
 
-## 5\. The Blueprint: Tiles
+`AlignedAllocator<T, 64>` is used for aligned float storage.
 
-These are compile-time constants that drive the math kernels in `comp`. They dictate register blocking.
+`AiWeights` is:
+- `std::vector<float, AlignedAllocator<float, 64>>`
 
-  * **`Tile4` (SSE):** 4x4 block. Fits 128-bit registers.
-  * **`Tile8` (AVX2 - The Golden Goose):** 8x8 block.
-      * 8 floats = 256 bits (1 YMM Register).
-      * Designed to saturate the 16 YMM registers of modern x86 CPUs (Ryzen/Intel Core).
-  * **`Tile16` (AVX-512):** 16x16 block. Targeted for ZMM registers or L1 Cache blocking.
+Used as the weights container (64-byte aligned).
 
-```cpp
-// Example: The compiler uses this type to unroll loops 8x
-comp::gemm<Tile8>(...); 
-```
 
------
+## Small structs
 
-### Usage Summary
+- `AttentionShape`: `{ batch, seq, dim, numHeads }`
+- `Tile4 / Tile8 / Tile16`: compile-time tile descriptors (rows/cols/elements/bytes)
+  - Tile8 is the “AVX2 sized” register block descriptor
+  - Tile16 is the “super tile / AVX-512-ish” descriptor
 
-```cpp
-// 1. Allocate Raw Matter (Aligned)
-AiWeights memory(1024); 
+---
 
-// 2. Impose Form (View as 32x32 Matrix)
-Matrix mat(memory.data(), 32, 32);
+## ML particle bridge
 
-// 3. Slice and Observe (Zero-Copy)
-Fiber row = mat.slice(5); // View of the 5th row
+`ml_particle.h` provides a small adapter type for particle like data stored in float buffers:
 
-// 4. Access (Safe)
-float val = row.at(0);
-```
+- `MLVec3f` is a view over 3 floats with conversions to/from `job::science::data::Vec3f`
+- `MLParticle` groups `pos/vel/acc + mass`
 
------
+Also includes a simple N-body force loop used by adapter tests.

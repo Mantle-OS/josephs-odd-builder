@@ -34,7 +34,7 @@ public:
         if (n < L)
             return "";
 
-        // NOTE: We sample positions in [0, n - L].
+        // NOTE: sample positions in [0, n - L].
         const std::size_t maxPos = n - L;
 
         // Small bounded TopK result from each block.
@@ -43,7 +43,7 @@ public:
         struct Candidate {
             uint64_t key = 0;
             uint32_t count = 0;
-            uint32_t pos = 0; // representative position for reconstruction
+            uint32_t pos = 0;
         };
 
         struct TopK {
@@ -75,7 +75,7 @@ public:
         };
 
         // 64-bit fingerprint of fragment (byte string).
-        // This is intentionally simple and deterministic. You can swap it later.
+        // This is intentionally simple and deterministic.
         auto hashFragment = [&](std::size_t pos) -> uint64_t {
             const uint8_t *p = reinterpret_cast<const uint8_t*>(m_corpus.data() + pos);
             uint64_t h = 0x9E3779B97F4A7C15ull ^ static_cast<uint64_t>(L);
@@ -134,10 +134,10 @@ public:
 
         // Pick best candidate from merged TopK
         Candidate best{};
-        for (std::size_t i = 0; i < top.used; ++i) {
+        for (std::size_t i = 0; i < top.used; ++i)
             if (top.items[i].count > best.count)
                 best = top.items[i];
-        }
+
 
         if (best.count <= 1)
             return "";
@@ -166,9 +166,9 @@ private:
         auto hashFragment = [&](std::size_t pos) -> uint64_t {
             const uint8_t *p = reinterpret_cast<const uint8_t*>(m_corpus.data() + pos);
             uint64_t h = 0x9E3779B97F4A7C15ull ^ static_cast<uint64_t>(L);
-            for (std::size_t i = 0; i < L; ++i) {
+            for (std::size_t i = 0; i < L; ++i)
                 h ^= (uint64_t)p[i] + 0x9E3779B97F4A7C15ull + (h << 6) + (h >> 2);
-            }
+
             h ^= (uint64_t(L) & 0xFFull) << 56;
             return h;
         };

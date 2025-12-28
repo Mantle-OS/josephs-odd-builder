@@ -16,7 +16,7 @@
 #include "data/particle.h"
 #include "data/disk.h"
 #include "data/zones.h"
-#include "data/composition.h"
+// #include "data/composition.h"
 #include "data/vec3f.h"
 
 #include "frames/frame_serializer.h"
@@ -91,7 +91,8 @@ public:
     using EngineCallback = std::function<void()>;
     using ParticleCallback = std::function<void(const Particles&)>;
 
-    explicit Engine(const DiskModel &diskModel,
+    explicit Engine(threads::ThreadPool::Ptr pool,
+                    const DiskModel &diskModel,
                     const Zones &zones,
                     size_t particleCount = 1024);
 
@@ -107,8 +108,8 @@ public:
 
     [[nodiscard]] bool pause() noexcept;
     [[nodiscard]] bool play() noexcept;
-    [[nodiscard]] bool ffwd(core::real_t multiplier) noexcept;
-    [[nodiscard]] bool rwd(core::real_t multiplier) noexcept;
+    [[nodiscard]] bool ffwd(float multiplier) noexcept;
+    [[nodiscard]] bool rwd(float multiplier) noexcept;
 
     [[nodiscard]] FrameSerializer::Ptr writer() const noexcept;
     [[nodiscard]] FrameDeserializer::Ptr reader() const noexcept;
@@ -124,10 +125,10 @@ public:
     void setDiskCallback(EngineCallback cb);
     void setZonesCallback(EngineCallback cb);
 
-    [[nodiscard]] core::real_t timeStep() const noexcept;
-    void setTimeStep(core::real_t dt_s) noexcept;
+    [[nodiscard]] float timeStep() const noexcept;
+    void setTimeStep(float dt_s) noexcept;
 
-    void step(core::real_t dt_s);
+    void step(float dt_s);
 private:
     void calculateForces(Particle &p);
     void runLoop();
@@ -142,7 +143,7 @@ private:
     Zones                   m_zones;
     std::atomic<bool>       m_running{false};
     std::atomic<bool>       m_paused{false};
-    core::real_t            m_dt{core::real_t(1.0)}; // Timestep
+    float                   m_dt{1.0f}; // Timestep
     ParticleCallback        m_particleCallback;
     EngineCallback          m_diskCallback;
     EngineCallback          m_zonesCallback;

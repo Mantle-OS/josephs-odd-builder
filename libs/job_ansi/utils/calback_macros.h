@@ -1,4 +1,4 @@
-#define API_CALLBACK_CONST(type, name, defaultValue) \
+#define JOB_ANSI_SCREEN_CALLBACK_CONST(type, name, defaultValue) \
 private: \
     type m_##name = defaultValue ; \
     public: \
@@ -14,7 +14,7 @@ private: \
 } \
     private:
 
-#define API_CALLBACK(type, name, defaultValue) \
+#define JOB_ANSI_SCREEN_CALLBACK(type, name, defaultValue) \
               private: \
     type m_##name = defaultValue ; \
     public: \

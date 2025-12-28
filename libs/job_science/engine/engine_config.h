@@ -4,7 +4,7 @@
 #include <filesystem>
 #include <string>
 
-#include <sched/job_scheduler_types.h> // job::threads::SchedulerType
+#include <sched/job_scheduler_types.h>
 
 namespace job::science::engine {
 

@@ -6,8 +6,8 @@
 #include <job_logger.h>
 #endif
 
-#include "frames/crc32.h"
-#include "frames/endian_utils.h"
+#include <crc32.h>
+#include <endian_utils.h>
 
 namespace job::science::frames {
 
@@ -33,7 +33,7 @@ bool FrameDeserializer::readFrame(DiskModel &diskOut,
         return false;
     }
 
-    // 1) Read header
+    // Read header
     auto hdrOpt = m_source->readHeader();
     if (!hdrOpt.has_value()) {
 #ifdef ENABLE_LOGGING
@@ -51,7 +51,7 @@ bool FrameDeserializer::readFrame(DiskModel &diskOut,
         return false;
     }
 
-    // 2) Decide payload size
+    // decide payload size
     const std::size_t payloadSize = static_cast<std::size_t>(hdr.byteLength);
     if (payloadSize == 0) {
 #ifdef ENABLE_LOGGING
@@ -63,7 +63,7 @@ bool FrameDeserializer::readFrame(DiskModel &diskOut,
     std::vector<std::uint8_t> payload;
     payload.resize(payloadSize);
 
-    // 3) Read payload in chunks
+    // read payload in chunks
     std::size_t totalRead = 0;
     while (totalRead < payloadSize) {
         const std::size_t toRead = payloadSize - totalRead;
@@ -81,7 +81,7 @@ bool FrameDeserializer::readFrame(DiskModel &diskOut,
 
     // 4) CRC check
     const std::uint32_t crcComputed =
-        Crc32::compute(payload.data(), payload.size());
+        job::core::Crc32::compute(payload.data(), payload.size());
 
     if (crcComputed != hdr.crc32) {
 #ifdef ENABLE_LOGGING
@@ -91,7 +91,7 @@ bool FrameDeserializer::readFrame(DiskModel &diskOut,
         return false;
     }
 
-    // 5) Decode into physics types
+    // decode into physics types
     return decodePayload(hdr, payload, diskOut, zonesOut, particlesOut);
 }
 
@@ -104,6 +104,11 @@ void FrameDeserializer::reset()
 {
     if (m_source)
         m_source->reset();
+}
+
+IFrameSource::Ptr FrameDeserializer::source() const noexcept
+{
+    return m_source;
 }
 
 bool FrameDeserializer::decodePayload(const FrameHeader               &hdr,
