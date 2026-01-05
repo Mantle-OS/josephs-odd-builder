@@ -1,7 +1,9 @@
 #include "stencil_adapter.h"
 #include <cmath>
 #include <vector>
-#include "transpose.h"
+
+#include <transpose.h>
+
 #include "aligned_allocator.h"
 
 namespace job::ai::adapters {
@@ -45,7 +47,7 @@ void StencilAdapter::adaptParallel(threads::ThreadPool &pool,
     threads::parallel_for(pool, size_t{0}, size_t(B), [&](size_t b) {
         const float *srcBatch = sources.data() + (b * elementsPerBatch);
         float *scratchBatch   = scratch.data() + (b * elementsPerBatch);
-        comp::transpose(srcBatch, scratchBatch, S, D);
+        simd::transpose(srcBatch, scratchBatch, S, D);
     });
 
     size_t totalSims = static_cast<size_t>(B) * D;
@@ -78,7 +80,7 @@ void StencilAdapter::adaptParallel(threads::ThreadPool &pool,
     threads::parallel_for(pool, size_t{0}, size_t(B), [&](size_t b) {
         const float *scratchBatch = scratch.data() + (b * elementsPerBatch);
         float *outBatch = output.data()  + (b * elementsPerBatch);
-        comp::transpose(scratchBatch, outBatch, D, S);
+        simd::transpose(scratchBatch, outBatch, D, S);
     });
 }
 
@@ -106,7 +108,7 @@ void StencilAdapter::adapt(threads::ThreadPool &pool,
     for(size_t b = 0; b < size_t(B); ++b){
         const float *srcBatch = sources.data() + (b * elementsPerBatch);
         float *scratchBatch   = scratch.data() + (b * elementsPerBatch);
-        comp::transpose(srcBatch, scratchBatch, S, D);
+        simd::transpose(srcBatch, scratchBatch, S, D);
     }
 
     size_t totalSims = static_cast<size_t>(B) * D;
@@ -139,7 +141,7 @@ void StencilAdapter::adapt(threads::ThreadPool &pool,
     for(size_t b = 0; b <= size_t(B); ++b ){
         const float *scratchBatch = scratch.data() + (b * elementsPerBatch);
         float *outBatch = output.data()  + (b * elementsPerBatch);
-        comp::transpose(scratchBatch, outBatch, D, S);
+        simd::transpose(scratchBatch, outBatch, D, S);
     };
 }
 \

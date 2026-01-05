@@ -11,7 +11,8 @@ enum class LogLevel : uint8_t {
     Error = 0,
     Warn,
     Info,
-    Debug
+    Debug,
+    Assert
 };
 
 class JobLogger final {
@@ -55,29 +56,37 @@ inline std::string format_log(std::string_view fmt, Args&&... args)
     }
 }
 
+
+
 // Helper macros
 #define JOB_LOG_ERROR(fmt, ...) \
-    ::job::core::JobLogger::instance().log( \
-        ::job::core::LogLevel::Error, \
-        ::job::core::detail::format_log(fmt, ##__VA_ARGS__) \
+::job::core::JobLogger::instance().log( \
+    ::job::core::LogLevel::Error, \
+    ::job::core::detail::format_log(fmt, ##__VA_ARGS__) \
 )
 
 #define JOB_LOG_WARN(fmt, ...) \
-    ::job::core::JobLogger::instance().log( \
-        ::job::core::LogLevel::Warn, \
-        ::job::core::detail::format_log(fmt, ##__VA_ARGS__) \
+::job::core::JobLogger::instance().log( \
+          ::job::core::LogLevel::Warn, \
+          ::job::core::detail::format_log(fmt, ##__VA_ARGS__) \
 )
 
 #define JOB_LOG_INFO(fmt, ...) \
-    ::job::core::JobLogger::instance().log( \
-        ::job::core::LogLevel::Info, \
-        ::job::core::detail::format_log(fmt, ##__VA_ARGS__) \
+::job::core::JobLogger::instance().log( \
+          ::job::core::LogLevel::Info, \
+          ::job::core::detail::format_log(fmt, ##__VA_ARGS__) \
 )
 
 #define JOB_LOG_DEBUG(fmt, ...) \
-    ::job::core::JobLogger::instance().log( \
-        ::job::core::LogLevel::Debug, \
-        ::job::core::detail::format_log(fmt, ##__VA_ARGS__) \
+::job::core::JobLogger::instance().log( \
+          ::job::core::LogLevel::Debug, \
+          ::job::core::detail::format_log(fmt, ##__VA_ARGS__) \
+)
+
+#define JOB_LOG_ASSERT(fmt, ...) \
+::job::core::JobLogger::instance().log( \
+          ::job::core::LogLevel::Assert, \
+          ::job::core::detail::format_log(fmt, ##__VA_ARGS__) \
 )
 
 } // job::core::detail

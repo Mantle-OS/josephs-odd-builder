@@ -74,9 +74,8 @@ inline void maskedStore(float* ptr, int valid_n, f32 val) {
         // but this illustrates the logic using your existing provider.
         alignas(32) float temp[8];
         SIMD::mov(temp, val);
-        for (int i = 0; i < valid_n; ++i) {
+        for (int i = 0; i < valid_n; ++i)
             ptr[i] = temp[i];
-        }
     }
 }
 
@@ -98,17 +97,18 @@ inline void computeTile(int M, int N, int K, float alpha,
                                &A[(start_m + mi) * lda], lda,
                                &B[(start_n + ni)], ldb,
                                &C[(start_m + mi) * ldc + (start_n + ni)], ldc);
-            }  else {
+            } else {
                 int m_limit = std::min(kMicroM, M_curr - mi); // How many rows are valid?
                 int n_limit = std::min(kMicroN, N_curr - ni); // How many cols are valid?
 
                 [[maybe_unused]]f32 c[8];
-                for(int i=0; i<8; ++i)
+                for(int i = 0; i < 8; ++i)
                     c[i] = SIMD::zero();
 
                 // Registers
                 f32 acc[8];
-                for(int i=0; i<8; ++i) acc[i] = SIMD::zero();
+                for(int i=0; i<8; ++i)
+                    acc[i] = SIMD::zero();
 
                 for (int p = 0; p < K; ++p) {
                     f32 b_row;
@@ -116,7 +116,7 @@ inline void computeTile(int M, int N, int K, float alpha,
                         b_row = SIMD::pull(B + p * ldb + (start_n + ni));
                     } else {
                         alignas(32) float tmp_b[8] = {0};
-                        for(int k=0; k<n_limit; ++k)
+                        for(int k = 0; k < n_limit; ++k)
                             tmp_b[k] = B[p * ldb + (start_n + ni) + k];
 
                         b_row = SIMD::pull(tmp_b);
@@ -132,7 +132,7 @@ inline void computeTile(int M, int N, int K, float alpha,
                 // Update C (Masked Store)
                 f32 v_alpha = SIMD::set1(alpha);
                 for (int i = 0; i < m_limit; ++i) {
-                    float* c_ptr = &C[(start_m + mi + i) * ldc + (start_n + ni)];
+                    float *c_ptr = &C[(start_m + mi + i) * ldc + (start_n + ni)];
 
                     // Load existing C (Masked)
                     f32 c_curr;
@@ -140,7 +140,8 @@ inline void computeTile(int M, int N, int K, float alpha,
                         c_curr = SIMD::pull(c_ptr);
                     } else {
                         alignas(32) float tmp_c[8] = {0};
-                        for(int k=0; k<n_limit; ++k) tmp_c[k] = c_ptr[k];
+                        for(int k = 0; k < n_limit; ++k)
+                            tmp_c[k] = c_ptr[k];
                         c_curr = SIMD::pull(tmp_c);
                     }
 
@@ -167,17 +168,16 @@ inline void computeTileNaive(int M, int N, int K, float alpha,
     int N_curr = std::min(block_size, N - start_n);
 
     // Simple triple loop for the block
-    for (int i = 0; i < M_curr; ++i) {
+    for (int i = 0; i < M_curr; ++i)
         for (int j = 0; j < N_curr; ++j) {
             float sum = 0.0f;
             // K-dimension dot product
-            for (int p = 0; p < K; ++p) {
+            for (int p = 0; p < K; ++p)
                 sum += A[(start_m + i) * lda + p] * B[p * ldb + (start_n + j)];
-            }
             // Accumulate: C = alpha*sum + C (Beta handled in outer loop)
             C[(start_m + i) * ldc + (start_n + j)] += alpha * sum;
         }
-    }
+
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -214,19 +214,18 @@ inline void sgemmNaive(int M, int N, int K,
                        float *C, int ldc)
 {
     if (beta == 0.0f) {
-        for(int i=0; i<M; ++i)
+        for(int i = 0; i < M; ++i)
             std::memset(C + i * ldc, 0, N * sizeof(float));
     } else if (beta != 1.0f) {
-        for(int i=0; i<M; ++i)
-            for(int j=0; j<N; ++j)
+        for(int i = 0; i < M; ++i)
+            for(int j = 0; j < N; ++j)
                 C[i * ldc + j] *= beta;
     }
 
-    for (int i = 0; i < M; i += JOB_BLOCK_SIZE) {
-        for (int j = 0; j < N; j += JOB_BLOCK_SIZE) {
+    for (int i = 0; i < M; i += JOB_BLOCK_SIZE)
+        for (int j = 0; j < N; j += JOB_BLOCK_SIZE)
             computeTileNaive(M, N, K, alpha, A, lda, B, ldb, C, ldc, i, j, JOB_BLOCK_SIZE);
-        }
-    }
+
 }
 
 
@@ -238,7 +237,7 @@ inline void sgemmParallel(job::threads::ThreadPool &pool,
                                float beta, float *C, int ldc)
 {
     // beta scaling (row parallel)
-    job::threads::parallel_for(pool, size_t{0}, size_t(M), [&](size_t i) {
+    threads::parallel_for(pool, size_t{0}, size_t(M), [&](size_t i) {
         if (beta == 0.0f) {
             std::memset(C + i * ldc, 0, N * sizeof(float));
         } else if (beta != 1.0f) {
@@ -252,7 +251,7 @@ inline void sgemmParallel(job::threads::ThreadPool &pool,
     int n_chunks = (N + JOB_BLOCK_SIZE - 1) / JOB_BLOCK_SIZE;
     size_t total_tiles = m_chunks * n_chunks;
 
-    job::threads::parallel_for(pool, size_t{0}, total_tiles, [&](size_t tile_idx) {
+    threads::parallel_for(pool, size_t{0}, size_t(total_tiles), [&](size_t tile_idx) {
         int chunk_m = tile_idx / n_chunks;
         int chunk_n = tile_idx % n_chunks;
         int i = chunk_m * JOB_BLOCK_SIZE;
@@ -267,7 +266,6 @@ inline void sgemmParallel(job::threads::ThreadPool &pool,
 
 
 
-// FIXME SWAP OUT THE job::threads::parallel_for for serial for loop
 inline void sgemmStridedBatched(int batchCount,
                                 int M, int N, int K,
                                 float alpha,
@@ -284,8 +282,6 @@ inline void sgemmStridedBatched(int batchCount,
     }
 }
 
-
-// FIXME SWAP OUT THE job::threads::parallel_for for serial for loop
 inline void sgemmNaiveStridedBatched( int batchCount,
                                 int M, int N, int K,
                                 float alpha,

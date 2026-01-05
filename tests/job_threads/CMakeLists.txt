@@ -23,9 +23,10 @@ add_executable(test_job_threads
 )
 
 target_link_libraries(test_job_threads PRIVATE
-    JosephsOddBuilder_Threads
-    ${CatchTwo_LIBRARIES}
     Threads::Threads
+    atomic
+    ${CatchTwo_LIBRARIES}
+    JosephsOddBuilder_Threads
 )
 
 target_include_directories(test_job_threads PRIVATE

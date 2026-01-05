@@ -41,6 +41,9 @@ void JobLogger::log(LogLevel lvl, const std::string &msg) noexcept
     case LogLevel::Debug:
         lvlStr = "DEBUG";
         break;
+    case LogLevel::Assert:
+        lvlStr = "ASSERT";
+        break;
     }
 
     const std::string timeStr = timestamp();

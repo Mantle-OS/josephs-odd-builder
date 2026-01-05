@@ -186,7 +186,6 @@ set(JOBAI_BASE_SOURCES)
 
 set(JOBAI_COMP_HEADERS
     comp/noise_table.h
-    comp/transpose.h
     comp/atomic_math.h
 
     #

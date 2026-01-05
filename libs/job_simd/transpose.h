@@ -1,17 +1,15 @@
 #pragma once
 
-#include <algorithm>
-
 #include <simd_provider.h>
-namespace job::ai::comp {
-using namespace job::simd;
+namespace job::simd {
+
+// 1 use the SIMD::width() OR us #if defined(__AVX512F__)
+// FIXME transpose_kernel_8x16 or make this transpose_kernel_8xX where we look at SIMD::width() from the other headers
 
 __attribute__((always_inline))
 inline void transpose_kernel_8x8(const float* __restrict__ src, size_t src_stride,
                      float* __restrict__ dst, size_t dst_stride)
 {
-    using namespace job::ai::comp; // For SIMD alias
-
     // load 8 rows
     auto r0 = SIMD::pull(src + 0 * src_stride);
     auto r1 = SIMD::pull(src + 1 * src_stride);
@@ -60,8 +58,6 @@ __attribute__((always_inline))
 inline void transpose_kernel_4x4(const float* __restrict__ src, size_t src_stride,
                      float* __restrict__ dst, size_t dst_stride)
 {
-    using namespace job::ai::comp;
-
     // 4 rows
     auto r0 = SIMD::pull(src + 0 * src_stride);
     auto r1 = SIMD::pull(src + 1 * src_stride);
@@ -81,11 +77,12 @@ inline void transpose_kernel_4x4(const float* __restrict__ src, size_t src_strid
 }
 
 inline void transpose(const float* __restrict__ src, float* __restrict__ dst, int rows, int cols) {
-    constexpr int K = SIMD::width();
+    constexpr int K = SIMD::width(); // Note this could be 16 in the future of avx-512
     int i = 0;
     for (; i + (K-1) < rows; i += K) {
         int j = 0;
         for (; j + (K-1) < cols; j += K)
+            // ADD 16 // transpose_kernel_XxX for 512 ?
             if constexpr (K == 8)
                 transpose_kernel_8x8(src + i * cols + j, cols, dst + j * rows + i, rows);
             else
@@ -103,4 +100,4 @@ inline void transpose(const float* __restrict__ src, float* __restrict__ dst, in
             dst[j * rows + i] = src[i * cols + j];
 }
 
-} // namespace job::ai::comp
+} // namespace job::simd

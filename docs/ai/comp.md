@@ -7,7 +7,6 @@ math:
 - activations
 - MLP glue (gate/value/proj)
 - attention forward (CPU)
-- transpose helper
 - a few small support pieces (atomic add, noise table, config structs)
 
 job:

@@ -23,6 +23,7 @@ set(JOBTHREADS_UTILS_HEADERS
     utils/job_thread_options.h
     utils/job_thread_args.h
     utils/job_thread_metrics.h
+    utils/job_latch.h
     utils/job_parallel_for.h
     utils/job_parallel_reduce.h
 

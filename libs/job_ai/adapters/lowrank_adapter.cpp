@@ -1,8 +1,9 @@
 #include "lowrank_adapter.h"
 
+#include <transpose.h>
+
 #include "gemm.h"
 #include "matrix.h"
-#include "transpose.h"
 
 namespace job::ai::adapters {
 
@@ -73,7 +74,7 @@ void LowRankAdapter::apply(int S, int D,
     float *kt_ptr = batch_scratch;
     float *m_ptr  = batch_scratch + (D * S);
 
-    comp::transpose(k_ptr, kt_ptr, S, D);
+    simd::transpose(k_ptr, kt_ptr, S, D);
 
     cords::Matrix KT(kt_ptr, D, S);
     cords::Matrix V(const_cast<float*>(v_ptr), S, D);

@@ -9,7 +9,9 @@ set(JOBSIMD_SOURCES
 )
 set(JOBSIMD_HEADERS
     rounding_mode.h
+    transpose.h
     simd_provider.h
+    simd_math.h
 )
 
 if(HAS_AVX)
