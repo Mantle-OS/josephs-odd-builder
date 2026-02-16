@@ -1,47 +1,46 @@
 #include "job_ansi_screen.h"
 #include <algorithm>
 #include <memory>
-#include <iostream>
 #include <cassert>
 
 namespace job::ansi {
 
 const Cell kDefaultCell{};
-Screen::Screen(int rows, int cols)
+Screen::Screen(int rows, int cols):
+    m_primaryGrid(rows, cols),
+    m_altGrid(rows, cols),
+    m_scrollback(MAX_SCROLLBACK_LINES),
+    m_cursor(std::make_unique<Cursor>(rows, cols)),
+    m_savedCursor(std::make_unique<Cursor>(rows, cols)),
+    m_currentAttributes(Attributes::intern(Attributes())),
+    m_scrollBottom(rows)
 {
     resize(rows, cols);
-    // Set default tab stops every 8 columns, up to m_columns - 1
-    for (int col = 0; col < m_columns; col += 8)
-        setTabStop(col);
 
-    m_currentAttributes = Attributes::intern(Attributes());
+    // Set default tab stops every 8 columns, up to m_columns - 1
+    for (int col = 0; col < m_primaryGrid.columns(); col += 8)
+        setTabStop(col);
+}
+
+void Screen::requestRender()
+{
+    m_needsRender = true;
+    if (renderCallback)
+        renderCallback();
+}
+
+int Screen::rowCount() const
+{
+    return m_primaryGrid.rows();
 }
 
 void Screen::insertLines(int startRow, int count)
 {
-    if (startRow < 0 || startRow >= m_rows || count <= 0)
-        return;
+    int limit = m_scrollBottom;
+    activeGrid().insertLines(startRow, count, Cell::blank(), limit);
 
-    int endRow = m_scrollBottom;
-    if (startRow >= endRow)
-        return;
-
-    count = std::min(count, endRow - startRow);
-    auto &buffer = activeBuffer();
-    int width = m_columns;
-
-    // Move existing lines down
-    for (int row = endRow - 1; row >= startRow + count; --row)
-        for (int col = 0; col < width; ++col)
-            buffer[index(row, col)] = buffer[index(row - count, col)];
-
-
-    // Clear new inserted lines
-    int clearLimit = std::min(startRow + count, endRow);
-    for (int row = startRow; row < clearLimit; ++row)
-        for (int col = 0; col < width; ++col)
-            buffer[index(row, col)].reset();  // or = Cell{};
-
+    for(int r = startRow; r < limit; ++r)
+        m_dirtyRows.insert(r);
 
     requestRender();
 }
@@ -53,58 +52,51 @@ void Screen::deleteLines(int count)
 
 void Screen::deleteLines(int startRow, int count)
 {
-    if (startRow < m_scrollTop || startRow >= m_scrollBottom)
+    int limit = m_scrollBottom;
+    if (startRow < m_scrollTop || startRow >= limit)
         return;
 
-    int linesToMove = m_scrollBottom - startRow - count;
-    if (linesToMove > 0)
-        for (int row = 0; row < linesToMove; ++row)
-            copyRow(startRow + row + count, startRow + row);
-
-
-    // Clear the bottom lines (respecting protected erase)
-    for (int row = m_scrollBottom - count; row < m_scrollBottom; ++row) {
-        for (int col = 0; col < m_columns; ++col) {
-            Cell &cell = activeBuffer()[index(row, col)];
-            if (!cell.isProtectedForErase())
-                cell = Cell::blank();
-        }
-    }
+    activeGrid().deleteLines(startRow, count, Cell::blank(), limit);
+    for(int r = startRow; r < limit; ++r)
+        m_dirtyRows.insert(r);
 
     requestRender();
 }
 
 void Screen::clearRow(int row)
 {
-    if (row < 0 || row >= m_rows)
+    auto &grid = activeGrid();
+    if (row < 0 || row >= grid.rows())
         return;
 
-    auto &buffer = activeBuffer();
-    for (int col = 0; col < m_columns; ++col) {
-        auto &cell = buffer[index(row, col)];
-        if (!cell.isProtectedForErase())
-            cell.reset();
-    }
+    // Hoist the row span for speed
+    auto rowSpan = grid[row];
 
+    for (int col = 0; col < grid.columns(); ++col) {
+        auto& cell = rowSpan[col];
+        if (!cell.isProtectedForErase()) {
+            cell.reset();
+            markCellDirty(row, col);
+        }
+    }
     requestRender();
 }
 
 void Screen::copyRow(int from, int to)
 {
-    if (from < 0 || from >= m_rows || to < 0 || to >= m_rows)
+    auto &grid = activeGrid();
+    if (from < 0 || from >= grid.rows() || to < 0 || to >= grid.rows())
         return;
 
-    auto &buffer = activeBuffer();
-    for (int col = 0; col < m_columns; ++col) {
-        const Cell &src = buffer[index(from, col)];
-        Cell &dst = buffer[index(to, col)];
+    auto srcSpan = grid[from];
+    auto dstSpan = grid[to];
 
-        if (!dst.isProtectedForWrite()) {
-            dst = src;
+    for (int col = 0; col < grid.columns(); ++col) {
+        if (!dstSpan[col].isProtectedForWrite()) {
+            dstSpan[col] = srcSpan[col];
             markCellDirty(to, col);
         }
     }
-
     requestRender();
 }
 
@@ -139,51 +131,24 @@ const std::unordered_set<int> &Screen::dirtyCols(int row) const
 
 void Screen::resize(int rows, int cols)
 {
-    int oldRows = m_rows;
-    int oldCols = m_columns;
+    m_primaryGrid.resize(rows, cols);
+    m_altGrid.resize(rows, cols);
 
-    const auto &oldBuffer = isAlternateBufferActive() ? m_altBuffer : m_mainBuffer;
+    if (m_cursor)
+        m_cursor->updateDimensions(rows, cols);
 
-    m_rows = rows;
-    m_columns = cols;
-
-    std::vector<Cell> newBuffer(rows * cols, Cell{});
-
-    if (!oldBuffer.empty()) {
-        int copyRows = std::min(rows, oldRows);
-        int copyCols = std::min(cols, oldCols);
-
-        for (int row = 0; row < copyRows; ++row) {
-            for (int col = 0; col < copyCols; ++col) {
-                int oldIndex = row * oldCols + col;
-                int newIndex = row * cols + col;
-                newBuffer[newIndex] = oldBuffer[oldIndex];
-            }
-        }
-    }
-
-    // Set active buffer
-    if (isAlternateBufferActive()) {
-        m_altBuffer = std::move(newBuffer);
-        if (m_mainBuffer.size() != static_cast<size_t>(rows * cols))
-            m_mainBuffer.resize(rows * cols, Cell{});
-    } else {
-        m_mainBuffer = std::move(newBuffer);
-        if (m_altBuffer.size() != static_cast<size_t>(rows * cols))
-            m_altBuffer.resize(rows * cols, Cell{});
-    }
-
-    m_cursor = std::make_unique<Cursor>(rows, cols);
-    m_savedCursor = std::make_unique<Cursor>(rows, cols);
+    if (m_savedCursor)
+        m_savedCursor->updateDimensions(rows, cols);
 
     m_tabStops.reset();
     for (int col = 0; col < cols; col += 8)
         setTabStop(col);
 
-    m_scrollBottom = rows;
+    if (m_scrollBottom == m_primaryGrid.rows() || m_scrollBottom > rows)
+        m_scrollBottom = rows;
+
     requestRender();
 }
-
 
 void Screen::putChar(char32_t ch)
 {
@@ -194,262 +159,201 @@ void Screen::putChar(char32_t ch, Attributes *style)
 {
     // Handle control characters
     if (ch == U'\r') {
+        m_wrapPending = false;
         moveCursor(m_cursor->row(), 0);
         if (get_autoLinefeed()) {
-            if (m_cursor->row() + 1 >= m_scrollBottom) {
+            if (m_cursor->row() + 1 >= m_scrollBottom)
                 scrollUp();
-            }
             moveCursor(std::min(m_cursor->row() + 1, m_scrollBottom - 1), 0);
         }
         return;
     } else if (ch == U'\n') {
-        if (m_cursor->row() + 1 >= m_scrollBottom) {
+        m_wrapPending = false;
+        if (m_cursor->row() + 1 >= m_scrollBottom)
             scrollUp();
-        }
-        moveCursor(std::min(m_cursor->row() + 1, m_scrollBottom - 1), m_cursor->col());
+
+        moveCursor(std::min(m_cursor->row() + 1, m_scrollBottom - 1), m_cursor->column());
         return;
     } else if (ch == U'\b') {
-        if (m_cursor->col() > 0)
-            moveCursor(m_cursor->row(), m_cursor->col() - 1);
+        m_wrapPending = false;
+        if (m_cursor->column() > 0)
+            moveCursor(m_cursor->row(), m_cursor->column() - 1);
         return;
     }
 
+    if (m_wrapPending && get_wraparound()) {
+        m_wrapPending = false;
+
+        // Perform the wrapping logic here
+        int nextRow = m_cursor->row() + 1;
+        if (nextRow >= m_scrollBottom) {
+            scrollUp();
+            nextRow = m_scrollBottom - 1;
+        }
+        // Wrap to start of next line
+        m_cursor->setPosition(nextRow, 0);
+    }
+
+    auto &grid = activeGrid();
+    const int g_rows = grid.rows();
+    const int g_cols = grid.columns();
+
     // Skip out-of-bounds writes
-    if (m_cursor->row() < 0 || m_cursor->row() >= m_rows ||
-        m_cursor->col() < 0 || m_cursor->col() >= m_columns)
+    if (m_cursor->row() < 0 || m_cursor->row() >= g_rows ||
+        m_cursor->column() < 0 || m_cursor->column() >= g_cols)
         return;
 
     ch = applyCharset(ch);
 
-    auto &buffer = activeBuffer();
-    const int row = m_cursor->row();
-    const int col = m_cursor->col();
 
+    const int row = m_cursor->row();
+    const int col = m_cursor->column();
     // Insert Mode: shift characters right before writing
+
+    // Insert Mode
     if (get_insertMode()) {
-        for (int i = m_columns - 2; i >= col; --i) {
-            buffer[index(row, i + 1)] = buffer[index(row, i)];
+        for (int i = g_cols - 2; i >= col; --i) {
+            grid[row, i + 1] = grid[row, i];
             markCellDirty(row, i + 1);
         }
-        buffer[index(row, col)].reset();
+        grid[row, col].reset();
     }
-
-    auto &cell = buffer[index(row, col)];
+    auto &cell = grid[row, col];
 
     // Respect write protection
-    if (cell.isProtectedForWrite())
-        return;
+    if (!cell.isProtectedForWrite()){
+        cell.setChar(ch);
+        cell.setAttributes(*style);
 
-    // Write character and style
-    cell.setChar(ch);
-    cell.setAttributes(*style);
-
-    // Apply protection from DECSCA mode
-    switch (m_protectionMode) {
-    case DECSCA_MODE::ERASE_PROTECTED:
-        cell.setProtection(true, false);
-        break;
-    case DECSCA_MODE::WRITE_ERASE_PROTECTED:
-        cell.setProtection(true, true);
-        break;
-    case DECSCA_MODE::NONE:
-    default:
-        cell.setProtection(false, false);
-        break;
-    }
-
-    markCellDirty(row, col);
-
-    // Handle cursor advancement with wraparound
-    if (col == m_columns - 1) {
-        if (get_wraparound()) {
-            if (row + 1 >= m_scrollBottom) {
-                scrollUp();
-                m_cursor->set(m_scrollBottom - 1, 0);
-            } else {
-                m_cursor->set(row + 1, 0);
-            }
+        // Apply protection from DECSCA mode
+        switch (m_protectionMode) {
+        case DECSCA_MODE::ERASE_PROTECTED:
+            cell.setProtection(true, false);
+            break;
+        case DECSCA_MODE::WRITE_ERASE_PROTECTED:
+            cell.setProtection(true, true);
+            break;
+        case DECSCA_MODE::NONE:
+        default:
+            cell.setProtection(false, false);
+            break;
         }
-        // else: cursor stays at last column
-    } else {
-        m_cursor->move(0, 1);
+
+        markCellDirty(row, col);
+        bool atRightEdge = (col == g_cols - 1);
+
+        if (atRightEdge) {
+            if (get_wraparound()) {
+                // DO NOT Scroll yet. Just set the flag.
+                m_wrapPending = true;
+                // Cursor stays visibly at the last column
+            } else {
+                // No wraparound: cursor stays clamped at edge
+            }
+        } else {
+            // Normal advance
+            m_cursor->move(0, 1);
+        }
+
+        requestRender();
     }
+}
 
+
+Grid &Screen::activeGrid()
+{
+    return m_inAlternateGrid ? m_altGrid : m_primaryGrid;
+}
+
+const Grid &Screen::activeGrid() const
+{
+    return m_inAlternateGrid ? m_altGrid : m_primaryGrid;
+}
+
+void Screen::enterAlternateGrid()
+{
+    m_inAlternateGrid = true;
+    std::fill(m_altGrid.begin(), m_altGrid.end(), Cell{});
+    setScrollRegion(0, m_altGrid.rows());  // Reset to full screen
     requestRender();
 }
 
-
-std::vector<Cell> &Screen::activeBuffer()
+void Screen::exitAlternateGrid()
 {
-    return m_inAlternateBuffer ? m_altBuffer : m_mainBuffer;
-}
-
-const std::vector<Cell> &Screen::activeBuffer() const
-{
-    return m_inAlternateBuffer ? m_altBuffer : m_mainBuffer;
-}
-
-void Screen::enterAlternateBuffer()
-{
-    m_inAlternateBuffer = true;
-    std::fill(m_altBuffer.begin(), m_altBuffer.end(), Cell{});
-    setScrollRegion(0, m_rows);  // Reset to full screen
+    m_inAlternateGrid = false;
     requestRender();
 }
 
-void Screen::exitAlternateBuffer()
+bool Screen::isAlternateGridActive() const
 {
-    m_inAlternateBuffer = false;
-    requestRender();
-}
-
-bool Screen::isAlternateBufferActive() const
-{
-    return m_inAlternateBuffer;
+    return m_inAlternateGrid;
 }
 
 Cell *Screen::cellAt(int row, int col)
 {
-    if (row < 0 || row >= m_rows || col < 0 || col >= m_columns)
+    auto &grid = activeGrid();
+    if (row < 0 || row >= grid.rows() || col < 0 || col >= grid.columns())
         return nullptr;
-    return &activeBuffer()[index(row, col)];
+    return &grid[row, col];
 }
 
 void Screen::setScrollRegion(int top, int bottom)
 {
-    m_scrollTop = std::clamp(top, 0, m_rows - 1);
-    m_scrollBottom = std::clamp(bottom, m_scrollTop + 1, m_rows);
+    m_scrollTop = std::clamp(top, 0, activeGrid().rows() - 1);
+    m_scrollBottom = std::clamp(bottom, m_scrollTop + 1, activeGrid().rows());
 }
 
 void Screen::scrollUp(int top, int bottom, int lines)
 {
-
-    // std::cerr << "[Scroll] scrollUp called\n";
-
-    if (lines <= 0)
+    if (lines <= 0 || top >= bottom)
         return;
 
-    if (top < 0)
-        top = 0;
-
-    if (bottom > m_rows)
-        bottom = m_rows;
-
-    if (top >= bottom)
-        return;
-
-    assert(top >= 0 && bottom <= m_rows);
-    assert(lines <= (bottom - top));
-
-    auto &buffer = activeBuffer();
-    int width = m_columns;
-
-    for (int i = 0; i < lines; ++i) {
-        std::vector<Cell> scrolledRow;
-        scrolledRow.reserve(width);
-        for (int col = 0; col < width; ++col)
-            scrolledRow.push_back(buffer[index(top, col)]);
-
-        m_scrollback.push_back(std::move(scrolledRow));
-
-        if (m_scrollback.size() > MAX_SCROLLBACK_LINES) {
-            m_scrollback.pop_front();
-            if (m_scrollOffset > 0) {
-                m_scrollOffset = std::max(0, m_scrollOffset - 1);
-            }
+    auto &grid = activeGrid();
+    if (top == 0 && !isAlternateGridActive()) {
+        for (int i = 0; i < lines; ++i) {
+            auto rowSpan = grid[top + i];
+            Cell::Line savedLine(rowSpan.begin(), rowSpan.end());
+            if (m_scrollback.push_back(std::move(savedLine)))
+                if (m_scrollOffset > 0) m_scrollOffset--;
         }
     }
 
-    // Move lines up
-    for (int row = top; row < bottom - lines; ++row) {
-        for (int col = 0; col < width; ++col) {
-            buffer[index(row, col)] = std::move(buffer[index(row + lines, col)]);
-            markCellDirty(row, col);
-        }
-    }
+    grid.deleteLines(top, lines, Cell::blank(), bottom);
 
-    // Clear lines at the bottom, respecting character protection
-    for (int row = bottom - lines; row < bottom; ++row) {
-        for (int col = 0; col < width; ++col) {
-            auto &cell = buffer[index(row, col)];
-            if (!cell.isProtectedForErase()) {
-                cell = kDefaultCell;
-                markCellDirty(row, col);
-            }
-        }
-    }
-    requestRender();
-
-    // Ensure cursor remains within scroll region bounds after scroll
     if (m_cursor->row() >= bottom)
-        m_cursor->set(bottom - 1, 0);
+        m_cursor->setPosition(bottom - 1, 0);
     else if (m_cursor->row() < top)
-        m_cursor->set(top, 0);
+        m_cursor->setPosition(top, 0);
 
+
+    for(int r = top; r < bottom; ++r)
+        m_dirtyRows.insert(r);
+
+    requestRender();
 }
-
 
 void Screen::scrollUp()
 {
-    std::cerr << "[Scroll] scrollUp called\n";
     scrollUp(m_scrollTop, m_scrollBottom, 1);
 }
 
 void Screen::scrollDown(int top, int bottom, int lines)
 {
-    std::cerr << "[Scroll] scrollDOWN called\n";
-
-    if (lines <= 0)
+    if (lines <= 0 || top >= bottom)
         return;
 
-    if (top < 0)
-        top = 0;
+    auto &grid = activeGrid();
+    grid.insertLines(top, lines, Cell::blank(), bottom);
 
-    if (bottom > m_rows)
-        bottom = m_rows;
-
-    if (top >= bottom)
-        return;
-
-    assert(top >= 0 && bottom <= m_rows);
-    assert(lines <= (bottom - top));
-
-    auto &buffer = activeBuffer();
-    int width = m_columns;
-
-    // Move lines down
-    for (int row = bottom - 1; row >= top + lines; --row) {
-        for (int col = 0; col < width; ++col) {
-            buffer[index(row, col)] = std::move(buffer[index(row - lines, col)]);
-            markCellDirty(row, col);
-        }
-    }
-
-    // Clear lines at the top, respecting character protection
-    for (int row = top; row < top + lines && row < bottom; ++row) {
-        for (int col = 0; col < width; ++col) {
-            auto &cell = buffer[index(row, col)];
-            if (!cell.isProtectedForErase()) {
-                cell = kDefaultCell;
-                markCellDirty(row, col);
-            }
-        }
-    }
-
+    for(int r = top; r < bottom; ++r)
+        m_dirtyRows.insert(r);
     requestRender();
-
-    // Ensure cursor remains within scroll region bounds after scroll
-    if (m_cursor->row() >= bottom)
-        m_cursor->set(bottom - 1, 0);
-    else if (m_cursor->row() < top)
-        m_cursor->set(top, 0);
-
 }
-
-const std::deque<std::vector<Cell>> &Screen::scrollbackLines() const
+const ScrollbackBuffer &Screen::scrollback() const
 {
     return m_scrollback;
 }
+
 
 void Screen::clearScrollback()
 {
@@ -461,7 +365,7 @@ void Screen::clearScrollback()
 void Screen::scrollbackPageUp()
 {
     if (!m_scrollback.empty()) {
-        m_scrollOffset = std::min<int>(m_scrollOffset + m_rows, m_scrollback.size());
+        m_scrollOffset = std::min<int>(m_scrollOffset + activeGrid().rows(), m_scrollback.size());
         requestRender();
     }
 }
@@ -469,14 +373,13 @@ void Screen::scrollbackPageUp()
 void Screen::scrollbackPageDown()
 {
     if (m_scrollOffset > 0) {
-        m_scrollOffset = std::max(0, m_scrollOffset - m_rows);
+        m_scrollOffset = std::max(0, m_scrollOffset - activeGrid().rows());
         requestRender();
     }
 }
 
 int Screen::scrollOffset() const
 {
-    // Always clamp to valid range for safety
     if (m_scrollOffset < 0)
         return 0;
 
@@ -488,7 +391,6 @@ int Screen::scrollOffset() const
 
 void Screen::setScrollOffset(int offset)
 {
-    // Clamp to valid range
     if (offset < 0)
         offset = 0;
 
@@ -519,6 +421,16 @@ bool Screen::isInScrollback() const
     return m_scrollOffset > 0;
 }
 
+const Cursor *Screen::cursor() const
+{
+    return m_cursor.get();
+}
+
+Cursor *Screen::cursor()
+{
+    return m_cursor.get();
+}
+
 void Screen::moveCursor(int rowDelta, int colDelta)
 {
     // std::cerr << "[Cursor] moveCursor(" << rowDelta << ", " << colDelta << ")\n";
@@ -526,7 +438,7 @@ void Screen::moveCursor(int rowDelta, int colDelta)
     int regionTop = originRow();
     int regionBottom = originBottom();
     int newRow = std::clamp(m_cursor->row() + rowDelta, regionTop, regionBottom - 1);
-    int newCol = std::clamp(m_cursor->col() + colDelta, 0, columnCount() - 1);
+    int newCol = std::clamp(m_cursor->column() + colDelta, 0, columnCount() - 1);
     setCursor(newRow, newCol); // no longer subtract regionTop
 }
 void Screen::moveCursorRelative(int rowDelta, int colDelta, int regionTop, int regionBottom)
@@ -538,20 +450,26 @@ void Screen::moveCursorRelative(int rowDelta, int colDelta, int regionTop, int r
     int limitRow = regionBottom - 1;
 
     int newRow = std::clamp(m_cursor->row() + rowDelta, baseRow, limitRow);
-    int newCol = std::clamp(m_cursor->col() + colDelta, 0, columnCount() - 1);
+    int newCol = std::clamp(m_cursor->column() + colDelta, 0, columnCount() - 1);
 
     setCursor(newRow, newCol);  // absolute
+}
+
+void Screen::moveCursorRelative(int rowDelta, int colDelta)
+{
+    moveCursorRelative(rowDelta, colDelta, originRow(), originBottom());
 }
 
 
 void Screen::setCursor(int row, int col)
 {
+    m_wrapPending = false; // Explicit movement resets wrap state
     // std::cerr << "[Cursor] setCursor(" << row << ", " << col << ")\n";
 
     int clampedRow = std::clamp(row, 0, rowCount() - 1);
     int clampedCol = std::clamp(col, 0, columnCount() - 1);
     if (m_cursor)
-        m_cursor->set(clampedRow, clampedCol);
+        m_cursor->setPosition(clampedRow, clampedCol);
     requestRender();
 }
 
@@ -642,6 +560,16 @@ void Screen::sendMouseUtf8Encoding(int button, [[maybe_unused]]bool pressed, int
     }
 }
 
+void Screen::set_focusEventEnabled(bool enable)
+{
+    m_focusEventEnabled = enable;
+}
+
+bool Screen::get_focusEventEnabled() const
+{
+    return m_focusEventEnabled;
+}
+
 void Screen::sendFocusEvent(bool focused)
 {
     std::string seq = focused ? "\033[I" : "\033[O";
@@ -662,7 +590,7 @@ int Screen::originRow() const
 
 int Screen::originBottom() const
 {
-    return m_originMode ? m_scrollBottom : m_rows;
+    return m_originMode ? m_scrollBottom : activeGrid().rows();
 }
 
 void Screen::setTabStop(int col)
@@ -685,6 +613,13 @@ void Screen::clearAllTabStops()
 bool Screen::isTabStop(int col) const
 {
     return col >= 0 && col < 512 && m_tabStops.test(col);
+}
+
+void Screen::resetTabStops()
+{
+    m_tabStops.reset();  // Clear all tab stops
+    for (int col = 0; col < activeGrid().columns(); col += 8)
+        m_tabStops.set(col);
 }
 
 void Screen::selectCharset(int set, CharsetDesignator designator)
@@ -810,7 +745,7 @@ void Screen::eraseLine(int row)
 void Screen::deleteChars(int count)
 {
     int row = m_cursor->row();
-    int col = m_cursor->col();
+    int col = m_cursor->column();
     int maxCol = columnCount();
 
     int shiftEnd = maxCol - count;
@@ -837,7 +772,7 @@ void Screen::deleteChars(int count)
 void Screen::eraseChars(int count)
 {
     int row = m_cursor->row();
-    int col = m_cursor->col();
+    int col = m_cursor->column();
 
     for (int i = 0; i < count && (col + i) < columnCount(); ++i) {
         Cell *cell = cellAt(row, col + i);
@@ -855,7 +790,7 @@ void Screen::repeatLastChar(int count)
         return;
 
     int row = m_cursor->row();
-    int col = m_cursor->col();
+    int col = m_cursor->column();
 
     for (int i = 0; i < count; ++i) {
         if (col >= columnCount())
@@ -871,18 +806,108 @@ void Screen::repeatLastChar(int count)
         ++col;
     }
 
-    m_cursor->set(row, col); // advance cursor
+    m_cursor->setPosition(row, col); // advance cursor
     requestRender();
+}
+
+void Screen::eraseField(int row, int col, EF_MODE mode)
+{
+    if (row < 0 || row >= activeGrid().rows() || col < 0 || col >= activeGrid().columns())
+        return;
+
+    switch (mode) {
+    case EF_MODE::TO_END:
+        for (int c = col; c < activeGrid().columns(); ++c)
+            if (!cellAt(row, c)->isProtectedForErase())
+                cellAt(row, c)->reset();
+        break;
+    case EF_MODE::TO_START:
+        for (int c = 0; c <= col; ++c)
+            if (!cellAt(row, c)->isProtectedForErase())
+                cellAt(row, c)->reset();
+        break;
+    case EF_MODE::ENTIRE_LINE:
+        for (int c = 0; c < activeGrid().columns(); ++c)
+            if (!cellAt(row, c)->isProtectedForErase())
+                cellAt(row, c)->reset();
+        break;
+    default:
+        break;
+    }
+
+    requestRender();
+}
+
+void Screen::eraseArea(EA_MODE mode)
+{
+    if (!m_cursor)
+        return;
+
+    const int rows = activeGrid().rows();
+    const int cols = activeGrid().columns();
+
+    const int curRow = m_cursor->row();
+    const int curCol = m_cursor->column();
+
+
+    switch (mode) {
+    case EA_MODE::TO_END:
+        for (int r = curRow; r < rows; ++r) {
+            int startCol = (r == curRow ? curCol : 0);
+            for (int c = startCol; c < cols; ++c) {
+                Cell *cell = cellAt(r, c);
+                if (cell && !cell->isProtectedForErase())
+                    cell->reset();
+            }
+        }
+        break;
+    case EA_MODE::TO_START:
+        for (int r = 0; r <= curRow; ++r) {
+            int endCol = (r == curRow ? curCol : cols - 1);
+            for (int c = 0; c <= endCol; ++c) {
+                Cell *cell = cellAt(r, c);
+                if (cell && !cell->isProtectedForErase())
+                    cell->reset();
+            }
+        }
+        break;
+    case EA_MODE::ENTIRE_SCREEN:
+        for (int r = 0; r < rows; ++r) {
+            for (int c = 0; c < cols; ++c) {
+                Cell *cell = cellAt(r, c);
+                if (cell && !cell->isProtectedForErase())
+                    cell->reset();
+            }
+        }
+        break;
+    }
+
+    requestRender();
+}
+
+void Screen::pushWindowTitle()
+{
+    m_titleStack.push_back(m_windowTitle);
+}
+
+void Screen::popWindowTitle()
+{
+    if (!m_titleStack.empty()) {
+        m_windowTitle = m_titleStack.back();
+        m_titleStack.pop_back();
+        requestRender(); // if needed
+    }
 }
 
 void Screen::setLineDisplayMode(int row, ansi::LineDisplayMode mode)
 {
-    if (row < 0 || row >= m_rows)
+
+    if (row < 0 || row >= activeGrid().rows())
         return;
 
-    auto &buffer = activeBuffer();
-    for (int col = 0; col < m_columns; ++col) {
-        auto &cell = buffer[index(row, col)];
+    auto &buffer = activeGrid();
+    for (int col = 0; col < activeGrid().columns(); ++col) {
+        auto &cell = buffer[row, col];
         if (!cell.isProtectedForWrite()) {
             cell.setLineDisplayMode(mode);
             markCellDirty(row, col);
@@ -894,20 +919,20 @@ void Screen::setLineDisplayMode(int row, ansi::LineDisplayMode mode)
 
 LineDisplayMode Screen::getLineDisplayMode(int row) const
 {
-    if (row < 0 || row >= m_rows)
+    if (row < 0 || row >= activeGrid().rows())
         return LineDisplayMode::SingleWidth;
 
-    return activeBuffer()[index(row, 0)].getLineDisplayMode();
+    return activeGrid()[row, 0].getLineDisplayMode();
 }
 
 void Screen::setLineWidth(int row, int width)
 {
-    if (row < 0 || row >= m_rows)
+    if (row < 0 || row >= activeGrid().rows())
         return;
 
-    auto &buffer = activeBuffer();
-    for (int col = 0; col < m_columns; ++col) {
-        auto &cell = buffer[index(row, col)];
+    auto &buffer = activeGrid();
+    for (int col = 0; col < buffer.columns(); ++col) {
+        auto &cell = buffer[row, col];
         if (!cell.isProtectedForWrite()) {
             cell.setLineWidth(width);
             markCellDirty(row, col);
@@ -919,12 +944,12 @@ void Screen::setLineWidth(int row, int width)
 
 void Screen::setLineHeight(int row, int height)
 {
-    if (row < 0 || row >= m_rows)
+    auto &buffer = activeGrid();
+    if (row < 0 || row >= buffer.rows())
         return;
 
-    auto &buffer = activeBuffer();
-    for (int col = 0; col < m_columns; ++col) {
-        auto &cell = buffer[index(row, col)];
+    for (int col = 0; col < buffer.columns(); ++col) {
+        auto &cell = buffer[row, col];
         if (!cell.isProtectedForWrite()) {
             cell.setLineHeight(height);
             markCellDirty(row, col);
@@ -936,18 +961,38 @@ void Screen::setLineHeight(int row, int height)
 
 void Screen::setLineHeightPosition(int row, bool isTop)
 {
-    if (row < 0 || row >= m_rows)
+    auto &buffer = activeGrid();
+    if (row < 0 || row >= buffer.rows())
         return;
 
-    auto &buffer = activeBuffer();
-    for (int col = 0; col < m_columns; ++col) {
-        auto &cell = buffer[index(row, col)];
+    for (int col = 0; col < buffer.columns(); ++col) {
+        auto &cell = buffer[row, col];
         if (!cell.isProtectedForWrite()) {
             cell.setLineHeightPosition(isTop);
             markCellDirty(row, col);
         }
     }
     requestRender();
+}
+
+void Screen::setEditingExtent(SEE_MODE mode)
+{
+    m_editingExtent = mode;
+}
+
+SEE_MODE Screen::editingExtent() const
+{
+    return m_editingExtent;
+}
+
+void Screen::setProtectionMode(DECSCA_MODE mode)
+{
+    m_protectionMode = mode;
+}
+
+DECSCA_MODE Screen::protectionMode() const
+{
+    return m_protectionMode;
 }
 
 
@@ -958,17 +1003,16 @@ bool Screen::originMode() const
 
 // Clear the entire active buffer but leave scrollback intact
 void Screen::clear()
-{
-    std::cerr << "[Screen::clear] Clearing with current attributes\n";
-    auto &buffer = activeBuffer();
-    // const auto attrs = m_currentAttributes;  // ← capture current attrs
+{;
+    auto &buffer = activeGrid();
+    // const auto attrs = m_currentAttributes;  //<- capture current attrs
 
-    for (int row = 0; row < m_rows; ++row) {
-        for (int col = 0; col < m_columns; ++col) {
-            Cell &cell = buffer[index(row, col)];
+    for (int row = 0; row < buffer.rows(); ++row) {
+        for (int col = 0; col < buffer.columns(); ++col) {
+            Cell &cell = buffer[row, col];
 
             if (!cell.isProtectedForErase()) {
-                cell = Cell(U' ', m_currentAttributes);   // ← preserve active color/styles
+                cell = Cell(U' ', m_currentAttributes);   //<- preserve active color/styles
                 markCellDirty(row, col);
             }
         }
@@ -986,17 +1030,16 @@ void Screen::reset()
     clear();
     clearScrollback();
     resetTabStops();
-    m_inAlternateBuffer = false;
+    m_inAlternateGrid = false;
     m_originMode = false;
     m_scrollTop    = 0;
-    m_scrollBottom = m_rows;
+    m_scrollBottom = activeGrid().rows();
     m_currentAttributes = Cell::defaultAttributes();
     m_tabStops.reset();
     // Set default tab stops every 8 columns on reset, up to m_columns - 1
-    for (int i = 0; i < m_columns - 1; i += 8)
+    for (int i = 0; i < activeGrid().columns() - 1; i += 8)
         setTabStop(i);
 
-    std::cerr << "[Screen::reset] Default tab stops set every 8 columns up to " << m_columns - 1 << std::endl;
     requestRender();
 }
 
@@ -1012,9 +1055,14 @@ Attributes *Screen::currentAttributes()
     return m_currentAttributes.get();
 }
 
+void Screen::setCurrentAttributes(const std::shared_ptr<Attributes> &attr)
+{
+    m_currentAttributes = attr;
+}
+
 Cell *Screen::currentCell()
 {
-    return cellAt(m_cursor->row(), m_cursor->col());
+    return cellAt(m_cursor->row(), m_cursor->column());
 }
 
 // Simple accessors used by many CSI handlers
@@ -1027,6 +1075,4 @@ int Screen::scrollBottom() const
     return m_scrollBottom;
 }
 
-
-}
-
+} // namespace job::ansi

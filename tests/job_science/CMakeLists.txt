@@ -19,6 +19,9 @@ add_executable(test_job_science
     solvers/test_euler.cpp
     solvers/test_fmm.cpp
 
+
+    engine/test_engine.cpp
+
 )
 
 target_link_libraries(test_job_science PRIVATE

@@ -2,100 +2,100 @@
 
 #include <memory>
 #include <string>
+#include <vector>
+
 #include "job_ansi_attributes.h"
+#include "job_ansi_line_display_mode.h"
 #include "utils/rgb_color.h"
 
 namespace job::ansi {
-
 using job::ansi::utils::RGBColor;
-
-// Line display modes for DECSWL, DECDWL, DECDHL
-enum class LineDisplayMode {
-    SingleWidth,         // Normal width (DECSWL)
-    DoubleWidth,        // Double width (DECDWL)
-    DoubleWidthTop,     // Double width, top half (DECDHL)
-    DoubleWidthBottom,  // Double width, bottom half (DECDHL)
-    DoubleHeight,       // Double height (DECDHL)
-    DoubleHeightTop,    // Double height, top half (DECDHL)
-    DoubleHeightBottom  // Double height, bottom half (DECDHL)
-};
 
 class Cell {
 public:
+    using Line =  std::vector<Cell>;
+
     Cell();
     explicit Cell(char32_t ch);
-    Cell(char32_t ch, Attributes::Ptr attr);
+    Cell(char32_t ch, Attributes::Ptr attr, int width = 1) noexcept;
     Cell(const Cell &other);
+    Cell(Cell &&other) noexcept;
 
     Cell &operator=(const Cell &other);
+    Cell &operator=(Cell &&other) noexcept = default;
 
-    char32_t getChar() const;
-    void setChar(char32_t ch);
 
-    int width() const;
+    [[nodiscard]] char32_t getChar() const noexcept;
+    void setChar(char32_t ch, int width = 1);
 
-    bool isTrailing() const;
+    [[nodiscard]] int width() const noexcept;
+    void setWidth(int width) noexcept{m_charWidth = width;}
+
+    [[nodiscard]] bool isTrailing() const noexcept;
     void setTrailing(bool trailing);
 
-    std::u32string marks() const;
+    [[nodiscard]] std::u32string marks() const;
     void clearMarks();
     void appendCombiningChar(char32_t ch);
+    [[nodiscard]] std::u32string fullCharSequence() const;
+    [[nodiscard]] bool hasMarks() const noexcept;
+
 
     // tracking for painting in other places.
-    bool isRenderable() const;
-    bool isEmpty() const;
+    [[nodiscard]] bool isRenderable() const noexcept;
+    [[nodiscard]] bool isEmpty() const;
 
-    bool dirty() const;
+    [[nodiscard]] bool dirty() const noexcept;
     void setDirty(bool dirty);
-
-    std::u32string fullCharSequence() const;
 
     // Shared default blank cell with default attributes
     static const Cell &blank();
 
     // Shared default attributes (used for flyweight pattern)
-    static Attributes::Ptr defaultAttributes();
-    const Attributes &attributesOrDefault() const;
+    [[nodiscard]] static Attributes::Ptr defaultAttributes();
+    [[nodiscard]] const Attributes &attributesOrDefault() const noexcept;
+    [[nodiscard]] const Attributes *attributes() const noexcept;
     void setAttributes(const Attributes &attr);
-    const Attributes *attributes() const;
 
-    void reset();
-    void resetAttributes();
-
+    void reset() noexcept;
+    void resetAttributes() noexcept;
 
     void setForeground(const RGBColor &color);
     void setBackground(const RGBColor &color);
     void resetColors();
 
-    void setLineDisplayMode(LineDisplayMode mode);
-    LineDisplayMode getLineDisplayMode() const;
+    void setLineDisplayMode(LineDisplayMode mode) noexcept;
+    [[nodiscard]] LineDisplayMode getLineDisplayMode() const noexcept;
 
-    void setLineWidth(int width);
-    int getLineWidth() const;
+    void setLineWidth(int width) noexcept;
+    [[nodiscard]] int getLineWidth() const noexcept;
 
-    void setLineHeight(int height);
-    int getLineHeight() const;
+    void setLineHeight(int height) noexcept;
+    [[nodiscard]] int getLineHeight() const noexcept;
 
-    void setLineHeightPosition(bool isTop);
-    bool isTopHalf() const;
+    void setLineHeightPosition(bool isTop) noexcept;
+    [[nodiscard]] bool isTopHalf() const noexcept;
 
-    void setProtection(bool erase, bool write);
-    bool isProtectedForErase() const;
-    bool isProtectedForWrite() const;
+    void setProtection(bool erase, bool write) noexcept;
+    [[nodiscard]] bool isProtectedForErase() const noexcept;
+    [[nodiscard]] bool isProtectedForWrite() const noexcept;
 
 private:
-    bool                    m_dirty = true;
-    Attributes::Ptr         m_attr;
-    std::u32string          m_marks;
-    char32_t                m_char = U' ';
-    bool                    m_trailing = false;
-    int                     m_charWidth = 1;
-    LineDisplayMode         m_lineMode = LineDisplayMode::SingleWidth;
-    int                     m_lineWidth = 1;
-    int                     m_lineHeight = 1;
-    bool                    m_isTopHalf = false;
-    bool                    m_protectErase = false;
-    bool                    m_protectWrite = false;
+    Attributes::Ptr                     m_attr;
+    std::unique_ptr<std::u32string>     m_marks;
+    char32_t                            m_char = U' ';
+
+
+    uint32_t m_charWidth     : 4 = 1; // Supports widths 0-15
+    uint32_t m_lineWidth     : 4 = 1;
+    uint32_t m_lineHeight    : 4 = 1;
+    uint32_t m_lineMode      : 3 = 0; // Enum LineDisplayMode
+
+    uint32_t m_dirty         : 1 = 1;
+    uint32_t m_trailing      : 1 = 0;
+    uint32_t m_isTopHalf     : 1 = 0;
+    uint32_t m_protectErase  : 1 = 0;
+    uint32_t m_protectWrite  : 1 = 0;
 };
 
 } // namespace Core

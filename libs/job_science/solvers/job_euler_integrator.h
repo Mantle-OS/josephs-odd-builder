@@ -53,7 +53,7 @@ public:
         m_accelCalc(std::move(accelCalc))
     {
         if (!m_pool)
-            JOB_LOG_WARN("[JobEulerIntegrator] ThreadPool is null You must be doing something right with your life.");
+            JOB_LOG_DEBUG("[JobEulerIntegrator] Warning ThreadPool is null.");
     }
 
     void step(T_Scalar dt)

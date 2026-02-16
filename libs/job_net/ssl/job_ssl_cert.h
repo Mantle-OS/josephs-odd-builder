@@ -8,7 +8,7 @@ namespace job::net::ssl {
 
 class JobSslCert {
 public:
-
+    using Ptr = std::shared_ptr<JobSslCert>;
 
     enum class SchemeType : uint8_t {
         Key,
@@ -75,17 +75,45 @@ public:
     // JobSslCert(const JobSslCert &other)
     // JobSslCert(JobSslCert &&other)
 
+    // Constructors
+    JobSslCert();
+    // Load Client/Server Identity from files
+    JobSslCert(const std::filesystem::path &certPath,
+               const std::filesystem::path &keyPath,
+               EncodingType format = EncodingType::PEM);
 
+    ~JobSslCert();
 
+    // Move semantics
+    JobSslCert(JobSslCert &&other) noexcept;
+    JobSslCert &operator=(JobSslCert &&other) noexcept;
 
+    // Delete copy (SSL_CTX has internal ref counting but let's keep it unique for now)
+    JobSslCert(const JobSslCert &) = delete;
+    JobSslCert &operator=(const JobSslCert &) = delete;
 
+    // Configuration API
+    bool setProtocol(CertVersion version);
+    void setOption(CertOptions option, bool on);
+
+    // Loading Identity
+    bool loadCertificate(const std::string &path, EncodingType format = EncodingType::PEM);
+    bool loadPrivateKey(const std::string &path, EncodingType format = EncodingType::PEM);
+    bool loadCaBundle(const std::string &path); // For verifying the server
+
+    // Validation
+    bool isValid() const;
+    std::string getError() const;
+
+    // Accessor for the Socket to use
+    SSL_CTX *nativeHandle() const { return m_ctx; }
 
 private:
+    void initOpenSSL();
+    int mapVersion(CertVersion v) const;
 
-
-
-
-
+    SSL_CTX *m_ctx{nullptr};
+    std::string m_lastError;
 };
 }
 // CHECKPOINT: v1

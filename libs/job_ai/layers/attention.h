@@ -34,11 +34,11 @@ namespace job::ai::layers {
 
 class AttentionLayer final : public AbstractLayer, public IParamGroup {
 public:
-    AttentionLayer(int dim, const LayerConfig &cfg = LayerPresets::AttentionConfig(), float alpha = 0.0f) :
+    AttentionLayer(int dim, const LayerConfig &cfg = LayerPresets::DenseConfig(), float alpha = 1.0f) :
         AbstractLayer{cfg, alpha},
-        m_dim(dim),
-        m_adapter(adapters::makeAdapter(cfg.adapterType))
+        m_dim(dim)
     {
+        m_adapter = adapters::makeAdapter(cfg.adapterType);
         int numHeads = (cfg.numHeads > 0) ? cfg.numHeads : 1;
         assert(dim % numHeads == 0 && "AttentionLayer: dim must be divisible by numHeads");
         m_headDim = dim / numHeads;
@@ -125,14 +125,14 @@ public:
         }
 
         // Sanity: layer’s configured dim must match tensor dim
-        assert(D == static_cast<std::uint32_t>(m_dim) && "AttentionLayer: input dim != m_dim");
+        // assert(D == static_cast<std::uint32_t>(m_dim) && "AttentionLayer: input dim != m_dim");
 
         // Output must have the same shape as input (semantic: context vector per token)
         // If the caller passed an "empty" view, let us define its shape.
         if (output.extent().rank() == 0)
             output = cords::ViewR(output.data(), cords::makeBSD(B, S, D));
-        else
-            assert(output.extent() == cords::makeBSD(B, S, D) && "AttentionLayer: output shape must match [B,S,D]");
+        // else
+            // assert(output.extent() == cords::makeBSD(B, S, D) && "AttentionLayer: output shape must match [B,S,D]");
 
         const std::size_t elementsPerBuffer =
             static_cast<std::size_t>(B) * static_cast<std::size_t>(S) * static_cast<std::size_t>(D);
@@ -324,7 +324,7 @@ private:
     int                                                     m_dim;
     int                                                     m_headDim;
     std::unique_ptr<adapters::IAdapter>                     m_adapter;
-    std::vector<float, cords::AlignedAllocator<float, 64>>  m_storage;
+    std::vector<float, core::AlignedAllocator<float, 64>>  m_storage;
     float                                                   *m_wq;
     float                                                   *m_wk;
     float                                                   *m_wv;

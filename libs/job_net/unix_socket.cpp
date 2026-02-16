@@ -16,13 +16,13 @@
 
 namespace job::net {
 
-UnixSocket::UnixSocket(std::shared_ptr<threads::JobIoAsyncThread> loop) :
+UnixSocket::UnixSocket(threads::JobIoAsyncThread::Ptr loop) :
     ISocketIO(std::move(loop))
 {
     m_state.store(SocketState::Unconnected);
 }
 
-UnixSocket::UnixSocket(std::shared_ptr<threads::JobIoAsyncThread> loop, int existing_fd, const std::string& peerPath) :
+UnixSocket::UnixSocket(threads::JobIoAsyncThread::Ptr loop, int existing_fd, const std::string& peerPath) :
     ISocketIO(std::move(loop)),
     m_peerPath(peerPath)
 {
@@ -124,7 +124,7 @@ bool UnixSocket::listen(int backlog)
     return true;
 }
 
-std::shared_ptr<ISocketIO> UnixSocket::accept()
+ISocketIO::Ptr UnixSocket::accept()
 {
     if (m_fd < 0 || m_state.load() != SocketState::Listening)
         return nullptr;
@@ -237,6 +237,25 @@ SocketErrors::SocketErrNo UnixSocket::lastError() const noexcept
     return m_errors.lastError();
 }
 
+void UnixSocket::triggerReadIfDataAvailable() {
+    if (m_fd < 0 || m_state.load() != SocketState::Connected)
+        return;
+
+    // Peek at the socket to see if data is available without consuming it
+    char probe;
+    ssize_t n = ::recv(m_fd, &probe, 1, MSG_PEEK | MSG_DONTWAIT);
+
+    if (n > 0 && onRead) {
+        // Data is available, trigger the callback
+        onRead(nullptr, 0);
+    }
+}
+
+std::string UnixSocket::lastErrorString() const noexcept
+{
+    return m_errors.lastErrorString();
+}
+
 ISocketIO::SocketType UnixSocket::type() const noexcept
 {
     return SocketType::Unix;
@@ -306,9 +325,8 @@ void UnixSocket::dumpState() const
 void UnixSocket::updateLocalInfo() {
     sockaddr_un sa{};
     socklen_t len = sizeof(sa);
-    if (m_fd != -1 && ::getsockname(m_fd, reinterpret_cast<sockaddr*>(&sa), &len) == 0) {
+    if (m_fd != -1 && ::getsockname(m_fd, reinterpret_cast<sockaddr*>(&sa), &len) == 0)
         m_path = sa.sun_path;
-    }
 }
 
 

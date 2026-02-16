@@ -28,16 +28,16 @@ std::string FmmAdapter::name() const
 
 void FmmAdapter::adaptParallel(threads::ThreadPool &pool,
     const AttentionShape &shape,
-    const ViewR &sources,                       // Keys (The Mass Sources)
+    const ViewR &sources,                       // Keys    (The Mass Sources)
     [[maybe_unused]] const ViewR &targets,      // Queries (The Test Particles)
-    [[maybe_unused]] const ViewR &values,       // Values (The Payload/Charge)
+    [[maybe_unused]] const ViewR &values,       // Values  (The Payload/Charge)
     ViewR &output,                              // The Resulting Field (Context)
     [[maybe_unused]] const AdapterCtx &ctx
     )
 {
     const size_t B = static_cast<size_t>(shape.batch);
     job::threads::parallel_for(pool, size_t{0}, B, [&](size_t b) {
-        apply(pool, shape, sources, output, b);
+        apply(pool, shape, sources,  output, b);
     });
 }
 
@@ -58,15 +58,19 @@ void FmmAdapter::adapt(threads::ThreadPool &pool,
 
 
 
-void FmmAdapter::apply(threads::ThreadPool &pool, const cords::AttentionShape &shape, const cords::ViewR &sources, cords::ViewR &output,  std::size_t size)
+void FmmAdapter::apply(threads::ThreadPool &pool, const cords::AttentionShape &shape, const cords::ViewR &sources,
+                       /*const ViewR &targets,*/
+                       cords::ViewR &output,  std::size_t size)
 {
+
+    // const int B = static_cast<int>(shape.batch);
     const int S = static_cast<int>(shape.seq);
     const int D = static_cast<int>(shape.dim);
     std::vector<FmmTraits::Body> bodies(S);
+
     // Pointers to this batch's data slice
-    // !!! NOTE !!!!!! this assume RowMajor layout (stride = D) :(
     const float *k_ptr = sources.data() + (size * S * D);
-    // const float *q_ptr = targets.data() + (b * S * D);
+    // const float *o_ptr = targets.data() + (B * S * D);
 
     float *out_ptr = output.data() + (size * S * D);
 
@@ -77,6 +81,7 @@ void FmmAdapter::apply(threads::ThreadPool &pool, const cords::AttentionShape &s
         p.position.x = k_ptr[idx + m_cfg.dim_mapping[0]];
         p.position.y = k_ptr[idx + m_cfg.dim_mapping[1]];
 
+
         // Handle 2D embeddings gracefully (e.g. RoPE)
         if (D > 2)
             p.position.z = k_ptr[idx + m_cfg.dim_mapping[2]];
@@ -84,6 +89,8 @@ void FmmAdapter::apply(threads::ThreadPool &pool, const cords::AttentionShape &s
             p.position.z = 0.0f;
 
         p.mass = 1.0f;
+
+
         p.acceleration = {0,0,0};
         p.id = i;
     }
@@ -96,7 +103,6 @@ void FmmAdapter::apply(threads::ThreadPool &pool, const cords::AttentionShape &s
     fmmParams.maxDepth    = m_cfg.maxDepth;
     Solver engine(pool, fmmParams);
 
-    // P2M -> M2M -> M2L -> L2L -> L2P  LETS FUCKING GO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     engine.compute(bodies);
 
     // decoder: Force -> Output Tensor
@@ -105,6 +111,8 @@ void FmmAdapter::apply(threads::ThreadPool &pool, const cords::AttentionShape &s
         // Use p.id because FMM might have reordered the vector ?
         int i = p.id;
         int idx = i * D;
+
+
 
         // write context vector (force) apply gravity constant (G)
         float fx = p.acceleration.x * m_cfg.gravity;

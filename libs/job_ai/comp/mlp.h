@@ -22,6 +22,9 @@ using namespace job::simd;
 //  Helpers
 // =========================================================
 
+
+
+// Note: If HiddenBuf is allocated with your AlignedAllocator, you could technically use aligned instructions here,
 // Element-wise Multiply: A = A * B
 inline void hadamardMul(float* __restrict__ A, const float* __restrict__ B, size_t count) {
     size_t i = 0;

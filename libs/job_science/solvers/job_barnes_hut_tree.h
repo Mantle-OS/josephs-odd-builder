@@ -19,7 +19,9 @@ class BarnesHutTree {
 public:
     // When node width shrinks below this, stop subdividing and keep
     // multiple particles in a single leaf to avoid infinite recursion.
-    static constexpr T_Scalar kMinNodeWidth = T_Scalar(1e-6);
+    static constexpr T_Scalar kMinNodeWidth = T_Scalar(1e-5);  // 1e-6
+    // Emergency Brake: Absolute limit on tree depth to prevent stack overflows
+    static constexpr int kMaxDepth = 64;
 
     // Callbacks
     using GetPosFunc = std::function<const T_Vec&(const T_Particle&)>;
@@ -60,12 +62,12 @@ public:
         m_root = std::make_unique<Node>();
         m_root->min_bound = min;
         m_root->max_bound = max;
-        m_root->width = (max.x - min.x);
+        m_root->width = std::max((max.x - min.x), kMinNodeWidth);
     }
 
     void insert(const T_Particle *p)
     {
-        insertRecursive(m_root.get(), p);
+        insertRecursive(m_root.get(), p, 0);
     }
 
     void calculateCenterOfMass()
@@ -98,54 +100,108 @@ private:
         return octant;
     }
 
-    void insertRecursive(Node *node, const T_Particle *p)
+
+    void insertRecursive(Node *node, const T_Particle *p, int depth)
     {
         const T_Vec center = (node->min_bound + node->max_bound) * T_Scalar(0.5);
 
-        // Internal node: just recurse into the appropriate child.
         if (!node->isLeaf()) {
             int octant = getOctant(m_get_pos(*p), center);
-            insertRecursive(node->children[octant].get(), p);
+            insertRecursive(node->children[octant].get(), p, depth + 1);
             return;
         }
 
-        // Leaf with no particles yet: just store it.
         if (!node->hasParticles()) {
             node->particles.push_back(p);
             return;
         }
 
-        // Leaf already has particles.
-        // If the node is already extremely small OR the new particle is (numerically) at the same spot as the existing ones,
-        // we *do not* subdivide further. We just keep aggregating in this leaf. This prevents infinite recursion when multiple particles share essentially the same position.
+        // Occupied Leaf: Check if we should split
         const T_Vec pos_new = m_get_pos(*p);
         const T_Vec pos_ref = m_get_pos(*node->particles.front());
         const T_Vec diff    = pos_new - pos_ref;
 
-        const bool same_pos = (diff.lengthSq() == T_Scalar(0));
+        // Fuzzy equality check (lengthSq < epsilon)
+        const bool same_pos = (diff.lengthSq() < T_Scalar(1e-12));
         const bool too_small = (node->width <= kMinNodeWidth);
+        const bool max_depth_hit = (depth >= kMaxDepth);
 
-        if (same_pos || too_small) {
+        // If particles are stacked, or node is tiny, or tree is too deep:
+        // DO NOT SPLIT. Treat as a bucket.
+        if (same_pos || too_small || max_depth_hit) {
             node->particles.push_back(p);
             return;
         }
 
-        // Otherwise: this leaf has a particle and still has usable size. Promote it to an internal node:
+        // 4. Split and Redistribute
+        // This leaf has conflicting particles and room to grow. Promote to internal.
         std::vector<const T_Particle*> existing = std::move(node->particles);
-        node->particles.clear();
+        node->particles.clear(); // Clear local bucket (it's now an internal node)
 
-        subdivide(node); // Create 8 children
+        subdivide(node);
 
-        // Reinsert existing particles into children
+        // Re-insert old particles into children
         for (const T_Particle* ep : existing) {
             int oct = getOctant(m_get_pos(*ep), center);
-            insertRecursive(node->children[oct].get(), ep);
+            insertRecursive(node->children[oct].get(), ep, depth + 1);
         }
 
-        // Insert the new particle
+        // Insert new particle
         int oct_new = getOctant(pos_new, center);
-        insertRecursive(node->children[oct_new].get(), p);
+        insertRecursive(node->children[oct_new].get(), p, depth + 1);
     }
+
+
+
+
+    // void insertRecursive(Node *node, const T_Particle *p)
+    // {
+    //     const T_Vec center = (node->min_bound + node->max_bound) * T_Scalar(0.5);
+
+    //     // Internal node: just recurse into the appropriate child.
+    //     if (!node->isLeaf()) {
+    //         int octant = getOctant(m_get_pos(*p), center);
+    //         insertRecursive(node->children[octant].get(), p);
+    //         return;
+    //     }
+
+    //     // Leaf with no particles yet: just store it.
+    //     if (!node->hasParticles()) {
+    //         node->particles.push_back(p);
+    //         return;
+    //     }
+
+    //     // Leaf already has particles.
+    //     // If the node is already extremely small OR the new particle is (numerically) at the same spot as the existing ones,
+    //     // we *do not* subdivide further. We just keep aggregating in this leaf. This prevents infinite recursion when multiple particles share essentially the same position.
+    //     const T_Vec pos_new = m_get_pos(*p);
+    //     const T_Vec pos_ref = m_get_pos(*node->particles.front());
+    //     const T_Vec diff    = pos_new - pos_ref;
+
+    //     const bool same_pos = (diff.lengthSq() == T_Scalar(0));
+    //     const bool too_small = (node->width <= kMinNodeWidth);
+
+    //     if (same_pos || too_small) {
+    //         node->particles.push_back(p);
+    //         return;
+    //     }
+
+    //     // Otherwise: this leaf has a particle and still has usable size. Promote it to an internal node:
+    //     std::vector<const T_Particle*> existing = std::move(node->particles);
+    //     node->particles.clear();
+
+    //     subdivide(node); // Create 8 children
+
+    //     // Reinsert existing particles into children
+    //     for (const T_Particle* ep : existing) {
+    //         int oct = getOctant(m_get_pos(*ep), center);
+    //         insertRecursive(node->children[oct].get(), ep);
+    //     }
+
+    //     // Insert the new particle
+    //     int oct_new = getOctant(pos_new, center);
+    //     insertRecursive(node->children[oct_new].get(), p);
+    // }
 
     void subdivide(Node *node)
     {
@@ -173,33 +229,42 @@ private:
         }
     }
 
-    // Post  traversal -> calculate CoM
+
     void calculateComRecursive(Node *node)
     {
-        if (node->hasParticles() && node->isLeaf()) {
-            T_Vec    weighted_pos_sum{};
+        // Reset Logic
+        node->total_mass = T_Scalar(0);
+        node->center_of_mass = T_Vec{}; // 0,0,0
+
+        if (node->isLeaf()) {
+            if (!node->hasParticles()) return;
+
+            T_Vec weighted_pos_sum{};
             T_Scalar mass_sum = T_Scalar(0);
 
             for (const T_Particle* p : node->particles) {
                 const T_Scalar m = m_get_mass(*p);
-                if (m <= T_Scalar(0))
-                    continue;
-                mass_sum        += m;
+                if (m <= T_Scalar(0)) continue;
+
+                mass_sum += m;
                 weighted_pos_sum = weighted_pos_sum + (m_get_pos(*p) * m);
             }
 
             node->total_mass = mass_sum;
             if (mass_sum > T_Scalar(0))
                 node->center_of_mass = weighted_pos_sum * (T_Scalar(1) / mass_sum);
-        } else if (!node->isLeaf()) {
-            T_Vec    weighted_pos_sum{};
+
+        } else {
+            // Internal Node: Aggregate children
+            T_Vec weighted_pos_sum{};
             T_Scalar mass_sum = T_Scalar(0);
 
             for (auto &child : node->children) {
+                // Since we subdivide all 8 at once, checking child ptr is safe/needed
                 if (child) {
                     calculateComRecursive(child.get());
                     if (child->total_mass > T_Scalar(0)) {
-                        mass_sum        += child->total_mass;
+                        mass_sum += child->total_mass;
                         weighted_pos_sum = weighted_pos_sum + (child->center_of_mass * child->total_mass);
                     }
                 }
@@ -208,49 +273,130 @@ private:
             node->total_mass = mass_sum;
             if (mass_sum > T_Scalar(0))
                 node->center_of_mass = weighted_pos_sum * (T_Scalar(1) / mass_sum);
-
         }
-        // else: empty node ⇒ mass 0, COM unused.
     }
 
+
+    // // Post  traversal -> calculate CoM
+    // void calculateComRecursive(Node *node)
+    // {
+    //     if (node->hasParticles() && node->isLeaf()) {
+    //         T_Vec    weighted_pos_sum{};
+    //         T_Scalar mass_sum = T_Scalar(0);
+
+    //         for (const T_Particle* p : node->particles) {
+    //             const T_Scalar m = m_get_mass(*p);
+    //             if (m <= T_Scalar(0))
+    //                 continue;
+    //             mass_sum        += m;
+    //             weighted_pos_sum = weighted_pos_sum + (m_get_pos(*p) * m);
+    //         }
+
+    //         node->total_mass = mass_sum;
+    //         if (mass_sum > T_Scalar(0))
+    //             node->center_of_mass = weighted_pos_sum * (T_Scalar(1) / mass_sum);
+    //     } else if (!node->isLeaf()) {
+    //         T_Vec    weighted_pos_sum{};
+    //         T_Scalar mass_sum = T_Scalar(0);
+
+    //         for (auto &child : node->children) {
+    //             if (child) {
+    //                 calculateComRecursive(child.get());
+    //                 if (child->total_mass > T_Scalar(0)) {
+    //                     mass_sum        += child->total_mass;
+    //                     weighted_pos_sum = weighted_pos_sum + (child->center_of_mass * child->total_mass);
+    //                 }
+    //             }
+    //         }
+
+    //         node->total_mass = mass_sum;
+    //         if (mass_sum > T_Scalar(0))
+    //             node->center_of_mass = weighted_pos_sum * (T_Scalar(1) / mass_sum);
+
+    //     }
+    //     // else: empty node ⇒ mass 0, COM unused.
+    // }
+
     // s/d < theta logic
+    // T_Vec calculateForceRecursive(const Node *node, const T_Particle &p, T_Scalar theta, T_Scalar G, T_Scalar epsilon_sq) const
+    // {
+    //     if (!node || node->total_mass == T_Scalar(0))
+    //         return {};
+
+    //     const T_Vec r_vec = node->center_of_mass - m_get_pos(p);
+
+    //     // Softened distance
+    //     const T_Scalar d_sq = r_vec.lengthSq() + epsilon_sq;
+    //     const T_Scalar d    = std::sqrt(d_sq);
+
+    //     const bool is_leaf = node->isLeaf();
+
+    //     // Leaf with exactly this single particle: skip self-interaction.
+    //     if (is_leaf && node->particles.size() == 1 && node->particles[0] == &p)
+    //         return {};
+
+    //     // Internal node: apply Barnes–Hut opening criterion.
+    //     if (!is_leaf) {
+    //         const T_Scalar s = node->width;
+    //         if ((s / d) >= theta) {
+    //             // Too close: recursively resolve children instead of treating as lump.
+    //             T_Vec total_force{};
+    //             for (const auto &child : node->children)
+    //                 total_force = total_force +
+    //                               calculateForceRecursive(child.get(), p, theta, G, epsilon_sq);
+    //             return total_force;
+    //         }
+    //         // else: far enough, approximate as single monopole.
+    //     }
+    //     // Leaf node with 1+ particles (or internal node passing opening test)
+    //     // Approximate them as a single body at center_of_mass with total_mass.
+    //     // WE ARE CALCULATING A FORCE !!!!!!!!!!
+    //     const T_Scalar F_mag = G * m_get_mass(p) * node->total_mass;
+    //     return r_vec * (F_mag / (d * d_sq)); // F_mag / d^3
+    // }
+
+
+
     T_Vec calculateForceRecursive(const Node *node, const T_Particle &p, T_Scalar theta, T_Scalar G, T_Scalar epsilon_sq) const
     {
-        if (!node || node->total_mass == T_Scalar(0))
+        // 1. Empty or Massless node -> No Gravity
+        if (!node || node->total_mass <= T_Scalar(0))
             return {};
 
         const T_Vec r_vec = node->center_of_mass - m_get_pos(p);
-
-        // Softened distance
         const T_Scalar d_sq = r_vec.lengthSq() + epsilon_sq;
         const T_Scalar d    = std::sqrt(d_sq);
 
-        const bool is_leaf = node->isLeaf();
+        // 2. Leaf Node Processing
+        if (node->isLeaf()) {
+            // If this leaf contains ONLY the query particle, skip self-interaction.
+            // Note: If leaf is a bucket with [p, other], we ideally want force from 'other'.
+            // But separating them is expensive. Standard BH usually ignores self-node if it's just 1 particle.
+            if (node->particles.size() == 1 && node->particles[0] == &p)
+                return {};
 
-        // Leaf with exactly this single particle: skip self-interaction.
-        if (is_leaf && node->particles.size() == 1 && node->particles[0] == &p)
-            return {};
-
-        // Internal node: apply Barnes–Hut opening criterion.
-        if (!is_leaf) {
+            // If bucket has multiple particles, treating it as a COM monopole is a valid approximation
+            // for "local group gravity". Or we could iterate the bucket.
+            // For O(N log N) speed, Monopole is preferred.
+        }
+        // 3. Internal Node Processing (Opening Criteria)
+        else {
             const T_Scalar s = node->width;
             if ((s / d) >= theta) {
-                // Too close: recursively resolve children instead of treating as lump.
+                // Too close! Open the box.
                 T_Vec total_force{};
                 for (const auto &child : node->children)
-                    total_force = total_force +
-                                  calculateForceRecursive(child.get(), p, theta, G, epsilon_sq);
+                    total_force = total_force + calculateForceRecursive(child.get(), p, theta, G, epsilon_sq);
                 return total_force;
             }
-            // else: far enough, approximate as single monopole.
         }
-        // Leaf node with 1+ particles (or internal node passing opening test)
-        // Approximate them as a single body at center_of_mass with total_mass.
-        // WE ARE CALCULATING A FORCE !!!!!!!!!!
+
+        // 4. Calculate Force (Monopole Approximation)
         const T_Scalar F_mag = G * m_get_mass(p) * node->total_mass;
-        return r_vec * (F_mag / (d * d_sq)); // F_mag / d^3
+        return r_vec * (F_mag / (d * d_sq));
     }
 };
+
 
 } // namespace job::threads
 

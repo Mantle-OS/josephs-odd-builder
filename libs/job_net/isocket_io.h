@@ -17,6 +17,7 @@
 namespace job::net {
 class ISocketIO  {
 public:
+    using Ptr = std::shared_ptr<ISocketIO>;
     enum class SocketType : uint8_t {
         Unknown = 0,
         Tcp,
@@ -45,16 +46,14 @@ public:
         NonBlocking  = 1 << 5
     };
 
-    explicit ISocketIO(std::shared_ptr<threads::JobIoAsyncThread> loop) :
-        m_loop(std::move(loop))
-    {}
+    explicit ISocketIO(threads::JobIoAsyncThread::Ptr loop);
     virtual ~ISocketIO() = default;
 
     virtual bool connectToHost(const JobUrl &url) = 0;
     virtual bool bind(const JobIpAddr &addr) = 0;
     virtual bool bind(const std::string &address, uint16_t port) = 0;
     virtual bool listen(int backlog = 5) = 0;
-    virtual std::shared_ptr<ISocketIO> accept() = 0;
+    virtual ISocketIO::Ptr accept() = 0;
     virtual void disconnect() = 0;
 
     virtual ssize_t read(void *buffer, size_t size) = 0;
@@ -73,15 +72,9 @@ public:
 
     virtual void dumpState() const = 0;
 
-    int fd() const noexcept
-    {
-        return m_fd;
-    }
+    int fd() const noexcept;
 
-    void setLoop(const std::shared_ptr<threads::JobIoAsyncThread> &loop)
-    {
-        m_loop = loop;
-    }
+    void setLoop(const threads::JobIoAsyncThread::Ptr &loop);
 
     std::function<void()> onConnect;
     std::function<void(const char*, size_t)> onRead;
@@ -94,19 +87,7 @@ public:
 
 protected:
     virtual void onEvents(uint32_t events) = 0;
-    virtual void registerEvents(uint32_t events)
-    {
-        if (m_fd < 0) {
-            JOB_LOG_ERROR("[ISocketIO] registerEvents called on invalid fd");
-            return;
-        }
-        if (auto loop = m_loop.lock()) {
-            if (!loop->registerFD(m_fd, events, [this](uint32_t e) { onEvents(e); }))
-                JOB_LOG_ERROR("[ISocketIO] Failed to register FD {}", m_fd);
-        } else {
-            JOB_LOG_ERROR("[ISocketIO] Failed to register FD {}: Event loop is null", m_fd);
-        }
-    }
+    virtual void registerEvents(uint32_t events);
     std::weak_ptr<threads::JobIoAsyncThread> m_loop;
     int m_fd{-1};
 };

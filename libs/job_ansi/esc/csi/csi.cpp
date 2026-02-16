@@ -1,5 +1,4 @@
 #include "csi.h"
-#include <iostream>
 
 namespace job::ansi::csi {
 
@@ -20,7 +19,7 @@ DispatchCSI::DispatchCSI(Screen *screen) :
 {
 }
 
-void DispatchCSI::dispatch(CSI_CODE code, const std::vector<int> &params)
+void DispatchCSI::dispatch(CSI_CODE code, std::span<const int> params)
 {
     switch (code) {
     // Cursor
@@ -52,9 +51,7 @@ void DispatchCSI::dispatch(CSI_CODE code, const std::vector<int> &params)
 
     // CharAttr
     case CSI_CODE::SGR: {
-        Attributes modified = *m_screen->currentAttributes();  // copy current state
-        m_SGR.dispatch(&modified, params);                   // mutate copy
-        m_screen->setCurrentAttributes(Attributes::intern(modified)); // install result
+        m_SGR.dispatch(params);
         break;
     }
     case CSI_CODE::SEE:
@@ -90,21 +87,19 @@ void DispatchCSI::dispatch(CSI_CODE code, const std::vector<int> &params)
     // ModeChange (handled by DispatchDECSET directly)
     case CSI_CODE::SM: {
         for (int p : params) {
-            if (m_privateMode) {
+            if (m_privateMode)
                 m_DECSET.dispatchPrivate(static_cast<DECSET_PRIVATE_CODE>(p), true);
-            } else {
+            else
                 m_DECSET.dispatchPublic(static_cast<DECSET_PUBLIC_CODE>(p), true);
-            }
         }
         break;
     }
     case CSI_CODE::RM: {
         for (int p : params) {
-            if (m_privateMode) {
+            if (m_privateMode)
                 m_DECSET.dispatchPrivate(static_cast<DECSET_PRIVATE_CODE>(p), false);
-            } else {
+            else
                 m_DECSET.dispatchPublic(static_cast<DECSET_PUBLIC_CODE>(p), false);
-            }
         }
         break;
     }
@@ -149,7 +144,7 @@ void DispatchCSI::dispatch(CSI_CODE code, const std::vector<int> &params)
         break;
 
     default:
-        std::cerr << "Unhandled CSI code: " << static_cast<int>(code) << '\n';
+        JOB_LOG_DEBUG("Unhandled CSI code: {}", static_cast<int>(code));
         break;
     }
 
@@ -180,9 +175,11 @@ void DispatchCSI::handlePrintable(char32_t ch)
     }
 }
 
-int DispatchCSI::getParam(const std::vector<int> &params, size_t index, int def)
+int DispatchCSI::getParam(std::span<const int> params, size_t index, int def)
 {
-    return index < params.size() ? params[index] : def;
+    if (index < params.size())
+        return params[index];
+    return def;
 }
 
 bool DispatchCSI::privateMode() const
@@ -195,27 +192,27 @@ void DispatchCSI::setPrivateMode(bool privateMode)
     m_privateMode = privateMode;
 }
 
-void job::ansi::csi::DispatchCSI::dispatchTilde(const std::vector<int> &params)
+void job::ansi::csi::DispatchCSI::dispatchTilde(std::span<const int> params)
 {
     if (params.empty()) {
-        std::cerr << "[CSI ~] No parameter provided\n";
+        JOB_LOG_DEBUG("[CSI ~] No parameter provided");
         return;
     }
-
-    switch (params[0]) {
-    case 200:
+    auto mode = static_cast<TILDE_MODE>(params[0]);
+    switch (mode) {
+    case TILDE_MODE::BRACKETED_PASTE_START_CODE:
         if (m_screen->get_bracketedPasteEnabled()) {
             // this is how we alert the gui frontend that bracketedPasteEnabled Changed..
             m_screen->set_bracketedPasteEnabled(true);
         }
         break;
-    case 201:
+    case TILDE_MODE::BRACKETED_PASTE_END_CODE:
         if (m_screen->get_bracketedPasteEnabled()) {
             m_screen->set_bracketedPasteEnabled(false);
         }
         break;
     default:
-        std::cerr << "[CSI ~] Unknown tilde param: " << params[0] << '\n';
+        JOB_LOG_DEBUG("[CSI ~] Unknown tilde param: {}",  static_cast<int>(mode));
         break;
     }
 }

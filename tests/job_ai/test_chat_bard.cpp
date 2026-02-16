@@ -23,18 +23,17 @@ using namespace job::threads;
 
 const std::string kChatCorpus =
     "<User>Who are you?\n"
+    "<Bard>I am the Physics Bard.\n"
+    "<User>What are you made of?\n"
+    "<Bard>I am made of code and math.\n"
+    "<User>Who built you?\n"
+    "<Bard>I was built by Joseph.\n"
+    "<User>Do you like C++?\n"
+    "<Bard>I love C++ templates.\n"
+    "<User>What is 1+1?\n"
+    "<Bard>It is 2.\n"
+    "<User>Who are you?\n"
     "<Bard>I am the Physics Bard.\n";
-// "<User>What are you made of?\n"
-// "<Bard>I am made of code and math.\n"
-// "<User>Who built you?\n"
-// "<Bard>I was built by Joseph.\n"
-// "<User>Do you like C++?\n"
-// "<Bard>I love C++ templates.\n"
-// "<User>What is 1+1?\n"
-// "<Bard>It is 2.\n"
-// // Repeat a bit to reinforce the pattern if the dataset is tiny
-// "<User>Who are you?\n"
-// "<Bard>I am the Physics Bard.\n";
 
 Genome buildChatBardGenome(uint32_t inputSize, uint32_t outputSize)
 {

@@ -24,7 +24,7 @@ private:
     uint8_t a = 255; // Alpha (optional, default fully opaque)
 
 public:
-    constexpr RGBColor(uint8_t red = 0, uint8_t green = 0, uint8_t blue = 0, uint8_t alpha = 255):
+    constexpr RGBColor(uint8_t red = 0, uint8_t green = 255, uint8_t blue = 0, uint8_t alpha = 255):
         r(red),
         g(green),
         b(blue),

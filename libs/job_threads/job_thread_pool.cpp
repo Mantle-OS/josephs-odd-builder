@@ -38,9 +38,6 @@ ThreadPool::ThreadPool( ISchedPolicy::Ptr scheduler, size_t threadCount, const J
         }
     }
     m_watcher->start();
-
-
-
 }
 
 ThreadPool::~ThreadPool()

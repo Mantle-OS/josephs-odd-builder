@@ -1,5 +1,4 @@
-#include "frames/frame_source_io.h"
-#include "io_base.h"
+#include "frame_source_io.h"
 
 #include <algorithm>
 #include <cstring>
@@ -10,7 +9,7 @@ namespace job::science::frames {
 
 using namespace job::core;
 
-FrameSourceIo::FrameSourceIo(DevicePtr dev, bool autoOpen) noexcept
+FrameSourceIO::FrameSourceIO(IODevice::Ptr dev, bool autoOpen) noexcept
     : m_device(std::move(dev))
     , m_autoOpen(autoOpen)
 {
@@ -18,15 +17,15 @@ FrameSourceIo::FrameSourceIo(DevicePtr dev, bool autoOpen) noexcept
         if (m_device->openDevice()) {
             m_open.store(true, std::memory_order_release);
         } else {
-            JOB_LOG_WARN("[FrameSourceIo] autoOpen is true but openDevice() failed");
+            JOB_LOG_WARN("[FrameSourceIO] autoOpen is true but openDevice() failed");
         }
     }
 }
 
-bool FrameSourceIo::open()
+bool FrameSourceIO::open()
 {
     if (!m_device) {
-        JOB_LOG_ERROR("[FrameSourceIo] open() called with null device");
+        JOB_LOG_ERROR("[FrameSourceIO] open() called with null device");
         return false;
     }
 
@@ -35,7 +34,7 @@ bool FrameSourceIo::open()
         return true;
 
     if (!m_device->openDevice()) {
-        JOB_LOG_ERROR("[FrameSourceIo] openDevice() failed");
+        JOB_LOG_ERROR("[FrameSourceIO] openDevice() failed");
         m_open.store(false, std::memory_order_release);
         return false;
     }
@@ -44,7 +43,7 @@ bool FrameSourceIo::open()
     return true;
 }
 
-void FrameSourceIo::close()
+void FrameSourceIO::close()
 {
     if (!m_device)
         return;
@@ -57,12 +56,12 @@ void FrameSourceIo::close()
     m_payloadRemaining = 0;
 }
 
-bool FrameSourceIo::isReady() const noexcept
+bool FrameSourceIO::isReady() const noexcept
 {
     return m_device && m_open.load(std::memory_order_acquire) && m_device->isOpen();
 }
 
-std::optional<FrameHeader> FrameSourceIo::readHeader()
+std::optional<FrameHeader> FrameSourceIO::readHeader()
 {
     // Lazy-open if requested.
     if (!isReady()) {
@@ -83,7 +82,7 @@ std::optional<FrameHeader> FrameSourceIo::readHeader()
     std::memcpy(&hdr, raw, sizeof(FrameHeader));
 
     if (!hdr.validateMagicAndSize()) {
-        JOB_LOG_ERROR("[FrameSourceIo] Invalid frame header (magic/size mismatch). "
+        JOB_LOG_ERROR("[FrameSourceIO] Invalid frame header (magic/size mismatch). "
                       "magic=0x{:08x}, version=0x{:04x}, headerSize={}, byteLength={}",
                       hdr.magic, hdr.version, hdr.headerSize, hdr.byteLength);
         return std::nullopt;
@@ -96,7 +95,7 @@ std::optional<FrameHeader> FrameSourceIo::readHeader()
     return hdr;
 }
 
-std::size_t FrameSourceIo::readPayload(std::uint8_t *dst, std::size_t maxSize)
+std::size_t FrameSourceIO::readPayload(std::uint8_t *dst, std::size_t maxSize)
 {
     if (!dst || maxSize == 0)
         return 0;
@@ -110,7 +109,7 @@ std::size_t FrameSourceIo::readPayload(std::uint8_t *dst, std::size_t maxSize)
 
     if (!readExact(dst, toRead)) {
         // Treat any failure here as “frame truncated”.
-        JOB_LOG_ERROR("[FrameSourceIo] Failed while reading payload (truncated frame?)");
+        JOB_LOG_ERROR("[FrameSourceIO] Failed while reading payload (truncated frame?)");
         m_lastHeader.reset();
         m_payloadRemaining = 0;
         return 0;
@@ -125,7 +124,7 @@ std::size_t FrameSourceIo::readPayload(std::uint8_t *dst, std::size_t maxSize)
     return toRead;
 }
 
-void FrameSourceIo::reset()
+void FrameSourceIO::reset()
 {
     // Logical reset of frame state. We *don’t* rewind the underlying device
     // because IODevice doesn’t expose seek/rewind generically.
@@ -133,7 +132,12 @@ void FrameSourceIo::reset()
     m_payloadRemaining = 0;
 }
 
-bool FrameSourceIo::readExact(std::uint8_t *dst, std::size_t size)
+IODevice::Ptr FrameSourceIO::device() const noexcept
+{
+    return m_device;
+}
+
+bool FrameSourceIO::readExact(std::uint8_t *dst, std::size_t size)
 {
     std::size_t total = 0;
 
@@ -147,7 +151,7 @@ bool FrameSourceIo::readExact(std::uint8_t *dst, std::size_t size)
         const ssize_t n = m_device->read(reinterpret_cast<char *>(dst + total), want);
 
         if (n < 0) {
-            JOB_LOG_ERROR("[FrameSourceIo] read() returned error");
+            JOB_LOG_ERROR("[FrameSourceIO] read() returned error");
             return false;
         }
 

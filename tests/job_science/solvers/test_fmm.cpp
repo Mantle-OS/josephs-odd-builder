@@ -12,12 +12,6 @@
 using namespace job::threads;
 using namespace job::science::data;
 
-// Old lets let this burn up in a star .....
-// struct TestBody {
-//     Vec3f pos;
-//     float mass;
-//     Vec3f force{0,0,0};
-// };
 
 struct TestTraits {
     static Vec3f position(const Particle &particle)
@@ -98,10 +92,8 @@ TEST_CASE("FMM Kernel Integrity (P=3 Octupole)", "[fmm][kernel][math]")
     Vec3f exactForce = exactForceOnTarget(sources, target);
 
     Coeffs M;
-    // you go to the center damit, I hate that I am doing this here
     for(const auto &s : sources)
         Kernel::P2M(M, s.position, s.mass, center);
-
 
     // monopole: 2.0
     CHECK(M.monopole == 2.0f);
@@ -153,9 +145,7 @@ TEST_CASE("FMM Kernel Integrity (P2M -> M2L)", "[fmm][kernel]")
     Vec3f r = targetPos - center;
 
     Kernel::M2L(L, M, r);
-    float pointMassForce = -0.02f;
-
-    // Quadrupole The "dumbell" is along X(hehe). We are at Y(hehe).
+    float pointMassForce = -0.02f; 
 
     float fmmForce = -L.dipole.y;
 

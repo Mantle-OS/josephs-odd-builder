@@ -4,25 +4,26 @@
 #include <cstdint>
 #include <memory>
 
+// job::core
 #include <io_base.h>
 
 #include "iframe_sink.h"
 #include "frame_header.h"
 
 namespace job::science::frames {
+using job::core::IODevice;
 
 class FrameSinkIO final : public IFrameSink {
 public:
-    using Ptr         = std::shared_ptr<FrameSinkIO>;
-    using IODevicePtr = std::shared_ptr<job::core::IODevice>;
+    using Ptr = std::shared_ptr<FrameSinkIO>;
 
-    explicit FrameSinkIO(IODevicePtr device) noexcept;
+    explicit FrameSinkIO(IODevice::Ptr device) noexcept;
     ~FrameSinkIO() override = default;
 
-    FrameSinkIO(const FrameSinkIO &)            = delete;
+    FrameSinkIO(const FrameSinkIO &) = delete;
     FrameSinkIO &operator=(const FrameSinkIO &) = delete;
 
-    FrameSinkIO(FrameSinkIO &&) noexcept        = default;
+    FrameSinkIO(FrameSinkIO &&) noexcept = default;
     FrameSinkIO &operator=(FrameSinkIO &&) noexcept = default;
 
     // IFrameSink contract
@@ -31,17 +32,12 @@ public:
     [[nodiscard]] bool isReady() const noexcept override;
 
     void flush() override;
-
-    // Extra helpers (not part of IFrameSink interface)
     void close();
 
-    [[nodiscard]] IODevicePtr device() const noexcept
-    {
-        return m_device;
-    }
+    [[nodiscard]] IODevice::Ptr device() const noexcept;
 
 private:
-    IODevicePtr m_device;
+    IODevice::Ptr m_device;
 };
 
 } // namespace job::science::frames

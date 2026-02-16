@@ -26,8 +26,8 @@ public:
                         std::span<uint8_t> output) = 0;
 
     // Evolution knob.
-    virtual void mutate(uint64_t seed) = 0;
-
+    virtual void mutate(uint64_t /*seed*/) {}
+    virtual void debug() const {}
     virtual bool save([[maybe_unused]]std::ostream &os) const { return true; }
     virtual bool load([[maybe_unused]]std::istream &is) { return true; }
 };

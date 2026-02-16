@@ -2,7 +2,7 @@
 #include <job_logger.h>
 namespace job::net {
 
-TcpClient::TcpClient(std::shared_ptr<threads::JobIoAsyncThread> loop, uint16_t buffer_size) :
+TcpClient::TcpClient(threads::JobIoAsyncThread::Ptr loop, uint16_t buffer_size) :
     m_loop(std::move(loop)),
     m_readBuffer(buffer_size)
 {
@@ -84,7 +84,7 @@ std::string TcpClient::lastErrorString() const noexcept
     return m_socket->lastErrorString();
 }
 
-void TcpClient::setSocket(TcpSocketPtr socket)
+void TcpClient::setSocket(TcpSocket::Ptr socket)
 {
     if (m_socket && m_socket->isOpen())
         m_socket->disconnect();

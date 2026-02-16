@@ -15,7 +15,7 @@ enum class AccessPattern : uint8_t {
     Linear  = 0,  // contiguous blocks per task
     Strided = 1   // interleaved blocks per task
 };
-
+// “Callable must be safe to invoke concurrently from multiple threads.”
 template <typename Func>
 void parallel_for(ThreadPool &pool,
                   std::size_t first,

@@ -10,11 +10,12 @@ ANSIParser::ANSIParser(Screen *screen):
     m_dispatchESC(screen),
     m_dispatchOSC(screen)
 {
+    m_buffer.reserve(256);
 }
 
 void ANSIParser::parseInput(std::string_view data)
 {
-    // std::cerr << "[ANSIParser] parseInput len=" << data.size() << "\n";
+    // JOB_LOG_DEBUG("[ANSIParser] parseInput len=" << data.size() << "\n";
 
     for (char byte : data) {
         m_utf8.appendByte(byte);
@@ -24,9 +25,9 @@ void ANSIParser::parseInput(std::string_view data)
             handleCodepoint(ch);
         }
     }
-    // std::cerr << "[Parser] End input. Cursor at ("
-    //           << m_screen->cursor()->row() << ", "
-    //           << m_screen->cursor()->col() << ")\n";
+    // JOB_LOG_DEBUG("[Parser] End input. Cursor at ( {} , {} )"
+    //           , m_screen->cursor()->row()
+    //           , m_screen->cursor()->col() );
 }
 
 void ANSIParser::parseInput(const std::string &data)
@@ -50,9 +51,16 @@ void ANSIParser::parseInput(const std::vector<uint8_t> &data)
 }
 void ANSIParser::handleCodepoint(char32_t ch)
 {
-    // std::cerr << "[Parser] State=" << static_cast<int>(m_state)
-    // << " ch=" << std::hex << static_cast<int>(ch)
-    // << " buffer='" << m_buffer << "'\n";
+    // auto chex = std::hex << static_cast<int>(ch);
+    // JOB_LOG_DEBUG("[Parser] State={} ch= {} buffer={}"
+    // , static_cast<int>(m_state)
+    // , chex
+    // , m_buffer);
+
+    if (m_state != ParserState::Ground && m_buffer.size() > kMaxSequenceLength) {
+        // std::cerr << "[Parser] Sequence too long, resetting.\n";
+        resetParserState();
+    }
 
     switch (m_state) {
     case ParserState::Ground:
@@ -65,7 +73,7 @@ void ANSIParser::handleCodepoint(char32_t ch)
         case U'\r': {
             if (m_screen && m_screen->cursor()) {
                 m_screen->setCursor(m_screen->cursor()->row(), 0);
-                // std::cerr << "[Parser] Carriage return (\\r) at row=" << m_screen->cursor()->row() << std::endl;
+                // JOB_LOG_DEBUG("[Parser] Carriage return (\\r) at row={}", m_screen->cursor()->row());
             }
             break;
         }
@@ -74,10 +82,10 @@ void ANSIParser::handleCodepoint(char32_t ch)
                 int row = m_screen->cursor()->row();
                 if (row == m_screen->scrollBottom() - 1) {
                     m_screen->scrollUp();
-                    // std::cerr << "[Parser] Scroll up at bottom row=" << row << std::endl;
+                    // JOB_LOG_DEBUG("[Parser] Scroll up at bottom row={}", row);;
                 } else {
                     m_screen->moveCursor(1, 0);
-                    // std::cerr << "[Parser] Newline (\\n) at row=" << row << std::endl;
+                    // JOB_LOG_DEBUG("[Parser] Newline (\\n) at row={}", row );
                 }
             }
             break;
@@ -88,14 +96,14 @@ void ANSIParser::handleCodepoint(char32_t ch)
         }
         case U'\t': {
             if (Cursor *cursor = m_screen->cursor()) {
-                int col = cursor->col();
+                int col = cursor->column();
                 int maxCol = m_screen->columnCount();
                 do {
                     ++col;
                 } while (col < maxCol - 1 && !m_screen->isTabStop(col));
                 if (col >= maxCol) col = maxCol - 1;
                 m_screen->setCursor(cursor->row(), col);
-                std::cerr << "[Parser] Tab (\\t) to col=" << col << "\n";
+                JOB_LOG_DEBUG("[Parser] Tab (\\t) to col={}", col);
             }
             break;
         }
@@ -111,7 +119,7 @@ void ANSIParser::handleCodepoint(char32_t ch)
         // Clamp cursor just in case
         if (m_screen && m_screen->cursor()) {
             int row = std::min(m_screen->cursor()->row(), m_screen->rowCount() - 1);
-            int col = std::min(m_screen->cursor()->col(), m_screen->columnCount() - 1);
+            int col = std::min(m_screen->cursor()->column(), m_screen->columnCount() - 1);
             m_screen->setCursor(row, col);
         }
         break;
@@ -131,7 +139,7 @@ void ANSIParser::handleCodepoint(char32_t ch)
         case '+': enterCharset();
             break;
         default:
-            processESC(m_buffer.substr(1));  // skip ESC
+            processESC(std::string_view(m_buffer).substr(1));
             resetParserState();
             break;
         }
@@ -146,15 +154,18 @@ void ANSIParser::handleCodepoint(char32_t ch)
         break;
 
     case ParserState::OSC:
-        appendToBuffer(ch);
+        appendToBuffer(ch); // [ESC] [ ] [T] [i] [t] [l] [e] [BEL]
         if (ch == '\x07') {
-            processOSC(m_buffer.substr(2));  // skip ESC]
+            if (m_buffer.size() >= 3) {
+                std::string_view content = std::string_view(m_buffer).substr(2, m_buffer.size() - 3);
+                processOSC(content);
+            }
             resetParserState();
-        } else if (ch == '\\' && m_buffer.size() >= 2 &&
-                   m_buffer[m_buffer.size() - 1] == '\\' &&
-                   m_buffer[m_buffer.size() - 2] == '\x1B') {
-            m_buffer.resize(m_buffer.size() - 2);
-            processOSC(m_buffer.substr(2));
+        } else if (ch == '\\' && m_buffer.size() >= 2 && m_buffer[m_buffer.size() - 1] == '\\' && m_buffer[m_buffer.size() - 2] == '\x1B') {
+            if (m_buffer.size() >= 4) {
+                std::string_view content = std::string_view(m_buffer).substr(2, m_buffer.size() - 4);
+                processOSC(content);
+            }
             resetParserState();
         }
         break;
@@ -162,7 +173,7 @@ void ANSIParser::handleCodepoint(char32_t ch)
     case ParserState::Charset:
         appendToBuffer(ch);
         if (m_buffer.size() == 3) {
-            processCharset(m_buffer.substr(1));
+            processCharset(std::string_view(m_buffer).substr(1));
             resetParserState();
         }
         break;
@@ -174,7 +185,11 @@ void ANSIParser::handleCodepoint(char32_t ch)
 
 void ANSIParser::appendToBuffer(char32_t ch)
 {
-    ansi::utils::Utf8Decoder::encodeTo(ch, m_buffer);
+    if (ch <= 0x7F)
+        m_buffer.push_back(static_cast<char>(ch));
+    else
+        ansi::utils::Utf8Decoder::encodeTo(ch, m_buffer);
+
 }
 
 void ANSIParser::resetParserState()
@@ -221,10 +236,16 @@ void ANSIParser::processCSI(std::string_view buf)
 
     char code = buf.back();
     std::string_view paramStr = buf.substr(0, buf.size() - 1);
-    CSI_CODE csiCode = ansi::utils::decodeCsiCode(code);
+
+    // FIXME heap and could be else where
     std::vector<int> params = parseParams(paramStr);
 
+    using job::ansi::utils::enums::CSI_CODE;
+    CSI_CODE csiCode = ansi::utils::decodeCsiCode(code);
+
     m_dispatchCSI.setPrivateMode(privateMode);
+
+    // Implicit conversion: vector<int> -> span<const int>
     m_dispatchCSI.dispatch(csiCode, params);
 }
 
@@ -244,7 +265,8 @@ void ANSIParser::processOSC(std::string_view buf)
 
 void ANSIParser::processESC(std::string_view buf)
 {
-    if (buf.empty()) return;
+    if (buf.empty())
+        return;
 
     char code = buf[0];
     CharsetDesignator designator = buf.size() > 1 ?
@@ -269,7 +291,7 @@ void ANSIParser::processCharset(std::string_view buf)
 
 std::vector<int> ANSIParser::parseParams(std::string_view str) const
 {
-    std::vector<int> out;
+    std::vector<int> ret;
     const char *start = str.data();
     const char *end = start + str.size();
 
@@ -279,19 +301,18 @@ std::vector<int> ANSIParser::parseParams(std::string_view str) const
 
         if (next != start) {
             std::from_chars_result result = std::from_chars(start, next, value);
-            if (result.ec == std::errc()) {
-                out.push_back(value);
-            } else {
-                out.push_back(0);
-            }
+            if (result.ec == std::errc())
+                ret.push_back(value);
+            else
+                ret.push_back(0);
         } else {
-            out.push_back(0);
+            ret.push_back(0);
         }
 
         start = (next == end) ? end : next + 1;
     }
-    return out;
+    return ret;
 }
 
 
-} // namespace ANSI
+}

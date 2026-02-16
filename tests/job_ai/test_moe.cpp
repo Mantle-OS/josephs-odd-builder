@@ -69,10 +69,6 @@ public:
     // Reset any internal state (KV cache, running stats, RNG state, etc.). when I get here ....
     virtual void resetState() noexcept override {};
 
-
-
-
-
 private:
     float           m_scalar;
     std::string     m_layerName{"ScalarMock"};
@@ -226,7 +222,7 @@ TEST_CASE("SparseMoE: Throughput Benchmark (LLaMA-Small Scale)", "[ai][moe][benc
     for(int i = 0; i < E; ++i)
         moe.addExpert(i, std::make_shared<DenseLayer>(D, D ,cfg));
 
-    using Alloc = cords::AlignedAllocator<float, 64>;
+    using Alloc = job::core::AlignedAllocator<float, 64>;
     std::vector<float, Alloc> input(B * D, 0.1f);
     std::vector<float, Alloc> output(B * D);
 

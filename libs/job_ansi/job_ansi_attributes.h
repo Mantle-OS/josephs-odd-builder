@@ -9,6 +9,11 @@
 #include "utils/rgb_color.h"
 #include "utils/job_ansi_enums.h"
 
+
+// Backlog Item: Add a static assert to ensure the sizes match: static_assert(sizeof(Attributes) == sizeof(uint16_t) + ...) or similar, just to catch if a compiler update adds padding.
+// Backlog Item: Implement a "Garbage Collection" sweep (e.g., scan and remove expired entries every N inserts) or a custom deleter strategy
+// Backlog Item: Consider std::shared_mutex (Read/Write lock) or sharding the cache if performance profiling shows contention.
+
 namespace job::ansi {
 
 using namespace job::ansi::utils::enums;
@@ -16,13 +21,62 @@ using job::ansi::utils::RGBColor;
 
 class Attributes {
 public:
-
     using Ptr = std::shared_ptr<Attributes>;
 
+    Attributes();
+    Attributes(const Attributes&) = default;
+    Attributes(Attributes&&) noexcept = default;
+
+    [[nodiscard]] bool operator==(const Attributes &other) const noexcept;
+    [[nodiscard]] bool operator!=(const Attributes &other) const noexcept;
+
+    Attributes& operator=(const Attributes&) = default;
+    Attributes& operator=(Attributes&&) noexcept = default;
+
+    ~Attributes() = default;
+
+    [[nodiscard]] const RGBColor *getForeground() const noexcept;
+    void setForeground(const RGBColor &color) noexcept;
+    void resetForeground() noexcept;
+
+    [[nodiscard]] const RGBColor *getBackground() const noexcept;
+    void setBackground(const RGBColor &color) noexcept;    
+    void resetBackground() noexcept;
+
+    void resetColors() noexcept;
+    void setBlink(uint8_t mode) noexcept;
+
+    UnderlineStyle getUnderline() const noexcept;
+    void setUnderline(UnderlineStyle style) noexcept;
+    [[nodiscard]] static std::string_view underlineToString(UnderlineStyle style) noexcept;
+
+    [[nodiscard]] std::string toString() const;
+    void reset();
+
+    struct Hash {
+        std::size_t operator()(const Attributes &attr) const {
+            // Hash the flags (includes bools, underline style, and hasColor bits)
+            std::size_t h = std::hash<uint16_t>{}(attr.flags);
+
+            // Only hash colors if the validity bit is set
+            if (attr.hasFg) {
+                h ^= std::hash<uint32_t>{}(attr.m_fg.toInt()) + 0x9e3779b9 + (h << 6) + (h >> 2);
+            }
+            if (attr.hasBg) {
+                h ^= std::hash<uint32_t>{}(attr.m_bg.toInt()) + 0x9e3779b9 + (h << 6) + (h >> 2);
+            }
+            return h;
+        }
+    };
+
+    static Attributes::Ptr intern(const Attributes &value);
+
+public: // Direct access allowed for bitfields (standard C++ practice for POD-like types)
     union {
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wpedantic"
         struct {
+            // Style Flags (9 bits)
             uint16_t bold          : 1;
             uint16_t faint         : 1;
             uint16_t italic        : 1;
@@ -32,140 +86,29 @@ public:
             uint16_t framed        : 1;
             uint16_t encircled     : 1;
             uint16_t overline      : 1;
-            uint16_t reserved      : 5;
+
+            // Blink (2 bits)
             uint16_t blink         : 2;  // 0=none, 1=slow, 2=rapid
-        } ;
+
+            // Packed Underline Style (3 bits, fits 0-7)
+            uint16_t underlineVal  : 3;
+
+            // Packed "Has Color" flags (2 bits) -> Replaces std::optional overhead
+            uint16_t hasFg         : 1;
+            uint16_t hasBg         : 1;
+        };
+        // Total: 16 bits = 2 bytes
         uint16_t flags = 0;
+#pragma GCC diagnostic pop
     };
 
-    UnderlineStyle underline = UnderlineStyle::None;
+private:
+    // Raw storage for colors (8 bytes). Validity determined by flags.
+    // Memory Layout: 4 (FG) + 4 (BG) + 2 (Flags) + 2 (Padding) = 12 Bytes total
+    RGBColor m_fg;
+    RGBColor m_bg;
 
-    static std::string_view underlineToString(UnderlineStyle style)
-    {
-        switch (style) {
-            case UnderlineStyle::None:
-            return "none";
-            case UnderlineStyle::Single:
-                return "single";
-            case UnderlineStyle::Double:
-                return "double";
-            case UnderlineStyle::Curly:
-                return "curly";
-            case UnderlineStyle::Dotted:
-                return "dotted";
-            case UnderlineStyle::Dashed:
-                return "dashed";
-        }
-        return "unknown";
-    }
 
-    std::optional<RGBColor> foreground;
-    std::optional<RGBColor> background;
-
-    /**
-     * @brief Construct default attributes (reset SGR)
-     */
-    Attributes()
-    {
-        flags = 0;
-        underline = UnderlineStyle::None;
-        foreground.reset();
-        background.reset();
-    }
-
-    void setForeground(const RGBColor &color)
-    {
-        foreground = color;
-    }
-
-    void setBackground(const RGBColor &color)
-    {
-        background = color;
-    }
-
-    void resetColors()
-    {
-        foreground.reset();
-        background.reset();
-    }
-
-    void setUnderline(UnderlineStyle style)
-    {
-        underline = style;
-    }
-
-    void setBlink(uint8_t mode)
-    {
-        blink = mode & 0x3;
-    }
-
-    std::string toString() const
-    {
-        std::string str = "flags=" + std::to_string(flags);
-        str += " underline=" + std::to_string(static_cast<int>(underline));
-        if (foreground)
-            str += " fg=" + foreground->toHexString();
-        if (background)
-            str += " bg=" + background->toHexString();
-        return str;
-    }
-
-    void reset()
-    {
-        bold = faint = italic = strikethrough = inverse =
-            conceal = framed = encircled = overline = false;
-        blink = 0;
-        flags = 0;  // Redundant, but safe if layout changes
-        underline = UnderlineStyle::None;
-        foreground.reset();
-        background.reset();
-    }
-    bool operator==(const Attributes &other) const
-    {
-        return flags == other.flags &&
-               underline == other.underline &&
-               foreground == other.foreground &&
-               background == other.background;
-    }
-
-    bool operator!=(const Attributes &other) const
-    {
-        return !(*this == other);
-    }
-
-    struct Hash
-    {
-        std::size_t operator()(const Attributes &attr) const {
-            std::size_t h1 = std::hash<uint16_t>{}(attr.flags);
-            std::size_t h2 = std::hash<int>{}(static_cast<int>(attr.underline));
-            std::size_t h3 = attr.foreground ?
-                                 std::hash<uint32_t>{}(attr.foreground->toInt()) :
-                                 0;
-            std::size_t h4 = attr.background ?
-                                 std::hash<uint32_t>{}(attr.background->toInt()) :
-                                 0;
-            return h1 ^ (h2 << 1) ^ (h3 << 2) ^ (h4 << 3);
-        }
-    };
-
-    static Attributes::Ptr intern(const Attributes &value)
-    {
-        static std::unordered_map<Attributes, std::weak_ptr<Attributes>, Hash> cache;
-        static std::mutex mutex;
-
-        std::lock_guard<std::mutex> lock(mutex);
-
-        auto it = cache.find(value);
-        if (it != cache.end()) {
-            if (auto shared = it->second.lock())
-                return shared;
-            cache.erase(it);
-        }
-
-        auto shared = std::make_shared<Attributes>(value);
-        cache.emplace(value, shared);
-        return shared;
-    }
 };
-
+static_assert(sizeof(Attributes) <= 12, "Attributes class has bloated beyond 12 bytes!");
 }

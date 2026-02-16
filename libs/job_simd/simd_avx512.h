@@ -18,12 +18,21 @@ struct AVX512_F {
     static inline i32 set1_i32(int v)           { return _mm512_set1_epi32(v); }
     static inline f32 pull(const float *p)      { return _mm512_loadu_ps(p); }
     static inline void mov(float *p, f32 reg)   { _mm512_storeu_ps(p, reg); }
+    template<int Mask>
+    static inline f32 permute_lanes(f32 a, f32 b, f32 c) { return _mm512_permutex2var_ps(a, b, c); }
+
+
     // Basic Float Math
     static inline f32 add(f32 a, f32 b)             { return _mm512_add_ps(a, b); }
     static inline f32 sub(f32 a, f32 b)             { return _mm512_sub_ps(a, b); }
     static inline f32 mul(f32 a, f32 b)             { return _mm512_mul_ps(a, b); }
     static inline f32 div(f32 a, f32 b)             { return _mm512_div_ps(a, b); }
+    // static inline f32 addsub(f32 reg_a, f32 reg_b) { return _mm512_addsub_ps(reg_a, reg_b); }
+    static inline f32 sqrt(f32 reg) { return _mm512_sqrt_ps(reg); }
+    static inline f32 rsqrt(f32 reg) { return _mm512_rsqrt14_ps(reg); }
     static inline f32 mul_plus(f32 a, f32 b, f32 c) { return _mm512_fmadd_ps(a, b, c); }
+
+
     // Basic Int Math
     static inline i32 add_i32(i32 a, i32 b) { return _mm512_add_epi32(a, b); }
     static inline i32 sub_i32(i32 a, i32 b) { return _mm512_sub_epi32(a, b); }
@@ -47,6 +56,9 @@ struct AVX512_F {
     static inline f32 or_ps(f32 a, f32 b)  { return _mm512_or_ps(a, b); }
     static inline f32 xor_ps(f32 a, f32 b) { return _mm512_xor_ps(a, b); }
     static inline f32 is_not(f32 a, f32 b) { return _mm512_andnot_ps(a, b); }
+
+    static inline f32 clamp_f32(f32 x, float floor, float ceil) { return max(set1(floor), min(set1(ceil), x)); }
+
     // Compair
     static inline f32 gt_ps(f32 a, f32 b) { return mask_to_ps(_mm512_cmp_ps_mask(a, b, _CMP_GT_OQ)); }
     static inline f32 le_ps(f32 a, f32 b) { return mask_to_ps(_mm512_cmp_ps_mask(a, b, _CMP_LE_OQ)); }
@@ -56,11 +68,19 @@ struct AVX512_F {
         return _mm512_mask_blend_ps(k, a, b);
     }
 
+    template<typename T>
+    static inline f32 blend(f32 reg_a, f32 reg_b, T x) { return blendv(reg_a, reg_b, (f32)x); }
+
+    // static inline f32 hadd(f32 reg_a, f32 reg_b) { return _mm512_hadd_ps(reg_a, reg_b); }
+    // static inline f32 hsub(f32 reg_a, f32 reg_b) { return _mm512_hsub_ps(reg_a, reg_b); }
 
     // Rounding
+    static inline f32 ceil(f32 reg_a)  { return _mm512_ceil_ps(reg_a); }
+    static inline f32 floor(f32 reg_a) { return _mm512_floor_ps(reg_a);}
+
     template<RoundingMode Mode>
     static inline f32 round(f32 a) { return _mm512_roundscale_ps(a, (int)Mode); }
-    //
+
     static inline f32 unpack_lo(f32 a, f32 b) { return _mm512_unpacklo_ps(a, b); }
     static inline f32 unpack_hi(f32 a, f32 b) { return _mm512_unpackhi_ps(a, b); }
 

@@ -11,6 +11,11 @@
 
 #include "matrix.h"
 
+// If K is large, A is accessed with stride lda for every single FMA. That is a lot of jumping.
+// High-performance libraries (like BLAS) often pack A into a temporary buffer
+// so that A[0..7][p] are contiguous in memory.
+
+
 namespace job::ai::comp {
 using namespace job::ai::cords;
 using namespace job::simd;
@@ -69,9 +74,6 @@ inline void maskedStore(float* ptr, int valid_n, f32 val) {
     if (valid_n >= 8) {
         SIMD::mov(ptr, val); // Full store
     } else {
-        // Create a mask for valid lanes
-        // Note: Faster to use a jump table or pre-computed masks,
-        // but this illustrates the logic using your existing provider.
         alignas(32) float temp[8];
         SIMD::mov(temp, val);
         for (int i = 0; i < valid_n; ++i)
@@ -251,6 +253,9 @@ inline void sgemmParallel(job::threads::ThreadPool &pool,
     int n_chunks = (N + JOB_BLOCK_SIZE - 1) / JOB_BLOCK_SIZE;
     size_t total_tiles = m_chunks * n_chunks;
 
+    size_t workers = std::max<size_t>(1, pool.workerCount());
+    size_t grain = std::max<size_t>(1, total_tiles / workers);
+
     threads::parallel_for(pool, size_t{0}, size_t(total_tiles), [&](size_t tile_idx) {
         int chunk_m = tile_idx / n_chunks;
         int chunk_n = tile_idx % n_chunks;
@@ -258,7 +263,7 @@ inline void sgemmParallel(job::threads::ThreadPool &pool,
         int j = chunk_n * JOB_BLOCK_SIZE;
 
         computeTile(M, N, K, alpha, A, lda, B, ldb, C, ldc, i, j, JOB_BLOCK_SIZE);
-    }, 0, 1); // grain size 1 to prevent timeouts
+    }, 0, grain); // grain size 1 to prevent timeouts
 }
 
 

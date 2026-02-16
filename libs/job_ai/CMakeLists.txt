@@ -58,8 +58,8 @@ set(JOBAI_COACH_SOURCES)
 
 # cords
 set(JOBAI_CORDS_HEADERS
+    cords/ai_weights.h
     cords/attention_shape.h
-    cords/aligned_allocator.h
     cords/extents.h
     cords/view_iter.h
     cords/view.h
@@ -150,26 +150,31 @@ set(JOBAI_LEARNER_SOURCES)
 
 
 set(JOBAI_TOKEN_HEADERS
-    token/byte_lattice_kernel.h ## Empty
-    token/byte_lattice.h        ## Donish
+    token/byte_lattice_kernel.h
+    token/byte_lattice.h
 
-    token/unicode_lattice_kernel.h  ## just finished
-    token/unicode_lattice.h     # the Unicode lattice
+    token/unicode_lattice_kernel.h
+    token/unicode_lattice.h
 
-    token/token_type.h          # enums of the token type plugins
+    token/token_type.h
 
     token/token_concept.h
-    token/itoken.h              # the interface refactor slash donish
+    token/itoken.h
 
     token/token_safety_dance.h
 
+    ## These can be in one unit tests
     token/byte_token.h
-    token/ascii_token.h         # refactor slash donish
-    token/char_token.h          # the Gen 0-50 (refactor slash donish)
-    token/corpus_chemist.h      # refactor slash donish
-    token/motif_token.h         # Gen 50+: (refactor slash donish)
-    # token/bpe_token.h           # compare against me EMPTY
-    token/token_factory.h       # the facory go get aq uniq pointer of the plugin type refactor slash donish
+    token/ascii_token.h
+    token/char_token.h
+    #needs tests
+    token/corpus_chemist.h
+    token/motif_token.h
+
+
+    token/token_factory.h
+    token/bpe_token.h           # JUNK
+    # token/unigram_token.h       # JUNK
 )
 set(JOBAI_TOKEN_SOURCES)
 
@@ -185,20 +190,21 @@ set(JOBAI_BASE_SOURCES)
 
 
 set(JOBAI_COMP_HEADERS
+
     comp/noise_table.h
+    comp/activation_types.h
     comp/atomic_math.h
 
-    #
+    # AI everywhere ...
     comp/gemm.h
-    comp/mlp.h
     comp/flash_attention.h
+    comp/mlp.h
 
-    #
+    # These are old
     comp/gdn_params.h
     comp/rrelu_config.h
 
-
-    comp/activation_types.h
+    # These are new.
     comp/elu.h
     comp/gelu.h
     comp/identity.h
@@ -209,14 +215,7 @@ set(JOBAI_COMP_HEADERS
     comp/special.h
     comp/swish.h
     comp/tanh.h
-
     comp/activation.h
-
-    ## OLD
-    # comp/iactivation.h
-    # comp/fast_math.h
-    # comp/activation_math.h
-    # comp/activation_functors.h
 )
 set(JOBAI_COMP_SOURCES)
 
@@ -225,7 +224,7 @@ set(JOBAI_COMP_SOURCES)
 # evo
 set(JOBAI_EVO_HEADERS
     evo/genome.h
-    evo/individual.h
+    # evo/individual.h
     evo/crossover_type.h
     evo/crossover_config.h
     evo/crossover.h

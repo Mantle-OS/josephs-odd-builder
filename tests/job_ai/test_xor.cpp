@@ -54,7 +54,7 @@ TEST_CASE("ESCoach: Solves XOR", "[ai][coach][es][xor]")
 
     Genome parent = buildXORGenome();
 
-    ESCoach::Config cfg;
+    ESConfig cfg;
     cfg.populationSize = 128;
     cfg.sigma = 0.1f;
     cfg.decay = 0.99f;
@@ -78,7 +78,7 @@ TEST_CASE("Evolution: XOR Edge Cases (Single Thread / Pop 1)", "[coach][edge]")
 {
     job::threads::JobStealerCtx ctx(1); // Single thread
 
-    ESCoach::Config cfg;
+    ESConfig cfg;
     cfg.populationSize = 1;
     cfg.sigma = 0.5f;
     cfg.envConfig.type = LearnType::XOR;
@@ -103,7 +103,7 @@ TEST_CASE("Evolution: XOR Flywheel Throughput", "[coach][benchmark]")
     // Benchmark XOR (High Frequency, Small Net)
     Genome xorSeed = buildXORGenome();
     BENCHMARK("XOR (Pop=4096)") {
-        ESCoach::Config cfg;
+        ESConfig cfg;
         cfg.populationSize = 4096;
         cfg.envConfig.type = LearnType::XOR;
         ESCoach coach(ctx.pool, cfg);

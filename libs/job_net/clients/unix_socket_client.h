@@ -15,8 +15,8 @@ namespace job::net {
 
 class UnixClient {
 public:
-    using UnixClientPtr = std::shared_ptr<UnixClient>;
-    explicit UnixClient(std::shared_ptr<threads::JobIoAsyncThread> loop, uint16_t buffer_size = 4096);
+    using Ptr = std::shared_ptr<UnixClient>;
+    explicit UnixClient(threads::JobIoAsyncThread::Ptr loop, uint16_t buffer_size = 4096);
     ~UnixClient();
 
     UnixClient(const UnixClient &) = delete;
@@ -38,12 +38,12 @@ public:
     std::function<void()> onDisconnect;
     std::function<void(int)> onError;
 
-    void setSocket(UnixSocket::UnixSocketPtr socket);
+    void setSocket(UnixSocket::Ptr socket);
 private:
     void setupSocketCallbacks();
 
-    std::shared_ptr<threads::JobIoAsyncThread> m_loop;
-    UnixSocket::UnixSocketPtr m_socket;
+    threads::JobIoAsyncThread::Ptr m_loop;
+    UnixSocket::Ptr m_socket;
     std::atomic<bool> m_connected{false};
     std::vector<char> m_readBuffer;
 };

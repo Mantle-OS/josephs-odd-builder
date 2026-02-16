@@ -7,7 +7,6 @@
 
 #include <vector>
 #include <random>
-#include <numeric>
 
 #include <ctx/job_stealing_ctx.h>
 
@@ -24,22 +23,6 @@ using namespace job::ai;
 using namespace job::ai::infer;
 using namespace job::ai::evo;
 using namespace job::threads;
-
-static void randomizeAttBuffer(float *ptr, size_t count)
-{
-    static std::mt19937 gen(123);
-    static std::uniform_real_distribution<float> dist(-1.0f, 1.0f);
-    for (size_t i = 0; i < count; ++i)
-        ptr[i] = dist(gen);
-}
-
-static void randomizeLayerParams(layers::AbstractLayer &layer)
-{
-    auto p = layer.parameters();
-    randomizeAttBuffer(p.data(), p.extent().volume());
-}
-
-
 
 void addDenseGene(Genome &genome, int input, int output, comp::ActivationType act)
 {
@@ -62,10 +45,6 @@ void addDenseGene(Genome &genome, int input, int output, comp::ActivationType ac
     for(size_t i=0; i<count; ++i)
         genome.weights.push_back(dist(gen));
 }
-
-
-
-
 
 void addAttentionGene(Genome &genome, int dim, int heads, adapters::AdapterType type = adapters::AdapterType::Flash) {
     LayerGene gene{};
@@ -125,7 +104,7 @@ TEST_CASE("Runner: End-to-End Pipeline Smoke Test", "[runner][integration]") {
     addAttentionGene(genome, Hidden, 4, adapters::AdapterType::FMM);                // 4 heads
     addAttentionGene(genome, Hidden, 4, adapters::AdapterType::BarnesHut);          // 4 heads
     addAttentionGene(genome, Hidden, 4, adapters::AdapterType::Verlet);             // 4 heads
-    addAttentionGene(genome, Hidden, 4, adapters::AdapterType::Stencil); // 4 heads
+    addAttentionGene(genome, Hidden, 4, adapters::AdapterType::Stencil);            // 4 heads
     addMoEGene(genome, Hidden, 8, 2);    // 8 experts, top-2
     addDenseGene(genome, Hidden, Classes, comp::ActivationType::Identity);
 
@@ -194,6 +173,21 @@ TEST_CASE("Runner: Genome Ownership Safety", "[runner][safety]") {
 
 
 #ifdef JOB_TEST_BENCHMARKS
+static void randomizeAttBuffer(float *ptr, size_t count)
+{
+    static std::mt19937 gen(123);
+    static std::uniform_real_distribution<float> dist(-1.0f, 1.0f);
+    for (size_t i = 0; i < count; ++i)
+        ptr[i] = dist(gen);
+}
+
+static void randomizeLayerParams(layers::AbstractLayer &layer)
+{
+    auto p = layer.parameters();
+    randomizeAttBuffer(p.data(), p.extent().volume());
+}
+
+
 TEST_CASE("Runner Bench: Attention adapters scaling", "[bench][attn]") {
     JobStealerCtx ctx(16);
 
@@ -203,6 +197,7 @@ TEST_CASE("Runner Bench: Attention adapters scaling", "[bench][attn]") {
     // Two regimes: short and long context
     const uint32_t S_short = 256;
     const uint32_t S_long  = 4096;
+    const uint32_t SV_long  = 16384;
 
     auto run_one = [&](uint32_t S, adapters::AdapterType type, const char* name) {
         infer::Workspace ws(1024 * 1024 * 1024); // 1GB scratch (big enough for dense @ 4096)
@@ -241,12 +236,19 @@ TEST_CASE("Runner Bench: Attention adapters scaling", "[bench][attn]") {
         run_one(S_long,  adapters::AdapterType::LowRank,   "Runner Attn LowRank S=4096");
         run_one(S_long,  adapters::AdapterType::FMM,       "Runner Attn FMM    S=4096");
         run_one(S_long,  adapters::AdapterType::BarnesHut, "Runner Attn BarnesHut S=4096");
-        run_one(S_long,  adapters::AdapterType::Verlet,    "Runner Attn Verlet S=4096");
 
         // Optional “reference cliff”
+        // run_one(S_long,  adapters::AdapterType::Verlet,    "Runner Attn Verlet S=4096");
         // run_one(S_long, AdapterType::Dense,   "Attn Dense  S=4096 (O(N^2) ref)");
         // run_one(S_long, AdapterType::Flash,   "Attn Flash  S=4096 (ref)");
     }
+
+
+    SECTION("Long context (S=16384)") {
+        run_one(SV_long,  adapters::AdapterType::FMM,       "Runner Attn FMM S=16384");
+        // run_one(SV_long,  adapters::AdapterType::BarnesHut, "Runner Attn BarnesHut S=16384");
+    }
+
 }
 #endif
 

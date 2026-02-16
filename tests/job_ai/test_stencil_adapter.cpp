@@ -16,6 +16,7 @@
 using namespace job::ai::adapters;
 using namespace job::ai::cords;
 using namespace job::threads;
+using namespace job::science;
 
 TEST_CASE("Stencil Adapter: Heat Diffusion (3x3 Grid)", "[ai][stencil][usage]")
 {

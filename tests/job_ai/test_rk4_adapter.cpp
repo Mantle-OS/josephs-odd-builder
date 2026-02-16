@@ -141,6 +141,56 @@ TEST_CASE("RK4 Adapter: Inertia (Zero Gravity)", "[ai][rk4][edge]")
     CHECK(data[0] == Catch::Approx(1.0f));
 }
 
+
+TEST_CASE("RK4 Adapter: Information Gravity (Value Mixing)", "[ai][rk4][mixing]") {
+    JobStealerCtx ctx(4);
+    Rk4Config cfg;
+    cfg.dt = 0.1f;
+    cfg.steps = 1; // 1 Step of RK4 involves 4 evaluations of the force kernel!
+    Rk4Adapter adapter(cfg);
+
+    const int S = 2;
+    const int D = 8; // Pos(3) + Vel(3) + Mass(1) + Value(1)
+
+    std::vector<float> data(S * D, 0.0f);
+
+    // --- P1 (Listener) ---
+    // Pos: -1.0, Mass: 1.0, Value: 0.0
+    data[0] = -1.0f;
+    data[6] = 1.0f;
+    data[7] = 0.0f;
+
+    // --- P2 (Speaker) ---
+    // Pos: 1.0, Mass: 100.0, Value: 10.0
+    data[D + 0] = 1.0f;
+    data[D + 6] = 100.0f;
+    data[D + 7] = 10.0f;
+
+    ViewR view(data.data(), makeBSD(1u, (uint32_t)S, (uint32_t)D));
+    AttentionShape shape{1u, (uint32_t)S, (uint32_t)D, 1u};
+    AdapterCtx aCtx;
+
+    // RUN RK4
+    // Remember: RK4 calls 'computeForcesAndMixing' 4 times internally (k1, k2, k3, k4).
+    // The final result will be the accumulation of these mixings.
+    adapter.adaptParallel(*ctx.pool, shape, view, view, view, view, aCtx);
+
+
+    // 1. Physics Check: P1 moved towards P2
+    CHECK(data[0] > -1.0f);
+
+    // 2. AI Check: P1 absorbed P2's Value
+    float p1_newValue = data[7];
+    INFO("P1 Value: " << p1_newValue);
+    CHECK(p1_newValue > 10.0f);
+
+    // 3. Asymmetry Check: P2 retains memory
+    float p2_newValue = data[D + 7];
+    INFO("P2 Value: " << p2_newValue);
+    CHECK(p2_newValue >= 10.0f);
+}
+
+
 // BLOCK 3: Benchmarks
 #ifdef JOB_TEST_BENCHMARKS
 TEST_CASE("RK4 Adapter: Throughput", "[ai][rk4][bench]")
@@ -174,18 +224,19 @@ TEST_CASE("RK4 Adapter: Throughput", "[ai][rk4][bench]")
         adapter.adaptParallel(*ctx.pool, shape, view, view, view, view, aCtx);
     };
 
-    BENCHMARK("RK4 N-Body B=1 S=256 (Small)") {
-        run_bench(1, 256, 7);
-    };
-
-    BENCHMARK("RK4 N-Body B=1 S=1024 (Medium)") {
-        run_bench(1, 1024, 7);
-    };
-
     // Let's verify batch parallelism while we're at it
     BENCHMARK("RK4 N-Body B=8 S=256 (Wide Batch)") {
         run_bench(8, 256, 7);
     };
+
+    BENCHMARK("RK4 N-Body B=1 S=256 (Small) 1 Batch") {
+        run_bench(1, 256, 7);
+    };
+
+    BENCHMARK("RK4 N-Body B=1 S=1024 (Medium) 1 Batch") {
+        run_bench(1, 1024, 7);
+    };
+
 }
 
 #endif

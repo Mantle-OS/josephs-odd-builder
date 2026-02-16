@@ -17,7 +17,6 @@ class FmmAdapter final : public IAdapter {
 public:
     // From the threads module
     using Solver = science::JobFmmEngine<FmmTraits::Body, FmmTraits::Vec3,  FmmTraits::Real, FmmTraits>;
-    // for the factory
     static std::unique_ptr<FmmAdapter> unique(FmmConfig cfg = {})
     {
         return std::make_unique<FmmAdapter>(cfg);

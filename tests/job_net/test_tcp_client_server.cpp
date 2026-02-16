@@ -16,7 +16,7 @@ TEST_CASE("TcpClient and TcpServer Full Echo Test", "[tcp_client_server][async][
     const std::string testMessage = "Hello, J.O.B.!";
     auto server = std::make_shared<TcpServer>(loop.loop);
 
-    server->onClientConnected = [&](job::net::TcpServer::ClientPtr client) {
+    server->onClientConnected = [&](job::net::TcpClient::Ptr client) {
         client->onMessage = [client, &serverGotMessage](const char* data, size_t len) {
             std::string msg(data, len);
             serverGotMessage.store(true);

@@ -18,7 +18,7 @@
 
 namespace job::net {
 
-UdpSocket::UdpSocket(std::shared_ptr<threads::JobIoAsyncThread> loop):
+UdpSocket::UdpSocket(threads::JobIoAsyncThread::Ptr loop):
     ISocketIO(std::move(loop))
 {
     m_state.store(SocketState::Unconnected);
@@ -130,7 +130,7 @@ bool UdpSocket::listen([[maybe_unused]]int backlog)
     return false;
 }
 
-std::shared_ptr<ISocketIO> UdpSocket::accept()
+ISocketIO::Ptr UdpSocket::accept()
 {
     // Not supported for UDP
     m_errors.setError(EOPNOTSUPP);

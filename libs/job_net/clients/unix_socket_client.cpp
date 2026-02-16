@@ -3,7 +3,7 @@
 
 namespace job::net {
 
-UnixClient::UnixClient(std::shared_ptr<threads::JobIoAsyncThread> loop, uint16_t buffer_size) :
+UnixClient::UnixClient(threads::JobIoAsyncThread::Ptr loop, uint16_t buffer_size) :
     m_loop(std::move(loop)),
     m_readBuffer(buffer_size)
 {
@@ -88,7 +88,7 @@ std::string UnixClient::lastErrorString() const noexcept
     return m_socket->lastErrorString();
 }
 
-void UnixClient::setSocket(UnixSocket::UnixSocketPtr socket)
+void UnixClient::setSocket(UnixSocket::Ptr socket)
 {
     if (m_socket && m_socket->isOpen())
         m_socket->disconnect();

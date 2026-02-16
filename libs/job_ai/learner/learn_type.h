@@ -7,7 +7,7 @@ enum class LearnType : uint8_t {
     XOR         = 1,
     CartPole    = 2,
     Portal      = 3,
-    Bard        = 4
+    Language    = 4
 };
 
 }

@@ -51,6 +51,10 @@ struct SplitMix64 {
         return min + nextDouble() * (max - min);
     }
 
+    constexpr void seed(uint64_t s) {
+        m_state = s;
+    }
+
     // Uniform integer in [0, maxExclusive). If maxExclusive==0, returns 0.
     [[nodiscard]] constexpr uint64_t rangeIndex(uint64_t maxExclusive)
     {

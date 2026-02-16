@@ -2,6 +2,7 @@
 
 #include <transpose.h>
 
+#include "ai_weights.h"
 #include "gemm.h"
 #include "matrix.h"
 

@@ -161,7 +161,6 @@ public:
 
         core::SplitMix64 rng(seed);
 
-        // ... (Your bondLen logic from the previous step) ...
         // Keep the longer lengths (5, 6, 7) to catch "Physics"
         int bondLen = 2;
         const float r = rng.nextFloat();
@@ -217,7 +216,7 @@ public:
     [[nodiscard]] std::size_t getMotifCount() const { return m_strToId.size(); }
     [[nodiscard]] std::size_t getMaxMotifLength() const noexcept { return m_maxMotifLen; }
 
-    void debug() const
+    void debug() const override
     {
         JOB_LOG_INFO("MotifToken Statistics");
         JOB_LOG_INFO("  Vocabulary: {}/{}", m_strToId.size(), kMaxCapacity);
@@ -289,13 +288,13 @@ public:
         return victimId;
     }
 
-private:
+
     [[nodiscard]] static constexpr bool isMotifLane(const ByteLattice &p) noexcept
     {
         return p.z > 0.5f;
    }
 
-    ByteLattice idToLattice(uint32_t id, float mass = 1.0f) const
+    static ByteLattice idToLattice(uint32_t id, float mass = 1.0f)
     {
         // const float x = (float)(id & 0x7F);         // low 7
         // const float y = (float)((id >> 7) & 0x7F);  // high 7
@@ -320,7 +319,7 @@ private:
         };
     }
 
-    uint32_t latticeToId(const ByteLattice &p) const
+    static uint32_t latticeToId(const ByteLattice &p)
     {
         // Snap to grid like ByteLattice decode does.
         // const int i_x = std::clamp((int)std::lrintf((p.x + 1.0f) * 64.0f), 0, 127);
@@ -335,6 +334,87 @@ private:
     }
 
 
+    bool save(std::ostream &os) const override
+    {
+        const uint32_t magic = 0xFEEDBEEF;
+        const uint32_t ver   = 1;
+        os.write(reinterpret_cast<const char*>(&magic), sizeof(magic));
+        os.write(reinterpret_cast<const char*>(&ver), sizeof(ver));
+
+        os.write(reinterpret_cast<const char*>(&m_nextId), sizeof(m_nextId));
+        os.write(reinterpret_cast<const char*>(&m_maxMotifLen), sizeof(m_maxMotifLen));
+        os.write(reinterpret_cast<const char*>(&m_minMotifLen), sizeof(m_minMotifLen));
+
+        // Save Dictionary
+        const uint32_t count = static_cast<uint32_t>(m_idToStr.size());
+        os.write(reinterpret_cast<const char*>(&count), sizeof(count));
+
+        for (const auto &[id, str] : m_idToStr) {
+            os.write(reinterpret_cast<const char*>(&id), sizeof(id));
+
+            const uint32_t len = static_cast<uint32_t>(str.size());
+            os.write(reinterpret_cast<const char*>(&len), sizeof(len));
+            os.write(str.data(), len);
+
+            uint32_t usage = 0;
+            if (id < kMaxCapacity)
+                usage = m_motifUsage[id].load(std::memory_order_relaxed);
+            os.write(reinterpret_cast<const char*>(&usage), sizeof(usage));
+        }
+        return os.good();
+    }
+
+    bool load(std::istream &is) override
+    {
+        uint32_t magic = 0, ver = 0;
+        is.read(reinterpret_cast<char*>(&magic), sizeof(magic));
+        if (magic != 0xFEEDBEEF)
+            return false;
+
+        is.read(reinterpret_cast<char*>(&ver), sizeof(ver));
+        if (ver != 1)
+            return false;
+
+        // Reset everything before loading
+        m_strToId.clear();
+        m_idToStr.clear();
+        m_freeIds.clear();
+        for(size_t i=0; i<kMaxCapacity; ++i) m_motifUsage[i].store(0);
+
+        is.read(reinterpret_cast<char*>(&m_nextId), sizeof(m_nextId));
+        is.read(reinterpret_cast<char*>(&m_maxMotifLen), sizeof(m_maxMotifLen));
+        is.read(reinterpret_cast<char*>(&m_minMotifLen), sizeof(m_minMotifLen));
+
+        uint32_t count = 0;
+        is.read(reinterpret_cast<char*>(&count), sizeof(count));
+
+        for (uint32_t i = 0; i < count; ++i) {
+            uint32_t id = 0;
+            is.read(reinterpret_cast<char*>(&id), sizeof(id));
+
+            uint32_t len = 0;
+            is.read(reinterpret_cast<char*>(&len), sizeof(len));
+
+            std::string str;
+            str.resize(len);
+            // Robust read into string buffer
+            is.read(&str[0], len);
+
+            uint32_t usage = 0;
+            is.read(reinterpret_cast<char*>(&usage), sizeof(usage));
+
+            // Restore Maps
+            m_idToStr.emplace(id, str);
+            m_strToId.emplace(str, id);
+
+            if (id < kMaxCapacity)
+                m_motifUsage[id].store(usage, std::memory_order_relaxed);
+        }
+        return is.good();
+    }
+
+
+private:
 
     void removeSquatters() {
         if (m_idToStr.size() <= kImmutableZone)
@@ -419,81 +499,6 @@ private:
         }
     };
 
-    bool save(std::ostream &os) const override
-    {
-        const uint32_t magic = 0xFEEDBEEF;
-        const uint32_t ver   = 1;
-        os.write(reinterpret_cast<const char*>(&magic), sizeof(magic));
-        os.write(reinterpret_cast<const char*>(&ver), sizeof(ver));
-
-        os.write(reinterpret_cast<const char*>(&m_nextId), sizeof(m_nextId));
-        os.write(reinterpret_cast<const char*>(&m_maxMotifLen), sizeof(m_maxMotifLen));
-        os.write(reinterpret_cast<const char*>(&m_minMotifLen), sizeof(m_minMotifLen));
-
-        // Save Dictionary
-        const uint32_t count = static_cast<uint32_t>(m_idToStr.size());
-        os.write(reinterpret_cast<const char*>(&count), sizeof(count));
-
-        for (const auto &[id, str] : m_idToStr) {
-            os.write(reinterpret_cast<const char*>(&id), sizeof(id));
-
-            const uint32_t len = static_cast<uint32_t>(str.size());
-            os.write(reinterpret_cast<const char*>(&len), sizeof(len));
-            os.write(str.data(), len);
-
-            uint32_t usage = 0;
-            if (id < kMaxCapacity)
-                usage = m_motifUsage[id].load(std::memory_order_relaxed);
-            os.write(reinterpret_cast<const char*>(&usage), sizeof(usage));
-        }
-        return os.good();
-    }
-
-    bool load(std::istream &is) override
-    {
-        uint32_t magic = 0, ver = 0;
-        is.read(reinterpret_cast<char*>(&magic), sizeof(magic));
-        if (magic != 0xFEEDBEEF) return false;
-        is.read(reinterpret_cast<char*>(&ver), sizeof(ver));
-        if (ver != 1) return false;
-
-        // Reset everything before loading
-        m_strToId.clear();
-        m_idToStr.clear();
-        m_freeIds.clear();
-        for(size_t i=0; i<kMaxCapacity; ++i) m_motifUsage[i].store(0);
-
-        is.read(reinterpret_cast<char*>(&m_nextId), sizeof(m_nextId));
-        is.read(reinterpret_cast<char*>(&m_maxMotifLen), sizeof(m_maxMotifLen));
-        is.read(reinterpret_cast<char*>(&m_minMotifLen), sizeof(m_minMotifLen));
-
-        uint32_t count = 0;
-        is.read(reinterpret_cast<char*>(&count), sizeof(count));
-
-        for (uint32_t i = 0; i < count; ++i) {
-            uint32_t id = 0;
-            is.read(reinterpret_cast<char*>(&id), sizeof(id));
-
-            uint32_t len = 0;
-            is.read(reinterpret_cast<char*>(&len), sizeof(len));
-
-            std::string str;
-            str.resize(len);
-            // Robust read into string buffer
-            is.read(&str[0], len);
-
-            uint32_t usage = 0;
-            is.read(reinterpret_cast<char*>(&usage), sizeof(usage));
-
-            // Restore Maps
-            m_idToStr.emplace(id, str);
-            m_strToId.emplace(str, id);
-
-            if (id < kMaxCapacity)
-                m_motifUsage[id].store(usage, std::memory_order_relaxed);
-        }
-        return is.good();
-    }
 
 private:
     std::unordered_map<std::string, uint32_t, StringHash, StringEqual>  m_strToId;

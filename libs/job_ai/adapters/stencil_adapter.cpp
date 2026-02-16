@@ -4,7 +4,7 @@
 
 #include <transpose.h>
 
-#include "aligned_allocator.h"
+#include "ai_weights.h"
 
 namespace job::ai::adapters {
 
@@ -42,7 +42,7 @@ void StencilAdapter::adaptParallel(threads::ThreadPool &pool,
     size_t elementsPerBatch = static_cast<size_t>(S) * D;
 
     // FIXME: In v3, ask Workspace for this buffer to avoid malloc.
-     cords::AiWeights scratch(B * elementsPerBatch);
+    cords::AiWeights scratch(B * elementsPerBatch);
 
     threads::parallel_for(pool, size_t{0}, size_t(B), [&](size_t b) {
         const float *srcBatch = sources.data() + (b * elementsPerBatch);

@@ -18,9 +18,9 @@ struct FunctorSigmoid {
 
         [[maybe_unused]] f32 e_neg_x;
         if constexpr (T_SMOOTH)
-            e_neg_x = SIMD::exp_estrin(neg_x);
+            e_neg_x = SIMD::exp(neg_x);
         else
-            e_neg_x = SIMD::exp_schraudolph(neg_x);
+            e_neg_x = SIMD::exp_fast(neg_x);
 
         auto denom = SIMD::add(one, e_neg_x);
         return SIMD::div(one, denom);

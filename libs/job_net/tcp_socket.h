@@ -11,14 +11,13 @@
 
 namespace job::net {
 
-class TcpSocket;
-using TcpSocketPtr = std::shared_ptr<TcpSocket>;
 
 class TcpSocket : public ISocketIO {
 public:
-    explicit TcpSocket(std::shared_ptr<threads::JobIoAsyncThread> loop);
+    using Ptr = std::shared_ptr<TcpSocket>;
+    explicit TcpSocket(threads::JobIoAsyncThread::Ptr loop);
 
-    TcpSocket(std::shared_ptr<threads::JobIoAsyncThread> loop, int existing_fd, const JobIpAddr& peerAddr);
+    TcpSocket(threads::JobIoAsyncThread::Ptr loop, int existing_fd, const JobIpAddr &peerAddr);
 
     ~TcpSocket() override;
 
@@ -26,7 +25,7 @@ public:
     bool bind(const JobIpAddr &addr) override;
     bool bind(const std::string &address, uint16_t port) override;
     bool listen(int backlog = 5) override;
-    std::shared_ptr<ISocketIO> accept() override;
+    ISocketIO::Ptr accept() override;
     void disconnect() override;
 
     ssize_t read(void *buffer, size_t size) override;

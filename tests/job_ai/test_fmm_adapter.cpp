@@ -128,7 +128,9 @@ TEST_CASE("FMM Adapter: Scaling Benchmark (O(N) Proof)", "[ai][fmm][bench]") {
 
     // Config: Allow somewhat large leaves to speed up tree build
     FmmConfig cfg;
+
     cfg.maxLeaf = 128;
+    cfg.maxDepth = 16;
     FmmAdapter adapter(cfg);
 
     const int D = 64;
@@ -155,7 +157,7 @@ TEST_CASE("FMM Adapter: Scaling Benchmark (O(N) Proof)", "[ai][fmm][bench]") {
 
     BENCHMARK("FMM N=1024") { run_bench(1024); };
     BENCHMARK("FMM N=4096") { run_bench(4096); };
-
+    BENCHMARK("FMM N=16384") { run_bench(16384); };
     // If it was O(N^2), 4096 would be 16x slower than 1024.
     // With O(N), it should be ~4x slower.
     //Need to look at linear scaling.

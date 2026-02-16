@@ -70,10 +70,12 @@ std::unique_ptr<AbstractLayer> LayerFactory::createDense(const evo::LayerGene &g
         cfg, 0.0f);
 }
 
-std::unique_ptr<AbstractLayer> LayerFactory::createAttention(const evo::LayerGene& gene)
+std::unique_ptr<AbstractLayer> LayerFactory::createAttention(const evo::LayerGene &gene)
 {
-    LayerConfig cfg;
-    cfg.numHeads = gene.outputs;
+    LayerConfig cfg = LayerPresets::AttentionConfig();
+    cfg.activation = gene.activation;
+    cfg.type = gene.type;
+    cfg.numHeads = gene.outputs; // FIXME
     cfg.setHasBias(true);
     cfg.adapterType = static_cast<adapters::AdapterType>(gene.auxiliaryData);
 

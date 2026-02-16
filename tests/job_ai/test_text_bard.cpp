@@ -1,3 +1,4 @@
+#include <catch2/benchmark/catch_benchmark.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/catch_approx.hpp>
 #include <job_stealing_ctx.h>
@@ -22,7 +23,7 @@ using namespace job::threads;
 inline std::string finalWords = "JOSEPHJoseph Odd Builder !";
 
 
-Genome buildAsciiBardGenome(uint32_t inputSize, uint32_t outputSize)
+Genome buildAsciiLayers(uint32_t inputSize, uint32_t outputSize)
 {
     Genome g;
     constexpr int kHidden = 64;
@@ -32,6 +33,9 @@ Genome buildAsciiBardGenome(uint32_t inputSize, uint32_t outputSize)
     l1.activation   = comp::ActivationType::Swish;
     l1.inputs       = inputSize;
     l1.outputs      = kHidden;
+
+    g.weights.resize((l1.inputs * l1.outputs) + l1.outputs);
+
     l1.weightCount  = (l1.inputs * l1.outputs) + l1.outputs;
     l1.weightOffset = 0;
     g.architecture.push_back(l1);
@@ -52,9 +56,9 @@ Genome buildAsciiBardGenome(uint32_t inputSize, uint32_t outputSize)
         w = ((rand() % 2000) / 1000.0f - 1.0f) * scale;
 
     return g;
-    }
+}
 
-Genome buildTextBardGenome(uint32_t inputSize, uint32_t outputSize)
+Genome buildTextLayers(uint32_t inputSize, uint32_t outputSize)
 {
     Genome g;
     constexpr int kHidden = 32;
@@ -89,55 +93,217 @@ Genome buildTextBardGenome(uint32_t inputSize, uint32_t outputSize)
     return g;
 }
 
-TEST_CASE("Bard Byte: Trains the Byte Bard", "[ai][coach][bard]")
+Genome buildPhysicsLanguageGenome(uint32_t inputSize, uint32_t /*outputSize*/, adapters::AdapterType physicsType = adapters::AdapterType::BarnesHut)
+{
+    Genome g;
+    constexpr int kHidden = 32;
+    constexpr int kHeads  = 4;
+
+     // Layer 1: Perception
+    LayerGene l1{};
+    l1.type         = LayerType::Dense;
+    l1.activation   = comp::ActivationType::Swish; // 82 3 seconds
+    l1.inputs       = inputSize;
+    l1.outputs      = kHidden;
+    l1.weightCount  = (l1.inputs * l1.outputs) + l1.outputs;
+    l1.weightOffset = 0;
+
+    g.weights.resize((l1.inputs * l1.outputs) + l1.outputs);
+    g.architecture.push_back(l1);
+
+
+     // Layer 2: Prediction
+    LayerGene lcfg{};
+    lcfg.type          = LayerType::Attention;
+    lcfg.auxiliaryData = static_cast<uint32_t>(physicsType);
+    // lcfg.activation    = comp::ActivationType::Swish;
+    lcfg.inputs        = kHidden;
+    lcfg.outputs       = kHeads ;
+    lcfg.weightCount   = (lcfg.inputs * lcfg.outputs) + lcfg.outputs;
+    lcfg.weightOffset  = l1.weightCount;
+
+    g.weights.resize(static_cast<uint32_t>(lcfg.weightCount));
+
+    // Params: 4(kHeads) matrices (Q,K,V,O) + biases
+    // Size: 4(kHeads) * (Dim * Dim) + 4(kHeads) * Dim
+    size_t attnParams = kHeads * (size_t(kHidden) * kHidden) + kHeads * kHidden;
+    lcfg.weightCount   = static_cast<uint32_t>(attnParams);
+
+    g.weights.resize(l1.weightCount + static_cast<uint32_t>(attnParams));
+    g.architecture.push_back(lcfg);
+
+    // Xavier Init
+    float scale = 1.0f / std::sqrt((float)kHidden);
+    for(auto &w : g.weights)
+        w = ((rand() % 2000) / 1000.0f - 1.0f) * scale;
+
+    return g;
+}
+
+
+TEST_CASE("Language Byte P=16, N=1000 : Trains using Byte Language", "[ai][coach][llm]")
 {
     JobStealerCtx ctx(8);
-    auto learnCfg = LearnPresets::BardConfig(
+
+    // Create the text_encoder
+    auto learnCfg = LearnPresets::LanguageConfig(
         finalWords.c_str(),
         job::ai::token::TokenType::Byte
         );
     learnCfg.contextLen     = 6;                                                // Context Window ? IE 1st 6 chars of the finalWords
     learnCfg.corpusLen      = (finalWords.length() - learnCfg.contextLen);      // the length of the corpus - the context window size (maybe should be doubled ?)
     learnCfg.seed           = 42;                                               // The seed
-    learnCfg.initWsMb       = 1;                                                // This is the workspace memory X * 1024 *1024
-    learnCfg.maxSteps       = 2000;                                             // How many loops
+    learnCfg.initWsMb       = 4;                                                // This is the workspace memory X * 1024 *1024
+    learnCfg.maxSteps       = 1000;                                             // How many loops
     learnCfg.targetFitness  = 98.0f;                                            // What we are aiming for
-    learnCfg.type           = LearnType::Bard;                                  // The type of learner
+    learnCfg.type           = LearnType::Language;                              // The type of learner
 
-    ESCoach::Config coachCfg;
+
+    // Create the Coach/Trainer
+    ESConfig coachCfg;
     coachCfg.populationSize = 16;
-    coachCfg.sigma          = 0.09f;
+    coachCfg.sigma          = 0.08f;
     coachCfg.decay          = 0.995f;
+    coachCfg.envConfig      = learnCfg;
+    ESCoach coach(ctx.pool, coachCfg);
+
+    // Get the "Learning Type" from the coach.
+    auto *llm = dynamic_cast<LanguageLearn*>(coach.learner());
+    REQUIRE(llm != nullptr);
+
+    const uint32_t inDim = llm->inputDimension();
+    const uint32_t outDim = llm->outputDimension();
+    REQUIRE(outDim == 256);
+
+    // Create the Layers
+    Genome bestGenome = buildTextLayers(inDim, outDim);
+
+    // Whatever logging for now
+    std::string thought{};
+    uint32_t gen = 0;
+
+    JOB_LOG_INFO("[Byte Language] Start training");
+    BENCHMARK("Training Loop Po=16: N=1000)") {
+        while(!llm->done() && gen < learnCfg.maxSteps ) {
+            bestGenome = coach.coach((gen == 0) ? bestGenome : coach.bestGenome());
+            gen++;
+        }
+    };
+    thought = llm->say(learnCfg.corpusLen, bestGenome);
+    JOB_LOG_INFO("\n[Language Model, Byte Encodings] {} Final: {}", llm->fitness(), thought.substr(0, 20));
+    REQUIRE(llm->fitness() > 80);
+}
+
+// TEST_CASE("Language Motif: The Physics Bard", "[ai][coach][llm]")
+// {
+
+//     JobFifoCtx ctx(16);
+//     const std::string kCorpus = "The portal is open. Time flows forward. The dragons are slain. Time flows backward. The portal is closed. The dragons rise.";
+
+//     auto learnCfg = LearnPresets::LanguageConfig(
+//         kCorpus.c_str(),
+//         job::ai::token::TokenType::Motif
+//         );
+
+//     learnCfg.contextLen    = 32;
+//     learnCfg.corpusLen     = (uint32_t)(kCorpus.length() - learnCfg.contextLen); // Approx
+//     learnCfg.seed          = 42;
+//     learnCfg.initWsMb      = 4;
+//     learnCfg.maxSteps      = 3000;
+//     learnCfg.targetFitness = 96.0f;
+
+//     ESConfig coachCfg;
+//     coachCfg.populationSize = 128;
+//     coachCfg.sigma          = 0.08f;
+//     coachCfg.decay          = 0.998f;
+//     coachCfg.envConfig      = learnCfg;
+
+//     ESCoach coach(ctx.pool, coachCfg);
+//     auto *llm = dynamic_cast<LanguageLearn*>(coach.learner());
+//     REQUIRE(llm != nullptr);
+
+//     const uint32_t inDim = llm->inputDimension();
+//     const uint32_t outDim = llm->outputDimension();
+
+//     // Using the new builder
+//     Genome bestGenome = buildTextLayers(inDim, outDim);
+//     std::string thought{};
+//     uint32_t gen = 0;
+
+//     BENCHMARK("Training Loop P=256, N=6000") {
+//         while(!llm->done() && gen < learnCfg.maxSteps) {
+//             bestGenome = coach.coach((gen == 0) ? bestGenome : coach.bestGenome());
+//             gen++;
+//         }
+//         return bestGenome;
+//     };
+
+//     thought = llm->say(learnCfg.corpusLen, coach.bestGenome());
+//     JOB_LOG_INFO("[Langauge Model] Fitness: {:.2f}", llm->fitness());
+//     JOB_LOG_INFO("[Langauge Model] Hallucination: {}", thought);
+//     REQUIRE(llm->fitness() > 90.0f);
+// }
+
+TEST_CASE("Language(With Attention) P=512 N=1000 Model Byte Encodings. ", "[ai][coach][llm]")
+{
+    JobStealerCtx ctx(8);
+    auto learnCfg = LearnPresets::LanguageConfig(
+        finalWords.c_str(),
+        job::ai::token::TokenType::Byte
+        );
+    learnCfg.contextLen     = 6;                                                // Context Window ? IE 1st 6 chars of the finalWords
+    learnCfg.corpusLen      = (finalWords.length() - learnCfg.contextLen);      // the length of the corpus - the context window size (maybe should be doubled ?)
+    learnCfg.seed           = 42;                                               // The seed
+    learnCfg.initWsMb       = 8;                                                // This is the workspace memory X * 1024 *1024
+    learnCfg.maxSteps       = 1000;                                             // How many loops
+    learnCfg.targetFitness  = 98.0f;                                            // What we are aiming for
+    learnCfg.type           = LearnType::Language;                              // The type of learner
+
+
+    ESConfig coachCfg;
+    coachCfg.populationSize = 512;
+    coachCfg.sigma          = 0.08f;
+    coachCfg.decay          = 0.995f;
+
     coachCfg.envConfig      = learnCfg;
 
     ESCoach coach(ctx.pool, coachCfg);
 
-    auto *bard = dynamic_cast<BardLearn*>(coach.learner());
-    REQUIRE(bard != nullptr);
+    auto *llm = dynamic_cast<LanguageLearn*>(coach.learner());
+    REQUIRE(llm != nullptr);
 
-    const uint32_t inDim = bard->inputDimension();
-    const uint32_t outDim = bard->outputDimension();
-    REQUIRE(outDim == 256);
-
-    Genome bestGenome = buildTextBardGenome(inDim, outDim);
+    const uint32_t inDim = llm->inputDimension();
+    const uint32_t outDim = llm->outputDimension();
+    // REQUIRE(outDim == 256);
+    // Genome bestGenome = buildPhysicsLanguageGenome(inDim, outDim, adapters::AdapterType::Dense);         // Sigma: 0.08f || POP: 1028 || Steps 500  || 90.010956,
+    // Genome bestGenome = buildPhysicsLanguageGenome(inDim, outDim, adapters::AdapterType::Flash);         // Sigma: 0.08f || POP: 1028 || Steps 550  || 92.649574
+    // Genome bestGenome = buildPhysicsLanguageGenome(inDim, outDim, adapters::AdapterType::LowRank);       // Sigma: 0.08f || POP: 1028 || Steps 3000 || 53.09803
+    Genome bestGenome = buildPhysicsLanguageGenome(inDim, outDim, adapters::AdapterType::FMM);           // Sigma: 0.08f || POP: 1028 || Steps 350  || 93.06909
+    // Genome bestGenome = buildPhysicsLanguageGenome(inDim, outDim, adapters::AdapterType::BarnesHut);     // Sigma: 0.08f || POP: 64   || Steps 500  || 85.5214 // This can not handle large populations
+    // Genome bestGenome = buildPhysicsLanguageGenome(inDim, outDim, adapters::AdapterType::Verlet);        // Sigma: 0.08f || POP: 1028 || Steps 1000 || 88.14781
+    // Genome bestGenome = buildPhysicsLanguageGenome(inDim, outDim, adapters::AdapterType::RK4);           // Sigma: 0.08f || POP: 1028 || Steps 1000 || 88.475716
+    // Genome bestGenome = buildPhysicsLanguageGenome(inDim, outDim, adapters::AdapterType::Stencil);       // Sigma: 0.08f || POP: 1028 || Steps 1000 || 87.72158
     std::string thought{};
     uint32_t gen = 0;
 
-    JOB_LOG_INFO("[Byte Bard] Starts drinking...");
+    BENCHMARK("[Byte Attention Language] Starts ...") {
+        while(!llm->done() && gen < learnCfg.maxSteps ) {
+            bestGenome = coach.coach((gen == 0) ? bestGenome : coach.bestGenome());
+            gen++;
+        }
+    };
+    thought = llm->say(learnCfg.corpusLen, bestGenome);
 
-    while(!bard->done() && gen < learnCfg.maxSteps ) {
-        bestGenome = coach.coach((gen == 0) ? bestGenome : coach.bestGenome());
-        thought = bard->say(learnCfg.corpusLen, bestGenome);
-        gen++;
-    }
-    JOB_LOG_INFO("[Byte Bard] Final: {}", thought.substr(0, 20));
-    REQUIRE(bard->fitness() > 80);
+    JOB_LOG_INFO("\n[Language Model, Byte Encodings] {} Final: {}",llm->fitness(), thought.substr(0, 20));
+    REQUIRE(llm->fitness() > 80);
 }
 
-TEST_CASE("Bard Ascii: Trains the Ascii Bard", "[ai][coach][bard]")
+
+
+TEST_CASE("Language Ascii: Trains the Ascii Language", "[ai][coach][llm]")
 {
     JobStealerCtx ctx(8);
-    auto learnCfg = LearnPresets::BardConfig(
+    auto learnCfg = LearnPresets::LanguageConfig(
         finalWords.c_str(),
         job::ai::token::TokenType::Ascii
         );
@@ -147,9 +313,9 @@ TEST_CASE("Bard Ascii: Trains the Ascii Bard", "[ai][coach][bard]")
     learnCfg.initWsMb       = 1;
     learnCfg.maxSteps       = 2000;
     learnCfg.targetFitness  = 98.0f;
-    learnCfg.type           = LearnType::Bard;
+    learnCfg.type           = LearnType::Language;
 
-    ESCoach::Config coachCfg;
+    ESConfig coachCfg;
     coachCfg.populationSize = 64;
     coachCfg.sigma          = 0.09f;
     coachCfg.decay          = 0.995f;
@@ -157,35 +323,32 @@ TEST_CASE("Bard Ascii: Trains the Ascii Bard", "[ai][coach][bard]")
 
     ESCoach coach(ctx.pool, coachCfg);
 
-    auto *bard = dynamic_cast<BardLearn*>(coach.learner());
-    REQUIRE(bard != nullptr);
+    auto *llm = dynamic_cast<LanguageLearn*>(coach.learner());
+    REQUIRE(llm != nullptr);
 
-    const uint32_t inDim = bard->inputDimension();
-    const uint32_t outDim = bard->outputDimension();
+    const uint32_t inDim = llm->inputDimension();
+    const uint32_t outDim = llm->outputDimension();
     REQUIRE(outDim == 95);
 
-    Genome bestGenome = buildAsciiBardGenome(inDim, outDim);
+    Genome bestGenome = buildAsciiLayers(inDim, outDim);
     std::string thought{};
     uint32_t gen = 0;
 
-    JOB_LOG_INFO("[Ascii Bard] Starts drinking...");
+    JOB_LOG_INFO("[Ascii Language] Starts drinking...");
 
-    while(!bard->done() && gen < learnCfg.maxSteps ) {
+    while(!llm->done() && gen < learnCfg.maxSteps ) {
         bestGenome = coach.coach((gen == 0) ? bestGenome : coach.bestGenome());
-        thought = bard->say(learnCfg.corpusLen, bestGenome);
+        thought = llm->say(learnCfg.corpusLen, bestGenome);
         gen++;
     }
-    JOB_LOG_INFO("[Ascii Bard] Final: {}", thought.substr(0, 20));
-    REQUIRE(bard->fitness() > 80);
+    JOB_LOG_INFO("[Ascii Language] Final: {}", thought.substr(0, 20));
+    REQUIRE(llm->fitness() > 80);
 }
 
-
-
-
-TEST_CASE("Char Byte: Trains the Char Bard", "[ai][coach][bard]")
+TEST_CASE("Char Byte: Trains the Char Language", "[ai][coach][llm]")
 {
     JobStealerCtx ctx(8);
-    auto learnCfg = LearnPresets::BardConfig(
+    auto learnCfg = LearnPresets::LanguageConfig(
         finalWords.c_str(),
         job::ai::token::TokenType::Char
         );
@@ -195,9 +358,9 @@ TEST_CASE("Char Byte: Trains the Char Bard", "[ai][coach][bard]")
     learnCfg.initWsMb       = 1;
     learnCfg.maxSteps       = 2000;
     learnCfg.targetFitness  = 98.0f;
-    learnCfg.type           = LearnType::Bard;
+    learnCfg.type           = LearnType::Language;
 
-    ESCoach::Config coachCfg;
+    ESConfig coachCfg;
     coachCfg.populationSize = 32;
     coachCfg.sigma          = 0.09f;
     coachCfg.decay          = 0.995f;
@@ -205,33 +368,35 @@ TEST_CASE("Char Byte: Trains the Char Bard", "[ai][coach][bard]")
 
     ESCoach coach(ctx.pool, coachCfg);
 
-    auto *bard = dynamic_cast<BardLearn*>(coach.learner());
-    REQUIRE(bard != nullptr);
+    auto *llm = dynamic_cast<LanguageLearn*>(coach.learner());
+    REQUIRE(llm != nullptr);
 
-    const uint32_t inDim  = bard->inputDimension();
-    const uint32_t outDim = bard->outputDimension();
+    const uint32_t inDim  = llm->inputDimension();
+    const uint32_t outDim = llm->outputDimension();
     REQUIRE(outDim == 256);
 
-    Genome bestGenome = buildTextBardGenome(inDim, outDim);
+    Genome bestGenome = buildTextLayers(inDim, outDim);
     std::string thought{};
     uint32_t gen = 0;
 
-    JOB_LOG_INFO("[Char Bard] Starts drinking...");
+    JOB_LOG_INFO("[Char Language] Starts drinking...");
 
-    while(!bard->done() && gen < learnCfg.maxSteps ) {
+    while(!llm->done() && gen < learnCfg.maxSteps ) {
         bestGenome = coach.coach((gen == 0) ? bestGenome : coach.bestGenome());
-        thought = bard->say(learnCfg.corpusLen, bestGenome);
+        thought = llm->say(learnCfg.corpusLen, bestGenome);
         gen++;
     }
-    JOB_LOG_INFO("[Char Bard] Final: {}", thought.substr(0, 20));
-    REQUIRE(bard->fitness() > 80);
+    JOB_LOG_INFO("[Char Language] Final: {}", thought.substr(0, 20));
+    REQUIRE(llm->fitness() > 80);
 }
 
-TEST_CASE("Motif Tokens: Trains the Physics Bard", "[ai][coach][bard]")
+
+
+
+TEST_CASE("Motif Tokens: Trains the Language Model", "[ai][coach][llm]")
 {
     JobStealerCtx ctx(8);
-    std::string finalWords = "JOSEPHJoseph Odd Builder !";                      // The context window (JOSEPH)6 then the corpus 20
-    auto learnCfg = LearnPresets::BardConfig(
+    auto learnCfg = LearnPresets::LanguageConfig(
         finalWords.c_str(),
         job::ai::token::TokenType::Motif
         );
@@ -241,9 +406,9 @@ TEST_CASE("Motif Tokens: Trains the Physics Bard", "[ai][coach][bard]")
     learnCfg.initWsMb       = 1;                                                // This is the workspace memory X * 1024 *1024
     learnCfg.maxSteps       = 200;                                              // How many loops
     learnCfg.targetFitness  = 98.0f;                                            // What we are aiming for
-    learnCfg.type           = LearnType::Bard;                                  // The typ0e of learner
+    learnCfg.type           = LearnType::Language;                                  // The typ0e of learner
 
-    ESCoach::Config coachCfg;
+    ESConfig coachCfg;
     coachCfg.populationSize = 8;                                                // How big is this
     coachCfg.sigma          = 0.1f;                                             // sigma push
     coachCfg.decay          = 0.99f;                                            // decay rate
@@ -251,27 +416,29 @@ TEST_CASE("Motif Tokens: Trains the Physics Bard", "[ai][coach][bard]")
 
     ESCoach coach(ctx.pool, coachCfg);                                          // Create the Coach
 
-    auto *bard = dynamic_cast<BardLearn*>(coach.learner());                     // get the bard from the coach
-    REQUIRE(bard != nullptr);
+    auto *llm = dynamic_cast<LanguageLearn*>(coach.learner());                  // get the Language from the coach
+    REQUIRE(llm != nullptr);
 
-    const uint32_t inDim = bard->inputDimension();                              // Dim In
-    const uint32_t outDim = bard->outputDimension();                            // Dim Out
+    const uint32_t inDim = llm->inputDimension();                              // Dim In
+    const uint32_t outDim = llm->outputDimension();                            // Dim Out
 
-    Genome bestGenome = buildTextBardGenome(inDim, outDim);                     // Create the Genome's with with the layers and also activation type
+    Genome bestGenome = buildTextLayers(inDim, outDim);                         // Create the Genome's with with the layers and also activation type
     std::string thought{};
     uint32_t gen = 0;
-    JOB_LOG_INFO("[Physics Bard] Starts drinking...");
-    while(!bard->done() && gen < learnCfg.maxSteps ) {
+    JOB_LOG_INFO("[Motif Language] Start ...");
+    while(!llm->done() && gen < learnCfg.maxSteps ) {
         bestGenome = coach.coach((gen == 0) ? bestGenome : coach.bestGenome()); // Evolve/train one generation save as survivor (which will later be the step fo non volitile)
-        thought = bard->say(learnCfg.corpusLen, bestGenome);                    // Get the output of what it just learned (should be 14 ? )
+        thought = llm->say(learnCfg.corpusLen, bestGenome);                    // Get the output of what it just learned (should be 14 ? )
         gen++;
     }
 
-    JOB_LOG_INFO("[Physics Bard] Final: {}", thought.substr(0, 20));
-    REQUIRE(bard->fitness() > 80.0f);
+    JOB_LOG_INFO("[Motif Language] {} Final: {}", llm->fitness(),  thought.substr(0, 20));
+    REQUIRE(llm->fitness() > 80.0f);
 }
 
-TEST_CASE("Reincarnation: Saving and Loading the Physics Bard", "[ai][bard][io]")
+
+
+TEST_CASE("Reincarnation: Saving and Loading the LLM", "[ai][llm][io]")
 {
     std::string vocabFile = "physics_vocab.bin";
     std::string brainFile = "physics_brain.bin";
@@ -283,52 +450,55 @@ TEST_CASE("Reincarnation: Saving and Loading the Physics Bard", "[ai][bard][io]"
     // The First Life (Training)
     {
         JobStealerCtx ctx(8);
-        auto learnCfg = LearnPresets::BardConfig(finalWords.c_str(), job::ai::token::TokenType::Motif);
+        auto learnCfg = LearnPresets::LanguageConfig(
+            finalWords.c_str(),
+            job::ai::token::TokenType::Motif
+        );
         learnCfg.contextLen = 6;
         learnCfg.corpusLen  = (finalWords.length() - learnCfg.contextLen);
         learnCfg.maxSteps = 250; // Ensure convergence
         learnCfg.seed = 42;
 
-        ESCoach::Config coachCfg;
+        ESConfig coachCfg;
         coachCfg.populationSize = 8;
         coachCfg.sigma          = 0.1f;
         coachCfg.decay          = 0.99f;
         coachCfg.envConfig = learnCfg;
 
         ESCoach coach(ctx.pool, coachCfg);
-        auto *bard = dynamic_cast<BardLearn*>(coach.learner());
+        auto *llm = dynamic_cast<LanguageLearn*>(coach.learner());
 
         // Train
-        const uint32_t inDim = bard->inputDimension();
-        const uint32_t outDim = bard->outputDimension();
-        Genome genome = buildTextBardGenome(inDim, outDim);
+        const uint32_t inDim = llm->inputDimension();
+        const uint32_t outDim = llm->outputDimension();
+        Genome genome = buildTextLayers(inDim, outDim);
 
         uint32_t gen = 0;
-        while (!bard->done() && gen < learnCfg.maxSteps) {
+        while (!llm->done() && gen < learnCfg.maxSteps) {
             genome = coach.coach((gen==0) ? genome : coach.bestGenome());
-            (void)bard->say(learnCfg.corpusLen, genome);
+            (void)llm->say(learnCfg.corpusLen, genome);
             gen++;
         }
 
         // Verify Life 1 worked
-        REQUIRE(bard->fitness() > 80.0f);
+        REQUIRE(llm->fitness() > 90.0f);
         Genome survivorGenome = coach.bestGenome();
 
         // SAVE THE DICTIONARY
         std::ofstream vFile(vocabFile, std::ios::binary);
         REQUIRE(vFile.is_open());
-        REQUIRE(bard->tokenizer()->save(vFile));
+        REQUIRE(llm->tokenizer()->save(vFile));
         vFile.close(); // Flush
 
         // SAVE THE BRAIN
         REQUIRE(GenomeSerializer::save(survivorGenome, brainFile));
 
-        JOB_LOG_INFO("[Life 1] Saved Bard to disk.");
-    } // Bard and Coach destroyed here
+        JOB_LOG_INFO("[Life 1] Saved llm to disk.");
+    } // Language and Coach destroyed here
 
     // The Second Life (Inference Only)
     {
-        JOB_LOG_INFO("[Life 2] Waking up from disk...");
+        JOB_LOG_INFO("[Life 2] Waking up llm from disk...");
         JobFifoCtx ctx(1);
         // Load Brain
         Genome reincarnatedGenome = GenomeSerializer::load(brainFile);
@@ -336,20 +506,19 @@ TEST_CASE("Reincarnation: Saving and Loading the Physics Bard", "[ai][bard][io]"
         REQUIRE(reincarnatedGenome.architecture.size() > 0);
 
         // Setup Learner (Simulate App Start)
-        auto learnCfg = LearnPresets::BardConfig(finalWords.c_str(), job::ai::token::TokenType::Motif);
+        auto learnCfg = LearnPresets::LanguageConfig(finalWords.c_str(), job::ai::token::TokenType::Motif);
         learnCfg.contextLen = 6;
         learnCfg.corpusLen = (uint32_t)(finalWords.length() - learnCfg.contextLen);
-        // Fresh bard, empty mind
-        BardLearn newBard(learnCfg, ctx.pool);
+        // Fresh Language, empty mind
+        LanguageLearn newLanguage(learnCfg, ctx.pool);
 
         std::ifstream vFile(vocabFile, std::ios::binary);
         REQUIRE(vFile.is_open());
-        REQUIRE(newBard.tokenizer()->load(vFile));
+        REQUIRE(newLanguage.tokenizer()->load(vFile));
         vFile.close();
 
-        // The new bard runs the old brain on the old dictionary.
-        std::string thought = newBard.say(learnCfg.corpusLen, reincarnatedGenome);
-
+        // The new Language runs the old brain on the old dictionary.
+        std::string thought = newLanguage.say(learnCfg.corpusLen, reincarnatedGenome);
         JOB_LOG_INFO("[Life 2] Recalled: {}", thought);
 
         // Check for success
@@ -357,3 +526,184 @@ TEST_CASE("Reincarnation: Saving and Loading the Physics Bard", "[ai][bard][io]"
         REQUIRE(thought.find("Joseph") != std::string::npos);
     }
 }
+
+
+
+#if 0
+
+std::string loadFile(const std::string &path) {
+    std::ifstream f(path, std::ios::binary);
+    return std::string(std::istreambuf_iterator<char>(f),
+                       std::istreambuf_iterator<char>());
+}
+
+
+
+Genome buildSpecialLayers(uint32_t inputSize, uint32_t outputSize, int hidden = 32)
+{
+    Genome g;
+    int kHidden = hidden;
+
+    // Layer 1: Perception
+    LayerGene l1{};
+    l1.type         = LayerType::Dense;
+    l1.activation   = comp::ActivationType::Swish;
+    l1.inputs       = inputSize;
+    l1.outputs      = kHidden;
+    l1.weightCount  = (l1.inputs * l1.outputs) + l1.outputs;
+    l1.weightOffset = 0;
+
+    g.architecture.push_back(l1);
+
+    // Layer 2: Prediction
+    LayerGene l2{};
+    l2.type         = LayerType::Dense;
+    l2.activation   = comp::ActivationType::Identity;
+    l2.inputs       = kHidden;
+    l2.outputs      = outputSize;
+    l2.weightCount  = (l2.inputs * l2.outputs) + l2.outputs;
+    l2.weightOffset = l1.weightCount;
+    g.architecture.push_back(l2);
+
+    g.weights.resize(l1.weightCount + l2.weightCount);
+
+    // Xavier Init
+    float scale = 1.0f / std::sqrt((float)kHidden);
+    for(auto &w : g.weights)
+        w = ((rand() % 2000) / 1000.0f - 1.0f) * scale;
+
+    return g;
+}
+
+
+TEST_CASE("Convo: Saving and Loading the LLM", "[ai][llm][io]")
+{
+    const std::string kChatCorpus =
+        "<User>Who are you?\n"
+        "<Bard>I am the Physics Bard.\n"
+        "<User>What are you made of?\n"
+       "<Bard>I am made of code and math.\n"
+       "<User>Who built you?\n"
+       "<Bard>I was built by Joseph.\n"
+        "<User>Do you like C++?\n"
+        "<Bard>I love C++ templates.\n"
+        "<User>What is 1+1?\n"
+        "<Bard>It is 2.\n"
+        "<User>Who are you?\n"
+        "<Bard>I am the Physics Bard.\n";
+
+    std::string promptStr = "<User>Who are you?\n<Bard>";
+
+    std::string vocabFile = "convo_vocab.bin";
+    std::string brainFile = "convo_brain.bin";
+
+    // Cleanup old files
+    // std::remove(vocabFile.c_str());
+    // std::remove(brainFile.c_str());
+
+    // The First Life (Training)
+    {
+        JobFifoCtx ctx(24);
+        auto learnCfg = LearnPresets::LanguageConfig(
+            kChatCorpus.c_str(),
+            job::ai::token::TokenType::Byte
+            );
+        learnCfg.contextLen = 256;//kChatCorpus.length();
+        learnCfg.corpusLen  = (kChatCorpus.length() - learnCfg.contextLen);
+        learnCfg.maxSteps = 5000; // Ensure convergence
+        learnCfg.seed = 42;
+        learnCfg.initWsMb = 4;
+        learnCfg.targetFitness  = 97.0f;
+
+
+
+        ESConfig coachCfg;
+        coachCfg.populationSize = 64;
+        coachCfg.sigma          = 0.08f;
+        coachCfg.decay          = 0.995f;
+        coachCfg.envConfig = learnCfg;
+
+        ESCoach coach(ctx.pool, coachCfg);
+        auto *llm = dynamic_cast<LanguageLearn*>(coach.learner());
+
+        // Train
+        const uint32_t inDim = llm->inputDimension();
+        const uint32_t outDim = llm->outputDimension();
+        Genome genome = buildSpecialLayers(inDim, outDim, 32);
+        std::string thought{};
+
+        uint32_t gen = 0;
+        while (!llm->done() && gen < learnCfg.maxSteps) {
+            genome = coach.coach((gen==0) ? genome : coach.bestGenome());
+            thought = llm->say(learnCfg.corpusLen, genome);
+            if(gen > 0 && (gen % 10 == 0))
+                JOB_LOG_INFO("[Convo Model] Gen {}/{}  P {}  ||  weight {}  ||  fitness {} || {}",
+                             gen,
+                             learnCfg.maxSteps,
+                             coachCfg.populationSize,
+                             genome.weights[gen -1],
+                             llm->fitness(),
+                             thought);
+            gen++;
+        }
+
+        // Verify Life 1 worked
+        REQUIRE(llm->fitness() > 90.0f);
+        /*
+        Genome survivorGenome = coach.bestGenome();
+        SAVE THE DICTIONARY
+        // std::ofstream vFile(vocabFile, std::ios::binary);
+        // REQUIRE(vFile.is_open());
+        // REQUIRE(llm->tokenizer()->save(vFile));
+        // vFile.close(); // Flush
+
+        // SAVE THE BRAIN
+        REQUIRE(GenomeSerializer::save(survivorGenome, brainFile));
+        */
+        JOB_LOG_INFO("[Convo Life 1] Saved llm to disk.");
+    } // Language and Coach destroyed here
+/*
+    // The Shakespeare Second Life (Inference Only)
+    {
+        JOB_LOG_INFO("[Convo Life 2] Waking up llm from disk...");
+        JobFifoCtx ctx(1);
+
+        Genome reincarnatedGenome = GenomeSerializer::load(brainFile);
+        REQUIRE(!reincarnatedGenome.weights.empty());
+        REQUIRE(!reincarnatedGenome.architecture.empty());
+
+        // Keep SAME token type + SAME contextLen as training
+        std::string seed = promptStr;
+        while (seed.size() < 64) seed += " "; // ensure enough bytes for contextLen=32
+
+        auto learnCfg = LearnPresets::LanguageConfig(seed.c_str(), job::ai::token::TokenType::Motif);
+        learnCfg.contextLen = 32;
+        learnCfg.corpusLen  = uint32_t(seed.size() - learnCfg.contextLen);
+
+        LanguageLearn newLanguage(learnCfg, ctx.pool);
+
+        std::ifstream vFile(vocabFile, std::ios::binary);
+        REQUIRE(vFile.is_open());
+        REQUIRE(newLanguage.tokenizer()->load(vFile));
+        vFile.close();
+
+        // Ask for actual output bytes
+        std::string thought = newLanguage.say(256, reincarnatedGenome);
+        JOB_LOG_INFO("[Convo 2] Recalled: {}", thought);
+
+        REQUIRE(thought.size() > 0);
+
+    }
+*/
+}
+
+#endif
+
+
+
+
+
+
+
+
+

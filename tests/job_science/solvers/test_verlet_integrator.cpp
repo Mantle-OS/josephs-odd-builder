@@ -77,7 +77,7 @@ TEST_CASE("VerletIntegrator runs KDK and DKD with generic (POD) structs", "[thre
     const float dt = 0.01f;
     const int steps = 10000;
 
-    JOB_LOG_INFO("[VELOCITY VERLET]: SCIENCE TIME Running {} loops on the simulation", steps);
+    JOB_LOG_INFO("[VELOCITY VERLET]: Running {} loops on the simulation", steps);
     for (int i = 0; i < steps; ++i) {
         sim_kdk.step(dt, VV_Scheme::KDK, true);
         sim_dkd.step(dt, VV_Scheme::DKD, true);

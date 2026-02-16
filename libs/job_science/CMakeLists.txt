@@ -70,6 +70,7 @@ set(JOB_SCIENCE_ENGINE_SOURCES
 )
 set(JOB_SCIENCE_ENGINE_HEADERS
     engine/engine_config.h
+    engine/engine_threads.h
     engine/engine.h
     # engine/integrator_strategy.h
 )
@@ -77,10 +78,16 @@ set(JOB_SCIENCE_ENGINE_HEADERS
 
 
 
-# set(JOB_SCIENCE_INTEGRATORS_HEADERS
-#     integrators/iintegrator.h
-# )
-# set(JOB_SCIENCE_INTEGRATORS_SOURCES)
+set(JOB_SCIENCE_INTEGRATORS_HEADERS
+    integrators/integrator_ctx.h
+    integrators/iintegrator.h
+    integrators/integrator_factory.h
+    integrators/verlet.h # << New where we are
+    # integrators/barns_hut.h
+    # integrators/fmm.h
+)
+
+set(JOB_SCIENCE_INTEGRATORS_SOURCES)
 
 
 
@@ -113,10 +120,10 @@ set(JOB_SCIENCE_SOLVERS_HEADERS
 add_library(JosephsOddBuilder_Science SHARED
     ${JOB_SCIENCE_DATA_HEADERS}         ${JOB_SCIENCE_DATA_SOURCES}
     ${JOB_SCIENCE_SOLVERS_HEADERS}      ${JOB_SCIENCE_SOLVERS_SOURCES}
-    ${JOB_SCIENCE_FRAMES_HEADERS}      ${JOB_SCIENCE_FRAMES_SOURCES}
-    # ${JOB_SCIENCE_INTEGRATORS_HEADERS}  ${JOB_SCIENCE_INTEGRATORS_SOURCES}
+    ${JOB_SCIENCE_FRAMES_HEADERS}       ${JOB_SCIENCE_FRAMES_SOURCES}
+    ${JOB_SCIENCE_INTEGRATORS_HEADERS}  ${JOB_SCIENCE_INTEGRATORS_SOURCES}
 
-    # ${JOB_SCIENCE_ENGINE_HEADERS}      ${JOB_SCIENCE_ENGINE_SOURCES}
+    ${JOB_SCIENCE_ENGINE_HEADERS}      ${JOB_SCIENCE_ENGINE_SOURCES}
  )
 
 set_target_properties(JosephsOddBuilder_Science PROPERTIES
@@ -130,6 +137,7 @@ target_link_libraries(JosephsOddBuilder_Science PUBLIC
     atomic
     JosephsOddBuilder_Core
     JosephsOddBuilder_Threads
+    JosephsOddBuilder_IO
     JosephsOddBuilder_Net
     JosephsOddBuilder_Crypto
 )

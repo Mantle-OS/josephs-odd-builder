@@ -19,6 +19,7 @@ set(JOBCORE_HEADERS
     job_permissions.h
     job_assert.h
     split_mix64.h
+    aligned_allocator.h
 )
 
 add_library(JosephsOddBuilder_Core SHARED

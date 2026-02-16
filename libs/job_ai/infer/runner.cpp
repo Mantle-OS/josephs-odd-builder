@@ -5,13 +5,10 @@
 
 namespace job::ai::infer {
 
-Runner::Runner(const evo::Genome &genome,
-               threads::ThreadPool::Ptr pool,
-               uint8_t initialWsMB)
-    : m_pool(std::move(pool))
-    , m_genome(genome)
-    // Reserve minimal space initially
-    , m_workspace(size_t(initialWsMB) * 1024 * 1024)
+Runner::Runner(const evo::Genome &genome, threads::ThreadPool::Ptr pool, uint8_t initialWsMB):
+    m_pool(std::move(pool)),
+    m_genome(genome),
+    m_workspace(size_t(initialWsMB) * 1024 * 1024)
 {
     comp::NoiseTable::instance();
     buildNetwork();
@@ -88,19 +85,13 @@ cords::ViewR Runner::run(const cords::ViewR &input, uint8_t wsMB)
     if (m_workspace.size() < totalBytes)
         m_workspace.resize(totalBytes); // HERE
 
-    // 3. Partition Pointers
     float *base = m_workspace.raw();
     float *bufA = base;
     float *bufB = base + ioFloats;
 
-    // Scratch starts after Buffer B
-    float* scratchBase = base + (ioFloats * 2);
-
-    // Create a View for the layers to use as scratch
-    // They won't know bufA/B exist before them.
+    float *scratchBase = base + (ioFloats * 2);
     Workspace scratchView(scratchBase, scratchBytes);
 
-    // Safe because bufA is part of m_workspace which we own
     if (input.size() <= ioFloats)
         std::memcpy(bufA, input.data(), input.size() * sizeof(float));
     else

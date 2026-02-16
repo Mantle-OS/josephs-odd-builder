@@ -1,5 +1,6 @@
 #include "mode_change.h"
-#include <iostream>
+
+#include <job_logger.h>
 
 namespace job::ansi::csi {
 
@@ -8,14 +9,14 @@ void DispatchDECSET::dispatchPrivate(DECSET_PRIVATE_CODE code, bool set)
     switch (code) {
     case DECSET_PRIVATE_CODE::CURSOR_KEYS:
         // Application cursor keys mode
-        std::cerr << "[DECSET] Application cursor keys mode " << (set ? "enabled" : "disabled") << "\n";
+        JOB_LOG_DEBUG("[DECSET] Application cursor keys mode {}", (set ? "enabled" : "disabled"));
         m_screen->set_cursorKeysMode(set);
         break;
 
         // SKIPPED
     case DECSET_PRIVATE_CODE::COLUMN_MODE_132:
         // 132 column mode (ignored in modern terminals)
-        std::cerr << "[DECSET] 132 column mode not supported\n";
+        JOB_LOG_DEBUG("[DECSET] 132 column mode not supported");
         break;
 
     // SKIPPED
@@ -24,7 +25,7 @@ void DispatchDECSET::dispatchPrivate(DECSET_PRIVATE_CODE code, bool set)
     // to performance and limited value. Most emulators (including xterm and Linux consoles) ignore this mode.
     case DECSET_PRIVATE_CODE::SMOOTH_SCROLL:
         // Smooth scrolling mode
-        std::cerr << "[DECSET] Smooth scroll mode not supported\n";
+        JOB_LOG_DEBUG("[DECSET] Smooth scroll mode not supported");
         break;
 
     case DECSET_PRIVATE_CODE::REVERSE_VIDEO:
@@ -42,7 +43,7 @@ void DispatchDECSET::dispatchPrivate(DECSET_PRIVATE_CODE code, bool set)
 
     case DECSET_PRIVATE_CODE::AUTOREPEAT_MODE:
         // Auto-repeat keys mode
-        std::cerr << "[DECSET] Auto-repeat mode not supported\n";
+        JOB_LOG_DEBUG("[DECSET] Auto-repeat mode not supported");
         break;
 
     case DECSET_PRIVATE_CODE::BLINKING_CURSOR:
@@ -83,18 +84,18 @@ void DispatchDECSET::dispatchPrivate(DECSET_PRIVATE_CODE code, bool set)
 
     case DECSET_PRIVATE_CODE::ALTERNATE_SCREEN:
         if (set) {
-            m_screen->enterAlternateBuffer();
+            m_screen->enterAlternateGrid();
         } else {
-            m_screen->exitAlternateBuffer();
+            m_screen->exitAlternateGrid();
         }
         break;
 
     case DECSET_PRIVATE_CODE::ALTERNATE_SCREEN_EXT:
         if (set) {
             m_screen->saveCursor();
-            m_screen->enterAlternateBuffer();
+            m_screen->enterAlternateGrid();
         } else {
-            m_screen->exitAlternateBuffer();
+            m_screen->exitAlternateGrid();
             m_screen->restoreCursor();
         }
         break;
@@ -110,7 +111,8 @@ void DispatchDECSET::dispatchPrivate(DECSET_PRIVATE_CODE code, bool set)
 
 
     default:
-        std::cerr << "[DECSET] Unknown private mode: ?" << static_cast<int>(code) << " = " << (set ? "set" : "reset") << "\n";
+        std::string_view setStr = (set ? "set" : "reset");
+        JOB_LOG_DEBUG("[DECSET] Unknown private mode: {} = {}" , static_cast<int>(code), setStr);
         break;
     }
 }
@@ -128,7 +130,7 @@ void DispatchDECSET::dispatchPublic(DECSET_PUBLIC_CODE code, bool set)
 
 
     default:
-        std::cerr << "[DECSET] Unknown public mode: " << static_cast<int>(code) << " = " << (set ? "set" : "reset") << "\n";
+        JOB_LOG_DEBUG("[DECSET] Unknown public mode: {} = ", static_cast<int>(code), (set ? "set" : "reset"));
         break;
     }
 }

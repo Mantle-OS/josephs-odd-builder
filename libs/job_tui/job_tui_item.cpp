@@ -305,11 +305,12 @@ void JobTuiItem::paintSelf(DrawContext &ctx)
     if (!m_attributes || !m_itemHasContents)
         return;
 
-    if (m_attributes->foreground)
-        ctx.setForeground(m_attributes->foreground.value());
 
-    if (m_attributes->background)
-        ctx.setBackground(m_attributes->background.value());
+    if (auto *fg = m_attributes->getForeground())
+        ctx.setForeground(*fg);
+
+    if (auto *bg = m_attributes->getBackground())
+        ctx.setBackground(*bg);
 
     for (int dy = 0; dy < m_height; ++dy) {
         ctx.moveCursor(m_x, m_y + dy);

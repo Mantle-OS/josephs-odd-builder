@@ -16,7 +16,7 @@ class UdpServer {
 public:
     using MessageCallback = std::function<void(const char*, size_t, const JobIpAddr&)>;
 
-    explicit UdpServer(std::shared_ptr<threads::JobIoAsyncThread> loop, uint16_t buffer_size = 4096);
+    explicit UdpServer(threads::JobIoAsyncThread::Ptr loop, uint16_t buffer_size = 4096);
     ~UdpServer();
 
     UdpServer(const UdpServer &) = delete;
@@ -37,8 +37,8 @@ public:
 private:
     void setupSocketCallbacks();
 
-    std::shared_ptr<threads::JobIoAsyncThread> m_loop;
-    UdpSocket::UdpSocketPtr m_socket;
+    threads::JobIoAsyncThread::Ptr m_loop;
+    UdpSocket::Ptr m_socket;
 
     uint16_t m_port{0};
     std::vector<char> m_readBuffer;

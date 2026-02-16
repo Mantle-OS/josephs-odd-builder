@@ -1,8 +1,10 @@
 #pragma once
+
+#include <job_logger.h>
+
+
 #include "esc/csi/dispatch_base.h"
-
 #include "utils/job_ansi_enums.h"
-
 #include "job_ansi_screen.h"
 
 namespace job::ansi::csi {
@@ -19,10 +21,10 @@ public:
     void initMap() override
     {
         // CHT - Cursor Horizontal Tab
-        m_dispatchMap[CSI_CODE::CHT] = [this](const std::vector<int> &params) {
+        m_dispatchMap[CSI_CODE::CHT] = [this](std::span<const int> params) {
             int count = params.empty() ? 1 : params[0];
             if (Cursor *cursor = m_screen->cursor()) {
-                int col = cursor->col();
+                int col = cursor->column();
                 for (int i = 0; i < count; ++i) {
                     do {
                         ++col;
@@ -35,10 +37,10 @@ public:
         };
 
         // CBT - Cursor Backward Tab
-        m_dispatchMap[CSI_CODE::CBT] = [this](const std::vector<int> &params) {
+        m_dispatchMap[CSI_CODE::CBT] = [this](std::span<const int> params) {
             int count = params.empty() ? 1 : params[0];
             if (Cursor *cursor = m_screen->cursor()) {
-                int col = cursor->col();
+                int col = cursor->column();
                 for (int i = 0; i < count && col > 0; ++i) {
                     do {
                         --col;
@@ -50,39 +52,39 @@ public:
         };
 
         // TBC - Tab Clear
-        m_dispatchMap[CSI_CODE::TBC] = [this](const std::vector<int> &params) {
+        m_dispatchMap[CSI_CODE::TBC] = [this](std::span<const int> params) {
             int mode = params.empty() ? 0 : params[0];
             if (Cursor *cursor = m_screen->cursor()) {
                 switch (mode) {
                 case 0:  // Clear tab stop at cursor
-                    m_screen->clearTabStop(cursor->col());
+                    m_screen->clearTabStop(cursor->column());
                     break;
                 case 3:  // Clear all tab stops
                     m_screen->clearAllTabStops();
                     break;
                 default:
-                    std::cerr << "Unhandled TBC mode: " << mode << '\n';
+                    JOB_LOG_DEBUG("Unhandled TBC mode: {}", mode);
                     break;
                 }
             }
         };
 
         // CTC - Cursor Tab Control (rarely used)
-        m_dispatchMap[CSI_CODE::CTC] = [this](const std::vector<int> &params) {
+        m_dispatchMap[CSI_CODE::CTC] = [this](std::span<const int> params) {
             int mode = params.empty() ? 0 : params[0];
             if (Cursor *cursor = m_screen->cursor()) {
                 switch (mode) {
                 case 0:  // Set tab stop at cursor
-                    m_screen->setTabStop(cursor->col());
+                    m_screen->setTabStop(cursor->column());
                     break;
                 case 2:  // Clear tab stop at cursor
-                    m_screen->clearTabStop(cursor->col());
+                    m_screen->clearTabStop(cursor->column());
                     break;
                 case 5:  // Clear all tab stops
                     m_screen->clearAllTabStops();
                     break;
                 default:
-                    std::cerr << "Unhandled CTC mode: " << mode << '\n';
+                    JOB_LOG_DEBUG("Unhandled CTC mode: {}", mode);
                     break;
                 }
             }

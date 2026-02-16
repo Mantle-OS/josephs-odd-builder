@@ -7,11 +7,11 @@ namespace job::science::frames {
 
 using job::net::ISocketIO;
 
-FrameSinkNet::FrameSinkNet(Socket socket, bool autoOpen) noexcept :
+FrameSinkNet::FrameSinkNet(ISocketIO::Ptr socket, bool autoOpen) noexcept :
     m_socket(std::move(socket)),
     m_autoOpen(autoOpen)
 {
-    // We *could* auto-open here, but we keep side-effects out of ctor.
+    // I *could* auto-open here, but we keep side-effects out of ctor.
 }
 
 bool FrameSinkNet::open()
@@ -30,7 +30,7 @@ bool FrameSinkNet::open()
     using State = ISocketIO::SocketState;
     const auto state = m_socket->state();
 
-    // We consider these "good enough" to send bytes:
+    // I consider these "good enough" to send bytes:
     // - Connected: normal client socket
     // - Listening / Bound: in case you're using a per-connection session sink,
     //   you should be passing that instead, but we won't over-police here.
@@ -45,7 +45,7 @@ bool FrameSinkNet::open()
         break;
     }
 
-    // We *could* try autoOpen logic here (e.g. reconnect), but we don't know
+    // I *could* try autoOpen logic here (e.g. reconnect), but we don't know
     // the URL/endpoint. The higher-level client/server owns connection policy.
     if (m_autoOpen) {
         JOB_LOG_WARN("[FrameSinkNet] autoOpen requested, but socket state={} "
@@ -58,7 +58,7 @@ bool FrameSinkNet::open()
 
 void FrameSinkNet::close()
 {
-    // We *do not* own the socket's lifetime policy; caller decides whether to
+    // I *do not* own the socket's lifetime policy; caller decides whether to
     // disconnect()/destroy it. We just mark this sink as closed.
     m_open.store(false, std::memory_order_release);
 }
@@ -108,13 +108,13 @@ bool FrameSinkNet::writeFrame(const FrameHeader  &header,
     const auto *hdrBytes = reinterpret_cast<const std::uint8_t*>(&header);
     constexpr std::size_t hdrSize = sizeof(FrameHeader);
 
-    // 1) Header
+    // Header
     if (!writeAll(*sock, hdrBytes, hdrSize)) {
         JOB_LOG_ERROR("[FrameSinkNet] Failed to write frame header");
         return false;
     }
 
-    // 2) Payload
+    // Payload
     if (payloadSize > 0 && data) {
         if (!writeAll(*sock, data, payloadSize)) {
             JOB_LOG_ERROR("[FrameSinkNet] Failed to write frame payload ({} bytes)", payloadSize);
@@ -127,9 +127,12 @@ bool FrameSinkNet::writeFrame(const FrameHeader  &header,
 
 void FrameSinkNet::flush()
 {
-    // Sockets typically don't expose a flush primitive; sending is enough.
-    // If later you wrap a buffered sink on top, *that* sink's flush() will
-    // do the real work.
+    // Sockets typically don't expose a flush primitive ...
+}
+
+ISocketIO::Ptr FrameSinkNet::socket() const noexcept
+{
+    return m_socket;
 }
 
 } // namespace job::science::frames

@@ -3,7 +3,8 @@
 #include <cstddef>
 #include <span>
 #include <vector>
-#include "aligned_allocator.h"
+
+#include <aligned_allocator.h>
 
 namespace job::ai::infer {
 
@@ -76,7 +77,7 @@ private:
     float           *m_view{nullptr};
     std::size_t     m_viewBytes{0};
 
-    std::vector<float, job::ai::cords::AlignedAllocator<float, 64>> m_memory;
+    std::vector<float, job::core::AlignedAllocator<float, 64>> m_memory;
 
 };
 

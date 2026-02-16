@@ -216,7 +216,7 @@ TEST_CASE("Unix Socket: AI Genome Transfer", "[unix][ai][genome]")
     std::atomic<bool> packetReceived{false};
     std::atomic<bool> serverSawDisconnect{false};
 
-    server->onClientConnected = [&](UnixClient::UnixClientPtr client) {
+    server->onClientConnected = [&](UnixClient::Ptr client) {
         auto accumulator = std::make_shared<std::vector<char>>();
         accumulator->reserve(totalSize);
 

@@ -26,7 +26,7 @@ struct FunctorGELU {
         // Keep fused order identical to scalar reference below:
         auto term  = SIMD::mul_plus(x3, c_cube, x);     // 0.044715*x^3 + x
         auto inner = SIMD::mul(term, c_magic);          // √(2/π) * (...)
-        auto t     = FunctorTann<T_SMOOTH>::apply(inner); // must be tanh
+        auto t     = FunctorTann<T_SMOOTH>::apply(inner, 1.0f); // must be tanh
 
         auto res = SIMD::add(c_one, t);
         res = SIMD::mul(res, x);
@@ -65,9 +65,9 @@ struct FunctorAproxGELU {
 
         f32 e_2x;
         if constexpr (T_SMOOTH)
-            e_2x = SIMD::exp_estrin(two_arg);
+            e_2x = SIMD::exp(two_arg);
         else
-            e_2x = SIMD::exp_schraudolph(two_arg);
+            e_2x = SIMD::exp_fast(two_arg);
 
         auto num = SIMD::sub(e_2x, one);
         auto den = SIMD::add(e_2x, one);

@@ -12,9 +12,14 @@
 #include "job_ansi_attributes.h"
 #include "job_ansi_cell.h"
 #include "job_ansi_cursor.h"
+#include "job_ansi_grid.h"
+#include "job_ansi_scrollback.h"
+#include "job_ansi_saved_buffer_state.h"
+#include "job_ansi_line_display_mode.h"
 
 #include "utils/job_ansi_utils.h"
 #include "utils/calback_macros.h"
+
 
 #include "utils/charset_translator.h"
 
@@ -27,38 +32,38 @@ static_assert(MAX_SCROLLBACK_LINES > 0, "MAX_SCROLLBACK_LINES must be greater th
 
 class Screen {
     // API Functional callbacks
-    API_CALLBACK(bool                               , wraparound                , true              )
-    API_CALLBACK(bool                               , insertMode                , false             )
-    API_CALLBACK(bool                               , autoLinefeed              , false             )
-    API_CALLBACK(bool                               , bracketedPasteEnabled     , false             )
+    JOB_ANSI_SCREEN_CALLBACK(bool                               , wraparound                , true              )
+    JOB_ANSI_SCREEN_CALLBACK(bool                               , insertMode                , false             )
+    JOB_ANSI_SCREEN_CALLBACK(bool                               , autoLinefeed              , false             )
+    JOB_ANSI_SCREEN_CALLBACK(bool                               , bracketedPasteEnabled     , false             )
 
-    API_CALLBACK_CONST(std::string                  , windowTitle               , ""                ) // OSC(API)
-    API_CALLBACK_CONST(std::string                  , windowIconTitle           , ""                ) // OSC(API)
-    API_CALLBACK_CONST(std::string                  , window_reply              , ""                ) // CSI ... t replies
-    API_CALLBACK_CONST(std::string                  , hyperlinkAnchor           , ""                ) // OSC(API)
-    API_CALLBACK_CONST(std::string                  , clipboardData             , ""                ) // OSC(API)
-    API_CALLBACK_CONST(std::string                  , device_attr               , "\033[?1;0c"      ) // CSI[DA]
-    API_CALLBACK_CONST(std::string                  , device_attr_secondary     , ""                ) // CSI[DA2]
-    API_CALLBACK_CONST(std::string                  , device_attr_tertiary      , ""                ) // CSI[DA3]
+    JOB_ANSI_SCREEN_CALLBACK_CONST(std::string                  , windowTitle               , ""                ) // OSC(API)
+    JOB_ANSI_SCREEN_CALLBACK_CONST(std::string                  , windowIconTitle           , ""                ) // OSC(API)
+    JOB_ANSI_SCREEN_CALLBACK_CONST(std::string                  , window_reply              , ""                ) // CSI ... t replies
+    JOB_ANSI_SCREEN_CALLBACK_CONST(std::string                  , hyperlinkAnchor           , ""                ) // OSC(API)
+    JOB_ANSI_SCREEN_CALLBACK_CONST(std::string                  , clipboardData             , ""                ) // OSC(API)
+    JOB_ANSI_SCREEN_CALLBACK_CONST(std::string                  , device_attr               , "\033[?1;0c"      ) // CSI[DA]
+    JOB_ANSI_SCREEN_CALLBACK_CONST(std::string                  , device_attr_secondary     , ""                ) // CSI[DA2]
+    JOB_ANSI_SCREEN_CALLBACK_CONST(std::string                  , device_attr_tertiary      , ""                ) // CSI[DA3]
 
-    API_CALLBACK(bool                               , blinkingCursor            , true              ) //
-    API_CALLBACK(bool                               , cursorVisible             , true              )
-    API_CALLBACK_CONST(std::string                  , cursor_report             , ""                ) // CSI[6n]
-    API_CALLBACK_CONST(std::string                  , cursor_position_report    , ""                ) // CSI[CPR]
-    API_CALLBACK(std::optional<ansi::utils::RGBColor>            , cursorColor               , std::nullopt      )
+    JOB_ANSI_SCREEN_CALLBACK(bool                               , blinkingCursor            , true              ) //
+    JOB_ANSI_SCREEN_CALLBACK(bool                               , cursorVisible             , true              )
+    JOB_ANSI_SCREEN_CALLBACK_CONST(std::string                  , cursor_report             , ""                ) // CSI[6n]
+    JOB_ANSI_SCREEN_CALLBACK_CONST(std::string                  , cursor_position_report    , ""                ) // CSI[CPR]
+    JOB_ANSI_SCREEN_CALLBACK(std::optional<ansi::utils::RGBColor>            , cursorColor               , std::nullopt      )
 
-    API_CALLBACK(bool                               , appKeypadMode             , false             ) // ESC_CODE: enable disable _APP_KEYPAP
-    API_CALLBACK_CONST(std::string                  , terminal_ident_reply      , "\x1B[?1;2c"      ) // ESC IDENTIFY_TERMINAL (DECID)
-    API_CALLBACK(bool                               , cursorKeysMode            , false             ) // DECSET: ?1h / ?1l
-    API_CALLBACK(bool                               , reverseVideo              , false             ) // DECSCNM
+    JOB_ANSI_SCREEN_CALLBACK(bool                               , appKeypadMode             , false             ) // ESC_CODE: enable disable _APP_KEYPAP
+    JOB_ANSI_SCREEN_CALLBACK_CONST(std::string                  , terminal_ident_reply      , "\x1B[?1;2c"      ) // ESC IDENTIFY_TERMINAL (DECID)
+    JOB_ANSI_SCREEN_CALLBACK(bool                               , cursorKeysMode            , false             ) // DECSET: ?1h / ?1l
+    JOB_ANSI_SCREEN_CALLBACK(bool                               , reverseVideo              , false             ) // DECSCNM
 
     // MOUSE
-    API_CALLBACK(bool, mouseX10Mode         , false)
-    API_CALLBACK(bool, mouseVT200Highlight  , false)
-    API_CALLBACK(bool, mouseButtonEventMode , false)
-    API_CALLBACK(bool, mouseAnyEventMode    , false)
-    API_CALLBACK(bool, mouseUtf8Encoding    , false)
-    API_CALLBACK(bool, mouseSgrEncoding     , false)
+    JOB_ANSI_SCREEN_CALLBACK(bool, mouseX10Mode         , false)
+    JOB_ANSI_SCREEN_CALLBACK(bool, mouseVT200Highlight  , false)
+    JOB_ANSI_SCREEN_CALLBACK(bool, mouseButtonEventMode , false)
+    JOB_ANSI_SCREEN_CALLBACK(bool, mouseAnyEventMode    , false)
+    JOB_ANSI_SCREEN_CALLBACK(bool, mouseUtf8Encoding    , false)
+    JOB_ANSI_SCREEN_CALLBACK(bool, mouseSgrEncoding     , false)
 
 public:
     explicit Screen(int rows = 24, int cols = 80);
@@ -71,24 +76,10 @@ public:
     }
 
     std::function<void()> renderCallback;
-    void requestRender()
-    {
-        m_needsRender = true;
-        if (renderCallback)
-            renderCallback();
-    }
-
-    // BUFFER UTILITIES
-    inline int index(int row, int col) const
-    {
-        return row * m_columns + col;
-    }
+    void requestRender();
 
     // ROW UTILITIES
-    int rowCount() const
-    {
-        return m_rows;
-    }
+    int rowCount() const;
     void clearLine();
     void insertLines(int startRow, int count);
     void deleteLines(int count);
@@ -97,7 +88,10 @@ public:
     void copyRow(int from, int to);
 
     // COLUMN UTILITIES
-    int columnCount() const {return m_columns;}
+    int columnCount() const
+    {
+        return m_primaryGrid.columns();
+    }
 
     // Painting utils
     void markCellDirty(int row, int col);
@@ -115,23 +109,19 @@ public:
     void putChar(char32_t ch, Attributes *style);
 
     // ACTIVE BUFFER
-    std::vector<Cell> &activeBuffer();
-    const std::vector<Cell> &activeBuffer() const;
-    void enterAlternateBuffer();
-    void exitAlternateBuffer();
-    bool isAlternateBufferActive() const;
+    Grid &activeGrid();
+    const Grid &activeGrid() const;
+    void enterAlternateGrid();
+    void exitAlternateGrid();
+    bool isAlternateGridActive() const;
 
     // CELL ACCESS
     Cell *cellAt(int row, int col);
     Attributes *currentAttributes();
-    void setCurrentAttributes(const std::shared_ptr<Attributes> &attr)
-    {
-        m_currentAttributes = attr;
-    }
+    void setCurrentAttributes(const Attributes::Ptr &attr);
     Cell *currentCell();
 
     // SCROLLBACK
-
     void setScrollRegion(int top, int bottom);
     int  scrollTop() const;
     int  scrollBottom() const;
@@ -139,32 +129,24 @@ public:
     void scrollUp();
     void scrollDown(int top, int bottom, int lines = 1);
     // void scrollDown();
-    const std::deque<std::vector<Cell>> &scrollbackLines() const;
+
+    // SCROLLBACK HISTORY
+    [[nodiscard]] const ScrollbackBuffer &scrollback() const;
     void clearScrollback();
     void scrollbackPageUp();
     void scrollbackPageDown();
-    int  scrollOffset() const;
-    void setScrollOffset(int offset);
     void scrollbackLineUp();
     void scrollbackLineDown();
+    int  scrollOffset() const;
+    void setScrollOffset(int offset);
     bool isInScrollback() const;
 
     // CURSOR OPERATIONS
-    const Cursor *cursor() const
-    {
-        return m_cursor.get();
-    }
-
-    Cursor *cursor()
-    {
-        return m_cursor.get();
-    }
+    const Cursor *cursor() const;
+    Cursor *cursor();
     void moveCursor(int rowDelta, int colDelta);
     void moveCursorRelative(int rowDelta, int colDelta, int regionTop, int regionBottom);
-    void moveCursorRelative(int rowDelta, int colDelta)
-    {
-        moveCursorRelative(rowDelta, colDelta, originRow(), originBottom());
-    }
+    void moveCursorRelative(int rowDelta, int colDelta);
     void setCursor(int row, int col);
     void saveCursor();
     void restoreCursor();
@@ -180,14 +162,8 @@ public:
     void sendMouseUtf8Encoding(int button, bool pressed, int row, int col);
 
     // FOCUS
-    void set_focusEventEnabled(bool enable)
-    {
-        m_focusEventEnabled = enable;
-    }
-    bool get_focusEventEnabled() const
-    {
-        return m_focusEventEnabled;
-    }
+    void set_focusEventEnabled(bool enable);
+    bool get_focusEventEnabled() const;
     void sendFocusEvent(bool focused);
 
     // ORIGIN MODE
@@ -201,12 +177,7 @@ public:
     void clearTabStop(int col);
     void clearAllTabStops();
     bool isTabStop(int col) const;
-    void resetTabStops()
-    {
-        m_tabStops.reset();  // Clear all tab stops
-        for (int col = 0; col < m_columns; col += 8)
-            m_tabStops.set(col);
-    }
+    void resetTabStops();
 
     // CHARSET
     void selectCharset(int set, CharsetDesignator designator);
@@ -229,89 +200,11 @@ public:
     void deleteChars(int count);
     void eraseChars(int count);
     void repeatLastChar(int count);
-    void eraseField(int row, int col, EF_MODE mode)
-    {
-        if (row < 0 || row >= m_rows || col < 0 || col >= m_columns)
-            return;
+    void eraseField(int row, int col, EF_MODE mode);
+    void eraseArea(EA_MODE mode);
 
-        switch (mode) {
-        case EF_MODE::TO_END:
-            for (int c = col; c < m_columns; ++c)
-                if (!cellAt(row, c)->isProtectedForErase())
-                    cellAt(row, c)->reset();
-            break;
-        case EF_MODE::TO_START:
-            for (int c = 0; c <= col; ++c)
-                if (!cellAt(row, c)->isProtectedForErase())
-                    cellAt(row, c)->reset();
-            break;
-        case EF_MODE::ENTIRE_LINE:
-            for (int c = 0; c < m_columns; ++c)
-                if (!cellAt(row, c)->isProtectedForErase())
-                    cellAt(row, c)->reset();
-            break;
-        default:
-            break;
-        }
-
-        requestRender();
-    }
-    void eraseArea(EA_MODE mode)
-    {
-        if (!m_cursor)
-            return;
-
-        int curRow = m_cursor->row();
-        int curCol = m_cursor->col();
-
-        switch (mode) {
-        case EA_MODE::TO_END:
-            for (int r = curRow; r < m_rows; ++r) {
-                int startCol = (r == curRow ? curCol : 0);
-                for (int c = startCol; c < m_columns; ++c) {
-                    Cell *cell = cellAt(r, c);
-                    if (cell && !cell->isProtectedForErase())
-                        cell->reset();
-                }
-            }
-            break;
-        case EA_MODE::TO_START:
-            for (int r = 0; r <= curRow; ++r) {
-                int endCol = (r == curRow ? curCol : m_columns - 1);
-                for (int c = 0; c <= endCol; ++c) {
-                    Cell *cell = cellAt(r, c);
-                    if (cell && !cell->isProtectedForErase())
-                        cell->reset();
-                }
-            }
-            break;
-        case EA_MODE::ENTIRE_SCREEN:
-            for (int r = 0; r < m_rows; ++r) {
-                for (int c = 0; c < m_columns; ++c) {
-                    Cell *cell = cellAt(r, c);
-                    if (cell && !cell->isProtectedForErase())
-                        cell->reset();
-                }
-            }
-            break;
-        }
-
-        requestRender();
-    }
-
-    void pushWindowTitle()
-    {
-        m_titleStack.push_back(m_windowTitle);
-    }
-
-    void popWindowTitle()
-    {
-        if (!m_titleStack.empty()) {
-            m_windowTitle = m_titleStack.back();
-            m_titleStack.pop_back();
-            requestRender(); // if needed
-        }
-    }
+    void pushWindowTitle();
+    void popWindowTitle();
 
     // Line width/height operations
     void setLineDisplayMode(int row, LineDisplayMode mode);
@@ -321,56 +214,38 @@ public:
     void setLineHeightPosition(int row, bool isTop);
 
     // SEE (Select Editing Extent)
-    void setEditingExtent(SEE_MODE mode)
-    {
-        m_editingExtent = mode;
-    }
-    SEE_MODE editingExtent() const
-    {
-        return m_editingExtent;
-    }
+    void setEditingExtent(SEE_MODE mode);
+    SEE_MODE editingExtent() const;
 
-    void setProtectionMode(DECSCA_MODE mode)
-    {
-        m_protectionMode = mode;
-    }
-    DECSCA_MODE protectionMode() const
-    {
-        return m_protectionMode;
-    }
+    void setProtectionMode(DECSCA_MODE mode);
+    DECSCA_MODE protectionMode() const;
 
 
 private:
-    struct SavedBufferState {
-        std::unique_ptr<Cursor> cursor;
-        int scrollTop;
-        int scrollBottom;
-        std::bitset<512> tabStops;
-    };
-
     bool                                                m_needsRender = false;
     std::unordered_set<int>                             m_dirtyRows;
     std::unordered_map<int, std::unordered_set<int>>    m_dirtyCols;
 
-    int                                                 m_rows = 24;
-    int                                                 m_columns = 80;
-    std::vector<Cell>                                   m_mainBuffer;
-    std::vector<Cell>                                   m_altBuffer;
-    std::deque<std::vector<Cell>>                       m_scrollback;
+    Grid                                                m_primaryGrid;
+    Grid                                                m_altGrid;
 
-    std::unique_ptr<Cursor>                             m_cursor;
-    std::unique_ptr<Cursor>                             m_savedCursor;
+    ScrollbackBuffer                                    m_scrollback;
+    int                                                 m_scrollOffset{0};
+
+    Cursor::UPtr                                        m_cursor;
+    Cursor::UPtr                                        m_savedCursor;
 
     Attributes::Ptr                                     m_currentAttributes = Cell::defaultAttributes();
 
     utils::CharsetTranslator                            m_charset;
 
-    bool                                                m_inAlternateBuffer = false;
+    bool                                                m_inAlternateGrid = false;
     bool                                                m_originMode = false;
+    bool                                                m_wrapPending = false;
     int                                                 m_scrollTop = 0;
-    int                                                 m_scrollBottom = m_rows;
-    int                                                 m_scrollOffset = 0;
+    int                                                 m_scrollBottom = 24; // matches up to Grid::m_rows
     std::bitset<512>                                    m_tabStops;
+
 
     std::optional<SavedBufferState>                     m_savedState;
     bool                                                m_focusEventEnabled = false;

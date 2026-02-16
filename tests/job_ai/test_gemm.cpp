@@ -1,3 +1,5 @@
+#include "ai_weights.h"
+#include "job_stealing_ctx.h"
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/benchmark/catch_benchmark.hpp>
 #include <catch2/catch_approx.hpp>
@@ -7,7 +9,6 @@
 #include <algorithm>
 #include <cmath>
 
-#include <real_type.h>
 #include <aligned_allocator.h>
 #include <matrix.h>
 #include <sched/job_fifo_scheduler.h>
@@ -15,16 +16,15 @@
 
 #include <gemm.h>
 using Catch::Approx;
-using job::core::real_t;
+using job::core::AlignedAllocator;
 using namespace job::threads;
 using namespace job::ai::cords;
 using namespace job::ai::comp;
-
 template <typename Vec>
-static void fillMatrix(Vec &m, real_t scale = real_t(0.01))
+static void fillMatrix(Vec &m, float scale = 0.01f)
 {
     for (std::size_t i = 0; i < m.size(); ++i)
-        m[i] = scale * static_cast<real_t>((static_cast<int>(i % 31) - 15));
+        m[i] = scale * static_cast<float>((static_cast<int>(i % 31) - 15));
 }
 
 
@@ -32,7 +32,7 @@ template <typename Vec>
 static void compareMats(const Vec& C_ref,
                         const Vec& C_test,
                         int M, int N,
-                        real_t tol = real_t(1e-4))
+                        float tol = float(1e-4))
 {
     REQUIRE(C_ref.size() == C_test.size());
 
@@ -70,18 +70,18 @@ TEST_CASE("sgemm: correctness vs naive reference on small shapes", "[ai][sgemm][
         const int ldc = N;
 
         // Use standard vector for small correctness tests is fine
-        std::vector<real_t> A(M * K);
-        std::vector<real_t> B(K * N);
+        std::vector<float> A(M * K);
+        std::vector<float> B(K * N);
 
-        fillMatrix(A, real_t(0.1));
-        fillMatrix(B, real_t(0.05));
+        fillMatrix(A, 0.1f);
+        fillMatrix(B, 0.05f);
 
-        std::vector<real_t> C_ref(M * N);
-        std::vector<real_t> C_test(M * N);
+        std::vector<float> C_ref(M * N);
+        std::vector<float> C_test(M * N);
 
         SECTION("Shape " + std::to_string(M) + "x" + std::to_string(N) + "x" + std::to_string(K)) {
-            std::fill(C_ref.begin(), C_ref.end(), real_t(0));
-            std::fill(C_test.begin(), C_test.end(), real_t(0));
+            std::fill(C_ref.begin(), C_ref.end(), 0.0f);
+            std::fill(C_test.begin(), C_test.end(), 0.0f);
 
             sgemmNaive(M, N, K, 1.0f, A.data(), lda, B.data(), ldb, 0.0f, C_ref.data(), ldc);
             sgemm(M, N, K, 1.0f, A.data(), lda, B.data(), ldb, 0.0f, C_test.data(), ldc);
@@ -106,11 +106,10 @@ TEST_CASE("sgemm: Matrix Object API Correctness", "[ai][sgemm][matrix]")
     constexpr int K = 256;
     constexpr int N = 128;
 
-    using AlignedVec = std::vector<real_t, AlignedAllocator<real_t, 64>>;
-    AlignedVec A_vec(M * K);
-    AlignedVec B_vec(K * N);
-    AlignedVec C_raw(M * N);
-    AlignedVec C_obj(M * N);
+    AiWeights A_vec(M * K);
+    AiWeights B_vec(K * N);
+    AiWeights C_raw(M * N);
+    AiWeights C_obj(M * N);
 
     fillMatrix(A_vec, 0.1f);
     fillMatrix(B_vec, 0.05f);
@@ -146,11 +145,9 @@ TEST_CASE("sgemm: Parallel Scaling (Single vs Multi-Thread)", "[ai][sgemm][bench
     const int ldb = N;
     const int ldc = N;
 
-    // Use Aligned Allocator
-    using AlignedVec = std::vector<real_t, AlignedAllocator<real_t, 64>>;
-    AlignedVec A(M * K, 0.01f);
-    AlignedVec B(K * N, 0.01f);
-    AlignedVec C(M * N, 0.0f);
+    AiWeights A(M * K, 0.01f);
+    AiWeights B(K * N, 0.01f);
+    AiWeights C(M * N, 0.0f);
 
     // Setup ThreadPool (Use 8 cores)
     auto sched = std::make_shared<job::threads::FifoScheduler>();
@@ -181,12 +178,10 @@ TEST_CASE("SGEMM Showdown: Naive vs Optimized", "[ai][sgemm][bench][vs]")
     const int ldb = N;
     const int ldc = N;
 
-    // Allocate
-    using AlignedVec = std::vector<real_t, AlignedAllocator<real_t, 64>>;
-    AlignedVec A(M * K, 1.0f);
-    AlignedVec B(K * N, 0.5f);
-    AlignedVec C_naive(M * N, 0.0f);
-    AlignedVec C_opt(M * N, 0.0f);
+    AiWeights A(M * K, 1.0f);
+    AiWeights B(K * N, 0.5f);
+    AiWeights C_naive(M * N, 0.0f);
+    AiWeights C_opt(M * N, 0.0f);
 
     // Run Naive (The Control Group)
     BENCHMARK("Naive Implementation (Scalar loops)") {
@@ -203,15 +198,17 @@ TEST_CASE("SGEMM Showdown: Naive vs Optimized", "[ai][sgemm][bench][vs]")
 
 TEST_CASE("sgemm: Matrix Object vs Raw Overhead", "[ai][sgemm][bench][matrix]")
 {
+
+    JobStealerCtx ctx(8);
+
     // Use a medium size to check if the abstraction adds latency
     constexpr int M = 1024;
     constexpr int K = 1024;
     constexpr int N = 1024;
 
-    using AlignedVec = std::vector<real_t, AlignedAllocator<real_t, 64>>;
-    AlignedVec A_vec(M * K, 0.01f);
-    AlignedVec B_vec(K * N, 0.01f);
-    AlignedVec C_vec(M * N, 0.0f);
+    AiWeights A_vec(M * K, 0.01f);
+    AiWeights B_vec(K * N, 0.01f);
+    AiWeights C_vec(M * N, 0.0f);
 
     Matrix matA(A_vec.data(), M, K);
     Matrix matB(B_vec.data(), K, N);
@@ -224,6 +221,11 @@ TEST_CASE("sgemm: Matrix Object vs Raw Overhead", "[ai][sgemm][bench][matrix]")
 
     BENCHMARK("Matrix Object SGEMM (1024^3)") {
         sgemmMatrix(matA, matB, matC, 1.0f, 0.0f);
+        return C_vec[0];
+    };
+
+    BENCHMARK("Matrix Object Parallel(8) SGEMM (1024^3)") {
+        sgemmParallelMatrix(*ctx.pool, matA, matB, matC, 1.0f, 0.0f);
         return C_vec[0];
     };
 }

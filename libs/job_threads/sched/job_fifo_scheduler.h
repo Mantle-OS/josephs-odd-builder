@@ -15,8 +15,6 @@ public:
 
     FifoScheduler() = default;
     explicit FifoScheduler(int threadCount) {
-        // If you have internal queues to size, do it here.
-        // Otherwise, just accepting the arg fixes the build.
         (void)threadCount;
     }
     ~FifoScheduler() override;

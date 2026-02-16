@@ -1,7 +1,6 @@
 #pragma once
 
-#include <vector>
-#include <iostream>
+#include <job_logger.h>
 
 #include "job_ansi_enums.h"
 
@@ -21,33 +20,33 @@ public:
     void initMap() override
     {
          // Bracketed Paste Mode End
-        m_dispatchMap[CSI_CODE::WINDOW_MANIP] = [](const std::vector<int> &params) {
+        m_dispatchMap[CSI_CODE::WINDOW_MANIP] = [](std::span<const int> params) {
             int mode = params.empty() ? 0 : params[0];
-            std::cerr << "[CSI:WINDOW_MANIP] Window operation mode: " << mode << '\n';
+            JOB_LOG_DEBUG("[CSI:WINDOW_MANIP] Window operation mode: {}", mode);
         };
 
-        m_dispatchMap[CSI_CODE::SCP] = [](const std::vector<int> &params) {
+        m_dispatchMap[CSI_CODE::SCP] = [](std::span<const int> params) {
             [[maybe_unused]] int mode = params.empty() ? 0 : params[0];
-            std::cerr << "[CSI:SCP] Save cursor parameters\n";
+            JOB_LOG_DEBUG("[CSI:SCP] Save cursor parameters");
         };
 
-        m_dispatchMap[CSI_CODE::RCP] = [](const std::vector<int> &params) {
+        m_dispatchMap[CSI_CODE::RCP] = [](std::span<const int> params) {
             [[maybe_unused]] int mode = params.empty() ? 0 : params[0];
-            std::cerr << "[CSI:RCP] Restore cursor parameters\n";
+            JOB_LOG_DEBUG("[CSI:RCP] Restore cursor parameters");
         };
 
-        m_dispatchMap[CSI_CODE::PASTE_END] = [this](const std::vector<int> &) {
+        m_dispatchMap[CSI_CODE::PASTE_END] = [this]([[maybe_unused]]std::span<const int> params) {
             m_screen->set_bracketedPasteEnabled(false);
         };
 
         // Device Attributes 3 (DA3) - Report terminal features
-        m_dispatchMap[CSI_CODE::DA3] = [this](const std::vector<int> &) {
+        m_dispatchMap[CSI_CODE::DA3] = [this]([[maybe_unused]]std::span<const int> params) {
             // Report as modern xterm with common features
             m_screen->set_device_attr_tertiary("\033[>1;95;0c"); // Report as xterm version 95
         };
 
         // Set Mode (SM) - Handle XTerm specific modes
-        m_dispatchMap[CSI_CODE::SM] = [this](const std::vector<int> &params) {
+        m_dispatchMap[CSI_CODE::SM] = [this](std::span<const int> params) {
             if (params.empty()) return;
             
             auto mode = static_cast<XTERM_MOUSE_MODE>(params[0]);
@@ -80,7 +79,7 @@ public:
         };
 
         // Reset Mode (RM) - Handle XTerm specific mode resets
-        m_dispatchMap[CSI_CODE::RM] = [this](const std::vector<int> &params) {
+        m_dispatchMap[CSI_CODE::RM] = [this](std::span<const int> params) {
             if (params.empty()) return;
             
             auto mode = static_cast<XTERM_MOUSE_MODE>(params[0]);
@@ -113,7 +112,7 @@ public:
         };
 
         // Device Status Report (DSR) - Handle XTerm specific queries
-        m_dispatchMap[CSI_CODE::DSR] = [this](const std::vector<int> &params) {
+        m_dispatchMap[CSI_CODE::DSR] = [this](std::span<const int> params) {
             if (params.empty()) return;
             
             switch (params[0]) {

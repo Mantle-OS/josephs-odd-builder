@@ -21,13 +21,13 @@
 
 namespace job::ai::learn {
 
-class BardLearn final : public ILearn {
+class LanguageLearn final : public ILearn {
 public:
     static constexpr int        kParticleDim    = 4;
     static constexpr uint32_t   kByteVocab      = 256;
     static constexpr float      kNegHuge        = -1.0e30f;
 
-    explicit BardLearn(const LearnConfig &cfg = LearnPresets::BardConfig(),
+    explicit LanguageLearn(const LearnConfig &cfg = LearnPresets::LanguageConfig(),
                         threads::ThreadPool::Ptr pool = nullptr):
         m_pool(std::move(pool)),
         m_cfg(cfg)
@@ -48,7 +48,7 @@ public:
         case token::TokenType::BPE:
         case token::TokenType::None:
         default:
-            JOB_LOG_WARN("[BardLearn] Unsupported token type");
+            JOB_LOG_WARN("[LanguageLearn] Unsupported token type");
             m_outputDim = kByteVocab;
             break;
         }
@@ -193,7 +193,7 @@ public:
 
     [[nodiscard]] static std::unique_ptr<ILearn> create(const LearnConfig &cfg, threads::ThreadPool::Ptr pool)
     {
-    return std::make_unique<BardLearn>(cfg, std::move(pool));
+    return std::make_unique<LanguageLearn>(cfg, std::move(pool));
     }
     token::IToken *tokenizer() {return m_tokenizer.get();}
 
@@ -201,10 +201,8 @@ private:
     // Lattice <-> index mapping
     static uint32_t motifLatticeToId(const token::ByteLattice &p) noexcept
     {
-        const int ix =
-            std::clamp((int)std::lrintf((p.x + 1.0f) * 64.0f), 0, 127);
-        const int iy =
-            std::clamp((int)std::lrintf((p.y + 1.0f) * 64.0f), 0, 127);
+        const int ix = std::clamp((int)std::lrintf((p.x + 1.0f) * 64.0f), 0, 127);
+        const int iy = std::clamp((int)std::lrintf((p.y + 1.0f) * 64.0f), 0, 127);
         return (uint32_t)(ix | (iy << 7));
     }
 
@@ -215,13 +213,18 @@ private:
         switch (m_cfg.tokenType) {
             case token::TokenType::Ascii: {
                 uint8_t bb = b;
-                if (bb < token::AsciiToken::kAsciiMin) bb = (uint8_t)token::AsciiToken::kAsciiMin;
-                if (bb > token::AsciiToken::kAsciiMax) bb = (uint8_t)token::AsciiToken::kAsciiMax;
+                if (bb < token::AsciiToken::kAsciiMin)
+                    bb = (uint8_t)token::AsciiToken::kAsciiMin;
+
+                if (bb > token::AsciiToken::kAsciiMax)
+                    bb = (uint8_t)token::AsciiToken::kAsciiMax;
+
                 return uint32_t(bb - token::AsciiToken::kAsciiMin); // 0..94
             }
             case token::TokenType::Motif:
-                if (p.z > 0.0f)
-                   return kByteVocab + motifLatticeToId(p);
+                // return kByteVocab + motifLatticeToId(p);
+                if (token::MotifToken::isMotifLane(p))
+                    return kByteVocab + token::MotifToken::latticeToId(p);
                 return uint32_t(b);
 
             default:
@@ -233,18 +236,20 @@ private:
     {
         switch (m_cfg.tokenType) {
         case token::TokenType::Ascii: {
-            if (idx >= token::AsciiToken::kAsciiVocab) idx = token::AsciiToken::kAsciiVocab - 1;
+
+            if (idx >= token::AsciiToken::kAsciiVocab)
+                idx = token::AsciiToken::kAsciiVocab - 1;
+
             return token::ByteLattice::encode(uint8_t(token::AsciiToken::kAsciiMin + idx), 1.0f);
         }
+
         case token::TokenType::Motif:
             if (idx < kByteVocab)
                 return token::ByteLattice::encode(uint8_t(idx), 1.0f);
-            break;
-
+            return token::MotifToken::idToLattice(idx - kByteVocab, 1.0f);
         default:
             if (idx < kByteVocab)
                 return token::ByteLattice::encode(uint8_t(idx), 1.0f);
-            break;
         }
 
         // motif branch
@@ -261,8 +266,7 @@ private:
 
         if (m_atoms.empty()) {
             m_atoms.resize(m_corpusBytes.size());
-            const std::size_t atomCount = m_tokenizer->encode(
-                m_corpusBytes, m_atoms, 1.0f);
+            const std::size_t atomCount = m_tokenizer->encode( m_corpusBytes, m_atoms, 1.0f);
             m_atoms.resize(atomCount);
         }
 

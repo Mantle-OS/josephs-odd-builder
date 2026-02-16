@@ -18,9 +18,9 @@ struct FunctorTann {
         auto two_x = SIMD::add(x, x);
         f32 e_2x;
         if constexpr (T_SMOOTH)
-            e_2x = SIMD::exp_estrin(two_x);
+            e_2x = SIMD::exp(two_x);
         else
-            e_2x = SIMD::exp_schraudolph(two_x);
+            e_2x = SIMD::exp_fast(two_x);
 
         auto num = SIMD::sub(e_2x, one);
         auto den = SIMD::add(e_2x, one);

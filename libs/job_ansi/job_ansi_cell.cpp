@@ -5,36 +5,49 @@
 namespace job::ansi {
 
 Cell::Cell() :
-    m_char(U' '), 
-    m_charWidth(1)
+    m_char(U' ')
 {}
 
-Cell::Cell(char32_t ch)
+Cell::Cell(char32_t ch) :
+    m_char(ch)
 {
-    setChar(ch);
 }
 
-Cell::Cell(char32_t ch, Attributes::Ptr attr) :
-    m_attr(attr),
-    m_char(U' '),
-    m_charWidth(1)
+Cell::Cell(char32_t ch, Attributes::Ptr attr, int width) noexcept :
+    m_attr(std::move(attr)),
+    m_char(ch)
 {
-    if(!m_attr)
+    m_charWidth = width;
+    if (!m_attr) {
         m_attr = defaultAttributes();
-
-    setChar(ch);
+    }
 }
 
-Cell::Cell(const Cell &other)
+Cell::Cell(const Cell &other) :
+    m_attr(other.m_attr),
+    m_char(other.m_char)
 {
-    *this = other;
+    // Copy Bitfields
+    m_charWidth    = other.m_charWidth;
+    m_lineWidth    = other.m_lineWidth;
+    m_lineHeight   = other.m_lineHeight;
+    m_lineMode     = other.m_lineMode;
+    m_dirty        = true; // New cell is dirty
+    m_trailing     = other.m_trailing;
+    m_isTopHalf    = other.m_isTopHalf;
+    m_protectErase = other.m_protectErase;
+    m_protectWrite = other.m_protectWrite;
+
+    // Deep copy marks if they exist
+    if (other.m_marks) {
+        m_marks = std::make_unique<std::u32string>(*other.m_marks);
+    }
 }
 
 Cell &Cell::operator=(const Cell &other)
 {
     m_dirty = other.m_dirty;
     m_char = other.m_char;
-    m_marks = other.m_marks;
     m_attr = other.m_attr;
     m_charWidth = other.m_charWidth;
     m_trailing = other.m_trailing;
@@ -46,15 +59,26 @@ Cell &Cell::operator=(const Cell &other)
     m_protectErase = other.m_protectErase;
     m_dirty = true;  // always mark new cells as dirty for repaint
 
+    if (other.m_marks)
+        m_marks = std::make_unique<std::u32string>(*other.m_marks);
+
     return *this;
 }
 
-int Cell::width() const
+
+Cell::Cell(Cell &&other) noexcept = default;
+
+bool Cell::hasMarks() const noexcept
+{
+    return m_marks != nullptr;
+}
+
+int Cell::width() const noexcept
 {
     return m_charWidth;
 }
 
-bool Cell::isTrailing() const
+bool Cell::isTrailing() const noexcept
 {
     return m_trailing;
 }
@@ -66,51 +90,37 @@ void Cell::setTrailing(bool trailing)
 
 std::u32string Cell::marks() const
 {
-    return m_marks;
+    return m_marks ? *m_marks : std::u32string{};
 }
 
 void Cell::clearMarks()
 {
-    if (!m_marks.empty()) {
-        m_marks.clear();
+    if (m_marks) {
+        m_marks.reset();
         m_dirty = true;
     }
 }
 
 void Cell::appendCombiningChar(char32_t ch)
 {
-    m_marks.push_back(ch);
+    if (!m_marks)
+        m_marks = std::make_unique<std::u32string>();
+
+    m_marks->push_back(ch);
     m_dirty = true;
 }
 
-bool Cell::dirty() const
-{
-    return m_dirty;
-}
-
-void Cell::setDirty(bool dirty) {
-    if(m_dirty != dirty)
-        m_dirty = dirty;
-}
 
 std::u32string Cell::fullCharSequence() const
 {
     std::u32string result;
     result += m_char;
-    result += m_marks;
+    if (m_marks) {
+        result += *m_marks;
+    }
     return result;
 }
 
-void Cell::setChar(char32_t ch)
-{
-    if (m_char != ch) {
-        m_char = ch;
-        m_marks.clear();
-        m_charWidth = std::max(1, wcwidth(ch));  // fallback to 1 if wcwidth() fails
-        m_trailing = false;
-        m_dirty = true;
-    }
-}
 
 const Cell &Cell::blank()
 {
@@ -118,6 +128,22 @@ const Cell &Cell::blank()
     return blankCell;
 }
 
+
+const Attributes *Cell::attributes() const noexcept
+{
+    return m_attr ? m_attr.get() : defaultAttributes().get();
+}
+
+std::shared_ptr<Attributes> Cell::defaultAttributes()
+{
+    static auto shared = std::make_shared<Attributes>();
+    return shared;
+}
+// Guaranteed non-null attributes (fly-weight default if none set)
+const Attributes &Cell::attributesOrDefault() const noexcept
+{
+    return m_attr ? *m_attr : *defaultAttributes();
+}
 void Cell::setAttributes(const Attributes &attr)
 {
     if (!m_attr || *m_attr != attr) {
@@ -126,41 +152,8 @@ void Cell::setAttributes(const Attributes &attr)
     }
 }
 
-const Attributes *Cell::attributes() const
-{
-    return m_attr ? m_attr.get() : defaultAttributes().get();
-}
 
 
-void Cell::reset()
-{
-    setChar(U' ');
-    resetAttributes();
-    m_lineMode = LineDisplayMode::SingleWidth;
-    m_lineWidth = 1;
-    m_lineHeight = 1;
-    m_isTopHalf = false;
-    m_dirty = true;
-    m_protectErase = false;
-    m_protectWrite = false;
-}
-
-std::shared_ptr<Attributes> Cell::defaultAttributes()
-{
-    static auto shared = std::make_shared<Attributes>();
-    return shared;
-}
-
-char32_t Cell::getChar() const
-{
-    return m_char;
-}
-
-void Cell::resetAttributes()
-{
-    m_attr = defaultAttributes();
-    m_dirty = true;
-}
 
 void Cell::setForeground(const RGBColor &color)
 {
@@ -178,6 +171,7 @@ void Cell::setBackground(const RGBColor &color)
     m_dirty = true;
 }
 
+
 void Cell::resetColors()
 {
     if (m_attr) {
@@ -188,7 +182,34 @@ void Cell::resetColors()
     }
 }
 
-bool Cell::isRenderable() const
+
+
+
+void Cell::reset() noexcept
+{
+    m_char = U' ';
+    m_charWidth = 1;
+    resetAttributes();
+    m_marks.reset();
+
+    m_lineMode = 0; // SingleWidth (assuming enum 0)
+    m_lineWidth = 1;
+    m_lineHeight = 1;
+    m_isTopHalf = false;
+    m_dirty = true;
+    m_protectErase = false;
+    m_protectWrite = false;
+    m_trailing = false;
+}
+
+void Cell::resetAttributes() noexcept
+{
+    m_attr = defaultAttributes();
+    m_dirty = true;
+}
+
+
+bool Cell::isRenderable() const noexcept
 {
     return !m_trailing && m_char != U' ';
 }
@@ -196,63 +217,89 @@ bool Cell::isRenderable() const
 // Empty means it contains only a space and no combining marks
 bool Cell::isEmpty() const
 {
-    return m_char == U' ' && m_marks.empty();
+    return m_char == U' ' && !m_marks;
 }
 
-// Guaranteed non-null attributes (fly-weight default if none set)
-const Attributes &Cell::attributesOrDefault() const
+bool Cell::dirty() const noexcept
 {
-    return m_attr ? *m_attr : *defaultAttributes();
+    return m_dirty;
 }
 
-// Line-mode helpers (used by Screen::setLineDisplayMode etc.)
-void Cell::setLineDisplayMode(LineDisplayMode mode)
+void Cell::setDirty(bool dirty)
 {
-    m_lineMode = mode;
-}
-LineDisplayMode Cell::getLineDisplayMode() const
-{
-    return m_lineMode;
+    m_dirty = dirty;
 }
 
-void Cell::setLineWidth(int width)
+
+char32_t Cell::getChar() const noexcept
+{
+    return m_char;
+}
+
+void Cell::setChar(char32_t ch, int width)
+{
+    if (m_char != ch) {
+        m_char = ch;
+        // Optimization: Removing libc dependency. Width is passed in.
+        m_charWidth = width;
+
+        m_marks.reset(); // Clear combining marks on new base char
+        m_trailing = false;
+        m_dirty = true;
+    }
+}
+
+void Cell::setLineDisplayMode(LineDisplayMode mode) noexcept
+{
+    m_lineMode = static_cast<uint32_t>(mode);
+}
+
+LineDisplayMode Cell::getLineDisplayMode() const noexcept
+{
+    return static_cast<LineDisplayMode>(m_lineMode);
+}
+
+void Cell::setLineWidth(int width) noexcept
 {
     m_lineWidth  = std::max(1, width);
 }
-int  Cell::getLineWidth()  const
+
+int  Cell::getLineWidth()  const noexcept
 {
     return m_lineWidth;
 }
 
-void Cell::setLineHeight(int height)
+void Cell::setLineHeight(int height) noexcept
 {
     m_lineHeight = std::max(1, height);
 }
-int  Cell::getLineHeight() const
+
+int Cell::getLineHeight() const noexcept
 {
     return m_lineHeight;
 }
 
-void Cell::setLineHeightPosition(bool isTop)
+void Cell::setLineHeightPosition(bool isTop) noexcept
 {
     m_isTopHalf = isTop;
 }
-bool Cell::isTopHalf() const
+
+bool Cell::isTopHalf() const noexcept
 {
     return m_isTopHalf;
 }
 
-void Cell::setProtection(bool erase, bool write)
+void Cell::setProtection(bool erase, bool write) noexcept
 {
     m_protectErase = erase;
     m_protectWrite = write;
 }
 
-bool Cell::isProtectedForErase() const
+bool Cell::isProtectedForErase() const noexcept
 {
     return m_protectErase;
 }
-bool Cell::isProtectedForWrite() const
+bool Cell::isProtectedForWrite() const noexcept
 {
     return m_protectWrite;
 }

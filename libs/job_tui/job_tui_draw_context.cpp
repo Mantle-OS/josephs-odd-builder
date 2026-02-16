@@ -87,7 +87,7 @@ void DrawContext::apply(const ansi::Attributes &attr)
         sgrCodes.emplace_back("3");
 
     // Underline styles: 4=single, 21=double, 4:3=dotted, 4:4=dashed, 4:5=curly
-    switch (attr.underline) {
+    switch (attr.getUnderline()) {
     case ansi::UnderlineStyle::Single:
         sgrCodes.emplace_back("4");
         break;
@@ -144,11 +144,11 @@ void DrawContext::apply(const ansi::Attributes &attr)
     }
 
     // Apply 24-bit foreground/background
-    if (attr.foreground)
-        setForeground(*attr.foreground);
+    if (auto *fg = attr.getForeground())
+        setForeground(*fg);
 
-    if (attr.background)
-        setBackground(*attr.background);
+    if (auto *bg = attr.getBackground())
+        setBackground(*bg);
 }
 
 void DrawContext::drawBox(int width, int height)

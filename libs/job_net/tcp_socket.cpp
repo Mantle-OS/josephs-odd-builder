@@ -19,13 +19,13 @@
 
 namespace job::net {
 
-TcpSocket::TcpSocket(std::shared_ptr<threads::JobIoAsyncThread> loop) :
+TcpSocket::TcpSocket(threads::JobIoAsyncThread::Ptr loop) :
     ISocketIO(std::move(loop))
 {
     m_state.store(SocketState::Unconnected);
 }
 
-TcpSocket::TcpSocket(std::shared_ptr<threads::JobIoAsyncThread> loop, int existing_fd, const JobIpAddr& peerAddr) :
+TcpSocket::TcpSocket(threads::JobIoAsyncThread::Ptr loop, int existing_fd, const JobIpAddr &peerAddr) :
     ISocketIO(std::move(loop)),
     m_peerAddr(peerAddr)
 {
@@ -194,7 +194,7 @@ bool TcpSocket::listen(int backlog)
     return true;
 }
 
-std::shared_ptr<ISocketIO> TcpSocket::accept()
+ISocketIO::Ptr TcpSocket::accept()
 {
     if (m_fd < 0 || m_state.load() != SocketState::Listening)
         return nullptr;

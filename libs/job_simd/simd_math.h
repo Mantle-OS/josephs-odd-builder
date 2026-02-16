@@ -101,7 +101,9 @@ static inline f32 exp_estrin(f32 x)
     return SIMD::cast_to_float(final_int);
 }
 
-static inline f32 log(f32 x)
+
+// FIXME not tested on NEON or 512
+static inline f32 avx_log(f32 x)
 {
 
     auto one  = SIMD::set1(1.0f);
@@ -176,5 +178,19 @@ static inline f32 log(f32 x)
     // handle invalid inputs (fast-math strikes again)
     return SIMD::blendv(res, SIMD::qnan(), invalid_mask);
 }
+
+
+
+__attribute__((always_inline))
+inline float hsum(f32 x) {
+    alignas(sizeof(float) * SIMD::width()) float tmp[SIMD::width()];
+    SIMD::mov(tmp, x);
+    float s = 0.0f;
+    for (int i = 0; i < SIMD::width(); ++i)
+        s += tmp[i];
+    return s;
+}
+
+
 
 }

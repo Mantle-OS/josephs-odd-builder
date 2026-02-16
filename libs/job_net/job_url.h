@@ -12,6 +12,7 @@ namespace job::net {
 
 class JobUrl {
 public:
+    using Ptr = std::shared_ptr<JobUrl>;
     enum class Scheme : uint8_t {
         Unknown = 0,
         File,

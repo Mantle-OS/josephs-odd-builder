@@ -1,7 +1,7 @@
 #pragma once
 
 #include <string>
-#include <algorithm>
+#include <memory>
 
 #include "utils/job_ansi_enums.h"
 #include "utils/rgb_color.h"
@@ -12,163 +12,66 @@ using job::ansi::utils::RGBColor;
 
 class Cursor {
 public:
-    Cursor(int maxRows, int maxCols):
-        m_maxRows(maxRows),
-        m_maxCols(maxCols)
+    using Ptr  = std::shared_ptr<Cursor>;
+    using UPtr = std::unique_ptr<Cursor>;
+
+    Cursor() = default;
+    Cursor(int maxRows, int maxCols);
+    Cursor(const Cursor&) = default;
+    Cursor(Cursor&&) noexcept = default;
+    Cursor &operator=(const Cursor&) = default;
+    Cursor &operator=(Cursor&&) noexcept = default;
+    ~Cursor() = default;
+
+    [[nodiscard]] int row() const noexcept;
+    [[nodiscard]] int column() const noexcept;
+
+    void setPosition(int row, int col) noexcept;
+    void updateDimensions(int rows, int cols) noexcept
     {
+        m_maxRows = rows;
+        m_maxCols = cols;
+        setPosition(m_row, m_column);
     }
 
-    int row() const
-    {
-        return m_row;
-    }
+    void move(int rowDelta, int colDelta) noexcept;
+    void advance(int maxCols) noexcept;
+    void up(int count = 1) noexcept;
+    void down(int count = 1) noexcept;
+    void left(int count = 1) noexcept;
+    void right(int count = 1) noexcept;
 
-    int col() const
-    {
-        return m_col;
-    }
-
-    void setPosition(int r, int c)
-    {
-        m_row = std::clamp(r, 0, m_maxRows - 1);
-        m_col = std::clamp(c, 0, m_maxCols - 1);
-    }
-
-    // Movement
-    void move(int rowDelta, int colDelta)
-    {
-        m_row = std::clamp(m_row + rowDelta, 0, m_maxRows - 1);
-        m_col = std::clamp(m_col + colDelta, 0, m_maxCols - 1);
-    }
 
     // State management
-    void save()
-    {
-        m_savedRow = m_row;
-        m_savedCol = m_col;
-        m_savedStyle = m_style;
-        m_savedCustomColor = m_customColor;
-        m_savedVisible = m_visible;
-        m_savedBlinking = m_blinking;
-    }
+    void save() noexcept;
+    void restore() noexcept;
 
-    void restore()
-    {
-        if (m_savedRow >= 0 && m_savedCol >= 0) {
-            m_row = m_savedRow;
-            m_col = m_savedCol;
-            m_style = m_savedStyle;
-            m_customColor = m_savedCustomColor;
-            m_visible = m_savedVisible;
-            m_blinking = m_savedBlinking;
-        }
-    }
+    void setStyle(int value) noexcept;
+    [[nodiscard]] CursorStyle cursorStyle() const noexcept;
+    void setDefaultCursorColor(const RGBColor &color) noexcept;
 
-    void setStyle(int value)
-    {
-        if (value >= 0 && value <= 6)
-            m_style = static_cast<CursorStyle>(value);
-    }
+    [[nodiscard]] RGBColor effectiveCursorColor() const noexcept;
+    [[nodiscard]] const std::optional<RGBColor> &customColor() const noexcept;
+    [[nodiscard]] const RGBColor &defaultColor() const noexcept;
+    void setCursorColor(const std::string &hex);
+    void resetCursorColor() noexcept;
 
-    CursorStyle cursorStyle() const
-    {
-        return m_style;
-    }
+    [[nodiscard]] bool visible() const noexcept;
+    void setVisible(bool visible) noexcept;
 
-    void setDefaultCursorColor(const RGBColor &color)
-    {
-        m_defaultColor = color;
-    }
+    [[nodiscard]] bool isBlinking() const noexcept;
+    void setBlinking(bool blink) noexcept;
 
-    RGBColor effectiveCursorColor() const
-    {
-        return m_customColor.value_or(m_defaultColor);
-    }
-
-    const std::optional<RGBColor> &customColor() const
-    {
-        return m_customColor;
-    }
-
-    const RGBColor &defaultColor() const
-    {
-        return m_defaultColor;
-    }
-
-    void setCursorColor(const std::string &hex)
-    {
-        auto maybeColor = job::ansi::utils::parseColorString(hex);
-        if (maybeColor)
-            m_customColor = *maybeColor;
-    }
-
-    void resetCursorColor()
-    {
-        m_customColor.reset();
-    }
-
-    // Cursor advancement
-    void advance(int maxCols)
-    {
-        ++m_col;
-        if (m_col >= maxCols) {
-            m_col = 0;
-            ++m_row;
-            m_row = std::clamp(m_row, 0, m_maxRows - 1);
-        }
-    }
-
-    bool visible() const
-    {
-        return m_visible;
-    }
-
-    void setVisible(bool visible)
-    {
-        m_visible = visible;
-    }
-
-    bool isBlinking() const
-    {
-        return m_blinking;
-    }
-
-    void setBlinking(bool blink)
-    {
-        m_blinking = blink;
-    }
-
-    void set(int row, int col)
-    {
-        m_row = std::clamp(row, 0, m_maxRows - 1);
-        m_col = std::clamp(col, 0, m_maxCols - 1);
-    }
-
-    bool isBlockMode() const
-    {
-        return m_style == CursorStyle::SteadyBlock || m_style == CursorStyle::BlinkingBlock;
-    }
-
-    bool isUnderlineMode() const
-    {
-        return m_style == CursorStyle::SteadyUnderline || m_style == CursorStyle::BlinkingUnderline;
-    }
-
-    bool isBarMode() const
-    {
-        return m_style == CursorStyle::SteadyBar || m_style == CursorStyle::BlinkingBar;
-    }
-
-    bool isInverseMode() const
-    {
-        return isBlockMode(); // Block mode is the only one that fully inverts background
-    }
+    [[nodiscard]] bool isBlockMode() const noexcept;
+    [[nodiscard]] bool isUnderlineMode() const noexcept;
+    [[nodiscard]] bool isBarMode() const noexcept;
+    [[nodiscard]] bool isInverseMode() const noexcept;
 
 private:
     int                         m_maxRows;
     int                         m_maxCols;
     int                         m_row               = 0;
-    int                         m_col               = 0;
+    int                         m_column            = 0;
     bool                        m_visible           = true;
     bool                        m_blinking          = true;
     CursorStyle                 m_style             = CursorStyle::SteadyBlock;
@@ -177,10 +80,9 @@ private:
     bool                        m_savedVisible      = false;
     bool                        m_savedBlinking     = true;
     CursorStyle                 m_savedStyle        = CursorStyle::SteadyBlock;
-    RGBColor                    m_defaultColor      = RGBColor(0, 255, 0); // green
+    RGBColor                    m_defaultColor      = RGBColor(0, 255, 0);
     std::optional<RGBColor>     m_customColor;
     std::optional<RGBColor>     m_savedCustomColor;
 };
-
 
 }

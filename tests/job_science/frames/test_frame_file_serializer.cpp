@@ -65,6 +65,8 @@ void check_particle_fidelity(const Particle& original, const Particle& loaded)
     REQUIRE(loaded.composition.silicate == Catch::Approx(original.composition.silicate));
 }
 
+
+
 TEST_CASE("Frames E2E: Write/Read Fidelity of Full PDL State", "[frames][e2e]")
 {
     const std::filesystem::path temp_file = "test_frame_out.job";
@@ -91,7 +93,7 @@ TEST_CASE("Frames E2E: Write/Read Fidelity of Full PDL State", "[frames][e2e]")
 
     // READ
     auto io_read = std::make_shared<job::io::FileIO>(temp_file, job::io::FileMode::RegularFile, false);
-    auto source  = std::make_shared<FrameSourceIo>(io_read, true); // autoOpen
+    auto source  = std::make_shared<FrameSourceIO>(io_read, true); // autoOpen
 
     FrameDeserializer reader(source);
 
@@ -131,7 +133,7 @@ TEST_CASE("Frames: Source autoOpen ready state", "[frames][source]")
     out.close();
 
     auto io_read = std::make_shared<job::io::FileIO>(temp_file, job::io::FileMode::RegularFile, false);
-    auto source  = std::make_shared<FrameSourceIo>(io_read, true); // autoOpen
+    auto source  = std::make_shared<FrameSourceIO>(io_read, true); // autoOpen
 
     REQUIRE(source->isReady()); // it should open the file
 
@@ -145,3 +147,155 @@ TEST_CASE("Frames: Source autoOpen ready state", "[frames][source]")
 
     std::filesystem::remove(temp_file);
 }
+
+
+#ifdef JOB_TEST_BENCHMARKS
+#include <catch2/benchmark/catch_benchmark.hpp>
+#endif
+
+#ifdef JOB_TEST_BENCHMARKS
+
+namespace {
+
+struct TempFileGuard final {
+    std::filesystem::path path;
+
+    explicit TempFileGuard(std::filesystem::path p) :
+        path(std::move(p))
+    {
+    }
+
+    ~TempFileGuard()
+    {
+        std::error_code ec;
+        std::filesystem::remove(path, ec);
+    }
+};
+
+static void writeManyFramesToFile(const std::filesystem::path &path,
+                                  std::size_t                  frameCount,
+                                  const Particles             &particles,
+                                  const DiskModel             &disk,
+                                  const Zones                 &zones)
+{
+    auto io_write = std::make_shared<job::io::FileIO>(path, job::io::FileMode::RegularFile, true);
+
+    // Current behavior: serializer checks sink->isReady() first.
+    // FrameSinkIO::isReady() returns m_device->isOpen(), so open explicitly.
+    REQUIRE(io_write->openDevice());
+
+    auto sink = std::make_shared<FrameSinkIO>(io_write);
+    FrameSerializer serializer(sink);
+
+    for (std::size_t i = 0; i < frameCount; ++i) {
+        const std::uint64_t frameId = static_cast<std::uint64_t>(i + 1);
+        REQUIRE(serializer.writeFrame(frameId, particles, disk, zones));
+    }
+
+    serializer.flush();
+    io_write->flush();
+    io_write->closeDevice();
+}
+
+static std::size_t readAllFramesOnce(const std::filesystem::path &path,
+                                     std::size_t                  frameCountExpected)
+{
+    auto io_read = std::make_shared<job::io::FileIO>(path, job::io::FileMode::RegularFile, false);
+    auto source  = std::make_shared<FrameSourceIO>(io_read, true); // autoOpen
+    FrameDeserializer reader(source);
+
+    DiskModel disk{};
+    Zones zones{};
+    Particles particles{};
+
+    std::size_t count = 0;
+    while (count < frameCountExpected) {
+        if (!reader.readFrame(disk, zones, particles))
+            break;
+
+        ++count;
+    }
+
+    return count;
+}
+
+static bool readSingleFrameOnce(const std::filesystem::path &path)
+{
+    auto io_read = std::make_shared<job::io::FileIO>(path, job::io::FileMode::RegularFile, false);
+    auto source  = std::make_shared<FrameSourceIO>(io_read, true); // autoOpen
+    FrameDeserializer reader(source);
+
+    DiskModel disk{};
+    Zones zones{};
+    Particles particles{};
+
+    return reader.readFrame(disk, zones, particles);
+}
+
+} // namespace
+
+TEST_CASE("Frames: FrameDeserializer benchmarks (file)", "[frames][bench][deserializer]")
+{
+    // Keep sizes reasonable; benchmarks can be bumped locally.
+    constexpr std::size_t kFramesSmall = 64;
+    constexpr std::size_t kFramesBig   = 256;
+
+    constexpr std::size_t kN1 = 1'024;
+    constexpr std::size_t kN2 = 8'192;
+
+    const DiskModel disk  = SciencePresets::tTauriDisk();
+    const Zones     zones = SciencePresets::solarSystemLike();
+
+    // Prepare payloads
+    const Particles ps1 = ParticleUtil::genParticles(kN1);
+    const Particles ps2 = ParticleUtil::genParticles(kN2);
+
+    // Prepare temp files (unique enough for local runs)
+    const auto file1 = std::filesystem::path("bench_frames_deser_n1.job");
+    const auto file2 = std::filesystem::path("bench_frames_deser_n2.job");
+    TempFileGuard cleanup1(file1);
+    TempFileGuard cleanup2(file2);
+
+    // Write test data once
+    writeManyFramesToFile(file1, kFramesBig, ps1, disk, zones);
+    writeManyFramesToFile(file2, kFramesSmall, ps2, disk, zones);
+
+    // Warm up page cache + CPU paths (like your integrator warmup)
+    for (int i = 0; i < 3; ++i) {
+        REQUIRE(readSingleFrameOnce(file1));
+        REQUIRE(readSingleFrameOnce(file2));
+    }
+
+    // ---- Throughput: read all frames in a file (dominant cost path)
+    BENCHMARK("[FrameDeserializer] Read all frames (N=1024, frames=256)") {
+        const auto got = readAllFramesOnce(file1, kFramesBig);
+        // Keep a correctness check *outside* the timed portion? Catch benchmarks time the lambda.
+        // But we do want to ensure we're not benchmarking a fast failure.
+        return got;
+    };
+
+    BENCHMARK("[FrameDeserializer] Read all frames (N=8192, frames=64)") {
+        const auto got = readAllFramesOnce(file2, kFramesSmall);
+        return got;
+    };
+
+    // ---- Per-frame: read a single frame from start (includes open/autoOpen/first read)
+    BENCHMARK("[FrameDeserializer] Read single frame (N=1024)") {
+        const bool ok = readSingleFrameOnce(file1);
+        return ok;
+    };
+
+    BENCHMARK("[FrameDeserializer] Read single frame (N=8192)") {
+        const bool ok = readSingleFrameOnce(file2);
+        return ok;
+    };
+
+    // Post-assertions (not benchmarked) to ensure the throughput benches are meaningful.
+    REQUIRE(readAllFramesOnce(file1, kFramesBig) == kFramesBig);
+    REQUIRE(readAllFramesOnce(file2, kFramesSmall) == kFramesSmall);
+}
+
+#endif // JOB_TEST_BENCHMARKS
+
+
+

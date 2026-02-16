@@ -49,15 +49,14 @@ TEST_CASE("CRC32 computation", "[frames][crc32]") {
     }
 
     SECTION("Test CRC32 with a single byte") {
-        uint8_t data[] = {0x01};  // Whhat is this ?
-        // known CRC32 {0x01}
+        uint8_t data[] = {0x01};
         uint32_t expectedCRC = 0xA505DF1Bu;
         uint32_t computedCRC = Crc32::compute(data, sizeof(data));
         REQUIRE(computedCRC == expectedCRC);
     }
 
     SECTION("Test CRC32 with '123456789'") {
-        const char* str = "123456789";
+        const char *str = "123456789";
         uint32_t expectedCRC = 0xCBF43926u;
         uint32_t computedCRC = Crc32::compute(reinterpret_cast<const uint8_t*>(str), 9);
         REQUIRE(computedCRC == expectedCRC);

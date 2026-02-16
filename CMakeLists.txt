@@ -4,101 +4,20 @@ project(JosephsOddBuilder
     LANGUAGES CXX
 )
 
+# Builkd time options
+include(cmake/build_options.cmake)
 
-##############################
-# Compiler flags
-##############################
-set(CMAKE_CXX_STANDARD 23)
-set(CMAKE_CXX_EXTENSIONS OFF)
-set(CMAKE_INCLUDE_CURRENT_DIR ON)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-
-if(POLICY CMP0135)
-    cmake_policy(SET CMP0135 NEW) # for reproducible timestamps
-endif()
-
-include(CheckIPOSupported)
-check_ipo_supported(RESULT result OUTPUT output)
-if(result)
-    message(STATUS "IPO/LTO is supported: enabling globally")
-    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION ON)
-else()
-    message(WARNING "IPO/LTO is not supported: ${output}")
-endif()
-
-include(CheckCXXCompilerFlag)
-
-add_compile_options(
-    $<$<CONFIG:Release>:-O3>
-    $<$<CONFIG:Release>:-funroll-loops>
-    $<$<CONFIG:Release>:-fno-omit-frame-pointer>
-)
-
-add_compile_options(-Wall -Wextra -Wpedantic -Werror)
+## Hardware checker and some compiler flags
 include(cmake/check_hardware.cmake)
 
-##############################
-# Options
-##############################
-## Becareful !!! if you are building the AI stack this can fuck shit up .....
-option(JOB_CORE_USE_DOUBLE "Use double precision" OFF)
-if(JOB_CORE_USE_DOUBLE)
-    add_compile_definitions(JOB_CORE_USE_DOUBLE)
-endif()
+## cuda crap
+include(cmake/check_nvidia.cmake)
 
+## build time deps
+include(cmake/build_deps.cmake)
 
-option(JOB_TEST_BENCHMARKS "build and run the benchhmarks in the tests" ON)
-if(CMAKE_BUILD_TYPE STREQUAL "Release" AND JOB_TEST_BENCHMARKS)
-    message("Building benchmarks into tests")
-    add_compile_definitions(JOB_TEST_BENCHMARKS)
-elseif(NOT CMAKE_BUILD_TYPE STREQUAL "Release" AND JOB_TEST_BENCHMARKS)
-    message("Invaild Build type for for benchmarks")
-else()
-    message("Not adding tests for benchmarks")
-endif()
-
-##############################
-# DEPS
-##############################
-include(GNUInstallDirs)
-find_package(Threads REQUIRED)                          #
-find_package(PkgConfig REQUIRED)                        # pkgconf libpkgconf-dev
-
-## CRYPTO
-pkg_check_modules(LibOpenSSL REQUIRED libssl)     # libssl-dev
-pkg_check_modules(LibCrypto  REQUIRED libcrypto)  # libssl-dev
-pkg_check_modules(LibZstd    REQUIRED libzstd)    # libzstd-dev
-pkg_check_modules(LibZ       REQUIRED zlib)       # zlib1g-dev
-pkg_check_modules(LibSodium  REQUIRED libsodium)  # libsodium-dev
-
-## UART
-pkg_check_modules(LibUdev REQUIRED libudev) # libudev-dev
-
-## TRANSLATIONS Fuck Translations
-
-## DATA fun
-pkg_check_modules(Flatbuffers  REQUIRED flatbuffers)    # libflatbuffers-dev flatbuffers-compiler
-pkg_check_modules(NlohmannJson REQUIRED nlohmann_json)   # nlohmann-json3-dev
-pkg_check_modules(YAMLCpp      REQUIRED yaml-cpp)        # libyaml-cpp-dev
-
-# sudo apt install libssl-dev libzstd-dev pkgconf libpkgconf-dev zlib1g-dev libsodium-dev libflatbuffers-dev flatbuffers-compiler nlohmann-json3-dev libyaml-cpp-dev
-
-##############################
-# sub dirs
-##############################
 add_subdirectory(libs)
-
-# Later
 add_subdirectory(apps)
-
-## TESTS
-enable_testing()
-pkg_check_modules(CatchTwo REQUIRED catch2-with-main)   # libcatch2-dev
 add_subdirectory(tests)
-
-##############################
-# docs and stuff
-##############################
 add_subdirectory(docs)
 

@@ -4,10 +4,11 @@
 #include <filesystem>
 #include <string>
 
+// job::threads
 #include <sched/job_scheduler_types.h>
+#include <utils/job_thread_options.h>
 
 namespace job::science::engine {
-
 
 enum class ThreadingAlgo : std::uint8_t {
     Auto = 0,
@@ -51,7 +52,11 @@ struct EngineThreadingConfig {
     ThreadingAlgo               algo{ThreadingAlgo::DataParallelism};
     job::threads::SchedulerType scheduler{job::threads::SchedulerType::Fifo};
     std::uint32_t               workerCount{0};  ///< 0 => use hardware_concurrency()
+
+    job::threads::JobThreadOptions workerOptions{job::threads::JobThreadOptions::normal()};
+    job::threads::JobThreadOptions driverOptions{job::threads::JobThreadOptions::normal()};
 };
+
 
 /// Frame IO configuration for Engine.
 /// The engine will later use this to decide which IFrameSink/IFrameSource
@@ -83,5 +88,19 @@ struct EngineConfig {
     EngineIOConfig        io{};
     IntegratorType        integrator{IntegratorType::VelocityVerlet};
 };
+
+
+[[nodiscard]] inline EngineConfig DefaultEngineConfig(
+    threads::SchedulerType scheduler = threads::SchedulerType::Fifo,
+    IntegratorType         integrator = IntegratorType::VelocityVerlet
+    )
+{
+    EngineConfig cfg;
+    cfg.integrator          = integrator;
+    cfg.threading.scheduler = scheduler;
+    cfg.io.sync             = SyncType::IO;
+    cfg.io.ioType           = IoType::File;
+    return cfg;
+}
 
 } // namespace job::science::engine

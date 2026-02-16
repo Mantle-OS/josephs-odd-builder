@@ -6,6 +6,7 @@
 #include <mutex>
 #include <atomic>
 
+// job::net
 #include <servers/tcp_server.h>
 #include <servers/udp_server.h>
 #include <servers/unix_socket_server.h>
@@ -13,17 +14,14 @@
 #include "frames/frame_header.h"
 #include "frames/iframe_sink.h"
 
-namespace job::net {
-    class ISocketIO;
-}
-
 namespace job::science::frames {
+using job::net::ISocketIO;
+
 class FrameSinkNet : public IFrameSink {
 public:
     using Ptr = std::shared_ptr<FrameSinkNet>;
-    using Socket = std::shared_ptr<job::net::ISocketIO>;
 
-    explicit FrameSinkNet(Socket socket, bool autoOpen = true) noexcept;
+    explicit FrameSinkNet(ISocketIO::Ptr socket, bool autoOpen = true) noexcept;
     ~FrameSinkNet() override = default;
 
     [[nodiscard]] bool open();
@@ -35,13 +33,10 @@ public:
     void flush() override;
 
     // Accessors
-    [[nodiscard]] Socket socket() const noexcept
-    {
-        return m_socket;
-    }
+    [[nodiscard]] ISocketIO::Ptr socket() const noexcept;
 
 private:
-    Socket              m_socket;
+    ISocketIO::Ptr      m_socket;
     bool                m_autoOpen{true};
     std::atomic<bool>   m_open{false};
     mutable std::mutex  m_mutex;

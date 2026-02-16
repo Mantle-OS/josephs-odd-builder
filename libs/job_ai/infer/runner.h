@@ -15,7 +15,7 @@
 namespace job::ai::infer {
 
 class Runner {
-    using Alloc = cords::AlignedAllocator<float, 64>; // Might now be needed anymore see notes on m_buf[A,B]
+    using Alloc = core::AlignedAllocator<float, 64>; // Might now be needed anymore see notes on m_buf[A,B]
 public:
     using Ptr = std::shared_ptr<Runner>;
     Runner(const evo::Genome &genome, threads::ThreadPool::Ptr pool, uint8_t initialWsMB = 1);  // Create the runner

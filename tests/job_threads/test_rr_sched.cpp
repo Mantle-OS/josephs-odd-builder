@@ -14,7 +14,7 @@ using namespace std::chrono_literals;
 
 TEST_CASE("JobRoundRobinScheduler create and shutdown", "[threading][scheduler][round_robin]")
 {
-    auto scheduler = std::make_shared<JobRoundRobinScheduler>();
+    auto scheduler = std::make_shared<JobRoundRobinScheduler>(4);
     auto pool = ThreadPool::create(scheduler, 2);
 
     REQUIRE(pool != nullptr);
@@ -35,7 +35,7 @@ TEST_CASE("JobRoundRobinScheduler create and shutdown", "[threading][scheduler][
 
 TEST_CASE("JobRoundRobinScheduler strictly alternates task priorities", "[threading][scheduler][round_robin]")
 {
-    auto scheduler = std::make_shared<JobRoundRobinScheduler>();
+    auto scheduler = std::make_shared<JobRoundRobinScheduler>(2);
     auto pool = ThreadPool::create(scheduler, 1);
     REQUIRE(pool != nullptr);
 
@@ -74,7 +74,7 @@ TEST_CASE("JobRoundRobinScheduler strictly alternates task priorities", "[thread
 
 TEST_CASE("JobRoundRobinScheduler handles empty priority queues", "[threading][scheduler][round_robin]")
 {
-    auto scheduler = std::make_shared<JobRoundRobinScheduler>();
+    auto scheduler = std::make_shared<JobRoundRobinScheduler>(2);
     auto pool = ThreadPool::create(scheduler, 1);
     REQUIRE(pool != nullptr);
 

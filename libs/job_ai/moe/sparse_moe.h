@@ -8,7 +8,10 @@
 #include <string>
 #include <cassert>
 
-// Core Crypto/Random
+// Core
+#include <aligned_allocator.h>
+
+// Crypto
 #include <job_random.h>
 
 // Interfaces
@@ -21,7 +24,6 @@
 
 // Cords & Memory
 #include "matrix.h"
-#include "aligned_allocator.h"
 
 // Layers & Infer
 #include "abstract_layer.h"
@@ -33,7 +35,6 @@
 // Compute
 #include "noise_table.h"
 #include "gemm.h"
-// #include "activation_math.h"
 #include "atomic_math.h"
 
 namespace job::ai::moe {
@@ -473,7 +474,7 @@ public:
 private:
     router::RouterConfig                                        m_routerCfg;
     [[maybe_unused]]uint32_t                                    m_inputDim{0}; // asserts only
-    std::vector<float, cords::AlignedAllocator<float, 64>>      m_gateWeights;
+    std::vector<float, core::AlignedAllocator<float, 64>>      m_gateWeights;
     float                                                       *m_gateWeightsPtr{nullptr};
     std::vector<AbstractLayer::Ptr>                             m_experts;
 };

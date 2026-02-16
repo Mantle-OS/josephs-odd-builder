@@ -6,6 +6,7 @@
 
 #include "activation.h"
 #include "abstract_layer.h"
+#include "ai_weights.h"
 #include "layer_config.h"
 #include "matrix.h"
 #include "aligned_allocator.h"
@@ -57,9 +58,9 @@ public:
         assert(inFeatures == static_cast<std::size_t>(m_cfg.inputs));
 
         // Pointers
-        const float* A_ptr = input.data();
-        const float* W_ptr = m_weightsPtr;
-        const float* B_ptr = m_cfg.hasBias() ? m_biasPtr : nullptr;
+        const float *A_ptr = input.data();
+        const float *W_ptr = m_weightsPtr;
+        const float *B_ptr = m_cfg.hasBias() ? m_biasPtr : nullptr;
         float* O_ptr = output.data();
 
         // Dimensions
@@ -70,9 +71,7 @@ public:
         // Heuristic
         const std::size_t flops = rows * inFeatures * static_cast<std::size_t>(m_cfg.outputs);
         constexpr std::size_t kMinFlopsForParallel = 32768; // Bumped up slightly for overhead
-
         bool runParallel = (rows > 1) && (flops > kMinFlopsForParallel);
-
         if (runParallel) {
             comp::activateDenseParallel<false>(
                 pool,
@@ -130,6 +129,8 @@ public:
 
 private:
 
+
+    // OLD
     // static inline void addBiasRow(float *row, const float *bias, size_t count)
     // {
     //     using SIMD = job::ai::comp::SIMD;
@@ -172,7 +173,7 @@ private:
     //     // comp::activate_buffer(pool, outData, rows * cols, m_cfg.activation, m_alpha);
     // }
 
-    std::vector<float, cords::AlignedAllocator<float, 64>>      m_storage;
+    cords::AiWeights                                            m_storage;
     float                                                       *m_weightsPtr{nullptr};
     float                                                       *m_biasPtr{nullptr};
 };

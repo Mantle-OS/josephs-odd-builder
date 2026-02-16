@@ -12,16 +12,28 @@ set(JOBSIMD_HEADERS
     transpose.h
     simd_provider.h
     simd_math.h
+    simd_for.h
 )
 
-if(HAS_AVX)
+if(JOB_AVX_512_VNNI_FLAG OR JOB_AVX_512_FLAG)
+    list(APPEND  JOBSIMD_HEADERS simd_avx512.h)
+elseif(JOB_AVX_FLAG OR JOB_AVX_TWO_FLAG OR JOB_AVX_VNNI_FLAG)
     list(APPEND  JOBSIMD_HEADERS simd_avx.h)
-elseif(HAS_NEON)
+elseif(JOB_AVX_NEON_FLAG)
     list(APPEND  JOBSIMD_HEADERS simd_arm.h)
+else()
+    message(FATAL_ERROR "AVX mismatch you have to set it up. see cmake/build_options")
 endif()
 
 
 add_library(JosephsOddBuilder_Simd SHARED ${JOBSIMD_HEADERS} ${JOBSIMD_SOURCES})
+
+target_link_libraries(JosephsOddBuilder_Simd PUBLIC
+    Threads::Threads
+    atomic
+    JosephsOddBuilder_Core
+    JosephsOddBuilder_Threads
+)
 
 set_target_properties(JosephsOddBuilder_Simd PROPERTIES
     VERSION ${PROJECT_VERSION}

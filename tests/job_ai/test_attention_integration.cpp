@@ -193,17 +193,17 @@ TEST_CASE("Attention: Scaling Benchmark (Seq=4096)", "[ai][attn][bench][scale]")
         );
 
     // Only run the scalable ones to save time in test suite
-    BENCHMARK("FMM Attention (O(N) Seq=4096)) - Long Context") {
+    BENCHMARK("LowRank Attention  Seq=4096)) - Long Context") {
         layers::LayerConfig cfg;
-        cfg.adapterType = adapters::AdapterType::FMM;
+        cfg.adapterType = adapters::AdapterType::LowRank;
         layers::AttentionLayer attn(static_cast<int>(D), cfg);
         attn.forward(*ctx.pool, input, output, ws);
         return outputData[0];
     };
 
-    BENCHMARK("LowRank Attention (O(N) Seq=4096)) - Long Context") {
+    BENCHMARK("Flash Attention  Seq=4096) - Long Context") {
         layers::LayerConfig cfg;
-        cfg.adapterType = adapters::AdapterType::LowRank;
+        cfg.adapterType = adapters::AdapterType::Flash;
         layers::AttentionLayer attn(static_cast<int>(D), cfg);
         attn.forward(*ctx.pool, input, output, ws);
         return outputData[0];
@@ -217,5 +217,46 @@ TEST_CASE("Attention: Scaling Benchmark (Seq=4096)", "[ai][attn][bench][scale]")
         return outputData[0];
     };
 
+    BENCHMARK("FMM Attention  Seq=4096)) - Long Context") {
+        layers::LayerConfig cfg;
+        cfg.adapterType = adapters::AdapterType::FMM;
+        layers::AttentionLayer attn(static_cast<int>(D), cfg);
+        attn.forward(*ctx.pool, input, output, ws);
+        return outputData[0];
+    };
+
+    BENCHMARK("BH Attention Seq=4096)) - Long Context") {
+        layers::LayerConfig cfg;
+        cfg.adapterType = adapters::AdapterType::BarnesHut;
+        layers::AttentionLayer attn(static_cast<int>(D), cfg);
+        attn.forward(*ctx.pool, input, output, ws);
+        return outputData[0];
+    };
+
+
+    BENCHMARK("Verlet  Seq=4096)) - Long Context") {
+        layers::LayerConfig cfg;
+        cfg.adapterType = adapters::AdapterType::Verlet;
+        layers::AttentionLayer attn(static_cast<int>(D), cfg);
+        attn.forward(*ctx.pool, input, output, ws);
+        return outputData[0];
+    };
+
+    BENCHMARK("Stencil Seq=4096)) - Long Context") {
+        layers::LayerConfig cfg;
+        cfg.adapterType = adapters::AdapterType::Stencil;
+        layers::AttentionLayer attn(static_cast<int>(D), cfg);
+        attn.forward(*ctx.pool, input, output, ws);
+        return outputData[0];
+    };
+/* TO HEAVY
+    BENCHMARK("RK4  Seq=4096)) - Long Context") {
+        layers::LayerConfig cfg;
+        cfg.adapterType = adapters::AdapterType::RK4;
+        layers::AttentionLayer attn(static_cast<int>(D), cfg);
+        attn.forward(*ctx.pool, input, output, ws);
+        return outputData[0];
+    };
+*/
 }
 #endif

@@ -173,7 +173,7 @@ Avoid `T& name` / `T* name` mixed with `auto&`/`auto *` on the same project; kee
 
 Good
 ```cpp
-for (cosnt auto &str : strList)
+for (const auto &str : strList)
     doSomething(str);
 ```
 

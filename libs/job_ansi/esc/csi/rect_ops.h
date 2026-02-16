@@ -2,9 +2,7 @@
 #include <algorithm>
 
 #include "job_ansi_enums.h"
-
 #include "job_ansi_screen.h"
-
 #include "esc/csi/dispatch_base.h"
 
 
@@ -20,7 +18,7 @@ public:
     void initMap() override
     {
         // DECFRA - Fill Rectangular Area
-        m_dispatchMap[CSI_CODE::DECFRA] = [this](const std::vector<int> &params) {
+        m_dispatchMap[CSI_CODE::DECFRA] = [this](std::span<const int> params) {
             // Default values per DEC spec
             int value = params.size() > 0 ? params[0] : 0;      // Character to fill
             int top = params.size() > 1 ? params[1] - 1 : 0;    // Top row (1-based)
@@ -53,7 +51,7 @@ public:
         };
 
         // DECCRA - Copy Rectangular Area
-        m_dispatchMap[CSI_CODE::DECCRA] = [this](const std::vector<int> &params) {
+        m_dispatchMap[CSI_CODE::DECCRA] = [this](std::span<const int> params) {
             // Source rectangle coordinates (1-based)
             int srcTop    = params.size() > 0 ? params[0] - 1 : 0;
             int srcLeft   = params.size() > 1 ? params[1] - 1 : 0;
@@ -107,7 +105,7 @@ public:
 
 
         // DECRARA - Reverse Attributes in Rectangular Area
-        m_dispatchMap[CSI_CODE::DECRARA] = [this](const std::vector<int> &params) {
+        m_dispatchMap[CSI_CODE::DECRARA] = [this](std::span<const int> params) {
             int top = params.size() > 0 ? params[0] - 1 : 0;
             int left = params.size() > 1 ? params[1] - 1 : 0;
             int bottom = params.size() > 2 ? params[2] - 1 : m_screen->rowCount() - 1;

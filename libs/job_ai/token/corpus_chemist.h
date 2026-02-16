@@ -20,7 +20,7 @@ public:
         m_pool(std::move(pool))
     {
         if(!m_pool)
-            JOB_LOG_WARN("[The Chemist] has no pool to swim in. This is not good.");
+            JOB_LOG_INFO("[The Chemist] has no pool to swim in. falling back to serial");
     }
 
     [[nodiscard]] std::string findReactiveMolecule(int len, int samples, uint64_t seed)

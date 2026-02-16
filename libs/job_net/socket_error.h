@@ -152,6 +152,12 @@ public:
 
     }
 
+    void inline recordError(SocketErrNo err) noexcept
+    {
+        recordError(static_cast<int>(err));
+    }
+
+
     void inline recordError(int err) noexcept
     {
         m_lastError = fromErrno(err);

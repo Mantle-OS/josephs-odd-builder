@@ -14,7 +14,7 @@ class JobRoundRobinScheduler : public ISchedPolicy {
 public:
     using Ptr = std::shared_ptr<JobRoundRobinScheduler>;
 
-    JobRoundRobinScheduler() = default;
+    JobRoundRobinScheduler(int threadCount){(void)threadCount;}
     ~JobRoundRobinScheduler() override;
 
     [[nodiscard]] JobIDescriptor::Ptr createDescriptor(uint64_t id, int priority) override;

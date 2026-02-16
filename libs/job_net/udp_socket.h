@@ -15,8 +15,8 @@ namespace job::net {
 class UdpSocket : public ISocketIO {
 
 public:
-    using UdpSocketPtr = std::shared_ptr<UdpSocket>;
-    explicit UdpSocket(std::shared_ptr<threads::JobIoAsyncThread> loop);
+    using Ptr = std::shared_ptr<UdpSocket>;
+    explicit UdpSocket(threads::JobIoAsyncThread::Ptr loop);
     ~UdpSocket() override;
 
     bool connectToHost(const JobUrl &url) override;
@@ -24,7 +24,7 @@ public:
     bool bind(const std::string &address, uint16_t port) override;
 
     bool listen([[maybe_unused]]int backlog = 0) override;
-    std::shared_ptr<ISocketIO> accept() override;
+    ISocketIO::Ptr accept() override;
 
     void disconnect() override;
 

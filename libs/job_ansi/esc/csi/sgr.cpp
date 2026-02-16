@@ -1,6 +1,6 @@
 #include "sgr.h"
-#include <iostream>
 
+#include <job_ansi_attributes.h>
 #include <rgb_color.h>
 #include <job_ansi_utils.h>
 #include "job_ansi_enums.h"
@@ -10,10 +10,16 @@ namespace job::ansi::csi {
 DispatchSGR::DispatchSGR(Screen *screen) :
     m_screen(screen)
 {
+
 }
 
-void DispatchSGR::dispatch(Attributes *attributes, const std::vector<int> &params)
+void DispatchSGR::dispatch(std::span<const int> params)
 {
+
+    if (!m_screen)
+        return;
+
+    Attributes *attributes = m_screen->currentAttributes();
     if (!attributes)
         return;
 
@@ -72,24 +78,24 @@ void DispatchSGR::dispatch(Attributes *attributes, const std::vector<int> &param
             attributes->conceal = false;
             break;
         case SGR_CODE::FG_DEFAULT:
-            attributes->foreground.reset();
+            attributes->resetForeground();
             break;
         case SGR_CODE::BG_DEFAULT:
-            attributes->background.reset();
+            attributes->resetBackground();
             break;
         case SGR_CODE::EXTENDED_FG: {
             if (i + 1 >= params.size()) break;
             int mode = params[i + 1];
 
             if (mode == 5 && i + 2 < params.size()) {
-                attributes->foreground = ansi::utils::fromXterm256Palette(params[i + 2]);
+                attributes->setForeground(ansi::utils::fromXterm256Palette(params[i + 2]));
                 i += 2;
             } else if (mode == 2 && i + 4 < params.size()) {
-                attributes->foreground = RGBColor{
+                attributes->setForeground(RGBColor{
                     static_cast<uint8_t>(params[i + 2]),
                     static_cast<uint8_t>(params[i + 3]),
                     static_cast<uint8_t>(params[i + 4])
-                };
+                });
                 i += 4;
             }
             break;
@@ -100,14 +106,14 @@ void DispatchSGR::dispatch(Attributes *attributes, const std::vector<int> &param
             int mode = params[i + 1];
 
             if (mode == 5 && i + 2 < params.size()) {
-                attributes->background = ansi::utils::fromXterm256Palette(params[i + 2]);
+                attributes->setBackground(ansi::utils::fromXterm256Palette(params[i + 2]));
                 i += 2;
             } else if (mode == 2 && i + 4 < params.size()) {
-                attributes->background = RGBColor{
+                attributes->setBackground(RGBColor{
                     static_cast<uint8_t>(params[i + 2]),
                     static_cast<uint8_t>(params[i + 3]),
                     static_cast<uint8_t>(params[i + 4])
-                };
+                });
                 i += 4;
             }
             break;
@@ -132,9 +138,9 @@ void DispatchSGR::dispatch(Attributes *attributes, const std::vector<int> &param
         default: {
             if (auto parsed = ansi::utils::sgrCodeToColor(raw)) {
                 if (parsed->isForeground)
-                    attributes->foreground = parsed->color;
+                    attributes->setForeground(parsed->color);
                 else
-                    attributes->background = parsed->color;
+                    attributes->setBackground(parsed->color);
             }
             break;
         }
@@ -148,5 +154,5 @@ void DispatchSGR::dispatch(Attributes *attributes, const std::vector<int> &param
     m_screen->setCurrentAttributes(interned);
 }
 
-} // namespace ANSI::CSI
+}
 

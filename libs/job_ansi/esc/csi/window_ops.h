@@ -1,9 +1,8 @@
 #pragma once
 #include <sstream>
+#include <job_logger.h>
 
 #include "job_ansi_enums.h"
-#include "rgb_color.h"
-
 #include "job_ansi_screen.h"
 #include "esc/csi/dispatch_base.h"
 
@@ -20,7 +19,7 @@ public:
 
     void initMap() override {
         // Window and Title Operations - CSI Ps ; Ps ; Ps t
-        m_dispatchMap[CSI_CODE::WINDOW_MANIP] = [this](const std::vector<int> &params) {
+        m_dispatchMap[CSI_CODE::WINDOW_MANIP] = [this](std::span<const int> params) {
             if (params.empty()) return;
 
             // First check if it's a window manipulation code
@@ -137,7 +136,7 @@ public:
                     break;
 
                 default:
-                    std::cerr << "[CSI:WINDOW] Unknown window operation: " << static_cast<int>(code) << '\n';
+                    JOB_LOG_DEBUG("[CSI:WINDOW] Unknown window operation: {}", static_cast<int>(code));
                     break;
                 }
             }
@@ -169,7 +168,7 @@ public:
                     break;
 
                 default:
-                    std::cerr << "[CSI:WINDOW] Unknown title operation: " << static_cast<int>(mode) << '\n';
+                    JOB_LOG_DEBUG("[CSI:WINDOW] Unknown title operation: {}", static_cast<int>(mode));
                     break;
                 }
             }

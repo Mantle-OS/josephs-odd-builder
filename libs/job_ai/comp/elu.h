@@ -19,9 +19,9 @@ struct FunctorELU {
         // Note: Using SIMD::exp from your provider
         [[maybe_unused]] f32 e_x ;
         if constexpr (T_SMOOTH)
-            e_x = SIMD::exp_estrin(x);
+            e_x = SIMD::exp(x);
         else
-            e_x = SIMD::exp_schraudolph(x);
+            e_x = SIMD::exp_fast(x);
 
         auto sub = SIMD::sub(e_x, one);   // (exp(x) - 1)
         auto neg_part = SIMD::mul(sub, v_alpha);
@@ -57,9 +57,9 @@ struct FunctorSELU {
         // Calculate inner negative branch: kSeluAlpha * (exp(x) - 1)
         f32 e_x;
         if constexpr (T_SMOOTH)
-            e_x = SIMD::exp_estrin(x);
+            e_x = SIMD::exp(x);
         else
-            e_x = SIMD::exp_schraudolph(x);
+            e_x = SIMD::exp_fast(x);
 
         auto sub = SIMD::sub(e_x, one);
         auto neg_inner = SIMD::mul(sub, v_alpha);

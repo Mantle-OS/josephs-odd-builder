@@ -12,8 +12,7 @@ struct FunctorSwish {
     static inline f32 apply(f32 x, float alpha = 1.0f)
     {
         // Swish = x * sigmoid(alpha * x)
-        // Note: Standard Swish/SiLU is alpha=1.0
-        assert(alpha == 1.0f && "Swish alpha should always be 1.0f ... I think");
+
         auto v_alpha = SIMD::set1(alpha);
         auto inner = SIMD::mul(x, v_alpha);
         return SIMD::mul(x, FunctorSigmoid<T_SMOOTH>::apply(inner));

@@ -21,7 +21,7 @@ TEST_CASE("UnixClient and UnixServer Full Echo Test", "[unix_client_server][asyn
     std::atomic<bool> clientWasDisconnected{false};
     std::atomic<bool> serverSawClientDisconnect{false};
 
-    server->onClientConnected = [&](UnixClient::UnixClientPtr client) {
+    server->onClientConnected = [&](UnixClient::Ptr client) {
         JOB_LOG_INFO("[UNIX][Server] Client connected!");
 
         client->onMessage = [client, &serverGotMessage](const char* data, size_t len) {

@@ -1,3 +1,5 @@
+enable_testing()
+
 add_subdirectory(job_core)
 add_subdirectory(job_threads)
 add_subdirectory(job_crypto)
@@ -8,7 +10,7 @@ add_subdirectory(job_serializer)
 if(MSGPACK_BINDINGS)
     add_subdirectory(job_serializer_msgpack)
 endif()
-
+add_subdirectory(job_ansi)
 add_subdirectory(job_science)
 add_subdirectory(job_ai)
 

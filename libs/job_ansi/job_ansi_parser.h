@@ -4,10 +4,8 @@
 #include <string_view>
 #include <vector>
 
-
 #include "utils/utf8_decoder.h"
 
-#include "job_ansi_cell.h"
 #include "job_ansi_screen.h"
 
 #include "esc/csi/csi.h"
@@ -27,7 +25,7 @@ public:
     void parseInput(const std::vector<uint8_t> &data);
 
 private:
-
+    static constexpr size_t kMaxSequenceLength = 4096;
     // Parser state machine
     enum class ParserState {
         Ground,     // Normal character processing

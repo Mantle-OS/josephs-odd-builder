@@ -85,7 +85,7 @@ void TcpServer::onClientConnect()
         if (!clientSockBase)
             break;
 
-        TcpSocketPtr clientSock = std::static_pointer_cast<TcpSocket>(clientSockBase);
+        TcpSocket::Ptr clientSock = std::static_pointer_cast<TcpSocket>(clientSockBase);
         if (!clientSock) {
             JOB_LOG_WARN("[TcpServer] Accepted socket was not a TcpSocket!");
             continue;
@@ -118,7 +118,7 @@ void TcpServer::onClientConnect()
     }
 }
 
-void TcpServer::onClientDisconnect(ClientPtr client)
+void TcpServer::onClientDisconnect(TcpClient::Ptr client)
 {
     if (onClientDisconnected)
         onClientDisconnected(client);

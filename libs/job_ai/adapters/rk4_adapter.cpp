@@ -1,6 +1,5 @@
 #include "rk4_adapter.h"
-#include "ml_particle.h"
-// #include "ml_particle.h"
+#include "verlet_config.h"
 
 #include <particle.h>
 #include <vec3f.h>
@@ -81,22 +80,32 @@ void Rk4Adapter::apply(int seq, int dim,
     const float *in_ptr = sources.data() + (size * seq * dim);
     float *out_ptr      = output.data()  + (size * seq * dim);
 
+
+    PhysicsContext physCtx;
+    physCtx.particles = bodies.data();
+    physCtx.count = seq;
+    physCtx.valueIn = in_ptr;    // Read V from here
+    physCtx.valueOut = out_ptr;  // Write Mixed V here
+    physCtx.stride = dim;
+    // Standard Layout: Dims 7+ are Payload
+    physCtx.valueDim = (dim > 7) ? (dim - 7) : 0;
+
     for (int i = 0; i < seq; ++i) {
         auto &p = bodies[i];
         int idx = i * dim;
 
         // Map Position
-        p.position[0] = in_ptr[idx + m_cfg.dim_mapping[0]];
-        p.position[1] = in_ptr[idx + m_cfg.dim_mapping[1]];
-        p.position[2] = in_ptr[idx + m_cfg.dim_mapping[2]];
+        p.position.x = in_ptr[idx + m_cfg.dim_mapping[0]];
+        p.position.y = in_ptr[idx + m_cfg.dim_mapping[1]];
+        p.position.z = in_ptr[idx + m_cfg.dim_mapping[2]];
 
         // Map Velocity (if dims exist)
         if (dim >= 6) {
-            p.position[0] = in_ptr[idx + m_cfg.dim_mapping[3]];
-            p.position[1] = in_ptr[idx + m_cfg.dim_mapping[4]];
-            p.position[2] = in_ptr[idx + m_cfg.dim_mapping[5]];
+            p.velocity.x = in_ptr[idx + m_cfg.dim_mapping[3]];
+            p.velocity.y = in_ptr[idx + m_cfg.dim_mapping[4]];
+            p.velocity.z = in_ptr[idx + m_cfg.dim_mapping[5]];
         } else {
-            p.position = {0,0,0};
+            p.velocity = {0,0,0}; // Fixed
         }
 
         // Map Mass
@@ -110,14 +119,18 @@ void Rk4Adapter::apply(int seq, int dim,
         p.acceleration = {0,0,0};
     }
 
-
-    // auto calcForces = [](std::vector<Particle>& ps) { computeNbodyForces(ps); };
-
+    // auto calcForces = [&](std::vector<Particle>& /*ignored*/) {
+    //     computeForcesAndMixing(physCtx);
+    // };
+    auto calcForces = [physCtx](std::vector<Particle> &currentParticles) mutable {
+        physCtx.particles = currentParticles.data();
+        computeForcesAndMixing(physCtx);
+    };
     Solver integrator(pool, &bodies,
                       [](Particle &p) -> Vec3f& { return p.position; },
                       [](Particle &p) -> Vec3f& { return p.velocity; },
                       [](Particle &p) -> Vec3f& { return p.acceleration; },
-                      [](std::vector<Particle> &ps) { computeNbodyForces(ps);},
+                      calcForces,
                       false);
 
     float dt = (ctx.dt > 0.0f) ? ctx.dt : m_cfg.dt;
@@ -137,8 +150,9 @@ void Rk4Adapter::apply(int seq, int dim,
             out_ptr[idx + m_cfg.dim_mapping[5]] = p.velocity.z;
         }
 
-        if (dim > 6)
-            std::memcpy(out_ptr + idx + 6, in_ptr + idx + 6, (dim - 6) * sizeof(float));
+        if (dim >= 7)
+            out_ptr[idx + m_cfg.dim_mapping[6]] = p.mass;
+
     }
 
 }

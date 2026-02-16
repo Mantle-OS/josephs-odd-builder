@@ -19,8 +19,8 @@ namespace job::ai::learn {
         return XORLearn::create(cfg, std::move(pool));
     case LearnType::CartPole:
         return CartPoleLearn::create(cfg, std::move(pool));
-    case LearnType::Bard:
-        return BardLearn::create(cfg, std::move(pool));
+    case LearnType::Language:
+        return LanguageLearn::create(cfg, std::move(pool));
 
     default:
         JOB_LOG_ERROR("Unknown Learner Type: {}", static_cast<uint8_t>(type));

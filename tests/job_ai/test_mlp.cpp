@@ -1,4 +1,3 @@
-#include "job_stealing_ctx.h"
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/benchmark/catch_benchmark.hpp>
 #include <catch2/catch_approx.hpp>
@@ -12,6 +11,7 @@
 #include <real_type.h>
 #include <job_thread_pool.h>
 #include <sched/job_fifo_scheduler.h>
+#include "job_stealing_ctx.h"
 
 #include <aligned_allocator.h>
 #include <mlp.h>
@@ -70,7 +70,7 @@ TEST_CASE("MLP: Correctness vs Naive", "[ai][mlp][correctness]")
     const int D = 32;
     const int H = 64;
 
-    using Alloc = AlignedAllocator<float, 64>;
+    using Alloc = job::core::AlignedAllocator<float, 64>;
     std::vector<float, Alloc> X(B * D);
     std::vector<float, Alloc> W1(D * H);
     std::vector<float, Alloc> W2(H * D);
@@ -104,7 +104,7 @@ TEST_CASE("MLP: Benchmark Standard (GPT-3 Medium Sized ReLU)", "[ai][mlp][bench]
     const int D = 1024;  // d_model
     const int H = 4096;  // d_hidden (4x expansion)
 
-    using Alloc = AlignedAllocator<float, 64>;
+    using Alloc = job::core::AlignedAllocator<float, 64>;
     std::vector<float, Alloc> X(B * D, 0.1f);
     std::vector<float, Alloc> W1(D * H, 0.01f);
     std::vector<float, Alloc> W2(H * D, 0.01f);
@@ -176,7 +176,7 @@ TEST_CASE("MLP: The Show down", "[ai][mlp][bench][compare]")
     const int D = 128;   // Small Embedding
     const int H = 512;   // 4x Expansion
 
-    using Alloc = AlignedAllocator<float, 64>;
+    using Alloc = job::core::AlignedAllocator<float, 64>;
     std::vector<float, Alloc> X(B * D, 0.5f);
     std::vector<float, Alloc> W1(D * H, 0.1f);
     std::vector<float, Alloc> W2(H * D, 0.1f);

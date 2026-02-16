@@ -1,14 +1,9 @@
 #pragma once
 
 #include <optional>
-#include <vector>
-#include <iostream>
 
 #include "utils/job_ansi_enums.h"
-
-
 #include "job_ansi_screen.h"
-
 #include "esc/csi/sgr.h"
 #include "esc/csi/mode_change.h"
 #include "esc/csi/char_attr.h"
@@ -27,14 +22,14 @@ class DispatchCSI {
 public:
 
     explicit DispatchCSI(Screen *screen);
-    void dispatch(CSI_CODE code, const std::vector<int> &params);
+    void dispatch(CSI_CODE code, std::span<const int> params);
     void setLastPrintedChar(char32_t ch);
     void setLastPrintedChar(std::optional<char32_t> ch);
     void clearLastPrintedChar();
     void handlePrintable(char32_t ch);
     bool privateMode() const;
     void setPrivateMode(bool privateMode);
-    void dispatchTilde(const std::vector<int> &params);
+    void dispatchTilde(std::span<const int> params);
 
 private:
     Screen                  *m_screen    = nullptr;
@@ -54,7 +49,7 @@ private:
     bool                    m_privateMode = false;
 
 
-    static int getParam(const std::vector<int> &params, size_t index, int def = 0);
+    static int getParam(std::span<const int> params, size_t index, int def = 0);
 };
 
 }

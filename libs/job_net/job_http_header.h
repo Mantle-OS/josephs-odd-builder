@@ -12,6 +12,7 @@ namespace job::net {
 
 class JobHttpHeader {
 public:
+
     JobHttpHeader();
     JobHttpHeader(std::string_view name, std::string_view value);
     JobHttpHeader(const JobHttpHeader &other);

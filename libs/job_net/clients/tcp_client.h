@@ -14,7 +14,8 @@ namespace job::net {
 
 class TcpClient {
 public:
-    explicit TcpClient(std::shared_ptr<threads::JobIoAsyncThread> loop, uint16_t buffer_size = 4096);
+    using Ptr = std::shared_ptr<TcpClient>;
+    explicit TcpClient(threads::JobIoAsyncThread::Ptr loop, uint16_t buffer_size = 4096);
     ~TcpClient();
 
     TcpClient(const TcpClient &) = delete;
@@ -36,16 +37,16 @@ public:
     std::function<void()> onDisconnect;
     std::function<void(int)> onError;
 
-    void setSocket(TcpSocketPtr socket);
+    void setSocket(TcpSocket::Ptr socket);
 private:
     void setupSocketCallbacks();
 
-    std::shared_ptr<threads::JobIoAsyncThread> m_loop;
-    TcpSocketPtr m_socket;
+    threads::JobIoAsyncThread::Ptr m_loop;
+    TcpSocket::Ptr m_socket;
     std::atomic<bool> m_connected{false};
 
     std::vector<char> m_readBuffer;
 };
 
 } // namespace job::net
-// CHECKPOINT: v2.1
+

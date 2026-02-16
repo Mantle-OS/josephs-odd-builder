@@ -148,7 +148,8 @@ TEST_CASE("Vectorized SIMD matches Scalar Reference (Comprehensive)", "[activati
     std::mt19937 gen(42);
     // Range [-5, 5] hits the active zones of Sigmoid/Tanh/GELU/Swish
     std::uniform_real_distribution<float> dist(-5.0f, 5.0f);
-    for(auto& x : input) x = dist(gen);
+    for(auto& x : input)
+        x = dist(gen);
 
     // Complete list of supported activations
     const std::vector<ActivationType> types = {
@@ -178,7 +179,7 @@ TEST_CASE("Vectorized SIMD matches Scalar Reference (Comprehensive)", "[activati
         // 1. Compute Scalar Truth
         // Uses T_ESTRIN = true to match the high-precision vector mode if available
         for(size_t i=0; i<N; ++i)
-            scalarRef[i] = activateNaive<true>(scalarRef[i], type, 0.1f);
+            scalarRef[i] = activateNaive<true>(scalarRef[i], type, 0.1f); // might break swish
 
         // 2. Compute Vectorized
         activate<true>(vectorOut.data(), N, type, 0.1f);

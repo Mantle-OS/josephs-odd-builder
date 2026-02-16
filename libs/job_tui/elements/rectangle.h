@@ -44,6 +44,8 @@ public:
 
     explicit Rectangle(JobTuiItem *parent = nullptr);
 
+    // ansi::Attributes::Ptr computeAttributeForStep(int step, int totalSteps) const;
+
     void paintSelf(DrawContext &ctx) override;
 
     std::string color() const;
@@ -84,7 +86,7 @@ private:
 
     std::optional<ansi::RGBColor> resolveColor(const std::string &str) const;
     ansi::RGBColor blend(const ansi::RGBColor &src, const ansi::RGBColor &dst) const;
-    void updateAttributesForRow(int row, int totalHeight);
+    ansi::Attributes::Ptr updateAttributesForRow(int step, int totalSteps) const;
 };
 
 } 

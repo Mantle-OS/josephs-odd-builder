@@ -24,9 +24,20 @@ public:
         m_mutator(cfg.mutator),
         m_crossover(cfg.crossover)
     {
-        m_genomes.reserve(cfg.populationSize);
-        m_fitness.reserve(cfg.populationSize);
+        m_genomes.resize(cfg.populationSize);
+        m_fitness.resize(cfg.populationSize, 0.0f);
     }
+
+
+    void spawnMutant(std::size_t index, const Genome& parent, uint64_t seed)
+    {
+        assert(index < m_genomes.size());
+        m_genomes[index] = parent;
+        Mutator localMutator = m_mutator;
+        localMutator.seed(seed);
+        localMutator.perturb(m_genomes[index]);
+    }
+
 
     [[nodiscard]] std::size_t size() const noexcept
     {
@@ -69,6 +80,19 @@ public:
         m_fitness.push_back(0.0f);
     }
 
+    // Dynamic Sizing (Coach Policy)
+    void resize(std::size_t newSize) {
+        if (m_genomes.size() != newSize) {
+            m_genomes.resize(newSize);
+            m_fitness.resize(newSize);
+            m_cfg.populationSize = newSize;
+        }
+    }
+
+    // Sigma Control (Annealing)
+    void setSigma(float s) { m_mutator.setSigma(s); }
+    float sigma() const { return m_mutator.sigma(); }
+    /*
     void evolveNextGeneration()
     {
         if (m_genomes.empty())
@@ -107,6 +131,7 @@ public:
         m_genomes  = std::move(nextGen);
         m_fitness.assign(m_genomes.size(), 0.0f);
     }
+*/
 
 private:
     PopulationConfig    m_cfg;

@@ -59,7 +59,7 @@ TEST_CASE("ESCoach: Masters CartPole", "[ai][coach][es][cartpole]")
 
     Genome parent = buildCartPoleGenome();
 
-    ESCoach::Config cfg;
+    ESConfig cfg;
     cfg.populationSize = 128; // Decent population size
     cfg.sigma = 0.2f;         // HIGHER SIGMA to break out of "suicide" mode
     cfg.decay = 0.99f;        // Anneal gently
@@ -96,7 +96,7 @@ TEST_CASE("Evolution: Edge Cases Cart Pole(Single Thread / Pop 1)", "[coach][edg
 {
     job::threads::JobStealerCtx ctx(1); // Single thread
 
-    ESCoach::Config cfg;
+    ESConfig cfg;
     cfg.populationSize = 1;
     cfg.sigma = 0.5f;
     cfg.envConfig.type = LearnType::CartPole;
@@ -120,7 +120,7 @@ TEST_CASE("Evolution: Cart Pole Benchmark", "[coach][benchmark]")
     // Benchmark CartPole (Physics + Inference)
     Genome cartSeed = buildCartPoleGenome();
     BENCHMARK("CartPole (Pop=1024)") {
-        ESCoach::Config cfg;
+        ESConfig cfg;
         cfg.populationSize = 1024;
         cfg.envConfig.type  = LearnType::CartPole;
         ESCoach coach(ctx.pool, cfg);

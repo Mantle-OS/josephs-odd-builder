@@ -59,21 +59,29 @@ void BhAdapter::apply(threads::ThreadPool &pool, const cords::AttentionShape &sh
 
     std::shared_ptr<threads::ThreadPool> poolPtr(&pool, [](void*){});
     std::vector<BhTraits::Body> bodies(S);
-    const float *k_ptr = sources.data() + (i * S * D);
+    const float *in_ptr = sources.data() + (i * S * D);
     float *out_ptr     = output.data()  + (i * S * D);
 
     for (int i = 0; i < S; ++i) {
-        auto& p = bodies[i];
+        auto &p = bodies[i];
         int idx = i * D;
-        p.position.x = k_ptr[idx + m_cfg.dim_mapping[0]];
-        p.position.y = k_ptr[idx + m_cfg.dim_mapping[1]];
+        p.position.x = in_ptr[idx + m_cfg.dim_mapping[0]];
+        p.position.y = in_ptr[idx + m_cfg.dim_mapping[1]];
         p.position.z = (D > 2) ?
-                           k_ptr[idx + m_cfg.dim_mapping[2]] :
+                           in_ptr[idx + m_cfg.dim_mapping[2]] :
                            0.0f;
         p.mass = 1.0f;
         p.acceleration = {0,0,0};
+        if (D >= 7)
+            p.mass = std::abs(in_ptr[idx + m_cfg.dim_mapping[6]]);
+        else
+            p.mass = 1.0f;
+
     }
 
+    float theta = (S < 128) ? 0.0f : m_cfg.theta;
+    float g_const = m_cfg.gravity * 0.001f;
+float softening = 0.5f;
     auto get_pos = [](const BhTraits::Body &body) -> const BhTraits::Vec3& {
         return body.position;
     };
@@ -82,9 +90,13 @@ void BhAdapter::apply(threads::ThreadPool &pool, const cords::AttentionShape &sh
         return body.mass;
     };
 
-    // The magic !!
-    Solver solver(poolPtr, get_pos, get_mass,
-                  m_cfg.theta, m_cfg.gravity, m_cfg.epsilon);
+    Solver solver(poolPtr,
+                  get_pos,
+                  get_mass,
+                  theta,     // Dynamic Theta
+                  g_const,   // Scaled Gravity
+                  softening      // Epsilon Squared (keep small but safe));
+                  );
 
     std::vector<BhTraits::Vec3> forces;
     solver.calculate_forces(bodies, forces);

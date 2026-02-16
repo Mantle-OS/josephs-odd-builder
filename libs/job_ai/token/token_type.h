@@ -7,6 +7,7 @@ enum class TokenType : uint8_t {
     Char            = 2,    // Gen 0-50: The "Crystal Lattice" (Raw Physics)
     Motif           = 3,    // Gen 50+: The "Molecule" (Merged Clusters)
     BPE             = 4,    // If we ever want to compare against standard
+    Unigram         = 5,
     None            = 254   // What are you even doing
 };
 

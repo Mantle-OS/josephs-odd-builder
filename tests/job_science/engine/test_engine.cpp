@@ -1,39 +1,39 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/catch_approx.hpp>
 
-#include <vector>
 #include <atomic>
 
 #include <engine/engine.h>
+
 #include <data/disk.h>
 #include <data/zones.h>
-#include <data/forces.h>
-#include <data/composition.h>
-#include <data/real_type.h>
+#include <data/particle.h>
 
-using namespace pps::engine;
-using namespace pps::data;
+using namespace job::science::engine;
+using namespace job::science::data;
+
 using namespace std::chrono_literals;
 
-constexpr real_t kTestTimeStep = static_cast<real_t>(60.0f); // 1 minute
+constexpr float kTestTimeStep = 60.0f; // 1 minute
 
-TEST_CASE("Engine Initialization and Configuration", "[engine][init]")
+TEST_CASE("Engine: Initialization and configuration", "[engine][init]")
 {
-    DiskModel disk = presets::solarNebula();
-    Zones zones = presets::solarSystemLike();
+    const DiskModel disk  = SciencePresets::solarNebula();
+    const Zones     zones = SciencePresets::solarSystemLike();
 
-    Engine engine(disk, zones, 10);
+    Engine engine(disk, zones, DefaultEngineConfig(), 10);
 
     REQUIRE(engine.particles().size() == 10);
-    REQUIRE_FALSE(engine.running());
-    REQUIRE_FALSE(engine.pause());
 
-    REQUIRE(engine.disk().innerRadius == disk.innerRadius);
-    REQUIRE(engine.zones().midBoundaryAU == zones.midBoundaryAU);
+    REQUIRE_FALSE(engine.running());
+    REQUIRE_FALSE(engine.pause()); // can't pause if not running
+
+    REQUIRE(engine.disk().innerRadius == Catch::Approx(disk.innerRadius));
+    REQUIRE(engine.zones().midBoundaryAU == Catch::Approx(zones.midBoundaryAU));
 
     bool hasMass = false;
-    for(const auto& p : engine.particles()) {
-        if (p.mass > static_cast<real_t>(0.0f)) {
+    for (const auto &p : engine.particles()) {
+        if (p.mass > 0.0f) {
             hasMass = true;
             break;
         }
@@ -41,60 +41,75 @@ TEST_CASE("Engine Initialization and Configuration", "[engine][init]")
     REQUIRE(hasMass);
 }
 
-TEST_CASE("Engine Start, Stop, and Pause Control", "[engine][control]")
+TEST_CASE("Engine: Start/Stop/Pause/Play control", "[engine][control]")
 {
-    DiskModel disk = presets::solarNebula();
-    Zones zones = presets::solarSystemLike();
-    Engine engine(disk, zones, 10);
+    const DiskModel disk  = SciencePresets::solarNebula();
+    const Zones     zones = SciencePresets::solarSystemLike();
+
+    Engine engine(disk, zones, DefaultEngineConfig(), 10);
 
     engine.start();
     REQUIRE(engine.running());
 
     REQUIRE(engine.pause());
     REQUIRE(engine.running());
+
     REQUIRE(engine.play());
     REQUIRE(engine.running());
-    engine.stop();
 
-    std::this_thread::sleep_for(10ms);
+    engine.stop();
     REQUIRE_FALSE(engine.running());
 }
 
-TEST_CASE("Engine Step and Velocity Verlet Integration Integrity", "[engine][step][sync]")
+TEST_CASE("Engine: step() advances particle state and recomputes derived fields", "[engine][step]")
 {
-    DiskModel disk = presets::solarNebula();
-    Zones zones = presets::solarSystemLike();
+    const DiskModel disk  = SciencePresets::solarNebula();
+    const Zones     zones = SciencePresets::solarSystemLike();
 
-    Engine engine(disk, zones, 1);
+    Engine engine(disk, zones, DefaultEngineConfig(), 1);
+
+    REQUIRE(engine.particles().size() == 1);
+
+    const Particle p0 = engine.particles()[0];
+
     engine.step(kTestTimeStep);
 
-    Particle p_start = engine.particles()[0];
+    const Particle p1 = engine.particles()[0];
 
-    engine.step(kTestTimeStep);
-    Particle p_end = engine.particles()[0];
+    // It should move (very weak constraints; integrator specifics are tested elsewhere)
+    REQUIRE_FALSE(p1.position.x == Catch::Approx(p0.position.x));
+    REQUIRE(p1.velocity.length() > 0.0f);
 
-    // from what I read (?Keplerian?) ... Not really sure
-    REQUIRE(p_end.velocity.length() > static_cast<real_t>(0.0f));
-    REQUIRE_FALSE(p_end.position.x == Catch::Approx(p_start.position.x));
+    // Temperature should be consistent with disk model + radius
+    const float r_au_expected = DiskModelUtil::metersToAU(p1.position.length());
+    const float t_expected    = DiskModelUtil::temperature(disk, r_au_expected);
 
-    REQUIRE(p_end.zone != DiskZone::Inner_Disk);
+    REQUIRE(job::core::isSafeFinite(t_expected));          // or std::isfinite(t_expected)
+    REQUIRE(job::core::isSafeFinite(p1.temperature));
+
+    REQUIRE(p1.temperature == Catch::Approx(t_expected));
+
+    // Zone should be consistent with classifier
+    const DiskZone z_expected = ZonesUtil::classify(zones, p1, disk);
+    REQUIRE(p1.zone == z_expected);
 }
 
-TEST_CASE("Engine Callback Notification on Step", "[engine][callback]")
+TEST_CASE("Engine: particle callback fires once per step()", "[engine][callback]")
 {
-    DiskModel disk = presets::solarNebula();
-    Zones zones = presets::solarSystemLike();
-    Engine engine(disk, zones, 5);
+    const DiskModel disk  = SciencePresets::solarNebula();
+    const Zones     zones = SciencePresets::solarSystemLike();
+
+    Engine engine(disk, zones, DefaultEngineConfig(), 5);
 
     std::atomic<int> calls{0};
 
-    engine.setParticleCallback([&](const std::vector<Particle>& parts) {
-        calls++;
+    engine.setParticleCallback([&](const Particles &parts) {
+        calls.fetch_add(1, std::memory_order_relaxed);
         REQUIRE(parts.size() == 5);
     });
-    // 2x's a charm I guess
+
     engine.step(kTestTimeStep);
     engine.step(kTestTimeStep);
 
-    REQUIRE(calls.load() == 2);
+    REQUIRE(calls.load(std::memory_order_relaxed) == 2);
 }

@@ -6,9 +6,9 @@
 #include <algorithm>
 #include <cstdint>
 
-#include <simd_provider.h>
+#include <aligned_allocator.h>
 
-#include "aligned_allocator.h"
+#include "simd_provider.h"
 
 namespace job::ai::comp {
 using namespace job::simd;
@@ -55,9 +55,8 @@ public:
                 auto n = SIMD::pull(n_ptr + idx);   // load noise
                 w = SIMD::mul_plus(n, vSigma, w);   // w = w + (n * sigma)
                 SIMD::mov(w_ptr + i, w);            // store back
-            }
-            // Slow Path: The wrap happens inside this register block
-            else {
+            } else {
+                // Slow Path: The wrap happens inside this register block
                 for (size_t k = 0; k < W; ++k) {
                     size_t wrap_idx = (idx + k) & kMask;
                     w_ptr[i + k] += n_ptr[wrap_idx] * sigma;
@@ -89,7 +88,7 @@ private:
             f = dist(gen);
     }
 
-    std::vector<float, job::ai::cords::AlignedAllocator<float, 64>> m_data;
+    std::vector<float, job::core::AlignedAllocator<float, 64>> m_data;
 };
 
 } // namespace job::ai::comp

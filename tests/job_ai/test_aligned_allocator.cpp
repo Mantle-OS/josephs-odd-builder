@@ -6,7 +6,7 @@
 #include <job_logger.h>
 
 #include <aligned_allocator.h>
-
+#include <ai_weights.h>
 using Catch::Approx;
 using namespace job::core;
 using namespace job::ai::cords;

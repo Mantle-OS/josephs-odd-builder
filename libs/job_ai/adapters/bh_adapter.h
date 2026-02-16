@@ -56,3 +56,6 @@ private:
 };
 
 } // namespace job::ai::adapters
+
+
+// AI Analogy: It is purely Contextual Clustering, not "Retrieval."Is this "Bad"?For a Language Model, it might be limiting because it can't say "I am looking for a Verb" ($Q$). It just says "Verbs clump together" ($K$).But combined with your standard DenseLayer, it might act as a powerful Global Mixing operator that standard attention misses.

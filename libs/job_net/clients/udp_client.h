@@ -15,7 +15,8 @@ namespace job::net {
 
 class UdpClient {
 public:
-    explicit UdpClient(std::shared_ptr<threads::JobIoAsyncThread> loop, uint16_t buffer_size = 4096);
+    using Ptr = std::shared_ptr<UdpClient>;
+    explicit UdpClient(threads::JobIoAsyncThread::Ptr loop, uint16_t buffer_size = 4096);
     ~UdpClient();
 
     UdpClient(const UdpClient &) = delete;
@@ -42,8 +43,8 @@ public:
 private:
     void setupSocketCallbacks();
 
-    std::shared_ptr<threads::JobIoAsyncThread> m_loop;
-    UdpSocket::UdpSocketPtr m_socket;
+    threads::JobIoAsyncThread::Ptr m_loop;
+    UdpSocket::Ptr m_socket;
     std::atomic<bool> m_connected{false};
 
     std::vector<char> m_readBuffer;

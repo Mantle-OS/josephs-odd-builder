@@ -7,14 +7,25 @@ Rectangle::Rectangle(JobTuiItem *parent) :
     JobTuiItem{parent}
 {
     setItemHasContents(true);
+
+    // Defaults
+    ansi::RGBColor bgColor{0, 0, 0};
+    ansi::RGBColor fgColor{255, 255, 255};
+
+    // Access via the new pointer-based API
     if (auto attr = attributes()) {
-        m_color = attr->background.value_or(ansi::RGBColor{0, 0, 0}).toHexString();
-        m_borderColor = attr->foreground.value_or(ansi::RGBColor{255, 255, 255}).toHexString();
-    } else {
-        m_color = "#000000";
-        m_borderColor = "#ffffff";
+        if (auto *bg = attr->getBackground()) {
+            bgColor = *bg;
+        }
+        if (auto *fg = attr->getForeground()) {
+            fgColor = *fg;
+        }
     }
+
+    m_color = bgColor.toHexString();
+    m_borderColor = fgColor.toHexString();
 }
+
 
 void Rectangle::paintSelf(DrawContext &ctx)
 {
@@ -26,16 +37,29 @@ void Rectangle::paintSelf(DrawContext &ctx)
     const int y = this->y();
     const int w = this->width();
     const int h = this->height();
+    bool isHorizontal = (m_gradient && m_gradient->orientation() == GradientOrientation::HORIZONTAL);
 
-    for (int row = 0; row < h; ++row) {
-        ctx.moveCursor(x, y + row);
-        updateAttributesForRow(row, h);
-        if(attributes()){
-            ctx.apply(*attributes());
+    if (isHorizontal) {
+        for (int row = 0; row < h; ++row) {
+            ctx.moveCursor(x, y + row);
+
+            for (int col = 0; col < w; ++col) {
+                auto attr = updateAttributesForRow(col, w);
+                if (attr) ctx.apply(*attr);
+                ctx.write(" ");
+            }
         }
-        ctx.write(std::string(w, ' '));
+    } else {
+        for (int row = 0; row < h; ++row) {
+            ctx.moveCursor(x, y + row);
+            auto attr = updateAttributesForRow(row, h);
+            if (attr) ctx.apply(*attr);
+            ctx.write(std::string(w, ' ')); // Write full line
+        }
     }
+
     ctx.resetColors();
+
     if (m_hasBorder && m_borderWidth > 0 && m_borderWidth == 1) {
         ctx.setForeground(resolveColor(m_borderColor).value_or(ansi::RGBColor{255, 255, 255}));
         ctx.drawBox(x, y, w, h, static_cast<DrawContext::BorderStyle>(m_borderStyle));
@@ -151,25 +175,30 @@ ansi::RGBColor Rectangle::blend(const ansi::utils::RGBColor &src, const ansi::ut
     };
 }
 
-void Rectangle::updateAttributesForRow(int row, int totalHeight)
+
+ansi::Attributes::Ptr Rectangle::updateAttributesForRow(int step, int totalSteps) const
 {
     ansi::Attributes attr;
     ansi::RGBColor base = resolveColor(m_color).value_or(ansi::RGBColor{0, 0, 0});
-
     if (m_gradient) {
-        int percent = (m_gradient->orientation() == GradientOrientation::VERTICAL)
-                          ? (100 * row / std::max(1, totalHeight - 1))
-                          : 50;
+        // Guard against divide by zero
+        int safeTotal = std::max(1, totalSteps - 1);
+        int percent = (step * 100) / safeTotal;
         base = m_gradient->colorAt(percent);
     }
 
     if (m_opacity < 255) {
         ansi::RGBColor parentBg = [this]() -> ansi::RGBColor {
+            // Optimization note: dynamic_cast is acceptable here if hierarchy is shallow
             auto *item = dynamic_cast<JobTuiItem *>(parent());
             if (!item)
                 return {0, 0, 0};
 
-            return item->attributes()->background.value_or(ansi::RGBColor{0, 0, 0});
+            if (auto attrs = item->attributes())
+                if (auto *bg = attrs->getBackground())
+                    return *bg;
+
+            return {0, 0, 0};
         }();
 
         base = blend(base, parentBg);
@@ -177,7 +206,7 @@ void Rectangle::updateAttributesForRow(int row, int totalHeight)
 
     attr.setBackground(base);
     attr.setForeground(resolveColor(m_borderColor).value_or(ansi::RGBColor{255, 255, 255}));
-    setAttributes(ansi::Attributes::intern(attr));
-}
 
+    return ansi::Attributes::intern(attr);
+}
 }

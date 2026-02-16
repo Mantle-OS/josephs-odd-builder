@@ -19,30 +19,23 @@ enum class VVScheme : uint8_t {
     DKD = 1         // Drift–Kick–Drift
 };
 
-// template <typename T_Particle, typename T_Vec>
-template <class T_Particle,
-         class T_Vector,
-         class T_Position,
-         class T_Velocity,
-         class T_Acceleration,
-         class T_AccelCalculator>
-
+template <typename T_Particle, typename T_Vec>
 class VerletIntegrator {
 public:
-    using VelocityVerlet = VerletIntegrator<T_Particle, T_Vector, T_Position, T_Velocity, T_AccelCalculator, T_AccelCalculator>;
-    using Ptr = std::shared_ptr<VelocityVerlet>;
+    using AccessorFunc = std::function<T_Vec&(T_Particle&)>;
+    using AccelCalculator = std::function<void(std::vector<T_Particle>&)>;
 
     VerletIntegrator(threads::ThreadPool::Ptr pool,
                      std::vector<T_Particle> *particles,
-                     T_Position position,
-                     T_Velocity velocity,
-                     T_Acceleration acceleration,
-                     T_AccelCalculator accelCalculator) :
+                     AccessorFunc getPosition,
+                     AccessorFunc getVelocity,
+                     AccessorFunc getAcceleration,
+                     AccelCalculator accelCalculator) :
         m_pool(std::move(pool)),
         m_particles(particles),
-        m_position(std::move(position)),
-        m_velocity(std::move(velocity)),
-        m_acceleration(std::move(acceleration)),
+        m_position(std::move(getPosition)),
+        m_velocity(std::move(getVelocity)),
+        m_acceleration(std::move(getAcceleration)),
         m_accelCalculator(std::move(accelCalculator))
     {
         // to do add aesserts ?
@@ -61,21 +54,21 @@ public:
 
     // API
     template <core::FloatScalar T_TYPE>
-        requires (VerletVector<T_Vector, T_TYPE>)
+        requires (VerletVector<T_Vec, T_TYPE>)
     void step(T_TYPE dt, VVScheme scheme = VVScheme::KDK, bool threaded = true)
     {
         run(dt, scheme, threaded);
     }
 
     template <core::FloatScalar T_TYPE>
-        requires (VerletVector<T_Vector, T_TYPE>)
+        requires (VerletVector<T_Vec, T_TYPE>)
     void stepKDK(T_TYPE dt, bool threaded = true)
     {
         step(dt, VVScheme::KDK, threaded);
     }
 
     template <core::FloatScalar T_TYPE>
-        requires (VerletVector<T_Vector, T_TYPE>)
+        requires (VerletVector<T_Vec, T_TYPE>)
     void stepDKD(T_TYPE dt, bool threaded = true)
     {
         step(dt, VVScheme::DKD, threaded);
@@ -84,7 +77,7 @@ public:
 private:
 
     template <core::FloatScalar T_TYPE>
-        requires (VerletVector<T_Vector, T_TYPE>)
+        requires (VerletVector<T_Vec, T_TYPE>)
     void run(T_TYPE dt, VVScheme scheme = VVScheme::KDK, bool threaded = true)
     {
         if (!m_pool || !m_particles)
@@ -100,52 +93,30 @@ private:
 
         switch (scheme) {
         case VVScheme::KDK:
-            kickDriftKick(dt, threaded);
+            kick(dt, threaded);
             break;
         case VVScheme::DKD:
-            driftKickDrift(dt, threaded);
+            drift(dt, threaded);
             break;
         }
     }
 
-
-
-    /////////////////////////////// KICK /////////////////////////////////////////////
-
     template <core::FloatScalar T_TYPE>
-        requires (VerletVector<T_Vector, T_TYPE>)
-    void halfKick(T_TYPE dt, bool threaded)
-    {
-        const T_TYPE half_dt = dt * T_TYPE(0.5);
-        forEachVelocity(threaded, [&](size_t i) {
-            auto &particle      = (*m_particles)[i];
-            auto &velocity      = m_velocity(particle);
-            auto &acceleration  = m_acceleration(particle);
-            velocity = velocity + (acceleration * half_dt);
-        });
-    }
-
-    template <core::FloatScalar T_TYPE>
-        requires (VerletVector<T_Vector, T_TYPE>)
-    void kick(bool threaded)
-    {
-        forEachVelocity(threaded, [&](size_t i) {
-            auto &particle      = (*m_particles)[i];
-            auto &velocity      = m_velocity(particle);
-            auto &acceleration  = m_acceleration(particle);
-            velocity = velocity + acceleration;
-        });
-    }
-
-    template <core::FloatScalar T_TYPE>
-        requires (VerletVector<T_Vector, T_TYPE>)
-    void kickDriftKick(T_TYPE dt, bool threaded)
+        requires (VerletVector<T_Vec, T_TYPE>)
+    void kick(T_TYPE dt, bool threaded)
     {
         const T_TYPE half_dt = dt * T_TYPE(0.5);
 
-        // kick -> drift
-        forEachVelocity(threaded,  [&](size_t i) {
+        auto run_loop = [&](auto func) {
+            if (threaded)
+                job::threads::parallel_for(*m_pool, std::size_t(0), m_particles->size(), func);
+            else
+                for (size_t i = 0; i < m_particles->size(); ++i)
+                    func(i);
+        };
+        run_loop([&](size_t i) {
             auto &particle      = (*m_particles)[i];
+
             auto &acceleration  = m_acceleration(particle);
             auto &velocity      = m_velocity(particle);
             auto &position      = m_position(particle);
@@ -153,12 +124,8 @@ private:
             velocity = velocity + (acceleration * half_dt);
             position = position + (velocity * dt);
         });
-
-        // maybe we should just pass the pool ?
-        m_accelCalculator(m_pool, *m_particles);
-
-        // kick
-        forEachVelocity(threaded, [&](size_t i) {
+        m_accelCalculator(*m_particles);
+        run_loop([&](size_t i) {
             auto &particle      = (*m_particles)[i];
             auto &velocity      = m_velocity(particle);
             auto &acceleration  = m_acceleration(particle);
@@ -167,42 +134,11 @@ private:
     }
 
 
-
-
-    /////////////////////////////   DRIFT  //////////////////////////////////////////
-
     template <core::FloatScalar T_TYPE>
-        requires (VerletVector<T_Vector, T_TYPE>)
-    void halfDrift(T_TYPE dt, bool threaded)
+        requires (VerletVector<T_Vec, T_TYPE>)
+    void drift(T_TYPE dt, bool threaded)
     {
         const T_TYPE half_dt = dt * T_TYPE(0.5);
-        forEachVelocity(threaded, [&](size_t i) {
-            auto &particle      = (*m_particles)[i];
-            auto &position      = m_position(particle);
-            auto &velocity      = m_velocity(particle);
-            position = position + (velocity * half_dt);
-        });
-    }
-
-
-    template <core::FloatScalar T_TYPE>
-        requires (VerletVector<T_Vector, T_TYPE>)
-    void drift(bool threaded)
-    {
-        forEachVelocity(threaded, [&](size_t i){
-            auto &particle      = (*m_particles)[i];
-            auto &position      = m_position(particle);
-            auto &velocity      = m_velocity(particle);
-            position = position + velocity;
-        });
-    }
-
-    template <core::FloatScalar T_TYPE>
-        requires (VerletVector<T_Vector, T_TYPE>)
-    void driftKickDrift(T_TYPE dt, bool threaded)
-    {
-        const T_TYPE half_dt = dt * T_TYPE(0.5);
-        //Drift
         forEachVelocity(threaded, [&](size_t i){
             auto &particle      = (*m_particles)[i];
             auto &position      = m_position(particle);
@@ -210,9 +146,9 @@ private:
             position = position + (velocity * half_dt);
         });
 
-        m_accelCalculator(m_pool, *m_particles);
+        m_accelCalculator(*m_particles);
 
-        //Kick -> Drift
+
         forEachVelocity(threaded, [&](size_t i) {
             auto &particle      = (*m_particles)[i];
             auto &velocity      = m_velocity(particle);
@@ -230,17 +166,18 @@ private:
         const size_t n = m_particles->size();
         if (threaded)
             parallel_for(*m_pool, std::size_t(0), n, std::forward<T_FUNC>(f));
-        else for (size_t i = 0; i < n; ++i)
+        else
+            for (size_t i = 0; i < n; ++i)
                 f(i);
     }
 
 
-    threads::ThreadPool::Ptr                m_pool;
-    std::vector<T_Particle>                 *m_particles{nullptr};
-    [[no_unique_address]] T_Position        m_position;
-    [[no_unique_address]] T_Velocity        m_velocity;
-    [[no_unique_address]] T_Acceleration    m_acceleration;
-    [[no_unique_address]] T_AccelCalculator m_accelCalculator;
+    threads::ThreadPool::Ptr    m_pool;
+    std::vector<T_Particle>     *m_particles{nullptr};
+    AccessorFunc                m_position;
+    AccessorFunc                m_velocity;
+    AccessorFunc                m_acceleration;
+    AccelCalculator             m_accelCalculator;
 };
 
 } // namespace job::threads

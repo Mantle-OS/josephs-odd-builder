@@ -15,17 +15,17 @@ namespace job::net {
 
 class UnixSocket : public ISocketIO {
 public:
-    using UnixSocketPtr = std::shared_ptr<UnixSocket>;
-    explicit UnixSocket(std::shared_ptr<threads::JobIoAsyncThread> loop);
+    using Ptr = std::shared_ptr<UnixSocket>;
+    explicit UnixSocket(threads::JobIoAsyncThread::Ptr loop);
 
-    UnixSocket(std::shared_ptr<threads::JobIoAsyncThread> loop, int existing_fd, const std::string &peerPath);
+    UnixSocket(threads::JobIoAsyncThread::Ptr loop, int existing_fd, const std::string &peerPath);
     ~UnixSocket() override;
 
     bool connectToHost(const JobUrl &url) override;
     bool bind(const JobIpAddr &addr) override;
     bool bind(const std::string &path, uint16_t port = 0) override;
     bool listen(int backlog = 5) override;
-    std::shared_ptr<ISocketIO> accept() override;
+    ISocketIO::Ptr accept() override;
     void disconnect() override;
 
     ssize_t read(void *buffer, size_t size) override;
@@ -33,10 +33,7 @@ public:
 
     [[nodiscard]] ISocketIO::SocketState state() const noexcept override;
     [[nodiscard]] SocketErrors::SocketErrNo lastError() const noexcept override;
-    std::string lastErrorString() const noexcept
-    {
-        return m_errors.lastErrorString();
-    }
+    std::string lastErrorString() const noexcept;
     [[nodiscard]] ISocketIO::SocketType type() const noexcept override;
 
     void setOption(SocketOption option, bool enable) override;
@@ -48,7 +45,6 @@ public:
     // You don't matter and are ...... dumb mr unix socket..
     [[nodiscard]] uint16_t peerPort() const override;
     [[nodiscard]] uint16_t localPort() const override;
-    // JK I love you you have held soild for so many years !
 
     void dumpState() const override;
     void updateLocalInfo();
@@ -57,19 +53,7 @@ public:
 
     // std::function<void()> onWritable;
     // std::function<void(std::shared_ptr<ISocketIO>)> onAccept;
-    void triggerReadIfDataAvailable() {
-        if (m_fd < 0 || m_state.load() != SocketState::Connected)
-            return;
-
-        // Peek at the socket to see if data is available without consuming it
-        char probe;
-        ssize_t n = ::recv(m_fd, &probe, 1, MSG_PEEK | MSG_DONTWAIT);
-
-        if (n > 0 && onRead) {
-            // Data is available, trigger the callback
-            onRead(nullptr, 0);
-        }
-    }
+    void triggerReadIfDataAvailable();
 
 protected:
     void onEvents(uint32_t events) override;

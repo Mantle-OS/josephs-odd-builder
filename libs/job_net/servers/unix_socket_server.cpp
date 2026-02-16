@@ -120,11 +120,11 @@ void UnixServer::setupListenerCallbacks()
 void UnixServer::onClientConnect()
 {
     while (true) {
-        std::shared_ptr<ISocketIO> clientSockBase = m_listener->accept();
+        ISocketIO::Ptr clientSockBase = m_listener->accept();
         if (!clientSockBase)
             break;
 
-        UnixSocket::UnixSocketPtr clientSock = std::static_pointer_cast<UnixSocket>(clientSockBase);
+        UnixSocket::Ptr clientSock = std::static_pointer_cast<UnixSocket>(clientSockBase);
         if (!clientSock) {
             JOB_LOG_WARN("[UnixServer] Accepted socket was not a UnixSocket!");
             continue;
@@ -156,7 +156,7 @@ void UnixServer::onClientConnect()
     }
 }
 
-void UnixServer::onClientDisconnect(ClientPtr client)
+void UnixServer::onClientDisconnect(UnixClient::Ptr client)
 {
     if (onClientDisconnected)
         onClientDisconnected(client);

@@ -1,16 +1,12 @@
 #pragma once
 
-#include <vector>
-#include <iostream>
+#include <job_logger.h>
 
 #include "job_ansi_screen.h"
-
 #include "utils/job_ansi_enums.h"
-
 #include "esc/csi/dispatch_base.h"
 
 namespace job::ansi::csi {
-
 
 class DispatchUnclassified : public DispatchBase<CSI_CODE> {
 public:
@@ -22,13 +18,14 @@ public:
 
     void initMap() override {
         // ICH - Insert Character(s)
-        m_dispatchMap[CSI_CODE::ICH] = [this](const std::vector<int> &params) {
+        m_dispatchMap[CSI_CODE::ICH] = [this](std::span<const int> params) {
             int count = params.empty() ? 1 : params[0];
             int row = m_screen->cursor()->row();
-            int col = m_screen->cursor()->col();
+            int col = m_screen->cursor()->column();
             int maxCol = m_screen->columnCount();
 
-            if (col >= maxCol) return;
+            if (col >= maxCol)
+                return;
 
             // Move existing characters right to make space
             for (int i = maxCol - 1; i >= col + count; --i) {
@@ -44,7 +41,7 @@ public:
         };
 
         // NP - Next Page
-        m_dispatchMap[CSI_CODE::NP] = [this](const std::vector<int> &params) {
+        m_dispatchMap[CSI_CODE::NP] = [this](std::span<const int> params) {
             int count = params.empty() ? 1 : params[0];
             // Move cursor down by screen height * count
             int distance = m_screen->rowCount() * count;
@@ -52,7 +49,7 @@ public:
         };
 
         // PP - Previous Page
-        m_dispatchMap[CSI_CODE::PP] = [this](const std::vector<int> &params) {
+        m_dispatchMap[CSI_CODE::PP] = [this](std::span<const int> params) {
             int count = params.empty() ? 1 : params[0];
             // Move cursor up by screen height * count
             int distance = m_screen->rowCount() * count;
@@ -60,13 +57,13 @@ public:
         };
 
         // DECLL - Load LEDs (ignored in modern terminals)
-        m_dispatchMap[CSI_CODE::DECLL] = [](const std::vector<int> &params) {
+        m_dispatchMap[CSI_CODE::DECLL] = [](std::span<const int> params) {
             int mode = params.empty() ? 0 : params[0];
-            std::cerr << "[CSI:DECLL] Load LEDs mode: " << mode << '\n';
+            JOB_LOG_DEBUG("[CSI:DECLL] Load LEDs mode: {}", mode);;
         };
 
         // DECSCUSR - Set Cursor Style
-        m_dispatchMap[CSI_CODE::DECSCUSR] = [this](const std::vector<int> &params) {
+        m_dispatchMap[CSI_CODE::DECSCUSR] = [this](std::span<const int> params) {
             int value = params.empty() ? 0 : params[0];
 
             [[maybe_unused]]CursorStyle style;
@@ -92,15 +89,15 @@ public:
                 style = CursorStyle::SteadyBar;
                 break;
             default:
-                std::cerr << "[CSI:DECSCUSR] Unknown cursor style: " << value << '\n';
+                JOB_LOG_DEBUG("[CSI:DECSCUSR] Unknown cursor style: {}", value);
                 return;
             }
             // FIXME update this to use the enum and jsut static_cast the enum
             m_screen->setCursorStyle(value);
         };
 
-        m_dispatchMap[CSI_CODE::UNKNOWN] = [](const std::vector<int> &) {
-            std::cerr << "[CSI:UNKNOWN] Unknown CSI sequence\n";
+        m_dispatchMap[CSI_CODE::UNKNOWN] = []([[maybe_unused]] std::span<const int> params) {
+            JOB_LOG_DEBUG("[CSI:UNKNOWN] Unknown CSI sequence");
         };
     }
 };

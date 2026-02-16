@@ -16,7 +16,7 @@ set(JOBNET_SOURCES
     # unix
     unix_socket.cpp
     # ssl
-    ssl/job_ssl_cert.h
+    ssl/job_ssl_cert.cpp
     ssl/ssl_socket.cpp
 )
 set(JOBNET_HEADERS

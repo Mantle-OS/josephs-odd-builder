@@ -1,17 +1,17 @@
-#include "frames/frame_source_net.h"
+#include "frame_source_net.h"
 
 #include <algorithm>
 #include <cstring>
 
+// job::core
 #include <job_logger.h>
-#include <isocket_io.h> // job::net::ISocketIO
+
 
 namespace job::science::frames {
 
-using job::net::ISocketIO;
 
-FrameSourceNet::FrameSourceNet(Socket socket) noexcept
-    : m_socket(std::move(socket))
+FrameSourceNet::FrameSourceNet(ISocketIO::Ptr socket) noexcept :
+    m_socket(std::move(socket))
 {
 }
 

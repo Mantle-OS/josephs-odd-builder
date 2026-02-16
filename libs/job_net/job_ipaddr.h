@@ -11,6 +11,7 @@ namespace job::net {
 
 class JobIpAddr {
 public:
+    using Ptr = std::shared_ptr<JobIpAddr>;
     enum class Family : uint8_t {
         Unknown = 0,
         IPv4,

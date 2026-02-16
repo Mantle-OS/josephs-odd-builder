@@ -1,6 +1,7 @@
 #pragma once
 
-#include "aligned_allocator.h"
+#include "ai_weights.h"
+
 #include "iadapter.h"
 #include "lowrank_config.h"
 

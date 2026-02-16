@@ -4,7 +4,7 @@
 
 namespace job::net {
 
-UdpServer::UdpServer(std::shared_ptr<threads::JobIoAsyncThread> loop, uint16_t buffer_size):
+UdpServer::UdpServer(threads::JobIoAsyncThread::Ptr loop, uint16_t buffer_size):
     m_loop(std::move(loop)),
     m_readBuffer(buffer_size)
 {

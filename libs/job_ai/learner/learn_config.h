@@ -59,10 +59,10 @@ namespace LearnPresets{
         return cfg;
     }
 
-    [[nodiscard]] inline constexpr LearnConfig BardConfig(const char *corpus = "", token::TokenType tt = token::TokenType::Motif)
+    [[nodiscard]] inline constexpr LearnConfig LanguageConfig(const char *corpus = "", token::TokenType tt = token::TokenType::Motif)
     {
         LearnConfig cfg;
-        cfg.type = LearnType::Bard;
+        cfg.type = LearnType::Language;
         cfg.corpus = corpus;
         cfg.tokenType = tt;
         cfg.targetFitness = 98.0f; // Good enough for jazz

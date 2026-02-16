@@ -5,15 +5,23 @@ project(JosephOddBuilderAnsi
 )
 
 set(JOB_ANSI_HEADERS
+    job_ansi_line_display_mode.h
     job_ansi_attributes.h
     job_ansi_cursor.h
     job_ansi_cell.h
+    job_ansi_grid.h
+    job_ansi_scrollback.h
+    job_ansi_saved_buffer_state.h
     job_ansi_screen.h
     job_ansi_parser.h
 )
 
 set(JOB_ANSI_SOURCES
+    job_ansi_attributes.cpp
+    job_ansi_cursor.cpp
     job_ansi_cell.cpp
+    job_ansi_grid.cpp
+    job_ansi_scrollback.cpp
     job_ansi_screen.cpp
     job_ansi_parser.cpp
 )
@@ -29,7 +37,6 @@ set(JOB_ANSI_ESC_HEADERS
     esc/csi/cursor.h
     esc/csi/device_status.h
     esc/csi/dispatch_base.h
-    esc/csi/mode_change.h
     esc/csi/rect_ops.h
     esc/csi/scroll.h
     esc/csi/tabulation.h
@@ -56,16 +63,20 @@ set(JOB_ANSI_UTILS_HEADERS
     utils/job_ansi_suffix.h
 )
 
-set(JOB_ANSI_UTILS_SOURCE
+set(JOB_ANSI_UTILS_SOURCES
     utils/utf8_decoder.cpp
     utils/job_ansi_utils.cpp
     utils/charset_translator.cpp
 )
 
 add_library(JosephsOddBuilder_Ansi SHARED
-    ${JOB_ANSI_UTILS_HEADERS}   ${JOB_ANSI_UTILS_SOURCE}
-    ${JOB_ANSI_ESC_HEADERS}     ${JOB_ANSI_ESC_SOURCE}
-    ${JOB_ANSI_HEADERS}         ${JOB_ANSI_SOURCE}
+    ${JOB_ANSI_UTILS_HEADERS}   ${JOB_ANSI_UTILS_SOURCES}
+    ${JOB_ANSI_ESC_HEADERS}     ${JOB_ANSI_ESC_SOURCES}
+    ${JOB_ANSI_HEADERS}         ${JOB_ANSI_SOURCES}
+)
+
+target_link_libraries( JosephsOddBuilder_Ansi PRIVATE
+    JosephsOddBuilder_Core
 )
 
 set_target_properties(JosephsOddBuilder_Ansi PROPERTIES

@@ -218,7 +218,7 @@ enum class CSI_CODE : char {
     RCP_DECRC                   = 'u',          // Restore cursor/attrs
 
 
-    TILDE = '~', // Used by CSI sequences like CSI 200~ and CSI 201~ (e.g. bracketed paste)
+    TILDE = '~',                                // Used by CSI sequences like CSI 200~ and CSI 201~ (e.g. bracketed paste)
 
     PASTE_BEGIN                 = '{',          // Bracketed paste start — internal use
     PASTE_END                   = '|',          // Bracketed paste end — internal use
@@ -446,21 +446,21 @@ enum class XTERM_FEATURE : int {
 };
 
 enum class UnderlineStyle : int {
-    None,
-    Single,
-    Double,
-    Curly,
-    Dotted,
-    Dashed
+    None    = 0,
+    Single  = 1,
+    Double  = 2,
+    Curly   = 3,
+    Dotted  = 4,
+    Dashed  = 5
 };
 
 enum class CursorStyle {
-    BlinkingBlock,      // CSI 0 q
-    SteadyBlock,        // CSI 2 q
-    BlinkingUnderline,  // CSI 3 q
-    SteadyUnderline,    // CSI 4 q
-    BlinkingBar,        // CSI 5 q
-    SteadyBar           // CSI 6 q
+    BlinkingBlock       = 1,  // CSI 0 q
+    SteadyBlock         = 2,  // CSI 2 q
+    BlinkingUnderline   = 3,  // CSI 3 q
+    SteadyUnderline     = 4,  // CSI 4 q
+    BlinkingBar         = 5,  // CSI 5 q
+    SteadyBar           = 6   // CSI 6 q
 };
 
 
@@ -486,5 +486,9 @@ enum class EA_MODE {
     ENTIRE_SCREEN = 2
 };
 
+enum class TILDE_MODE {
+    BRACKETED_PASTE_START_CODE = 200,
+    BRACKETED_PASTE_END_CODE = 201
+};
 
 };

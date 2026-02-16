@@ -1,4 +1,3 @@
-// frames/frame_sink_io.cpp
 #include "frame_sink_io.h"
 
 #include <array>
@@ -8,12 +7,12 @@ namespace job::science::frames {
 
 using job::core::IODevice;
 
-FrameSinkIO::FrameSinkIO(IODevicePtr device) noexcept :
+FrameSinkIO::FrameSinkIO(IODevice::Ptr device) noexcept :
     m_device(std::move(device))
 {
 }
 
-static bool ensureOpen(const std::shared_ptr<IODevice> &dev)
+static bool ensureOpen(const IODevice::Ptr &dev)
 {
     if (!dev)
         return false;
@@ -82,7 +81,7 @@ void FrameSinkIO::flush()
     if (!m_device)
         return;
 
-    // IODevice::flush() is usually bool, but we don't care about the result here.
+    // IODevice::flush() is usually bool, but we don't care about the result here ?
     (void)m_device->flush();
 }
 
@@ -93,6 +92,11 @@ void FrameSinkIO::close()
 
     if (m_device->isOpen())
         m_device->closeDevice();
+}
+
+IODevice::Ptr FrameSinkIO::device() const noexcept
+{
+    return m_device;
 }
 
 } // namespace job::science::frames

@@ -209,7 +209,7 @@ void fusedDenseKernel(
     int rows,
     int inFeatures,
     int outFeatures,
-    float alpha)
+    float alpha )
 {
     constexpr int VECLEN = SIMD::width();   // 8 on AVX2, 16 on AVX512
     constexpr int MR = 8;                   // Row Blocking Factor  8
