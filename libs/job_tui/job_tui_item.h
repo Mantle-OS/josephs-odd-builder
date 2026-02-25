@@ -76,7 +76,7 @@ public:
     void setAttributes(const ansi::Attributes::Ptr &attr);
     ansi::Attributes::Ptr attributes() const;
 
-    virtual void setVisible(bool visible);;
+    virtual void setVisible(bool visible);
     bool isVisible() const;
 
     void setFocus(bool focus);
