@@ -61,6 +61,6 @@ else()
 endif()
 
 
-option(JOB_CUDA "Add nvidia cuda support " ON)
 
-option(JOB_QT_APPS "Build the Qt6 applications that are supported" ON)
+option(JOB_CUDA "Add nvidia cuda support " OFF)
+option(JOB_QT_APPS "Build the Qt6 applications that are supported" OFF)

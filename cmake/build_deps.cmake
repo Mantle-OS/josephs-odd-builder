@@ -1,9 +1,15 @@
 ##############################
 # DEPS
 ##############################
+# TODO add the Qt Qml deps for the protoplanarty viewer
+
 # * DEBIAN based install the following
 # Note: tested on debian sid(atm)
 # sudo apt install libssl-dev libzstd-dev pkgconf libpkgconf-dev zlib1g-dev libsodium-dev libflatbuffers-dev flatbuffers-compiler nlohmann-json3-dev libyaml-cpp-dev libmsgpack-cxx-dev libcatch2-dev
+
+# for the qt stuff
+# sudo apt install qt6-base-dev libqt6gui6 qt6-declarative-dev qt6-3d-dev qt6-quick3d-dev qt6-graphs-dev \
+#    qml6-module-qtquick3d qml6-module-qtquick-layouts qml6-module-qtquick-controls qml6-module-qtgraphs qml6-module-qtcore qml6-module-qtqml
 
 # * ARCH LINUX based(not tested)
 # sudo pacman -S openssl zstd pkgconf zlib libsodium flatbuffers nlohmann-json yaml-cpp msgpack-cxx catch2

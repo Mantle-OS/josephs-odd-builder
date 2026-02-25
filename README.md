@@ -14,8 +14,8 @@ The project relies on several libraries for networking, serialization, and secur
 ```shell
 sudo apt install libssl-dev libzstd-dev pkgconf libpkgconf-dev zlib1g-dev libsodium-dev \
     libflatbuffers-dev flatbuffers-compiler nlohmann-json3-dev \
-    libyaml-cpp-dev libmsgpack-cxx-dev libcatch2-dev
-
+    libyaml-cpp-dev libmsgpack-cxx-dev libcatch2-dev \
+    cmake build-essential git
 ```
 
 #### Clone and Build
@@ -29,7 +29,6 @@ mkdir build && cd build
 cmake ..
 cmake --build . --target all -j$(nproc)
 ```
-
 
 ---
 ## Job's core library 
@@ -194,3 +193,12 @@ job_crypto library is a very small and simple crypto library.
 This is a rough outline. Do as you wish... pull requests welcome ....  
 [This doc goes into more detail.](docs/coding_style.md)
 
+
+#### Qt Apps
+if you want to build the qt qml examnple app you need these. (some others might be needed)
+
+```shell 
+sudo apt install qt6-base-dev libqt6gui6 qt6-declarative-dev qt6-3d-dev qt6-quick3d-dev qt6-graphs-dev \
+    qml6-module-qtquick3d qml6-module-qtquick-layouts qml6-module-qtquick-controls \
+    qml6-module-qtgraphs qml6-module-qtcore qml6-module-qtqml
+```

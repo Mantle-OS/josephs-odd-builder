@@ -1,12 +1,14 @@
 # Job Crypto
 
-The crypto of job.
+*Warning:* A bit outdated
+ 
+The very basic crypto of job.
 
 jobcrypto links against libsodium and `job_core`.
 
 job:
 - `job::crypto` wraps libsodium init + secure memory + random
-- `job::core` provides logging + `real_t`
+- `job::core` provides logging + safe finite
 
 ## JobCryptoInit
 
