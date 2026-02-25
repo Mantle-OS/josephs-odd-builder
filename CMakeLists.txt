@@ -18,7 +18,10 @@ include(cmake/build_deps.cmake)
 
 add_subdirectory(libs)
 add_subdirectory(apps)
+
+enable_testing()
 add_subdirectory(tests)
+
 add_subdirectory(docs)
 
 add_custom_target(github_ci SOURCES .github/workflows/test.yml )
