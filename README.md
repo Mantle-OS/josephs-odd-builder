@@ -4,33 +4,7 @@ Job or Joseph's odd builder is a c++23 **gnu/linux only** playground for creatin
 libraries and applications. I use it to test out ideas and algorithms. 
 
 
-## Building
 
-### Installation & Build
-#### Dependencies
-
-The project relies on several libraries for networking, serialization, and security. Currently, **Debian Sid** is the primary tested platform.
-
-```shell
-sudo apt install libssl-dev libzstd-dev pkgconf libpkgconf-dev zlib1g-dev libsodium-dev \
-    libflatbuffers-dev flatbuffers-compiler nlohmann-json3-dev \
-    libyaml-cpp-dev libmsgpack-cxx-dev libcatch2-dev \
-    cmake build-essential git
-```
-
-#### Clone and Build
-
-There are a number of [build options](cmake/build_options.cmake) but to keep this simple.
-
-```shell
-git clone https://github.com/Mantle-OS/josephs-odd-builder.git
-cd josephs-odd-builder
-mkdir build && cd build
-cmake ..
-cmake --build . --target all -j$(nproc)
-```
-
----
 ## Job's core library 
 
 The foundational utility layer for the entire Job ecosystem, job_core provides the essential primitives 
@@ -186,6 +160,34 @@ job_crypto library is a very small and simple crypto library.
 
 [This doc goes into more detail.](docs/crypto_overview.md)
 
+---
+
+
+## Building
+
+### Installation & Build
+#### Dependencies
+
+The project relies on several libraries for networking, serialization, and security. Currently, **Debian Sid** is the primary tested platform.
+
+```shell
+sudo apt install libssl-dev libzstd-dev pkgconf libpkgconf-dev zlib1g-dev libsodium-dev \
+    libflatbuffers-dev flatbuffers-compiler nlohmann-json3-dev \
+    libyaml-cpp-dev libmsgpack-cxx-dev libcatch2-dev \
+    cmake build-essential git
+```
+
+#### Clone and Build
+
+There are a number of [build options](cmake/build_options.cmake) but to keep this simple.
+
+```shell
+git clone https://github.com/Mantle-OS/josephs-odd-builder.git
+cd josephs-odd-builder
+mkdir build && cd build
+cmake ..
+cmake --build . --target all -j$(nproc)
+```
 
 ---
 
