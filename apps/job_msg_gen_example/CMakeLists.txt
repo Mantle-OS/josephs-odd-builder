@@ -34,18 +34,18 @@ set(GENERATED_HDRS)
 foreach(IN_FILE ${INPUT_FILES})
     get_filename_component(IN_WE ${IN_FILE} NAME_WE)
 
-    ## this part .... stu[id hardcoded crazy
-    set(GENERATED_SRC "${GENERATOR_OUT_DIR}/job_example/${IN_WE}.cpp")
-    set(GENERATED_HDR "${GENERATOR_OUT_DIR}/job_example/${IN_WE}.hpp")
+    set(OUT_SUBDIR "${GENERATOR_OUT_DIR}/job_example")
+    set(GENERATED_SRC "${OUT_SUBDIR}/${IN_WE}.cpp")
+    set(GENERATED_HDR "${OUT_SUBDIR}/${IN_WE}.hpp")
 
     list(APPEND GENERATED_SRCS ${GENERATED_SRC})
     list(APPEND GENERATED_HDRS ${GENERATED_HDR})
 
     add_custom_command(
         OUTPUT ${GENERATED_SRC} ${GENERATED_HDR}
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${OUT_SUBDIR}
         COMMAND "$<TARGET_FILE:job_msg_gen>"
-        ARGS  --schemas ${IN_FILE}
-          --out "${GENERATOR_OUT_DIR}/job_example"
+        ARGS --schemas ${IN_FILE} --out ${OUT_SUBDIR}
         DEPENDS ${IN_FILE} job_msg_gen
         COMMENT "Generating code from ${IN_FILE}"
         VERBATIM
