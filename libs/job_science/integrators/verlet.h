@@ -24,20 +24,27 @@ class VerletStrategy final : public IIntegrator {
 public:
     using Verlet = job::science::VerletIntegrator<Particle, Vec3f>;
 
-    explicit VerletStrategy(bool kdk = true, bool threaded = true)
-        : m_kdk(kdk), m_threaded(threaded) {}
+    explicit VerletStrategy(bool kdk = true, bool threaded = true):
+        m_kdk(kdk),
+        m_threaded(threaded)
+    {
 
-    engine::IntegratorType type() const noexcept override {
+    }
+
+    engine::IntegratorType type() const noexcept override
+    {
         return engine::IntegratorType::VelocityVerlet;
     }
 
-    void prime(IntegratorCtx &ctx) override {
+    void prime(IntegratorCtx &ctx) override
+    {
         bindIfNeeded(ctx);
         m_accelCalc(ctx.particles);
         m_primed = true;
     }
 
-    void step(IntegratorCtx &ctx, float dt) override {
+    void step(IntegratorCtx &ctx, float dt) override
+    {
         if (!(dt > 0.0f))
             return;
 
@@ -52,7 +59,8 @@ public:
         m_verlet->step(dt, scheme, m_threaded);
     }
 
-    void reset() noexcept override {
+    void reset() noexcept override
+    {
         IIntegrator::reset();
         m_primed = false;
         m_particlesPtr = nullptr;
@@ -84,7 +92,6 @@ private:
 
                 // compute net accel in disk potential
                 Vec3f a = Forces::netAcceleration(p, *disk, p.composition);
-
                 // guard fast-math blowups
                 if (!job::core::isSafeFinite(a.x) ||
                     !job::core::isSafeFinite(a.y) ||

@@ -53,4 +53,3 @@ TEST_CASE("JobEmitterMsgPack generates pack/unpack functions", "[job_emitter_msg
         REQUIRE(stringContains(source, "header.unpack_msgpack(val_obj);"));
     }
 }
-// CHECKPOINT: v2

@@ -67,11 +67,6 @@ struct AVX_F {
     static inline  f16 ext_f16(f32 a, const T b){return _mm256_extractf128_ps(a, (int)b);}
     static inline  f16 add_f16(f16 a, f16 b){ return _mm_add_ps(a, b);}
 
-
-
-
-
-
     // Logic
     static inline f32 max(f32 reg_a, f32 reg_b) { return _mm256_max_ps(reg_a, reg_b); }
     static inline f32 min(f32 reg_a, f32 reg_b) { return _mm256_min_ps(reg_a, reg_b); }

@@ -68,4 +68,3 @@ struct JobThreadOptions final {
 };
 
 } // namespace job::threads
-// CHECKPOINT: v1.0

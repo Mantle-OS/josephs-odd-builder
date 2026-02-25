@@ -68,6 +68,3 @@ install(EXPORT JosephsOddBuilderIOTargets
     NAMESPACE JOB::
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/JosephsOddBuilderIO
 )
-
-
-# CHECKPOINT: v1

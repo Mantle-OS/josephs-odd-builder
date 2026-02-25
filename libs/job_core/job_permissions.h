@@ -147,4 +147,3 @@ enum class PermissionStringType : uint8_t {
 
 } // namespace job::core
 
-// CHECKPOINT v1.0

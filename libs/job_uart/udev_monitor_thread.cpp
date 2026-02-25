@@ -89,4 +89,4 @@ void UdevMonitorThread::onEvents(uint32_t events)
 }
 
 } // namespace job::uart
-// CHECKPOINT: v2.0
+

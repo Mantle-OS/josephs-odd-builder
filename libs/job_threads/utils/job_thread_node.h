@@ -20,4 +20,3 @@ struct JobThreadNode {
     }
 };
 } //namespace job::threads
-// CHECKPOINT: v1.0

@@ -64,17 +64,17 @@ public:
         m_disk(diskModel),
         m_zones(zones)
     {
-        // 1) Handle the default particle's
+        // Default particle's
         m_particles.reserve(particleCount);
         initialize_particles(m_particles, m_disk, m_zones);
 
-        // 1) create the Threads for the driver
+        // Threads
         updateWorkers();
 
-        // 2) Integrator
+        // Integrator
         updateIntegrator();
 
-        // 3) Frames
+        // Frames
         updateFrameIo();
     }
 
@@ -100,7 +100,7 @@ public:
             JobThreadOptions opts = JobThreadOptions::normal();
             // Give it a name so perf traces don’t look like a crime scene.
             std::snprintf(opts.name.data(), opts.name.size(), "job_engine");
-            // heartbeat is for JobThread::run() default; we won’t use JobThread::run().
+            // heartbeat for JobThread::run()
             opts.heartbeat = 1;
 
             m_driver = std::make_shared<JobThread>(opts);
@@ -136,7 +136,7 @@ public:
         if (m_driver) {
             m_driver->requestStop();
             (void)m_driver->join();
-            m_driver.reset(); // kill is not restartable
+            m_driver.reset();
         }
 
         // tear down services that might use the pool
@@ -220,8 +220,11 @@ public:
     void setDiskCallback(EngineCallback cb)       { m_diskCallback = std::move(cb); }
     void setZonesCallback(EngineCallback cb)      { m_zonesCallback = std::move(cb); }
 
-    [[nodiscard]] float timeStep() const noexcept;
-    void setTimeStep(float dt_s) noexcept;
+    // [[nodiscard]] float timeStep() const noexcept;
+    // void setTimeStep(float dt_s) noexcept
+    // {
+
+    // }
     void step(float dt_s)
     {
         if (!(dt_s > 0.0f))
@@ -239,44 +242,38 @@ public:
         if (!m_integrator)
             return;
 
-        // 1) Integrate
+        // Integrate
         integrators::IntegratorCtx ctx{
             m_worker->pool,
             m_disk,
             m_zones,
             m_particles,
-            (m_stepIndex == 0) // prime only on first step if you want that flag
+            !m_integratorPrimed
         };
 
-        // If your IIntegrator has prime(): call it once.
-        // If it doesn't, ignore this.
         if (ctx.prime) {
-            // optional if you added prime() to interface
-            // m_integrator->prime(ctx);
+            m_integrator->prime(ctx);
+            m_integratorPrimed = true;
         }
 
         m_integrator->step(ctx, dt_s);
 
-        // 2) Derived fields after integration
         for (auto &p : m_particles) {
             const float r_au = DiskModelUtil::metersToAU(p.position.length());
             p.temperature    = DiskModelUtil::temperature(m_disk, r_au);
             p.zone           = ZonesUtil::classify(m_zones, p, m_disk);
         }
 
-        // 3) Frame IO (optional)
+        // IO
         if (m_writer) {
-            // If your serializer expects a frame index:
-            // (This matches your earlier test usage: serializer.writeFrame(1, particles, disk, zones))
             (void)m_writer->writeFrame(static_cast<std::uint32_t>(m_stepIndex), m_particles, m_disk, m_zones);
             m_writer->flush();
         }
 
-        // 4) Callbacks
+        // Callbacks
         if (m_particleCallback)
             m_particleCallback(m_particles);
 
-        // If you want these to fire “when changed”, add dirty flags later.
         if (m_diskCallback)
             m_diskCallback();
 
@@ -286,6 +283,10 @@ public:
         ++m_stepIndex;
     }
 
+    IntegratorType  currentIntegratorType()
+    {
+        return m_integrator->type();
+    }
 
 private:
     static void sleepNs(std::uint64_t ns) noexcept
@@ -307,10 +308,6 @@ private:
             }
 
             step(m_dt);
-
-            // Optional pacing so the GUI doesn’t melt:
-            // If dt is “sim dt”, you may not want to pace 1:1.
-            // For now, a small nap keeps CPU sane.
             sleepNs(1'000'000ull); // 1ms
         }
     }
@@ -334,20 +331,21 @@ private:
 
     void updateIntegrator()
     {
-
-        if(!m_integrator)
-            m_integrator = integrators::create(m_cfg.integrator);
-
-        if(m_cfg.integrator != m_integrator->type()){
-            auto n_inter = integrators::create(m_cfg.integrator);
-            m_integrator.swap(n_inter);
+        if (!m_integrator) {
+            m_integrator = integrators::create(m_cfg);
+            m_integratorPrimed = false;
+            return;
         }
 
+        // Check if the type changed OR if we need a deep check on params
+        if (m_cfg.integrator != m_integrator->type()) {
+            auto next_integrator = integrators::create(m_cfg);
+            m_integrator.swap(next_integrator);
+            m_integratorPrimed = false;
+        }
     }
     void updateFrameIo()
     {
-        // Always tear down old wiring first if sync mode changes.
-        // (If you want "hot-swap" later, we can add diffing.)
         m_writer.reset();
         m_reader.reset();
 
@@ -366,9 +364,6 @@ private:
                     outPath = baseDir() / "frames.job";
                 } else {
                     outPath = m_cfg.io.filepath;
-
-                    // If it's an existing directory, write "frames.job" inside it.
-                    // If it doesn't exist yet, we use heuristic: has extension => file, else directory.
                     if (std::filesystem::exists(outPath) && std::filesystem::is_directory(outPath)) {
                         outPath /= "frames.job";
                     } else if (!outPath.has_extension()) {
@@ -399,9 +394,6 @@ private:
                     m_writer  = std::make_shared<FrameSerializer>(sink);
                 }
 
-                // Reader (same file, read mode, autoOpen)
-                // NOTE: reading a file you're simultaneously writing is a policy question.
-                // For now we wire it; you can decide whether GUI uses it.
                 {
                     auto ioRead = std::make_shared<job::io::FileIO>(
                         outPath,
@@ -426,8 +418,6 @@ private:
         }
 
         case SyncType::Socket: {
-            // We can scaffold this now, but you need a real socket creation API.
-            // See section 4 below.
             JOB_LOG_WARN("[Engine] Socket sync selected, not wired yet (endpoint={})", m_cfg.io.endpoint);
             return;
         }
@@ -454,8 +444,9 @@ private:
     // The Intergrator/Adapter
     std::unique_ptr<integrators::IIntegrator>    m_integrator;
 
+
     // Data
-    data::Particles               m_particles;
+    data::Particles         m_particles;
     std::vector<Vec3f>      m_prev_accel;
     DiskModel               m_disk;
     Zones                   m_zones;
@@ -473,9 +464,6 @@ private:
     ParticleCallback        m_particleCallback;
     EngineCallback          m_diskCallback;
     EngineCallback          m_zonesCallback;
-
-
-
 
 
     void initialize_particles(Particles &particles, const DiskModel &disk, const Zones &zones)

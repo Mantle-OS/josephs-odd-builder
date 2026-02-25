@@ -30,6 +30,7 @@ target_link_libraries(test_job_science PRIVATE
     Threads::Threads
     JosephsOddBuilder_Science
     JosephsOddBuilder_IO
+    JosephsOddBuilder_Simd
 )
 
 target_include_directories(test_job_science PRIVATE

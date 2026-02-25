@@ -10,10 +10,10 @@ public:
     virtual ~ILearn() = default;
 
     // The Core Loop:
-    // 1. Load Genome (Flywheel)
-    // 2. Run Simulation (Physics + Inference)
-    // 3. Update the m_fitness
-    // 4. Return m_fitness Higher is better at 100%
+    // Load Genome (Flywheel)
+    // Run Simulation (Physics + Inference)
+    // Update the m_fitness
+    // Return m_fitness Higher is better at 100%
     [[nodiscard]] virtual float learn(const evo::Genome &genome)  = 0;
 
     // Optional: Returns the input dimension required by this environment

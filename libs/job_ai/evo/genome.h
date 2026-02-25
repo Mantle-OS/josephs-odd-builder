@@ -53,13 +53,12 @@ struct Genome {
 struct GenomeSerializer {
     static bool save(const Genome& g, const std::string& filename) {
         std::ofstream file(filename, std::ios::binary);
-        if (!file) return false;
+        if (!file)
+            return false;
 
-        // 1. Header Magic
         const uint32_t magic = 0x47454E4F; // "GENO"
         file.write(reinterpret_cast<const char*>(&magic), sizeof(magic));
 
-        // 2. Architecture
         uint32_t layerCount = static_cast<uint32_t>(g.architecture.size());
         file.write(reinterpret_cast<const char*>(&layerCount), sizeof(layerCount));
 
@@ -77,12 +76,11 @@ struct GenomeSerializer {
             file.write(reinterpret_cast<const char*>(&gene.auxiliaryData), sizeof(gene.auxiliaryData));
         }
 
-        // 3. Weights
         uint32_t weightCount = static_cast<uint32_t>(g.weights.size());
         file.write(reinterpret_cast<const char*>(&weightCount), sizeof(weightCount));
-        if (weightCount > 0) {
+        if (weightCount > 0)
             file.write(reinterpret_cast<const char*>(g.weights.data()), weightCount * sizeof(float));
-        }
+
 
         return file.good();
     }
@@ -90,11 +88,13 @@ struct GenomeSerializer {
     static Genome load(const std::string& filename) {
         Genome g;
         std::ifstream file(filename, std::ios::binary);
-        if (!file) return g;
+        if (!file)
+            return g;
 
         uint32_t magic = 0;
         file.read(reinterpret_cast<char*>(&magic), sizeof(magic));
-        if (magic != 0x47454E4F) return g; // Invalid magic
+        if (magic != 0x47454E4F)
+            return g;
 
         uint32_t layerCount = 0;
         file.read(reinterpret_cast<char*>(&layerCount), sizeof(layerCount));
@@ -120,9 +120,9 @@ struct GenomeSerializer {
         uint32_t weightCount = 0;
         file.read(reinterpret_cast<char*>(&weightCount), sizeof(weightCount));
         g.weights.resize(weightCount);
-        if (weightCount > 0) {
+        if (weightCount > 0)
             file.read(reinterpret_cast<char*>(g.weights.data()), weightCount * sizeof(float));
-        }
+
 
         return g;
     }

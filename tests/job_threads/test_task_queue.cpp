@@ -263,5 +263,3 @@ TEST_CASE("TaskQueue swap() exchanges all state", "[threading][task_queue][swap]
     REQUIRE(taskB.has_value() == true);
     REQUIRE(queueB.size() == 2);
 }
-
-// CHECKPOINT: v1.3

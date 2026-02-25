@@ -68,4 +68,4 @@ std::shared_ptr<threads::JobIoAsyncThread> SerialManager::loop() const
 }
 
 } // namespace job::uart
-// CHECKPOINT: v2.0
+

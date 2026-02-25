@@ -110,4 +110,3 @@ std::string Reader::readText(Schema &in_schema)
 }
 
 } // namespace job::serializer
-// CHECKPOINT: v2

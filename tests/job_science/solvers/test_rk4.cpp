@@ -266,5 +266,3 @@ TEST_CASE("RK4 Integrator: handles many particles", "[threading][science][rk4][s
     }
 
 }
-
-// CHECKPOINT: v1.0

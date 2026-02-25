@@ -290,4 +290,4 @@ std::string JobSecureMem::fromBase64toString(const std::string &encoded, int var
     return {};
 }
 } // namespace job::crypto
-// CHECKPOINT: v1
+

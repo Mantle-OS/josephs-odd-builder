@@ -194,55 +194,6 @@ TEST_CASE("Language Byte P=16, N=1000 : Trains using Byte Language", "[ai][coach
     REQUIRE(llm->fitness() > 80);
 }
 
-// TEST_CASE("Language Motif: The Physics Bard", "[ai][coach][llm]")
-// {
-
-//     JobFifoCtx ctx(16);
-//     const std::string kCorpus = "The portal is open. Time flows forward. The dragons are slain. Time flows backward. The portal is closed. The dragons rise.";
-
-//     auto learnCfg = LearnPresets::LanguageConfig(
-//         kCorpus.c_str(),
-//         job::ai::token::TokenType::Motif
-//         );
-
-//     learnCfg.contextLen    = 32;
-//     learnCfg.corpusLen     = (uint32_t)(kCorpus.length() - learnCfg.contextLen); // Approx
-//     learnCfg.seed          = 42;
-//     learnCfg.initWsMb      = 4;
-//     learnCfg.maxSteps      = 3000;
-//     learnCfg.targetFitness = 96.0f;
-
-//     ESConfig coachCfg;
-//     coachCfg.populationSize = 128;
-//     coachCfg.sigma          = 0.08f;
-//     coachCfg.decay          = 0.998f;
-//     coachCfg.envConfig      = learnCfg;
-
-//     ESCoach coach(ctx.pool, coachCfg);
-//     auto *llm = dynamic_cast<LanguageLearn*>(coach.learner());
-//     REQUIRE(llm != nullptr);
-
-//     const uint32_t inDim = llm->inputDimension();
-//     const uint32_t outDim = llm->outputDimension();
-
-//     // Using the new builder
-//     Genome bestGenome = buildTextLayers(inDim, outDim);
-//     std::string thought{};
-//     uint32_t gen = 0;
-
-//     BENCHMARK("Training Loop P=256, N=6000") {
-//         while(!llm->done() && gen < learnCfg.maxSteps) {
-//             bestGenome = coach.coach((gen == 0) ? bestGenome : coach.bestGenome());
-//             gen++;
-//         }
-//         return bestGenome;
-//     };
-
-//     thought = llm->say(learnCfg.corpusLen, coach.bestGenome());
-//     JOB_LOG_INFO("[Langauge Model] Fitness: {:.2f}", llm->fitness());
-//     JOB_LOG_INFO("[Langauge Model] Hallucination: {}", thought);
-//     REQUIRE(llm->fitness() > 90.0f);
-// }
 
 TEST_CASE("Language(With Attention) P=512 N=1000 Model Byte Encodings. ", "[ai][coach][llm]")
 {

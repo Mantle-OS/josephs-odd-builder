@@ -371,4 +371,4 @@ TEST_CASE("Field::to_yaml emits correct YAML", "[job_field]") {
     REQUIRE(output.find("size:") == std::string::npos);
     REQUIRE(output.find("ctype:") == std::string::npos);
 }
-// CHECKPOINT: v1
+

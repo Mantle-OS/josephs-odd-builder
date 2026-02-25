@@ -25,4 +25,4 @@ protected:
 };
 
 } // namespace job::serializer::msg_pack
-// CHECKPOINT: v1
+

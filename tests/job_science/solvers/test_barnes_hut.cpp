@@ -332,5 +332,3 @@ TEST_CASE("Barnes-Hut approximates direct forces for small cluster two threads",
     REQUIRE(vec_rel_error(sum_bh, sum_direct) < 1e-2f);
 }
 
-
-// CHECKPOINT v1.2

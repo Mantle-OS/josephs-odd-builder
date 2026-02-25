@@ -52,7 +52,6 @@ TEST_CASE("Zones classify combined with disk model", "[zones][disk]")
     Zones zones = SciencePresets::solarSystemLike();
     DiskModel disk = SciencePresets::solarNebula();
 
-    // Use explicit real_t casting for Particle position initialization
     Particle p = ParticleUtil::particleAtRadiusAU(0.05f);
 
     // Inner Disk (r=0.05 AU). T at this distance is > 1200K (T_silicateSub)

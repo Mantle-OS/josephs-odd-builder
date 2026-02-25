@@ -130,4 +130,3 @@ TEST_CASE("FileIO invalid operations", "[fileio][invalid]") {
     const ssize_t invalidRead = stdoutFile.read(buf, sizeof(buf));
     REQUIRE(invalidRead == -1);
 }
-// CHECKPOINT: v1

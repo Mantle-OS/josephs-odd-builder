@@ -121,4 +121,3 @@ TEST_CASE("ThreadWatcher can add a new thread while running", "[threading][threa
     watcher->stop();
 }
 
-// CHECKPOINT: v1.1

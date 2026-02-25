@@ -108,4 +108,3 @@ struct FieldValue final {
 }
 
 } // namespace job::serializer
-// CHECKPOINT: v2

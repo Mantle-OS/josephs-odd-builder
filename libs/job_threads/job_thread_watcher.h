@@ -60,4 +60,3 @@ private:
     std::chrono::milliseconds       m_summaryInterval{std::chrono::seconds(5)};
 };
 } // job::threads
-// CHECKPOINT: v1.2

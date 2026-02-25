@@ -295,4 +295,3 @@ bool Field::isValid(std::vector<Field> fields) noexcept
     return true;
 }
 } // namespoace job::serializer
-// CHECKPOINT: v1

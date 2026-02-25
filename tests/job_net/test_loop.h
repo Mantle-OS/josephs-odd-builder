@@ -65,4 +65,4 @@ inline static std::string make_temp_sock_path(const std::string &base)
         std::filesystem::remove(path);
     return path;
 }
-// CHECKPOINT: v1.1
+

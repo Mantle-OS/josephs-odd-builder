@@ -23,7 +23,7 @@ job:
 
 ## Data (`job::science::data`)
 
-Small POD-style types used by the solvers:
+Small'ish POD-style types used by the solvers:
 
 - `Vec3f` : float 3D vector utility type (math ops, length, etc)
 - `Particle` : simulation particle (id, position/velocity/acceleration, radius/mass, temperature, composition, zone)
@@ -70,6 +70,8 @@ This layer is intentionally plain. It’s the “stuff that moves around” laye
 
 ## Stuff that exists but is currently commented out in the build
 
+THIS IS OLD AND I ADDED THIS CODE. 
+
 ### Frames (`libs/job_science/frames/*`)
 Frame header + serializer/deserializer + sink/source adapters for IO and net.
 The code is present, but the CMake target has it commented out.
@@ -84,7 +86,6 @@ A higher-level simulation engine wrapper that pulls together:
 Also present, also commented out in the build target.
 
 ### Integrators folder (`libs/job_science/integrators/*`)
-An interface layer exists in-tree but is not compiled into the library target right now.
 
 ---
 

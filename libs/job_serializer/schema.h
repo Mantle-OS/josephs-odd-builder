@@ -58,4 +58,4 @@ struct adl_serializer<job::serializer::Schema> {
 };
 
 } // namespace nlohmann
-// CHECKPOINT: v1
+

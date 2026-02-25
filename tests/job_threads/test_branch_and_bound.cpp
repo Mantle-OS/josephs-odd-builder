@@ -708,9 +708,7 @@ TEST_CASE("parallel_branch_and_bound handles zero timeout gracefully",  "[thread
 
     // Should still report valid timing (not negative or NaN)
     REQUIRE(res.elapsedSeconds >= 0.0);
-    REQUIRE(std::isfinite(res.elapsedSeconds));
+    REQUIRE(std::isfinite(res.elapsedSeconds)); //FIXME
 
     INFO("Zero-timeout search expanded " << res.nodesExpanded << " nodes in " << res.elapsedSeconds << " seconds");
 }
-
-// CHECKPOINT: v1.3

@@ -90,4 +90,4 @@ inline std::string format_log(std::string_view fmt, Args&&... args)
 )
 
 } // job::core::detail
-// CHECKPOINT: v1.0
+

@@ -15,22 +15,19 @@
 #include <ctx/job_stealing_ctx.h>
 #include <es_coach.h>
 #include <learn_type.h>
-#include <layer_factory.h> // Needed for LayerGene
+#include <layer_factory.h>
 
 using namespace job::io;
 using namespace job::ansi;
 using namespace job::tui;
 using namespace job::tui::gui;
 
-// ---------------------------------------------------------
-// HELPER: Create the Neural Network Topology
-// ---------------------------------------------------------
 job::ai::evo::Genome buildNetwork() {
     using namespace job::ai::evo;
     using namespace job::ai::layers;
 
     Genome g;
-    // Layer 1: 4 Inputs -> 32 Hidden (Tanh is stable)
+    // Layer 1: 4 Inputs -> 32 Hidden (Tanh is stable enough)
     LayerGene l1{};
     l1.type = LayerType::Dense;
     l1.activation = comp::ActivationType::Tanh;
@@ -66,26 +63,25 @@ int main() {
     // Taller window to see the title clearly
     auto root = Window::create({2, 1, 80, 20}, "Neural CartPole: Idle", app.get());
 
-    // 1. LEFT RECTANGLE (Start/Stop)
+    // LEFT RECTANGLE (Start/Stop)
     auto rect1 = Rectangle::create(root.get());
     rect1->setGeometry(5, 3, 30, 10);
     rect1->setColor("blue");
 
-    // 2. RIGHT RECTANGLE (Status)
+    // RIGHT RECTANGLE (Status)
     auto rect2 = Rectangle::create(root.get());
     rect2->setGeometry(40, 3, 30, 10);
     rect2->setColor("dark_gray");
 
-    // 3. AI BACKEND
+    // AI BACKEND
     std::atomic<bool> runSim{false};
-
     std::thread aiThread([rect2, root, app, &runSim]() {
         job::threads::JobStealerCtx ctx(8);
 
         job::ai::coach::ESConfig cfg;
         cfg.envConfig.type  = job::ai::learn::LearnType::CartPole;
         cfg.populationSize = 128;
-        cfg.sigma = 0.5f; // Good noise level
+        cfg.sigma = 0.5f;
         cfg.envConfig.initWsMb = 1;
 
         job::ai::coach::ESCoach coach(ctx.pool, cfg);
@@ -108,7 +104,6 @@ int main() {
                     rect2->setColor("green");  // Learning...
                 }
 
-                // Update Title safely (assuming thread safe or risky-but-ok for simple app)
                 root->setTitle(status);
                 app->markDirty();
             }
@@ -117,7 +112,6 @@ int main() {
     });
     aiThread.detach();
 
-    // 4. MOUSE
     auto mouseOne = JobTuiMouseArea::create(rect1.get());
     mouseOne->onClicked = [rect1, root, app, &runSim](const Event &) {
         bool running = !runSim;

@@ -201,9 +201,9 @@ TEST_CASE("Vectorized SIMD matches Scalar Reference (Comprehensive)", "[activati
             tolerance = 1e-5f;
             break;
 
-            // --- Transcendental / Curved Types ---
-            // These rely on exp/log/tanh/sigmoid.
-            // Even with High Precision mode, SIMD polynomial Approx != std::exp
+        // --- Transcendental / Curved Types ---
+        // These rely on exp/log/tanh/sigmoid.
+        // Even with High Precision mode, SIMD polynomial Approx != std::exp
         case ActivationType::Sigmoid:
         case ActivationType::Tanh:
         case ActivationType::ELU:
@@ -212,9 +212,9 @@ TEST_CASE("Vectorized SIMD matches Scalar Reference (Comprehensive)", "[activati
             tolerance = 0.01f; // 1% tolerance
             break;
 
-            // --- Compound Approximations ---
-            // These stack approximations (e.g. Tanh inside Mul, or Sigmoid inside Mul)
-            // Error accumulates slightly more.
+        // --- Compound Approximations ---
+        // These stack approximations (e.g. Tanh inside Mul, or Sigmoid inside Mul)
+        // Error accumulates slightly more.
         case ActivationType::GELU:
         case ActivationType::AproxGELU:
         case ActivationType::Swish:
@@ -227,7 +227,7 @@ TEST_CASE("Vectorized SIMD matches Scalar Reference (Comprehensive)", "[activati
             break;
         }
 
-        // 4. Compare
+        // Compare
         for(size_t i=0; i<N; ++i) {
             float diff = std::abs(scalarRef[i] - vectorOut[i]);
 

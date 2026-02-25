@@ -1,7 +1,6 @@
 cmake_minimum_required(VERSION 3.16)
 add_executable(test_job_threads
     main.cpp
-    # test_thread_science.h
     ../test_spin_till.h
     test_job_semaphore.cpp
     test_job_thread.cpp

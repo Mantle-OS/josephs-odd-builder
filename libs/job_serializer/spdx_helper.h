@@ -1397,4 +1397,4 @@ inline const std::unordered_map<SpdxHelper::SPDX_License, std::string> SpdxHelpe
         { SPDX_License::Zope_Public_License_2_1                                                               , "ZPL-2.1" }
 };
 } // namespace job::core
-// CHECKPOINT: v1
+

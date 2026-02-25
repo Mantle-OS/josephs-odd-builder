@@ -57,4 +57,4 @@ protected:
     std::atomic<uint64_t>           m_nextTimerId{1};
 };
 } // job::threads
-// CHECKPOINT: v1.1
+

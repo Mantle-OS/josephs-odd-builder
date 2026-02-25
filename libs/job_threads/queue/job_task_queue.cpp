@@ -189,4 +189,4 @@ bool TaskQueue::stopped() const noexcept
 }
 
 } // job::threads
-// CHECKPOINT: v1.1
+

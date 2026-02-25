@@ -8,6 +8,7 @@
 #include <solvers/job_fmm_integrator.h>
 #include <data/particle.h>
 #include <data/vec3f.h>
+#include <data/forces.h>
 
 using namespace job::threads;
 using namespace job::science::data;
@@ -32,49 +33,8 @@ using FMMEngine = job::science::JobFmmEngine<Particle, Vec3f, float, TestTraits>
 using Kernel = job::science::FmmKernels<Vec3f, float>;
 using Coeffs = job::science::FmmCoefficients<Vec3f, float>;
 
-
-// Brute force N^2 to get the "Ground Truth"
-void computeExactForces(std::vector<Particle> &particles)
-{
-    for(size_t i = 0; i < particles.size(); ++i) {
-        particles[i].acceleration = {0,0,0};
-        for(size_t j = 0; j < particles.size(); ++j) {
-            if(i==j)
-                continue;
-
-            auto r = particles[j].position - particles[i].position;
-            float distSq = r.x*r.x + r.y*r.y + r.z*r.z;
-            float invDist = 1.0f/std::sqrt(distSq);
-            float invDist3 = invDist * invDist * invDist;
-            // F = G * m1 * m2 * r / r^3
-            auto f = r * (particles[j].mass * invDist3); // Mass of *other*
-            particles[i].acceleration = particles[i].acceleration + f;
-        }
-    }
-}
-
-static Vec3f exactForceOnTarget(const std::vector<Particle> &sources,
-                                const Particle &target)
-{
-    Vec3f exact{0,0,0};
-    for (const auto &s : sources) {
-        Vec3f dr = s.position - target.position;   // source - target (same as P2P)
-        float r2 = dr.x*dr.x + dr.y*dr.y + dr.z*dr.z;
-        if (r2 <= 1e-10f)
-            continue;               // just in case
-        float invR  = 1.0f / std::sqrt(r2);
-        float invR3 = invR * invR * invR;
-        exact = exact + dr * (s.mass * invR3);
-    }
-    return exact;
-}
-
-
-// This all needs to be in the Utils or something of the lib top make this API much more simple
 TEST_CASE("FMM Kernel Integrity (P=3 Octupole)", "[fmm][kernel][math]")
 {
-
-
     // Setup Geometry
     // Cluster: Two particles at +/- 1.0 (Size ~ 2.0)
     // Target:  Point at +20.0 (Dist = 20.0)
@@ -89,7 +49,7 @@ TEST_CASE("FMM Kernel Integrity (P=3 Octupole)", "[fmm][kernel][math]")
 
     Particle target{ .position{0.0f, 20.0f, 0.0f}, .mass = 1.0f };
 
-    Vec3f exactForce = exactForceOnTarget(sources, target);
+    Vec3f exactForce = Forces::exactForceOnTarget(sources, target);
 
     Coeffs M;
     for(const auto &s : sources)
@@ -166,7 +126,7 @@ TEST_CASE("FMM Quadrupole Accuracy (Regresion 0.7%)", "[fmm][math][quadrupole]")
          { .position{ 0.0f, 20.0f, 0.0f}, .mass = 1.0f}
     };
 
-    computeExactForces(bodies);
+    Forces::computeExactForces(bodies);
     float exactForceY = bodies[2].acceleration.y;
 
     bodies[2].acceleration = {0,0,0};
@@ -181,7 +141,6 @@ TEST_CASE("FMM Quadrupole Accuracy (Regresion 0.7%)", "[fmm][math][quadrupole]")
 
     float fmmForceY = bodies[2].acceleration.y;
 
-    // The "Error"
     float error = std::abs(fmmForceY - exactForceY);
     float relError = error / std::abs(exactForceY);
 

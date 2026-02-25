@@ -6,6 +6,9 @@ set(JOB_CUDA_ARCHITECTURES       "120"                               CACHE STRIN
 
 if(JOB_CUDA)
     message(STATUS "Building with CUDA support")
+
+    find_package(CUDAToolkit REQUIRED)
+
     add_compile_definitions(JOB_CUDA_BUILD)
     set(CMAKE_CUDA_TOOLKIT_ROOT_DIR "${JOB_CUDA_TOOLKIT_ROOT_DIR}")
     set(CMAKE_CUDA_COMPILER         "${JOB_CUDA_COMPILER}")
@@ -13,7 +16,6 @@ if(JOB_CUDA)
     set(CMAKE_CUDA_ARCHITECTURES    "${JOB_CUDA_ARCHITECTURES}")
 
     enable_language(CUDA)
-
     if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.18")
         set(CMAKE_CUDA_ARCHITECTURES 120)
     endif()
@@ -22,9 +24,10 @@ if(JOB_CUDA)
 
     if(CMAKE_BUILD_TYPE STREQUAL "Debug")
         # list(APPEND CMAKE_CUDA_FLAGS "-G")
-        list(APPEND CMAKE_CUDA_FLAGS "-lineinfo") # Better profile info without full debug perf hit
+        list(APPEND CMAKE_CUDA_FLAGS "-lineinfo")
     endif()
 
+    message(STATUS JOSERPH ${CMAKE_CUDA_FLAGS})
 
 else()
     message(STATUS "CUDA Disabled: set JOB_CUDA_BUILD=ON if you want to use that. see cmake/build_options.txt")

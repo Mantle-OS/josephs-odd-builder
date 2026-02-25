@@ -225,4 +225,3 @@ void AsyncEventLoop::runOnce()
 
 } // job::threads
 
-// CHECKPOINT: v1.2

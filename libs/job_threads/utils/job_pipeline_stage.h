@@ -109,4 +109,4 @@ make_pipeline_stage(ThreadPool::Ptr pool, typename JobPipelineStage<In, Out>::Pr
 }
 
 } // namespace job::threads
-// CHECKPOINT: v1.0
+

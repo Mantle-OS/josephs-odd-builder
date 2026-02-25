@@ -40,7 +40,6 @@ static_assert(alignof(LearnConfig) == 8);
     return (bits & 0x7F800000u) == 0x7F800000u;
 }
 
-// DO NOT TOUCH THESE  they are here for a reason
 namespace LearnPresets{
     [[nodiscard]] inline constexpr LearnConfig XORConfig()
     {

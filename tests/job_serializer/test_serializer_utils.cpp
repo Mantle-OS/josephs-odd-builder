@@ -79,4 +79,3 @@ TEST_CASE("jsonToScalar converts FieldValue::Scalar to nlohmann::json", "[serial
         REQUIRE(j.get<std::string>() == "Hello, JOB!");
     }
 }
-// CHECKPOINT: v1

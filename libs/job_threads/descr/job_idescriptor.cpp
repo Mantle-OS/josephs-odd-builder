@@ -64,4 +64,3 @@ void JobIDescriptor::setBps(double bps) noexcept
 
 }
 
-// CHECKPOINT: v1.1

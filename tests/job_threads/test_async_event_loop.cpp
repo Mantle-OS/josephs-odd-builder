@@ -150,4 +150,3 @@ TEST_CASE("AsyncEventLoop handles re-entrancy (post from a timer)", "[threading]
     REQUIRE(task_from_timer_ran.load() == true);
     loop.stop();
 }
-// CHECKPOINT: v1.2

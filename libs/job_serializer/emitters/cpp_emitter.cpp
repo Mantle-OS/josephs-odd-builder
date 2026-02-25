@@ -151,4 +151,4 @@ std::string CppEmitter::renderImply(const Schema &schema)
 
 
 } // namespace job::serializer
-// CHECKPOINT: v1
+

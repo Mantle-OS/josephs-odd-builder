@@ -166,4 +166,3 @@ void UnixServer::onClientDisconnect(UnixClient::Ptr client)
 }
 
 } // namespace job::net
-// CHECKPOINT: v1.1

@@ -180,4 +180,4 @@ TEST_CASE("JobThread startup/join latency benchmark", "[threading][bench][latenc
 
     REQUIRE(avg_us < 10000.0);
 }
-// CHECKPOINT: v2.1
+

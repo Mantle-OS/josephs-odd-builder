@@ -219,4 +219,3 @@ bool Schema::isValid() const noexcept
 }
 
 } // namespace job::serializer
-// CHECKPOINT: v1

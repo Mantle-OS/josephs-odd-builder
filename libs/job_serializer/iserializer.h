@@ -42,4 +42,4 @@ protected:
     [[nodiscard]] virtual bool decodeText( const Schema &schema, RuntimeObject &outObject, const std::vector<uint8_t> &inBuffer) noexcept;
 };
 } // namespace job::serializer
-// CHECKPOINT: v1
+

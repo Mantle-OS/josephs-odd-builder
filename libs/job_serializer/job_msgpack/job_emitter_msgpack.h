@@ -26,4 +26,3 @@ public:
 };
 
 } // namespace job::serializer::msg_pack
-// CHECKPOINT: v2

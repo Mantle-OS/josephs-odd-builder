@@ -3,7 +3,6 @@
 #include <array>
 #include <vector>
 
-#include <real_type.h>
 #include <extents.h>
 #include <view.h>
 #include <fiber.h>
@@ -12,14 +11,13 @@
 #include <batch.h>
 #include <rank.h>
 
-using job::core::real_t;
 using namespace job::ai::cords;
 
 // Tiny helper to fill with pattern: val = base + linear_index
-static void fillLinear(real_t *data, std::size_t n, real_t base)
+static void fillLinear(float *data, std::size_t n, float base)
 {
     for (std::size_t i = 0; i < n; ++i)
-        data[i] = base + static_cast<real_t>(i);
+        data[i] = base + static_cast<float>(i);
 }
 
 TEST_CASE("Extents basic construction", "[cords][extents]")
@@ -39,8 +37,8 @@ TEST_CASE("Extents basic construction", "[cords][extents]")
 
 TEST_CASE("View 1D indexing", "[cords][view][1d]")
 {
-    std::vector<real_t> storage(5);
-    fillLinear(storage.data(), storage.size(), real_t(10)); // 10,11,12,13,14
+    std::vector<float> storage(5);
+    fillLinear(storage.data(), storage.size(), 10.0f); // 10,11,12,13,14
 
     ViewR v(storage.data(), ViewR::Extent{5u});
     REQUIRE(v.rank() == 1);
@@ -54,8 +52,8 @@ TEST_CASE("View 1D indexing", "[cords][view][1d]")
 
 TEST_CASE("View reshape preserves layout", "[cords][view][reshape]")
 {
-    std::vector<real_t> storage(6);
-    fillLinear(storage.data(), storage.size(), real_t(0)); // 0..5
+    std::vector<float> storage(6);
+    fillLinear(storage.data(), storage.size(), 0.0f); // 0..5
 
     ViewR v1(storage.data(), ViewR::Extent{6u});
     auto v2 = v1.reshape(ViewR::Extent{2u, 3u});
@@ -77,8 +75,8 @@ TEST_CASE("View slice drops first dimension", "[cords][view][slice]")
     const std::uint32_t B = 3;
     const std::uint32_t C = 2;
 
-    std::vector<real_t> storage(B * C);
-    fillLinear(storage.data(), storage.size(), real_t(100)); // 100..105
+    std::vector<float> storage(B * C);
+    fillLinear(storage.data(), storage.size(), 100.0f); // 100..105
 
     ViewR v(storage.data(), ViewR::Extent{B, C});
     REQUIRE(v.rank() == 2);
@@ -102,8 +100,8 @@ TEST_CASE("Matrix at() matches operator()", "[cords][matrix]")
     const std::uint32_t rows = 3;
     const std::uint32_t cols = 4;
 
-    std::vector<real_t> storage(rows * cols);
-    fillLinear(storage.data(), storage.size(), real_t(0));
+    std::vector<float> storage(rows * cols);
+    fillLinear(storage.data(), storage.size(), 0.0f);
 
     Matrix mat(storage.data(), rows, cols);
     REQUIRE(mat.rank() == 2);
@@ -121,8 +119,8 @@ TEST_CASE("Volume and Batch basic layout", "[cords][volume][batch]")
     // 3D: [D0, D1, D2]
     {
         const std::uint32_t d0 = 2, d1 = 3, d2 = 4;
-        std::vector<real_t> storage(d0 * d1 * d2);
-        fillLinear(storage.data(), storage.size(), real_t(0));
+        std::vector<float> storage(d0 * d1 * d2);
+        fillLinear(storage.data(), storage.size(), 0.0f);
 
         Volume t3(storage.data(), d0, d1, d2);
         REQUIRE(t3.rank() == 3);
@@ -137,8 +135,8 @@ TEST_CASE("Volume and Batch basic layout", "[cords][volume][batch]")
     // 4D: [B, C, H, W]
     {
         const std::uint32_t B = 2, C = 2, H = 2, W = 3;
-        std::vector<real_t> storage(B * C * H * W);
-        fillLinear(storage.data(), storage.size(), real_t(5));
+        std::vector<float> storage(B * C * H * W);
+        fillLinear(storage.data(), storage.size(), 5.0);
 
         Batch t4(storage.data(), B, C, H, W);
         REQUIRE(t4.rank() == 4);
@@ -155,8 +153,8 @@ TEST_CASE("Volume and Batch basic layout", "[cords][volume][batch]")
 TEST_CASE("Rank matches View indexing", "[cords][rank]")
 {
     const std::uint32_t d0 = 2, d1 = 2, d2 = 3;
-    std::vector<real_t> storage(d0 * d1 * d2);
-    fillLinear(storage.data(), storage.size(), real_t(7));
+    std::vector<float> storage(d0 * d1 * d2);
+    fillLinear(storage.data(), storage.size(), 7.0f);
 
     // std::array<std::uint32_t, 3> dims{d0, d1, d2};
     Volume tr(storage.data(), d0, d1, d2);
@@ -175,8 +173,8 @@ TEST_CASE("ViewIter slices 2D along first dimension", "[cords][iter][2d]")
     const std::uint32_t B = 3;
     const std::uint32_t C = 4;
 
-    std::vector<real_t> storage(B * C);
-    fillLinear(storage.data(), storage.size(), real_t(10)); // 10..21
+    std::vector<float> storage(B * C);
+    fillLinear(storage.data(), storage.size(), 10.0f); // 10..21
 
     ViewR v(storage.data(), ViewR::Extent{B, C});
     REQUIRE(v.rank() == 2);
@@ -205,8 +203,8 @@ TEST_CASE("ViewIter member begin/end and free beginSlices/endSlices agree on 2D"
     const std::uint32_t B = 3;
     const std::uint32_t C = 4;
 
-    std::vector<real_t> storage(B * C);
-    fillLinear(storage.data(), storage.size(), real_t(10)); // 10..21
+    std::vector<float> storage(B * C);
+    fillLinear(storage.data(), storage.size(), 10.0f); // 10..21
 
     ViewR v(storage.data(), ViewR::Extent{B, C});
     REQUIRE(v.rank() == 2);
@@ -251,8 +249,8 @@ TEST_CASE("ViewIter member and free APIs agree on 3D batch slices",
     const std::uint32_t C = 3;
     const std::uint32_t H = 4;
 
-    std::vector<real_t> storage(B * C * H);
-    fillLinear(storage.data(), storage.size(), real_t(0)); // 0..23
+    std::vector<float> storage(B * C * H);
+    fillLinear(storage.data(), storage.size(), 0.0f); // 0..23
 
     ViewR v(storage.data(), ViewR::Extent{B, C, H});
     REQUIRE(v.rank() == 3);
@@ -291,8 +289,8 @@ TEST_CASE("ViewIter works with const View", "[cords][iter][const]")
     const std::uint32_t B = 2;
     const std::uint32_t C = 2;
 
-    std::vector<real_t> storage(B * C);
-    fillLinear(storage.data(), storage.size(), real_t(1));
+    std::vector<float> storage(B * C);
+    fillLinear(storage.data(), storage.size(), 1.0f);
 
     const ViewR v(storage.data(), ViewR::Extent{B, C});
 

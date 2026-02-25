@@ -16,7 +16,6 @@ add_custom_target(Documentation SOURCES
 add_custom_target(AI_Documentation SOURCES
     ai.md
     ai_benchmarks.md
-    odd_portal.md
     ai/cords.md
     ai/comp.md
     ai/evo.md

@@ -25,7 +25,7 @@ Levels that exist in-tree:
 - `Ascii`  : printable ASCII lane
 - `Char`   : UTF-8 aware byte stream turned into lattice atoms
 - `Motif`  : merges common byte fragments into single atoms (“molecules”)
-- `BPE`    : placeholder (comparison lane, not wired)
+- `BPE`    : comparison lane
 
 ### TokenFactory
 Creates a tokenizer from `TokenType` (Byte/Ascii/Char/Motif).

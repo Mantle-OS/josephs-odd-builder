@@ -167,4 +167,4 @@ TEST_CASE("ThreadPool submit() is thread-safe (concurrency)", "[threading][threa
     REQUIRE(counter.load() == kNumHammerThreads * kTasksPerThread);
     SUCCEED("All tasks completed.");
 }
-// CHECKPOINT: v1.2
+

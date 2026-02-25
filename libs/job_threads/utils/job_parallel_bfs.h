@@ -170,5 +170,3 @@ BfsResult parallel_bfs(ThreadPool &pool, const std::vector<std::vector<std::size
 }
 
 } // namespace job::threads
-// CHECKPOINT: v1.3
-

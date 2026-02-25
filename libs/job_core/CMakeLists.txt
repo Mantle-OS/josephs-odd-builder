@@ -10,11 +10,11 @@ set(JOBCORE_SOURCES
     job_timer.cpp
 )
 set(JOBCORE_HEADERS
-    crc32.h          ## polynomial crc32
-    endian_utils.h   ## [from,to]LE16, [from,to]LE32 
-    real_type.h      ## static and what the compiler sets as real_t
-    io_base.h        ## the base of IO not net IO
-    job_logger.h     ## logger clas
+    crc32.h
+    endian_utils.h
+    real_type.h      ## REMOVE ME FIXME
+    io_base.h
+    job_logger.h
     job_timer.h
     job_permissions.h
     job_assert.h
@@ -66,4 +66,3 @@ install(EXPORT JosephsOddBuilderCoreTargets
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/JosephsOddBuilderCore
 )
 
-# CHECKPOINT: v1.0

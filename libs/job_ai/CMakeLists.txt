@@ -195,7 +195,6 @@ set(JOBAI_COMP_HEADERS
     comp/activation_types.h
     comp/atomic_math.h
 
-    # AI everywhere ...
     comp/gemm.h
     comp/flash_attention.h
     comp/mlp.h
@@ -204,7 +203,6 @@ set(JOBAI_COMP_HEADERS
     comp/gdn_params.h
     comp/rrelu_config.h
 
-    # These are new.
     comp/elu.h
     comp/gelu.h
     comp/identity.h
@@ -375,4 +373,3 @@ install(EXPORT JosephsOddBuilderAITargets
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/JosephsOddBuilderAi
 )
 
-# CHECKPOINT: v1.6

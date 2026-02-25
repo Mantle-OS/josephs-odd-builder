@@ -231,4 +231,3 @@ void JobIoAsyncThread::loop(std::stop_token token, [[maybe_unused]] std::chrono:
 }
 
 } // namespace job::threads
-// CHECKPOINT: v1.3

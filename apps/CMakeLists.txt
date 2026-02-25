@@ -5,4 +5,7 @@ endif()
 
 add_subdirectory(job_ansi_examples)
 add_subdirectory(job_ai_terminal_dashboard_example)
-# CHECKPOINT: v1
+
+if(JOB_QT_APPS)
+    add_subdirectory(qt_protoplanetary_view)
+endif()

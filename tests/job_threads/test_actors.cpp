@@ -166,4 +166,3 @@ TEST_CASE("Actor yields thread after batch limit", "[threading][actor][cooperati
     pool->shutdown();
 }
 
-// CHECKPOINT: v1.1

@@ -8,7 +8,7 @@ using SIMD = AVX512_F;
 
 #elif defined(HAS_AVX) || defined(HAS_AVX_TWO) || defined(HAS_AVX_VNNI)
 
-#include "simd_avx.h" // 8 width floats
+    #include "simd_avx.h" // 8 width floats
 namespace job::simd {
 using SIMD = AVX_F;
 }

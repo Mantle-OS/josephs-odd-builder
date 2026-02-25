@@ -44,4 +44,4 @@ TEST_CASE("JobLogger prints timestamps and levels", "[logger]") {
     REQUIRE(output.find("test message") != std::string::npos);
     REQUIRE(output.find('[') != std::string::npos);  // timestamp brackets
 }
-// CHECKPOINT: v1.0
+

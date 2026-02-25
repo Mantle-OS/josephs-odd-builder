@@ -2,15 +2,13 @@
 # DEPS
 ##############################
 # * DEBIAN based install the following
-# Note: tested on debian sid( atm)
+# Note: tested on debian sid(atm)
 # sudo apt install libssl-dev libzstd-dev pkgconf libpkgconf-dev zlib1g-dev libsodium-dev libflatbuffers-dev flatbuffers-compiler nlohmann-json3-dev libyaml-cpp-dev libmsgpack-cxx-dev libcatch2-dev
 
-# * ARCH LINUX based
-# Note: Arch packages often include headers by default, so "-dev" variants are rare.
+# * ARCH LINUX based(not tested)
 # sudo pacman -S openssl zstd pkgconf zlib libsodium flatbuffers nlohmann-json yaml-cpp msgpack-cxx catch2
 
-# * REDHAT / FEDORA / CENTOS based
-# Note: You likely need the EPEL repository enabled for RHEL/CentOS to find some of these (libsodium, flatbuffers, yaml-cpp).
+# * REDHAT / FEDORA / CENTOS based (not tested)
 # sudo dnf install openssl-devel libzstd-devel pkgconf-pkg-config zlib-devel libsodium-devel flatbuffers-devel flatbuffers-compiler json-devel yaml-cpp-devel msgpack-devel catch2-devel
 
 include(GNUInstallDirs)
@@ -36,8 +34,6 @@ pkg_check_modules(LibSodium  REQUIRED libsodium)
 
 ## UART
 pkg_check_modules(LibUdev REQUIRED libudev)
-
-## TRANSLATIONS Fuck Translations
 
 ## DATA fun
 pkg_check_modules(Flatbuffers  REQUIRED flatbuffers)

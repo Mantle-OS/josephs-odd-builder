@@ -269,8 +269,6 @@ TEST_CASE("Frames: FrameDeserializer benchmarks (file)", "[frames][bench][deseri
     // ---- Throughput: read all frames in a file (dominant cost path)
     BENCHMARK("[FrameDeserializer] Read all frames (N=1024, frames=256)") {
         const auto got = readAllFramesOnce(file1, kFramesBig);
-        // Keep a correctness check *outside* the timed portion? Catch benchmarks time the lambda.
-        // But we do want to ensure we're not benchmarking a fast failure.
         return got;
     };
 

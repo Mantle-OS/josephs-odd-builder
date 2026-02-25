@@ -300,5 +300,3 @@ void FileIO::setReadCallback(ReadCallback cb) {
 
 
 } // job::io
-
-// CHECKPOINT: v1.0

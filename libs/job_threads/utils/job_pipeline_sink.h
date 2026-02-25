@@ -48,4 +48,4 @@ make_pipeline_sink(ThreadPool::Ptr pool, typename JobPipelineSink<In>::ConsumeFu
 }
 
 } // namespace job::threads
-// CHECKPOINT: v1.0
+

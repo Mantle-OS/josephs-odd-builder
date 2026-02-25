@@ -27,18 +27,23 @@ void Runner::buildNetwork()
 
         size_t layerWidth = gene.inputs;
         // Check output width too
-        if (gene.outputs > layerWidth) layerWidth = gene.outputs;
+        if (gene.outputs > layerWidth)
+            layerWidth = gene.outputs;
 
-        if (layerWidth > maxDim) maxDim = layerWidth;
+        if (layerWidth > maxDim)
+            maxDim = layerWidth;
     }
     m_maxLayerDim = (maxDim > 0) ? maxDim : 1;
 }
 
-void Runner::reset() {
-    for(auto &l : m_layers) l->resetState();
+void Runner::reset()
+{
+    for(auto &l : m_layers)
+        l->resetState();
 }
 
-bool Runner::isCompatible(const evo::Genome &g) const {
+bool Runner::isCompatible(const evo::Genome &g) const
+{
     size_t totalParams = 0;
     for(const auto& layer : m_layers)
         totalParams += layer->parameterCount();
@@ -75,10 +80,9 @@ cords::ViewR Runner::run(const cords::ViewR &input, uint8_t wsMB)
     size_t scratchBytes = size_t(wsMB) * 1024 * 1024;
 
     size_t minSafeScratch = m_maxLayerDim * sizeof(float) * 4; // Minimal sanity buffer
-    if (scratchBytes < minSafeScratch) {
-        // Auto-expand or clamp if the config is suicidally small
+    if (scratchBytes < minSafeScratch)
         scratchBytes = std::max(scratchBytes, minSafeScratch);
-    }
+
 
     // Total Bytes Needed
     size_t totalBytes = (ioFloats * 2 * sizeof(float)) + scratchBytes;

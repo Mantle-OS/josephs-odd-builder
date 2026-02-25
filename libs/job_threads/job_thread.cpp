@@ -195,4 +195,4 @@ int JobThread::applyAffinity() noexcept
 
 } // job::threads
 
-// CHECKPOINT: v1.7
+

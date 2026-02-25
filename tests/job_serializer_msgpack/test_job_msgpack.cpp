@@ -76,4 +76,3 @@ TEST_CASE("JobSerializerMsgPack (Runtime) encode/decode round-trip", "[job_seria
         REQUIRE(std::get<FieldValue::Scalar>(map.at("name").value) == FieldValue::Scalar{std::string("test")});
     }
 }
-// CHECKPOINT: v1

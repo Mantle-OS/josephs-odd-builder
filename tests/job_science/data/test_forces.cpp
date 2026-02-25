@@ -1,6 +1,9 @@
+#include "transpose.h"
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/catch_approx.hpp>
-
+#ifdef JOB_TEST_BENCHMARKS
+#include <catch2/benchmark/catch_benchmark.hpp>
+#endif
 
 #include <data/forces.h>
 #include <data/particle.h>
@@ -111,3 +114,181 @@ TEST_CASE("Forces::netAcceleration - vector addition integrity", "[forces][net]"
     REQUIRE(net.y < 0.0f);
     REQUIRE(net.z == Catch::Approx(0.0f));
 }
+
+
+#ifdef JOB_TEST_BENCHMARKS
+
+TEST_CASE("Forces: Scalar Throughput Benchmarks", "[science][forces][benchmark][scalar]")
+{
+    const DiskModel disk = SciencePresets::solarNebula();
+    const Composition rocky = SciencePresets::rocky();
+
+    // We want a large enough N to minimize jitter, but small enough to fit in L3.
+    // 10k particles is a good "sweet spot" for throughput testing.
+    constexpr size_t kParticleCount = 10000;
+    std::vector<Particle> particles(kParticleCount);
+
+    // Setup a predictable ring of particles to avoid branch-prediction noise
+    for (size_t i = 0; i < kParticleCount; ++i) {
+        float r_au = 1.0f + (float(i) / kParticleCount) * 10.0f;
+        particles[i] = ParticleUtil::createDragParticle(r_au, 1e-4f, 100.0f, rocky);
+    }
+
+    // Block 3: Benchmarks
+    // Pushing the scalar math to the limit before we bring in the SIMD heavy hitters.
+
+    BENCHMARK("Gravity (Scalar, N=10k)")
+    {
+        Vec3f totalAccel{0, 0, 0};
+        for (const auto &p : particles) {
+            // We accumulate to a dummy variable to prevent the optimizer
+            // from deleting the loop because it thinks we're doing nothing.
+            totalAccel = totalAccel + Forces::gravity(p, disk);
+        }
+        return totalAccel;
+    };
+
+    BENCHMARK("Radiation Pressure (Scalar, N=10k)")
+    {
+        Vec3f totalAccel{0, 0, 0};
+        for (const auto &p : particles) {
+            totalAccel = totalAccel + Forces::radiationPressure(p, disk, rocky);
+        }
+        return totalAccel;
+    };
+}
+
+
+TEST_CASE("Forces: Gas Drag Benchmarks", "[science][forces][benchmark][gasDrag]")
+{
+    const DiskModel disk = SciencePresets::solarNebula();
+    const Composition rocky = SciencePresets::rocky();
+
+    constexpr size_t kParticleCount = 10000;
+
+    // We create two identical sets to ensure memory state doesn't bias the test
+    std::vector<Particle> scalarParticles(kParticleCount);
+    std::vector<Particle> simdParticles(kParticleCount);
+
+    for (size_t i = 0; i < kParticleCount; ++i) {
+        float r_au = 1.0f + (float(i) / kParticleCount) * 10.0f;
+        scalarParticles[i] = ParticleUtil::createDragParticle(r_au, 1e-4f, 100.0f, rocky);
+        simdParticles[i]   = scalarParticles[i];
+    }
+    BENCHMARK("Gas Drag (Scalar, N=10k)")
+    {
+        Vec3f totalAccel{0, 0, 0};
+        for (const auto &p : scalarParticles) {
+            totalAccel = totalAccel + Forces::gasDrag(p, disk);
+        }
+        return totalAccel;
+    };
+
+    // BENCHMARK("Gas Drag (SIMD, N=10k)")
+    // {
+    //     Vec3f totalAccel{0, 0, 0};
+    //     for (const auto &p : scalarParticles) {
+    //         totalAccel = totalAccel + Forces::gasDrag(p, disk);
+    //     }
+    //     return totalAccel;
+    // };
+
+}
+
+
+TEST_CASE("Forces: Net Acceleration Benchmarks", "[science][forces][benchmark][netAcceleration]")
+{
+    const DiskModel disk = SciencePresets::solarNebula();
+    const Composition rocky = SciencePresets::rocky();
+
+    constexpr size_t kParticleCount = 10000;
+
+    // We create two identical sets to ensure memory state doesn't bias the test
+    std::vector<Particle> scalarParticles(kParticleCount);
+    std::vector<Particle> simdParticles(kParticleCount);
+
+    for (size_t i = 0; i < kParticleCount; ++i) {
+        float r_au = 1.0f + (float(i) / kParticleCount) * 10.0f;
+        scalarParticles[i] = ParticleUtil::createDragParticle(r_au, 1e-4f, 100.0f, rocky);
+        simdParticles[i]   = scalarParticles[i];
+    }
+
+    BENCHMARK("Net Acceleration (Scalar, N=10k)")
+    {
+        // Scalar logic: Process one by one
+        for (auto &p : scalarParticles) {
+            p.acceleration = Forces::netAcceleration(p, disk, rocky);
+        }
+        // Return first element's x to prevent optimization
+        return scalarParticles[0].acceleration.x;
+    };
+
+    BENCHMARK("Net Acceleration (SIMD Fused, N=10k)")
+    {
+        // SIMD logic: Process 8 at a time in a tight loop
+        // This is where we expect the massive speedup from reduced math and cache hits
+        Forces::calculateNetAccelerationSimd(simdParticles, disk);
+
+        // Return first element's x to prevent optimization
+        return simdParticles[0].acceleration.x;
+    };
+}
+
+
+TEST_CASE("Forces: SIMD Memory Layout Benchmarks", "[science][forces][benchmark][memory]")
+{
+    // const DiskModel disk = SciencePresets::solarNebula();
+    constexpr size_t kCount = 10240; // Multiple of 8
+
+    // 1. AoS Data (The current messy way)
+    Particles ps = ParticleUtil::genParticles(kCount);
+
+    // 2. SoA Data (The fast way)
+    // We allocate flat arrays for X, Y, Z coordinates
+    std::vector<float> soaX(kCount), soaY(kCount), soaZ(kCount);
+    std::vector<float> accX(kCount), accY(kCount), accZ(kCount);
+
+    // Block 3: Benchmarks
+
+    BENCHMARK("Memory: Manual Gather (Current AoS bottleneck)")
+    {
+        // This measures just the cost of getting data into registers
+        float temp[8];
+        float sum = 0;
+        for (size_t i = 0; i < kCount; i += 8) {
+            for (int j = 0; j < 8; ++j) {
+                temp[j] = ps[i + j].position.x;
+            }
+            f32 reg = SIMD::pull(temp);
+            // Anchor the result
+            sum += ((float*)&reg)[0];
+        }
+        return sum;
+    };
+
+    BENCHMARK("Memory: Pure SoA Load (The theoretical limit)")
+    {
+        // This is what the CPU can do when data is perfectly aligned
+        float sum = 0;
+        for (size_t i = 0; i < kCount; i += 8) {
+            f32 reg = SIMD::pull(&soaX[i]);
+            sum += ((float*)&reg)[0];
+        }
+        return sum;
+    };
+
+    BENCHMARK("Memory: SIMD Transpose Kernel (8x8 block)")
+    {
+        // Testing the speed of your new transpose logic
+        // We'll transpose a 8x8 block of coordinates
+        for (size_t i = 0; i < kCount; i += 8) {
+            // In a real scenario, you'd load 8 positions into a temp buffer
+            // and then transpose them to get 3 registers (X, Y, Z)
+            job::simd::transpose_kernel_8x8(&soaX[0], 8, &accX[0], 8);
+        }
+        return accX[0];
+    };
+}
+#endif
+
+

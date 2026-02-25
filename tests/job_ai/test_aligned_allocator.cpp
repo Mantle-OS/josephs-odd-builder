@@ -31,7 +31,7 @@ TEST_CASE("AiWeights preserves alignment after resize and push_back", "[allocato
 
     // Force reallocation
     for (int i = 0; i < 10'000; ++i)
-        w.push_back(static_cast<real_t>(i));
+        w.push_back(static_cast<float>(i));
 
     auto addr2 = reinterpret_cast<std::uintptr_t>(w.data());
     REQUIRE(addr2 % 64 == 0);
@@ -39,7 +39,7 @@ TEST_CASE("AiWeights preserves alignment after resize and push_back", "[allocato
 
 TEST_CASE("AiWeights copy and move semantics work", "[allocator][copy-move]")
 {
-    AiWeights w1(128, real_t(1));
+    AiWeights w1(128, 1.0f);
     auto addr = reinterpret_cast<std::uintptr_t>(w1.data());
     REQUIRE(addr % 64 == 0);
 
@@ -47,7 +47,7 @@ TEST_CASE("AiWeights copy and move semantics work", "[allocator][copy-move]")
     REQUIRE(w2.size() == w1.size());
 
     for (std::size_t i = 0; i < w2.size(); ++i)
-        REQUIRE(w2[i] == real_t(1));
+        REQUIRE(w2[i] == 1.0f);
 
     auto addr2 = reinterpret_cast<std::uintptr_t>(w2.data());
     REQUIRE(addr2 % 64 == 0);

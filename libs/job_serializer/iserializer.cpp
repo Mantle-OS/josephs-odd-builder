@@ -459,4 +459,4 @@ bool ISerializer::decodeText( [[maybe_unused]] const Schema &schema, [[maybe_unu
 }
 
 } // namespace job::serializer
-// CHECKPOINT: v1
+

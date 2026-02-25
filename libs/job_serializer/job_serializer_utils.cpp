@@ -28,4 +28,4 @@ FieldKind deduceFieldKind(const std::string &type) noexcept
 }
 
 } // namespace job::serializer
-// CHECKPOINT: v1
+

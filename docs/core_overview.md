@@ -40,8 +40,7 @@ Small helpers for little-endian conversion.
 CRC32 checksums slash integrity.
 
 ## real_t
-### legacy will be removed.
-Single “float vs double” getting phased out.
+Simple float utils
 
 ## SplitMix64
 PRNG used for sampling / seeding. Not Crypto

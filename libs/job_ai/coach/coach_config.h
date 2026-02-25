@@ -61,7 +61,7 @@ static constexpr ESConfig kPhysics {
     .decay          = 0.99f
 };
 
-// The Drunk Bard (Needs defaults, user usually overrides corpus)
+// The Language Model (Needs defaults, user usually overrides corpus)
 static constexpr ESConfig kBard {
     .envConfig      = learn::LearnPresets::LanguageConfig(),
     .populationSize = 32,       // Smaller pop due to memory/CPU cost

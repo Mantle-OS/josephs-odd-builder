@@ -8,8 +8,7 @@
 #include <cmath>
 
 #include <real_type.h>
-
-#include <job_random.h> // whatever header defines job::crypto::JobRandom
+#include <job_random.h>
 
 using namespace job;
 using job::crypto::JobRandom;
@@ -61,14 +60,14 @@ TEST_CASE("JobRandom::secureBytes fills a buffer", "[job_random][secure]")
 TEST_CASE("JobRandom::uniformReal stays within bounds", "[job_random][prng]")
 {
     constexpr std::size_t N = 10'000;
-    const core::real_t a = core::real_t(-3.5);
-    const core::real_t b = core::real_t(7.25);
+    const float a = float(-3.5);
+    const float b = float(7.25);
 
-    core::real_t min_seen = b;
-    core::real_t max_seen = a;
+    float min_seen = b;
+    float max_seen = a;
 
     for (std::size_t i = 0; i < N; ++i) {
-        core::real_t v = JobRandom::uniformReal(a, b);
+        float v = JobRandom::uniformReal(a, b);
         REQUIRE(v >= a);
         REQUIRE(v <  b); // std::uniform_real is [a, b) by spec
 
@@ -77,8 +76,8 @@ TEST_CASE("JobRandom::uniformReal stays within bounds", "[job_random][prng]")
     }
 
     // We should have explored at least a decent chunk of the interval
-    REQUIRE(min_seen <= a + (b - a) * core::real_t(0.1));
-    REQUIRE(max_seen >= b - (b - a) * core::real_t(0.1));
+    REQUIRE(min_seen <= a + (b - a) * float(0.1));
+    REQUIRE(max_seen >= b - (b - a) * float(0.1));
 }
 
 TEST_CASE("JobRandom::uniformU32 stays within bounds", "[job_random][prng]")
@@ -106,21 +105,21 @@ TEST_CASE("JobRandom::uniformU32 stays within bounds", "[job_random][prng]")
 TEST_CASE("JobRandom::normal looks roughly sane", "[job_random][prng]")
 {
     constexpr std::size_t N = 50'000;
-    const core::real_t mean = core::real_t(1.5);
-    const core::real_t stddev = core::real_t(2.0);
+    const float mean = float(1.5);
+    const float stddev = float(2.0);
 
-    core::real_t sum = 0;
-    core::real_t sum_sq = 0;
+    float sum = 0;
+    float sum_sq = 0;
 
     for (std::size_t i = 0; i < N; ++i) {
-        core::real_t v = JobRandom::normal(mean, stddev);
+        float v = JobRandom::normal(mean, stddev);
         sum    += v;
         sum_sq += v * v;
     }
 
-    const core::real_t n      = static_cast<core::real_t>(N);
-    const core::real_t emp_mu = sum / n;
-    const core::real_t emp_var = sum_sq / n - emp_mu * emp_mu;
+    const float n      = static_cast<float>(N);
+    const float emp_mu = sum / n;
+    const float emp_var = sum_sq / n - emp_mu * emp_mu;
 
     // Very rough sanity band; we're not doing a real stats test here.
     REQUIRE(emp_mu == Catch::Approx(mean).margin(0.1));
@@ -129,39 +128,30 @@ TEST_CASE("JobRandom::normal looks roughly sane", "[job_random][prng]")
 
 TEST_CASE("JobRandom global seed influences deterministic sequences per-thread", "[job_random][seed]")
 {
-    // NOTE: because engines are thread_local, determinism is mostly about:
-    // "given a global seed and the same sequence of calls in a thread,
-    //  we get the same values *within that thread* across runs."
-    // We can't restart the process inside the test, but we *can* test that
-    // setting the seed before first use changes the sequence in a predictable way.
-
     JobRandom::setGlobalSeed(123456789ULL);
 
     // Grab a small sequence
     constexpr std::size_t N = 8;
-    std::array<core::real_t, N> seq1{};
-    for (std::size_t i = 0; i < N; ++i) {
-        seq1[i] = JobRandom::uniformReal(core::real_t(0), core::real_t(1));
-    }
+    std::array<float, N> seq1{};
+    for (std::size_t i = 0; i < N; ++i)
+        seq1[i] = JobRandom::uniformReal(0.0f, 1.0f);
 
     // Reset global seed and force a new thread to get its own engine
     JobRandom::setGlobalSeed(123456789ULL);
 
-    std::array<core::real_t, N> seq2{};
+    std::array<float, N> seq2{};
     std::thread t([&](){
-        for (std::size_t i = 0; i < N; ++i) {
-            seq2[i] = JobRandom::uniformReal(core::real_t(0), core::real_t(1));
-        }
+        for (std::size_t i = 0; i < N; ++i)
+            seq2[i] = JobRandom::uniformReal(0.0f, 1.0f);
     });
     t.join();
 
     // We *don't* expect seq1 == seq2 (different threads get different derived seeds),
     // but we at least expect the sequences to differ from a "no global seed" run.
     JobRandom::disableGlobalSeed();
-    std::array<core::real_t, N> seq3{};
-    for (std::size_t i = 0; i < N; ++i) {
-        seq3[i] = JobRandom::uniformReal(core::real_t(0), core::real_t(1));
-    }
+    std::array<float, N> seq3{};
+    for (std::size_t i = 0; i < N; ++i)
+        seq3[i] = JobRandom::uniformReal(0.0f, 1.0f);
 
     // Very weak sanity: seq2 should differ from seq3 in at least one position.
     bool any_diff = false;
@@ -182,13 +172,13 @@ TEST_CASE("JobRandom is usable safely from many threads", "[job_random][threads]
     std::vector<std::thread> threads;
     threads.reserve(num_threads);
 
-    std::vector<core::real_t> sums(num_threads, core::real_t(0));
+    std::vector<float> sums(num_threads, float(0));
 
     for (std::size_t t = 0; t < num_threads; ++t) {
         threads.emplace_back([t, &sums]() {
-            core::real_t local_sum = 0;
+            float local_sum = 0;
             for (std::size_t i = 0; i < samples_per_thread; ++i) {
-                local_sum += JobRandom::uniformReal(core::real_t(0), core::real_t(1));
+                local_sum += JobRandom::uniformReal(float(0), float(1));
             }
             sums[t] = local_sum;
         });
@@ -199,10 +189,10 @@ TEST_CASE("JobRandom is usable safely from many threads", "[job_random][threads]
     }
 
     // Sanity: all sums should be finite, non-zero, and not all identical.
-    std::set<core::real_t> uniq;
+    std::set<float> uniq;
     for (auto s : sums) {
-        REQUIRE(std::isfinite(static_cast<double>(s)));
-        REQUIRE(s > core::real_t(0));
+        REQUIRE(job::core::isSafeFinite(static_cast<double>(s)));
+        REQUIRE(s > float(0));
         uniq.insert(s);
     }
     REQUIRE(uniq.size() > 1);

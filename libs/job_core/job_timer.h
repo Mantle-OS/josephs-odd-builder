@@ -55,4 +55,4 @@ private:
 };
 
 } // namespace job::core
-// CHECKPOINT: v1.0
+

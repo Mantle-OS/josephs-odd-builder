@@ -82,12 +82,16 @@ set(JOB_SCIENCE_INTEGRATORS_HEADERS
     integrators/integrator_ctx.h
     integrators/iintegrator.h
     integrators/integrator_factory.h
-    integrators/verlet.h # << New where we are
-    # integrators/barns_hut.h
-    # integrators/fmm.h
+    integrators/verlet.h
+    integrators/rk4.h
+    integrators/euler.h
+    integrators/barns_hut.h
+    integrators/fmm.h
 )
 
-set(JOB_SCIENCE_INTEGRATORS_SOURCES)
+set(JOB_SCIENCE_INTEGRATORS_SOURCES
+    integrators/integrator_factory.cpp
+)
 
 
 
@@ -140,6 +144,7 @@ target_link_libraries(JosephsOddBuilder_Science PUBLIC
     JosephsOddBuilder_IO
     JosephsOddBuilder_Net
     JosephsOddBuilder_Crypto
+    JosephsOddBuilder_Simd
 )
 target_include_directories(JosephsOddBuilder_Science PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/>

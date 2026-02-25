@@ -53,9 +53,9 @@ public:
         return eng;
     }
 
-    [[nodiscard]] static core::real_t uniformReal(core::real_t a, core::real_t b)
+    [[nodiscard]] static float uniformReal(float a, float b)
     {
-        std::uniform_real_distribution<core::real_t> dist(a, b);
+        std::uniform_real_distribution<float> dist(a, b);
         return dist(engine());
     }
 
@@ -65,13 +65,13 @@ public:
         return dist(engine());
     }
 
-    [[nodiscard]] static core::real_t normal(core::real_t mean, core::real_t stddev)
+    [[nodiscard]] static float normal(float mean, float stddev)
     {
-        std::normal_distribution<core::real_t> dist(mean, stddev);
+        std::normal_distribution<float> dist(mean, stddev);
         return dist(engine());
     }
 
-    [[nodiscard]] static bool bernoulli(core::real_t p)
+    [[nodiscard]] static bool bernoulli(float p)
     {
         std::bernoulli_distribution dist(static_cast<double>(p));
         return dist(engine());

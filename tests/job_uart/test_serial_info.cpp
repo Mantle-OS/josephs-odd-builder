@@ -65,4 +65,4 @@ TEST_CASE("SerialInfo update_serial_devices() populates device map one", "[seria
         REQUIRE(devPtr->location() == path);
     }
 }
-// CHECKPOINT: v1
+

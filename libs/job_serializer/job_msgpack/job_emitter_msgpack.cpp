@@ -48,4 +48,4 @@ std::string JobEmitterMsgPack::appendImply( const Schema &schema ) noexcept
 }
 
 } // namespace job::serializer::msg_pack
-// CHECKPOINT: v2
+

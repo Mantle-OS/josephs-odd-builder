@@ -69,4 +69,3 @@ install(EXPORT JosephsOddBuilderCryptoTargets
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/JosephsOddBuilder_Crypto
 )
 
-# CHECKPOINT: v1

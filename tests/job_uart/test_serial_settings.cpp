@@ -116,4 +116,4 @@ TEST_CASE("Available options lists are non-empty", "[serial][lists]") {
     REQUIRE_FALSE(SerialSettings::availableStopBitsOptions().empty());
     REQUIRE_FALSE(SerialSettings::availableFlowControlOptions().empty());
 }
-// CHECKPOINT: v1
+

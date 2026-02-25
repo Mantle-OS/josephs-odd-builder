@@ -177,4 +177,3 @@ bogus_field: this-should-be-ignored-by-decoder)";
         REQUIRE(std::get<FieldValue::Scalar>(item_1_map["name"].value) == FieldValue::Scalar{ std::string("first") });
     }
 }
-// CHECKPOINT: v1

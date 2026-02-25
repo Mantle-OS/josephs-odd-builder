@@ -201,6 +201,4 @@ TEST_CASE("Schema to/from round trip verification", "[schema][roundtrip]") {
         REQUIRE(f_json.ref_sym == "other");
         REQUIRE(s_yaml_out == s_json_out);
     }
-
 }
-// CHECKPOINT: v1

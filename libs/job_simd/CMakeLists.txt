@@ -74,4 +74,3 @@ install(EXPORT JosephsOddBuilderSimdTargets
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/JosephsOddBuilderSimd
 )
 
-# CHECKPOINT: v1.0

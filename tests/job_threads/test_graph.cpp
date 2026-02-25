@@ -350,4 +350,3 @@ TEST_CASE("JobThreadGraph reset recomputes depsLeft", "[threading][graph][reset-
     REQUIRE(d_seen.load() == 2);
     pool->shutdown();
 }
-// CHECKPOINT: v1.2

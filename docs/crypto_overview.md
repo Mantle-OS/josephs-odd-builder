@@ -19,7 +19,7 @@ Random utilities split into two lanes:
 - secure bytes (libsodium `randombytes_*`)
 - per-thread PRNG (`std::mt19937_64`) seeded from secure bytes (or from a global seed)
 
-includes basic distributions (uniform / normal / bernoulli) using `job::core::real_t`.
+includes basic distributions (uniform / normal / bernoulli).
 
 Global seed mode exists for repeatable runs (thread-local engines still get derived seeds).
 

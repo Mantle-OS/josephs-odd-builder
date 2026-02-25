@@ -7,7 +7,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-set(QT_CREATOR_SKIP_MAINTENANCE_TOOL_PROVIDER ON)
+set(CMAKE_QT_CREATOR_SKIP_MAINTENANCE_TOOL_PROVIDER ON)
 
 if(POLICY CMP0135)
     cmake_policy(SET CMP0135 NEW) # for reproducible timestamps
@@ -48,12 +48,6 @@ else()
     message(FATAL_ERROR "JOB_L3_MB must be 8, 16, or 32!")
 endif()
 
-## Becareful !!! if you are building the AI stack this can fuck shit up .....
-## WARNING THIS IS GETTING PHASED OUT
-option(JOB_CORE_USE_DOUBLE "Use double precision" OFF)
-if(JOB_CORE_USE_DOUBLE)
-    add_compile_definitions(JOB_CORE_USE_DOUBLE)
-endif()
 
 
 option(JOB_TEST_BENCHMARKS "build and run the benchhmarks in the tests" ON)
@@ -69,4 +63,4 @@ endif()
 
 option(JOB_CUDA "Add nvidia cuda support " ON)
 
-
+option(JOB_QT_APPS "Build the Qt6 applications that are supported" ON)

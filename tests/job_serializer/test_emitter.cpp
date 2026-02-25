@@ -110,4 +110,3 @@ TEST_CASE("Emitter correctly generates types for variable-size 'bin' (bug fix)",
         REQUIRE_FALSE(stringContains(header, "std::vector<std::array<uint8_t, 0> > var_bin_list;"));
     }
 }
-// CHECKPOINT: v1

@@ -1,17 +1,10 @@
 # Job AI Comp
 
-Compute kernels for `job::ai`.
+Some compute kernels for `job::ai`.
 
-math:
-- GEMM (float32)
-- activations
-- MLP glue (gate/value/proj)
-- attention forward (CPU)
-- a few small support pieces (atomic add, noise table, config structs)
-
-job:
+## job namespaces used
 - `job::ai::comp` = kernels
-- `job::simd` = backend selection (AVX/NEON)
+- `job::simd` = backend selection (AVX/NEON some math)
 - `job::threads` = `ThreadPool` + `parallel_for` for the parallel wrappers
 - `job::ai::cords` = matrix / tensor views used by some helpers
 

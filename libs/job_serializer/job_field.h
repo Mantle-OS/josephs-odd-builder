@@ -58,4 +58,3 @@ struct adl_serializer<job::serializer::Field> {
     }
 };
 };
-// CHECKPOINT: v1

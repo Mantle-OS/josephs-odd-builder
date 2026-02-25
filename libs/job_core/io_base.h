@@ -97,5 +97,4 @@ protected:
     PermissionsCallback *m_permissionsCallback{};
 };
 
-} // namespace job::core
-// CHECKPOINT: v1.1
+}

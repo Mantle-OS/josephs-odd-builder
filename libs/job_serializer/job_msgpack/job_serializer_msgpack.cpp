@@ -90,4 +90,4 @@ bool JobMsgPackSerializer::decodeBinary(const Schema &schema, RuntimeObject &out
 }
 
 } // namespace job::serializer::msg_pack
-// CHECKPOINT: v1
+

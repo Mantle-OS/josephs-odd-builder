@@ -139,4 +139,3 @@ static inline bool stringContains(const std::string& haystack, const std::string
     return haystack.find(needle) != std::string::npos;
 }
 
-// CHECKPOINT: v1

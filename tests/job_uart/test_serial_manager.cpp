@@ -76,4 +76,4 @@ TEST_CASE("SerialInfo update_serial_devices() populates device map", "[serial_in
 
     loop->stop(); // Clean up the loop
 }
-// CHECKPOINT: v1
+

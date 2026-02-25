@@ -218,5 +218,3 @@ TEST_CASE("JobPipeline processes many messages end-to-end", "[threading][pipelin
 
     pool->shutdown();
 }
-
-// CHECKPOINT: v1.0

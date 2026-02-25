@@ -97,4 +97,3 @@ void UdpServer::setupSocketCallbacks()
 }
 
 } // namespace job::net
-// CHECKPOINT: v1.1

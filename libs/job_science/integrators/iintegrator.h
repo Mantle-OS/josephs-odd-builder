@@ -18,8 +18,6 @@ using job::science::data::DiskModel;
 using job::science::data::Zones;
 
 
-
-
 // Optional: stats the engine can read back after a step.
 // (This is intentionally tiny; we can grow it later if useful.)
 struct IntegratorStats {

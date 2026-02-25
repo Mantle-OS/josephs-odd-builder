@@ -78,6 +78,26 @@ struct EngineIOConfig {
     std::string           endpoint{};
 };
 
+
+/**
+ * Configuration for the Barnes-Hut algorithm.
+ */
+struct BarnesHutConfig {
+    float theta{0.5f};        // Opening criterion (0.0 = exact N^2, 1.0 = very fast/approx)
+    float G{6.67430e-11f};    // Gravitational constant
+    float epsilonSq{1e-6f};   // Softening factor squared
+};
+
+/**
+ * Configuration for the Fast Multipole Method.
+ */
+struct FmmConfig {
+    float theta{0.6f};        //  Multipole acceptance criterion
+    uint32_t maxLeafSize{4}; // Max particles per leaf before stopping tree split
+    // Note: P (Expansion Order) is currently fixed at 3 in the kernel templates,
+};
+
+
 /// Full engine configuration bundle.
 /// Engine can take this in its ctor or via a setter, and use it to:
 ///   - build a ThreadPool
@@ -87,6 +107,12 @@ struct EngineConfig {
     EngineThreadingConfig threading{};
     EngineIOConfig        io{};
     IntegratorType        integrator{IntegratorType::VelocityVerlet};
+    // Sub-configs for specific solvers
+    BarnesHutConfig       barnesHut{};
+    FmmConfig             fmm{};
+
+    // Global physics overrides
+    float fixedDeltaTime{0.01667f};
 };
 
 
@@ -100,6 +126,9 @@ struct EngineConfig {
     cfg.threading.scheduler = scheduler;
     cfg.io.sync             = SyncType::IO;
     cfg.io.ioType           = IoType::File;
+    cfg.barnesHut.theta     = 0.5f;
+    cfg.fmm.theta           = 0.6f;
+    cfg.fmm.maxLeafSize     = 16;
     return cfg;
 }
 

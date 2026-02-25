@@ -174,4 +174,3 @@ TEST_CASE("RuntimeObject API (set, get, has, remove)", "[runtime_object]")
         REQUIRE(std::get<FieldValue::Scalar>(retrieved_list_vec[1].value) == FieldValue::Scalar{ std::string("item2") });
     }
 }
-// CHECKPOINT: v1

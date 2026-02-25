@@ -134,4 +134,3 @@ TEST_CASE("Writer::writeRuntime round-trip (JSON)", "[job_writer]") {
 
     fs::remove(jsonPath);
 }
-// CHECKPOINT: v1

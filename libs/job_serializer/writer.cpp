@@ -207,4 +207,4 @@ bool Writer::writeBinary([[maybe_unused]] const Schema &schema) noexcept
 }
 
 } // namespace job::serializer
-// CHECKPOINT: v1
+

@@ -116,4 +116,4 @@ TEST_CASE("JobIpAddr version string utility", "[job_ipaddr][utils]") {
     REQUIRE(JobIpAddr::versionString(JobIpAddr::Family::Unix) == "Unix");
     REQUIRE(JobIpAddr::versionString(JobIpAddr::Family::Unknown) == "Unknown");
 }
-// CHECKPOINT: v1
+
