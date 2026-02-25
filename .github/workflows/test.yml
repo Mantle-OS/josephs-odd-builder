@@ -37,9 +37,7 @@ jobs:
 
     - name: Test Threads
       working-directory: ${{github.workspace}}/build/tests/job_threads
-      run: |
-        ulimit -l unlimited
-        ./test_job_threads
+      run: ./test_job_threads
 
     - name: Test Crypto
       working-directory: ${{github.workspace}}/build/tests/job_crypto

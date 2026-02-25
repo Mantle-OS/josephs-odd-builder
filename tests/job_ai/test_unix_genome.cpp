@@ -200,17 +200,13 @@ TEST_CASE("Unix Socket: AI Genome Transfer", "[unix][ai][genome]")
     TestLoop loop;
     auto path = make_temp_sock_path("unix_ai_genome");
 
-    // 1. Prepare Data
     Genome original = createTestGenome();
-
-    // FIX: Buffer size increased to 64KB (Weights alone are 32KB)
     char sendBuffer[65536];
     RawGenomeSerializer ser(sendBuffer, sizeof(sendBuffer));
 
     REQUIRE(ser.write(original));
     size_t totalSize = ser.bytesWritten();
 
-    // 2. Setup Server
     auto server = std::make_shared<UnixServer>(loop.loop);
 
     std::atomic<bool> packetReceived{false};
@@ -237,7 +233,6 @@ TEST_CASE("Unix Socket: AI Genome Transfer", "[unix][ai][genome]")
 
     REQUIRE(server->start(path, 0));
 
-    // 3. Setup Client
     auto client = std::make_shared<UnixClient>(loop.loop);
     std::atomic<bool> clientConnected{false};
     std::atomic<bool> clientDisconnected{false};
@@ -256,7 +251,6 @@ TEST_CASE("Unix Socket: AI Genome Transfer", "[unix][ai][genome]")
     while (!clientConnected.load())
         std::this_thread::yield();
 
-    // We keep the connection open to measure throughput/latency without handshake overhead
     BENCHMARK("Unix Socket Roundtrip (Kernel Latency)") {
         packetReceived.store(false);
         client->send(sendBuffer, totalSize);
@@ -268,8 +262,6 @@ TEST_CASE("Unix Socket: AI Genome Transfer", "[unix][ai][genome]")
         return packetReceived.load();
     };
 
-    // 5. CLEANUP (The Critical Anti-Deadlock Dance)
-    // We must disconnect client and wait for server to process it BEFORE stopping server.
     client->disconnect();
 
     int retries = 0;
@@ -279,7 +271,6 @@ TEST_CASE("Unix Socket: AI Genome Transfer", "[unix][ai][genome]")
     }
     REQUIRE(serverSawDisconnect.load());
 
-    // Now it is safe to stop, as m_clients list inside server should be clean
     server->stop();
     fs::remove(path);
 }
