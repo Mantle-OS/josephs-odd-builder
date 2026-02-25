@@ -22,7 +22,7 @@ jobs:
           libssl-dev libzstd-dev libsodium-dev zlib1g-dev \
           libflatbuffers-dev flatbuffers-compiler \
           nlohmann-json3-dev libyaml-cpp-dev libmsgpack-cxx-dev \
-          libudev-dev \
+          libudev-dev
         sudo apt-get install -y catch2 || sudo apt-get install -y libcatch2-dev
 
     - name: Configure CMake
