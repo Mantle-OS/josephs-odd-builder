@@ -18,4 +18,6 @@ target_link_libraries(test_job_uart PRIVATE
 target_include_directories(test_job_uart PRIVATE
     ${CatchTwo_INCLUDE_DIRS}
 )
-# CHECKPOINT: v1
+
+add_test(NAME job_uart COMMAND test_job_uart)
+

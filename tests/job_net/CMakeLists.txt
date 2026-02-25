@@ -29,4 +29,5 @@ target_link_libraries(test_job_net PRIVATE
 target_include_directories(test_job_net PRIVATE
     ${CatchTwo_INCLUDE_DIRS}
 )
-# CHECKPOINT: v1.3
+
+add_test(NAME job_net COMMAND test_job_net)

@@ -45,3 +45,5 @@ target_link_libraries(test_job_ai PRIVATE
 )
 target_compile_options(JosephsOddBuilder_Ai PRIVATE ${JOB_CXX_FLAGS} )
 target_include_directories(test_job_ai PRIVATE ${CatchTwo_INCLUDE_DIRS} )
+
+add_test(NAME job_ai COMMAND test_job_ai)

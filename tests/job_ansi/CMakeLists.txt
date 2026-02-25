@@ -29,3 +29,5 @@ target_link_libraries(test_job_ansi PRIVATE
 target_include_directories(test_job_ansi PRIVATE
     ${CatchTwo_INCLUDE_DIRS}
 )
+
+add_test(NAME job_ansi COMMAND test_job_ansi)

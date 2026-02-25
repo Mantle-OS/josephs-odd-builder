@@ -32,4 +32,6 @@ target_include_directories(test_job_serializer_msgpack PRIVATE
     ${YAMLCpp_INCLUDE_DIRS}
     ${NlohmannJson_INCLUDE_DIRS}
 )
-# CHECKPOINT: v1
+
+
+add_test(NAME job_serializer_msgpack COMMAND test_job_serializer_msgpack)

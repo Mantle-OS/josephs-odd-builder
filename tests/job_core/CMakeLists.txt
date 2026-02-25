@@ -16,4 +16,5 @@ target_link_libraries(test_job_core PRIVATE
 target_include_directories(test_job_core PRIVATE
     ${CatchTwo_INCLUDE_DIRS}
 )
-# CHECKPOINT: v1
+
+add_test(NAME job_core COMMAND test_job_core)

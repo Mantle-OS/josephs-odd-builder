@@ -31,4 +31,5 @@ target_link_libraries(test_job_threads PRIVATE
 target_include_directories(test_job_threads PRIVATE
     ${CatchTwo_INCLUDE_DIRS}
 )
-# CHECKPOINT: v1.1
+
+add_test(NAME job_threads COMMAND test_job_threads)

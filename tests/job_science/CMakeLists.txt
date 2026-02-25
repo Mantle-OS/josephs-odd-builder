@@ -36,3 +36,5 @@ target_link_libraries(test_job_science PRIVATE
 target_include_directories(test_job_science PRIVATE
     ${CatchTwo_INCLUDE_DIRS}
 )
+
+add_test(NAME job_science COMMAND test_job_science)

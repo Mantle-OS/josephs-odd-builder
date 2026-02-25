@@ -21,3 +21,4 @@ add_subdirectory(apps)
 add_subdirectory(tests)
 add_subdirectory(docs)
 
+add_custom_target(github_ci SOURCES .github/workflows/test.yml )
