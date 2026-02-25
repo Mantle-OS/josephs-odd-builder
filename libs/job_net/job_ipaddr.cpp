@@ -3,9 +3,13 @@
 #include <sstream>
 #include <cstring>
 #include <regex>
+#include <array>
 
+#include <arpa/inet.h>
+#include <sys/un.h>
 #include <netdb.h>
 #include <unistd.h>
+
 namespace job::net {
 
 
