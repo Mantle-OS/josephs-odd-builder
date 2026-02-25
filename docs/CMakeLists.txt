@@ -1,4 +1,5 @@
 add_custom_target(Documentation SOURCES
+    ../README.md
     ansi_overview.md
     coding_style.md
     core_overview.md

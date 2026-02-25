@@ -1,5 +1,7 @@
 # Job Science
 
+**Warning this doc is a bit outdated**
+
 The science stack of job.
 
 `jobscience` links against `job_core`, `job_threads`, `job_net`, `job_crypto`.
@@ -68,10 +70,6 @@ This layer is intentionally plain. It’s the “stuff that moves around” laye
 
 ---
 
-## Stuff that exists but is currently commented out in the build
-
-THIS IS OLD AND I ADDED THIS CODE. 
-
 ### Frames (`libs/job_science/frames/*`)
 Frame header + serializer/deserializer + sink/source adapters for IO and net.
 The code is present, but the CMake target has it commented out.
@@ -83,7 +81,6 @@ A higher-level simulation engine wrapper that pulls together:
 - threading algo selection enums
 - frame read/write plumbing
 
-Also present, also commented out in the build target.
 
 ### Integrators folder (`libs/job_science/integrators/*`)
 

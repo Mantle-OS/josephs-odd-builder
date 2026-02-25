@@ -162,7 +162,7 @@ public:
         cords::Matrix WV(m_wv, D, D);
         cords::Matrix WO(m_wo, D, D);
 
-        comp::sgemmMatrix( X, WQ, Q);
+        comp::sgemmMatrix(X, WQ, Q);
         comp::sgemmMatrix(X, WK, K);
         comp::sgemmMatrix(X, WV, V);
 

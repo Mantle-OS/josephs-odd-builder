@@ -108,11 +108,9 @@ void FmmAdapter::apply(threads::ThreadPool &pool, const cords::AttentionShape &s
     // decoder: Force -> Output Tensor
     // The "Force" felt by a token is the aggregate "Attention" it received. map this force vector back into the embedding.
     for (const auto &p : bodies) {
-        // Use p.id because FMM might have reordered the vector ?
+        // Use p.id because FMM might have reordered the vector
         int i = p.id;
         int idx = i * D;
-
-
 
         // write context vector (force) apply gravity constant (G)
         float fx = p.acceleration.x * m_cfg.gravity;
