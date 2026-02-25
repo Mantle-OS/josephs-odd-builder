@@ -21,7 +21,7 @@ using namespace job::threads;
 using namespace std::chrono_literals;
 
 #ifdef JOB_CI_BUILD
-    const int max_threads = 4
+const int max_threads = 4;
 #else
     const int max_threads = 8;
 #endif
