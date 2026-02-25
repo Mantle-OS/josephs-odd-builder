@@ -37,7 +37,7 @@ TEST_CASE("JobIoAsyncThread processes tasks, timers, and I/O events", "[threadin
                            REQUIRE((events & EPOLLIN));
 
                            char buf[1];
-                           read(read_fd, buf, 1);
+                           (void)read(read_fd, buf, 1);
                            REQUIRE(buf[0] == 'A');
 
                            io_event_fired.store(true);
