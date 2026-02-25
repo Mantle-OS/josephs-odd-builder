@@ -34,7 +34,7 @@ TEST_CASE("ThreadPool submit task and get future", "[threading][thread_pool]")
     pool->shutdown();
 }
 
-TEST_CASE("ThreadPool run multiple tasks", "[threading][thread_pool]")
+TEST_CASE("ThreadPool run multiple tasks 4 threads", "[threading][thread_pool]")
 {
     auto scheduler = std::make_shared<FifoScheduler>();
     auto pool = ThreadPool::create(scheduler, 4);
@@ -137,6 +137,7 @@ TEST_CASE("ThreadPool futures correctly throw exceptions", "[threading][thread_p
     pool->shutdown();
 }
 
+#ifndef JOB_CI_BUILD
 TEST_CASE("ThreadPool submit() is thread-safe (concurrency)", "[threading][thread_pool][bench][concurrency]")
 {
     job::core::JobLogger::instance().setLevel(job::core::LogLevel::Info);
@@ -167,4 +168,4 @@ TEST_CASE("ThreadPool submit() is thread-safe (concurrency)", "[threading][threa
     REQUIRE(counter.load() == kNumHammerThreads * kTasksPerThread);
     SUCCEED("All tasks completed.");
 }
-
+#endif

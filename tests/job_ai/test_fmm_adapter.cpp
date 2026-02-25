@@ -120,11 +120,11 @@ TEST_CASE("FMM Adapter: The Singularity (Overlapping Tokens)", "[ai][fmm][edge]"
 
 
 #ifdef JOB_TEST_BENCHMARKS
-TEST_CASE("FMM Adapter: Scaling Benchmark (O(N) Proof)", "[ai][fmm][bench]") {
+TEST_CASE("FMM Adapter: 4 threads Scaling Benchmark (O(N) Proof)", "[ai][fmm][bench]") {
     // N = 4096 (Standard Transformer Context)
     // N = 16384 (Long Context)
 
-    JobStealerCtx ctx(8); // Steal so that the pool does not hate us.
+    JobStealerCtx ctx(4); // Steal so that the pool does not hate us.
 
     // Config: Allow somewhat large leaves to speed up tree build
     FmmConfig cfg;

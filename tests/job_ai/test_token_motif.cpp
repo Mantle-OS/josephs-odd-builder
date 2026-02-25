@@ -135,7 +135,6 @@ TEST_CASE("MotifToken: The Hive Mind", "[token][motif][impl]")
         size_t n = token.encode(input, output);
 
         REQUIRE(n == 7); // 7 raw bytes
-        // Verify they are raw bytes (Z = -1.0)
         REQUIRE(output[0].z == -1.0f);
         REQUIRE(ByteLattice::decode(output[0]) == 'Z');
     }
@@ -143,18 +142,10 @@ TEST_CASE("MotifToken: The Hive Mind", "[token][motif][impl]")
     // BLOCK TWO: Mutation & Learning
     SECTION("Evolution (Mutation)")
     {
-        // 1. Setup a corpus where "TEST" is extremely common
         std::string corpus;
         for(int i=0; i<500; ++i) corpus += "TEST"; // 2000 bytes
 
-        // 2. Give the token access to the chemist
         token.setCorpus(corpus, nullptr);
-
-        // 3. Force mutation.
-        // We need to call mutate enough times or get lucky with the seed to pick length 4.
-        // The mutate() logic picks length 2,3,4,5,6,7 based on rng.
-        // Let's brute force it slightly to guarantee we hit length 4.
-
         bool learned = false;
         for(int i=0; i<50; ++i) {
             token.mutate(i * 999); // Different seeds
@@ -316,6 +307,7 @@ TEST_CASE("MotifToken benchmarks", "[token][motif][benchmark]")
     // -----------------------
     // Benchmark: mutation/learning (how expensive is "get smarter")
     // -----------------------
+
     BENCHMARK("motif mutate x50 (corpus=TEST*500)") {
         job::threads::JobStealerCtx ctx(4);
         MotifToken t;

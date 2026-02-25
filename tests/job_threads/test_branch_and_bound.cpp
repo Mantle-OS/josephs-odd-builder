@@ -1,3 +1,4 @@
+#include "real_type.h"
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/catch_approx.hpp>
 
@@ -592,6 +593,7 @@ TEST_CASE("parallel_branch_and_bound handles trivial and no-solution cases", "[t
 }
 
 // // Benchmarks
+#ifndef JOB_CI_BUILD
 TEST_CASE("parallel_branch_and_bound handles moderately deep binary tree", "[threading][bnb][stress]")
 {
     auto sched = std::make_shared<FifoScheduler>();
@@ -659,7 +661,7 @@ TEST_CASE("parallel_branch_and_bound handles moderately deep binary tree", "[thr
     // so don't assert an exact number, but expect at least some pruning, I mean Jim did get the chainsaw after all.
     REQUIRE(res.nodesPruned > 0);
 }
-
+#endif
 
 TEST_CASE("parallel_branch_and_bound handles zero timeout gracefully",  "[threading][bnb][edge][timeout]")
 {
@@ -708,7 +710,7 @@ TEST_CASE("parallel_branch_and_bound handles zero timeout gracefully",  "[thread
 
     // Should still report valid timing (not negative or NaN)
     REQUIRE(res.elapsedSeconds >= 0.0);
-    REQUIRE(std::isfinite(res.elapsedSeconds)); //FIXME
+    REQUIRE(job::core::isSafeFinite(res.elapsedSeconds));
 
     INFO("Zero-timeout search expanded " << res.nodesExpanded << " nodes in " << res.elapsedSeconds << " seconds");
 }

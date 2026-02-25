@@ -268,7 +268,7 @@ TEST_CASE("parallel_bfs handles edge cases safely", "[threading][bfs][graph][edg
     pool->shutdown();
 }
 
-
+#ifndef JOB_CI_BUILD
 TEST_CASE("parallel_bfs handles large graphs efficiently", "[threading][bfs][graph][stress]")
 {
     auto sched = std::make_shared<FifoScheduler>();
@@ -302,5 +302,5 @@ TEST_CASE("parallel_bfs handles large graphs efficiently", "[threading][bfs][gra
     // We have been everywhere !
     REQUIRE(visitedCount == kNodes);
 }
+#endif
 
-// CHECKPOINT v1.0

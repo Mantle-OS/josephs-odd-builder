@@ -78,7 +78,7 @@ TEST_CASE("FlashAttention Correctness", "[ai][att][correctness]") {
     // flash
 
 
-    JobStealerCtx ctx(8);
+    JobStealerCtx ctx(4);
     flashParallelAttentionForward(*ctx.pool, N, d, Q.data(), K.data(), V.data(), O_flash.data(), scale);
 
     for(int i=0; i<N*d; ++i)
@@ -97,7 +97,7 @@ TEST_CASE("FlashAttention Benchmark", "[ai][att][bench]") {
     std::vector<float> V(N*d, 0.5f);
     std::vector<float> O(N*d);
 
-    JobStealerCtx ctx(8);
+    JobStealerCtx ctx(4);
 
     BENCHMARK("FlashAttention Forward (N=2048)") {
         flashParallelAttentionForward(*ctx.pool, N, d, Q.data(), K.data(), V.data(), O.data(), scale);
@@ -116,7 +116,7 @@ TEST_CASE("The Showdown FlashAttention Benchmark", "[ai][att][bench]") {
     std::vector<float> V(N*d, 0.5f);
     std::vector<float> O(N*d);
 
-    JobStealerCtx ctx(8);
+    JobStealerCtx ctx(4);
 
     BENCHMARK("Naive Attention (N=512 dim=64)") {
         naiveAttention(N, d, Q.data(), K.data(), V.data(), O.data(), scale);

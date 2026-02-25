@@ -64,3 +64,8 @@ endif()
 
 option(JOB_CUDA "Add nvidia cuda support " OFF)
 option(JOB_QT_APPS "Build the Qt6 applications that are supported" OFF)
+
+option(JOB_CI_BUILD "Enable settings specific to CI environments" OFF)
+if(JOB_CI_BUILD)
+    add_compile_definitions(JOB_CI_BUILD)
+endif()

@@ -89,8 +89,8 @@ void addMoEGene(Genome &genome, int dim, int experts, int topk)
         genome.weights.push_back(dist(gen));
 }
 
-TEST_CASE("Runner: End-to-End Pipeline Smoke Test", "[runner][integration]") {
-    JobStealerCtx ctx(8);
+TEST_CASE("Runner: End-to-End Pipeline Smoke Test 4 threads", "[runner][integration]") {
+    JobStealerCtx ctx(4);
 
     Genome genome;
     // architecture: input(64) -> dense(128) -> attention(128) -> moe(128) -> dense(10) -> output
@@ -151,7 +151,7 @@ TEST_CASE("Runner: End-to-End Pipeline Smoke Test", "[runner][integration]") {
     REQUIRE(sane);
 }
 
-TEST_CASE("Runner: Genome Ownership Safety", "[runner][safety]") {
+TEST_CASE("Runner: Genome Ownership Safety 4 threads", "[runner][safety]") {
     JobStealerCtx ctx(4);
     std::unique_ptr<Runner> runner;
 
@@ -172,6 +172,7 @@ TEST_CASE("Runner: Genome Ownership Safety", "[runner][safety]") {
 }
 
 
+#ifndef JOB_CI_BUILD
 #ifdef JOB_TEST_BENCHMARKS
 static void randomizeAttBuffer(float *ptr, size_t count)
 {
@@ -250,6 +251,7 @@ TEST_CASE("Runner Bench: Attention adapters scaling", "[bench][attn]") {
     }
 
 }
+#endif
 #endif
 
 

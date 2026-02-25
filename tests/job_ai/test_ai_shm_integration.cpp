@@ -146,7 +146,6 @@ private:
 
 
 #ifdef JOB_TEST_BENCHMARKS
-// could do this with the class itsself .,... whatever
 static void cleanup_shm(const std::string &key)
 {
     ::shm_unlink(key.c_str());

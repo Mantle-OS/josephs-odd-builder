@@ -55,7 +55,7 @@ Genome buildCartPoleGenome()
 
 TEST_CASE("ESCoach: Masters CartPole", "[ai][coach][es][cartpole]")
 {
-    JobStealerCtx ctx(8);
+    JobStealerCtx ctx(4);
 
     Genome parent = buildCartPoleGenome();
 
@@ -116,7 +116,7 @@ TEST_CASE("Evolution: Edge Cases Cart Pole(Single Thread / Pop 1)", "[coach][edg
 
 TEST_CASE("Evolution: Cart Pole Benchmark", "[coach][benchmark]")
 {
-    job::threads::JobStealerCtx ctx(8);
+    job::threads::JobStealerCtx ctx(4);
     // Benchmark CartPole (Physics + Inference)
     Genome cartSeed = buildCartPoleGenome();
     BENCHMARK("CartPole (Pop=1024)") {

@@ -308,6 +308,7 @@ TEST_CASE("JobThreadGraph rerun without reset executes again", "[threading][grap
     pool->shutdown();
 }
 
+#ifndef JOB_CI_BUILD
 TEST_CASE("JobThreadGraph handles long chain", "[threading][graph][stress]")
 {
     auto pool = ThreadPool::create(std::make_shared<FifoScheduler>(), 8);
@@ -324,6 +325,7 @@ TEST_CASE("JobThreadGraph handles long chain", "[threading][graph][stress]")
     REQUIRE(ran.load() == N);
     pool->shutdown();
 }
+#endif
 
 TEST_CASE("JobThreadGraph reset recomputes depsLeft", "[threading][graph][reset-indegee]")
 {

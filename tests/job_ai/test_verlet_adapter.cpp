@@ -146,8 +146,8 @@ TEST_CASE("Verlet Adapter: Information Gravity (Value Mixing)", "[ai][verlet][mi
 
 
 #ifdef JOB_TEST_BENCHMARKS
-TEST_CASE("Verlet Adapter: Throughput (N-Body O(N^2))", "[ai][verlet][bench]") {
-    JobStealerCtx ctx(8);
+TEST_CASE("Verlet Adapter: Throughput (N-Body O(N^2)) 4 threads", "[ai][verlet][bench]") {
+    JobStealerCtx ctx(4);
     VerletAdapter adapter;
     const int D = 64;
     AdapterCtx aCtx;

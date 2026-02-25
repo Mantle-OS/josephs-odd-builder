@@ -25,9 +25,10 @@ add_executable(test_job_ai
     test_token_base.cpp
     test_token_motif.cpp
     test_token_bpe.cpp
-
     test_text_bard.cpp # This is the LLM
 )
+
+
 
 target_link_libraries(test_job_ai PRIVATE
     ${CatchTwo_LIBRARIES}

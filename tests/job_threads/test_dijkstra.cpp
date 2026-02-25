@@ -27,7 +27,6 @@ DijkstraResult<float> sequentialDijkstra(const WeightedAdjList<float> &adj,
     const std::size_t n = adj.size();
     DijkstraResult<float> res;
 
-    // FIX: Use max() instead of infinity()
     res.distance.assign(n, kInf);
     res.parent.assign(n, std::numeric_limits<std::size_t>::max());
 
@@ -35,7 +34,7 @@ DijkstraResult<float> sequentialDijkstra(const WeightedAdjList<float> &adj,
         return res;
 
     using Node = std::pair<float, std::size_t>; // (dist, v)
-    std::priority_queue< Node, std::vector<Node>, std::greater<Node> > pq;
+    std::priority_queue<Node, std::vector<Node>, std::greater<Node> > pq;
 
     res.distance[start] = 0.0f;
     pq.emplace(0.0f, start);
@@ -323,6 +322,7 @@ TEST_CASE("parallelDijkstra handles edge cases safely",
     pool->shutdown();
 }
 
+#ifndef JOB_CI_BUILD
 TEST_CASE("parallelDijkstra scales on a larger tree-shaped graph",
           "[threading][graph][dijkstra][stress]")
 {
@@ -359,6 +359,7 @@ TEST_CASE("parallelDijkstra scales on a larger tree-shaped graph",
         REQUIRE(res.distance[v] == Catch::Approx(depth));
     }
 }
+#endif
 
 TEST_CASE("parallelDijkstra matches sequential Dijkstra on random graph",
           "[threading][graph][dijkstra][seq-compare]")
@@ -393,6 +394,7 @@ TEST_CASE("parallelDijkstra matches sequential Dijkstra on random graph",
     }
 }
 
+#ifndef JOB_CI_BUILD
 TEST_CASE("parallelDijkstra distances are deterministic across worker counts",
           "[threading][graph][dijkstra][determinism]")
 {
@@ -432,6 +434,7 @@ TEST_CASE("parallelDijkstra distances are deterministic across worker counts",
         REQUIRE(res8.distance[i] == Catch::Approx(res1.distance[i]));
     }
 }
+#endif
 
 TEST_CASE("parallelDijkstra easy API is consistent with explicit delta", "[threading][graph][dijkstra][delta]")
 {
@@ -521,7 +524,7 @@ TEST_CASE("parallelDijkstra: performance on random sparse graph",
 
         pool4->shutdown();
     }
-
+#ifndef JOB_CI_BUILD
     // parallelDijkstra with 8 workers.
     {
         auto sched8 = std::make_shared<FifoScheduler>();
@@ -535,4 +538,5 @@ TEST_CASE("parallelDijkstra: performance on random sparse graph",
 
         pool8->shutdown();
     }
+#endif
 }

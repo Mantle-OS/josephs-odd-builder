@@ -48,9 +48,9 @@ Genome buildXORGenome()
     return g;
 }
 
-TEST_CASE("ESCoach: Solves XOR", "[ai][coach][es][xor]")
+TEST_CASE("ESCoach: Solves XOR 4 threads", "[ai][coach][es][xor]")
 {
-    JobStealerCtx ctx(8);
+    JobStealerCtx ctx(4);
 
     Genome parent = buildXORGenome();
 
@@ -96,9 +96,9 @@ TEST_CASE("Evolution: XOR Edge Cases (Single Thread / Pop 1)", "[coach][edge]")
 
 #ifdef JOB_TEST_BENCHMARKS
 
-TEST_CASE("Evolution: XOR Flywheel Throughput", "[coach][benchmark]")
+TEST_CASE("Evolution: XOR Flywheel Throughput 4 threads", "[coach][benchmark]")
 {
-    job::threads::JobStealerCtx ctx(8);
+    job::threads::JobStealerCtx ctx(4);
 
     // Benchmark XOR (High Frequency, Small Net)
     Genome xorSeed = buildXORGenome();

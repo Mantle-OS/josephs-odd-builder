@@ -192,6 +192,7 @@ TEST_CASE("RK4 Adapter: Information Gravity (Value Mixing)", "[ai][rk4][mixing]"
 
 
 // BLOCK 3: Benchmarks
+#ifndef JOB_CI_BUILD
 #ifdef JOB_TEST_BENCHMARKS
 TEST_CASE("RK4 Adapter: Throughput", "[ai][rk4][bench]")
 {
@@ -239,4 +240,5 @@ TEST_CASE("RK4 Adapter: Throughput", "[ai][rk4][bench]")
 
 }
 
+#endif
 #endif

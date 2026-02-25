@@ -47,10 +47,10 @@ TEST_CASE("Dense Adapter: TEST Basic (Uniform)", "[ai][dense][usage]") {
 }
 
 
-#ifdef JOB_TEST_BENCHMARKS
+
 #ifdef JOB_TEST_BENCHMARKS
 TEST_CASE("Dense Adapter: Pure Kernel Benchmark", "[ai][dense][bench]") {
-    JobStealerCtx ctx(8);
+    JobStealerCtx ctx(4);
 
     DenseConfig cfg;
     cfg.scale = 0.0f;
@@ -84,45 +84,6 @@ TEST_CASE("Dense Adapter: Pure Kernel Benchmark", "[ai][dense][bench]") {
     run_pure_bench(1024);
     run_pure_bench(4096);
 }
-#endif
-// TEST_CASE("Dense Adapter: Scaling Benchmark", "[ai][dense][bench]") {
-//     JobStealerCtx ctx(8);
-
-//     DenseConfig cfg;
-//     // cfg.theta = 0.5f; // Standard approximation
-//     DenseAdapter adapter(cfg);
-
-//     AdapterCtx aCtx;
-//     const int D = 4; // Pos(3) + Mass(1)
-
-//     auto run_bench = [&](int n) {
-//         const int B = 1;
-//         std::vector<float> data(B * n * D);
-
-//         // Galaxy distribution (cluster around 0)
-//         std::mt19937 gen(42);
-//         std::normal_distribution<float> dist(0.0f, 50.0f);
-//         for (auto &x : data)
-//             x = dist(gen);
-
-//         ViewR view(data.data(), makeBSD(B, static_cast<uint32_t>(n), static_cast<uint32_t>(D)));
-//         // in-place is fine for throughput benchmark
-//         ViewR out(data.data(), makeBSD(B, static_cast<uint32_t>(n), static_cast<uint32_t>(D)));
-
-//         AttentionShape shape{
-//             static_cast<uint32_t>(B),
-//             static_cast<uint32_t>(n),
-//             static_cast<uint32_t>(D),
-//             1
-//         };
-
-//         adapter.adaptParallel(*ctx.pool, shape, view, view, view, out, aCtx);
-//     };
-
-//     BENCHMARK("Dense N=1024")  { run_bench(1024);  };
-//     BENCHMARK("Dense N=4096")  { run_bench(4096);  };
-//     // BENCHMARK("Dense N=16384") { run_bench(16384); };
-// }
 #endif
 
 

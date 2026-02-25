@@ -20,8 +20,15 @@
 using namespace job::threads;
 using namespace std::chrono_literals;
 
+#ifdef JOB_CI_BUILD
+    const int max_threads = 4
+#else
+    const int max_threads = 8;
+#endif
+
+
 TEST_CASE("parallel_for correctly processes all elements", "[threading][algorithms][parallel_for]") {
-    JobFifoCtx sched(8);
+    JobFifoCtx sched(max_threads);
     constexpr size_t kVectorSize = 100000;
     std::vector<std::atomic<int>> data(kVectorSize);
     for (size_t i = 0; i < kVectorSize; ++i) data[i].store(0);
@@ -42,8 +49,7 @@ TEST_CASE("parallel_for correctly processes all elements", "[threading][algorith
 }
 
 TEST_CASE("parallel_for Distribution sanity (Linear): each worker must get ≥1 chunk", "[threading][parallel_for][distribution]") {
-    const size_t workers = 8;
-    JobFifoCtx sched(workers);
+    JobFifoCtx sched(max_threads);
 
     const size_t N = 1u << 18;      // 262,144
     const size_t grain = 256;       // many chunks
@@ -73,7 +79,7 @@ TEST_CASE("parallel_for Distribution sanity (Linear): each worker must get ≥1 
 }
 
 TEST_CASE("parallel_for Small-N cutoff: should run serially on the calling thread", "[threading][parallel_for][smallN]") {
-    JobFifoCtx sched(8);
+    JobFifoCtx sched(max_threads);
 
     // N smaller than default min_grain and explicit small grain
     for (size_t N : {0ul, 1ul, 7ul, 63ul}) {
@@ -100,7 +106,7 @@ TEST_CASE("parallel_for Small-N cutoff: should run serially on the calling threa
 }
 
 TEST_CASE("parallel_for Nested call from within a worker recursion guard", "[threading][parallel_for][nested]") {
-    JobFifoCtx sched(8);
+    JobFifoCtx sched(max_threads);
 
     std::atomic<size_t> outer_sum{0};
     std::atomic<size_t> inner_sum{0};
@@ -130,7 +136,7 @@ TEST_CASE("parallel_for Nested call from within a worker recursion guard", "[thr
 }
 
 TEST_CASE("parallel_for Exception path: we rethrow after joining all tasks", "[threading][parallel_for][exceptions]") {
-    JobFifoCtx sched(8);
+    JobFifoCtx sched(max_threads);
 
     const size_t N = 4096;
     std::atomic<size_t> progressed{0};
@@ -163,7 +169,7 @@ TEST_CASE("parallel_for Exception path: we rethrow after joining all tasks", "[t
 }
 
 TEST_CASE("parallel_for Strided vs Linear: correctness + thread utilization sanity", "[threading][parallel_for][strided]") {
-    JobFifoCtx sched(8);
+    JobFifoCtx sched(max_threads);
     const size_t N = 1u << 18;
     const size_t grain = 128;
 
@@ -216,7 +222,7 @@ TEST_CASE("parallel_for Strided vs Linear: correctness + thread utilization sani
 
 #ifdef JOB_TEST_BENCHMARKS
 TEST_CASE("parallel_for benchmark Linear vs Strided on skewed workload", "[threading][algorithms][parallel_for][bench]") {
-    JobFifoCtx sched(8);
+    JobFifoCtx sched(max_threads);
 
     const size_t size = 1u << 20;
     const size_t grain = 128;
@@ -249,7 +255,7 @@ TEST_CASE("parallel_for benchmark Linear vs Strided on skewed workload", "[threa
 
 TEST_CASE("parallel_reduce correctly sums elements", "[threading][algorithms][parallel_reduce]")
 {
-    JobFifoCtx sched(8);
+    JobFifoCtx sched(max_threads);
     constexpr size_t kVectorSize = 100000;
     std::vector<int> data(kVectorSize);
     std::iota(data.begin(), data.end(), 1);
@@ -277,7 +283,7 @@ TEST_CASE("parallel_reduce correctly sums elements", "[threading][algorithms][pa
 
 TEST_CASE("parallel_reduce finds max element", "[threading][algorithms][parallel_reduce]")
 {
-    JobFifoCtx sched(8);
+    JobFifoCtx sched(max_threads);
     std::vector<int> data = {1, 5, 2, 100, 50, 99, 1000, 3, 45, 999};
 
     auto map_fn = [](int val) {

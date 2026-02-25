@@ -31,14 +31,14 @@ void randomize_layer_params(layers::AbstractLayer &layer)
 TEST_CASE("Attention: Multi-Backend Integration", "[ai][attn][integration]") {
 
     // Setup Context
-    JobStealerCtx ctx(8);
+    JobStealerCtx ctx(4);
     infer::Workspace ws(256 * 1024 * 1024);
 
     const uint32_t B = 2;   // Small batch
     const uint32_t S = 128; // Sequence
     const uint32_t D = 64;  // Dim
 
-    // 1. Randomize Inputs (Critical for Physics/FMM)
+    // Randomize Inputs (Critical for Physics/FMM)
     // If these are all 1.0f, all particles overlap -> Zero Gravity.
     std::vector<float> inputData(static_cast<size_t>(B) * S * D);
     randomize_buffer(inputData.data(), inputData.size());
@@ -55,7 +55,7 @@ TEST_CASE("Attention: Multi-Backend Integration", "[ai][attn][integration]") {
         cords::makeBSD(B, S, D)
         );
 
-    // 1. FMM
+    // FMM
     SECTION("FMM Attention (O(N))") {
         layers::LayerConfig cfg;
         cfg.adapterType = adapters::AdapterType::FMM;
@@ -75,7 +75,7 @@ TEST_CASE("Attention: Multi-Backend Integration", "[ai][attn][integration]") {
         CHECK(gotSignal);
     }
 
-    // 2. Dense
+    // Dense
     SECTION("Dense Attention") {
         layers::LayerConfig cfg;
         cfg.adapterType = adapters::AdapterType::Dense;
@@ -98,7 +98,7 @@ TEST_CASE("Attention: Multi-Backend Integration", "[ai][attn][integration]") {
         CHECK(gotSignal);
     }
 
-    // 3. Verlet (Dynamics)
+    // Verlet (Dynamics)
     SECTION("Verlet Dynamics (Particle Simulation)") {
         layers::LayerConfig cfg;
         cfg.adapterType = adapters::AdapterType::Verlet;
@@ -110,7 +110,7 @@ TEST_CASE("Attention: Multi-Backend Integration", "[ai][attn][integration]") {
         CHECK(outputData[0] != 0.0f);
     }
 
-    // 4. Barnes-Hut (Dynamics)
+    // Barnes-Hut (Dynamics)
     SECTION("Barns and Hut Dynamics (Particle Simulation)") {
         layers::LayerConfig cfg;
         cfg.adapterType = adapters::AdapterType::BarnesHut;
@@ -122,7 +122,7 @@ TEST_CASE("Attention: Multi-Backend Integration", "[ai][attn][integration]") {
         CHECK(outputData[0] != 0.0f); // REGRESSION PROBE
     }
 
-    // 5. LowRank (Dynamics)
+    // LowRank (Dynamics)
     SECTION("LowRank (Simulation)") {
         layers::LayerConfig cfg;
         cfg.adapterType = adapters::AdapterType::LowRank;
@@ -145,7 +145,7 @@ TEST_CASE("Attention: Multi-Backend Integration", "[ai][attn][integration]") {
         CHECK(gotSignal);
     }
 
-    // 6. Flash (Dynamics)
+    // Flash (Dynamics)
     SECTION("Flash (Simulation)") {
         layers::LayerConfig cfg;
         cfg.adapterType = adapters::AdapterType::Flash;
@@ -170,6 +170,7 @@ TEST_CASE("Attention: Multi-Backend Integration", "[ai][attn][integration]") {
 }
 
 #ifdef JOB_TEST_BENCHMARKS
+#ifndef JOB_CI_BUILD
 TEST_CASE("Attention: Scaling Benchmark (Seq=4096)", "[ai][attn][bench][scale]") {
     // Large Context. This is where O(N^2) dies and O(N) shines.
     const uint32_t B = 1; // Single batch to focus on Sequence Length scaling
@@ -259,4 +260,5 @@ TEST_CASE("Attention: Scaling Benchmark (Seq=4096)", "[ai][attn][bench][scale]")
     };
 */
 }
+#endif
 #endif

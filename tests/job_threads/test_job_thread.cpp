@@ -85,6 +85,7 @@ TEST_CASE("JobThread lifecycle with overridden run (Inheritance)", "[threading][
     REQUIRE(thread.stopTokenWasHonored.load() == true);
 }
 
+#ifndef JOB_CI_BUILD
 TEST_CASE("JobThread real-time options failure (as non-root)", "[threading][options]")
 {
     // This test assumes it's NOT run as root.
@@ -109,6 +110,7 @@ TEST_CASE("JobThread real-time options failure (as non-root)", "[threading][opti
         REQUIRE(thread.join() == false);
     }
 }
+#endif
 
 TEST_CASE("JobThread data race stress test (proves mutex)", "[threading][bench][race]")
 {

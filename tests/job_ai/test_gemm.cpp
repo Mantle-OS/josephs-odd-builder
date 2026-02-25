@@ -151,14 +151,14 @@ TEST_CASE("sgemm: Parallel Scaling (Single vs Multi-Thread)", "[ai][sgemm][bench
 
     // Setup ThreadPool (Use 8 cores)
     auto sched = std::make_shared<job::threads::FifoScheduler>();
-    auto pool = job::threads::ThreadPool::create(sched, 8);
+    auto pool = job::threads::ThreadPool::create(sched, 4);
 
     BENCHMARK("Serial AVX + Tiling SGEMM (m=512 K=1024 N=1024)") {
         sgemm(M, N, K, 1.0f, A.data(), lda, B.data(), ldb, 0.0f, C.data(), ldc);
         return C[0];
     };
 
-    BENCHMARK("Parallel(8) + Tiling + AVX SGEMM (m=512 K=1024 N=1024)") {
+    BENCHMARK("Parallel(4) + Tiling + AVX SGEMM (m=512 K=1024 N=1024)") {
         sgemmParallel(*pool, M, N, K, 1.0f, A.data(), lda, B.data(), ldb, 0.0f, C.data(), ldc);
         return C[0];
     };
@@ -199,7 +199,7 @@ TEST_CASE("SGEMM Showdown: Naive vs Optimized", "[ai][sgemm][bench][vs]")
 TEST_CASE("sgemm: Matrix Object vs Raw Overhead", "[ai][sgemm][bench][matrix]")
 {
 
-    JobStealerCtx ctx(8);
+    JobStealerCtx ctx(4);
 
     // Use a medium size to check if the abstraction adds latency
     constexpr int M = 1024;
@@ -224,7 +224,7 @@ TEST_CASE("sgemm: Matrix Object vs Raw Overhead", "[ai][sgemm][bench][matrix]")
         return C_vec[0];
     };
 
-    BENCHMARK("Matrix Object Parallel(8) SGEMM (1024^3)") {
+    BENCHMARK("Matrix Object Parallel(4) SGEMM (1024^3)") {
         sgemmParallelMatrix(*ctx.pool, matA, matB, matC, 1.0f, 0.0f);
         return C_vec[0];
     };

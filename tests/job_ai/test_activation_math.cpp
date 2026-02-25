@@ -176,20 +176,18 @@ TEST_CASE("Vectorized SIMD matches Scalar Reference (Comprehensive)", "[activati
         std::vector<float> scalarRef = input;
         std::vector<float> vectorOut = input;
 
-        // 1. Compute Scalar Truth
+        // Compute Scalar Truth
         // Uses T_ESTRIN = true to match the high-precision vector mode if available
         for(size_t i=0; i<N; ++i)
             scalarRef[i] = activateNaive<true>(scalarRef[i], type, 0.1f); // might break swish
 
-        // 2. Compute Vectorized
+        // Compute Vectorized
         activate<true>(vectorOut.data(), N, type, 0.1f);
 
-        // 3. Determine Tolerance Strategy
+        // Determine Tolerance Strategy
         float tolerance = 1e-5f; // Default Strict
 
         switch(type) {
-        // --- Exact / Piecewise Linear Types ---
-        // These rely on simple math (+, -, *, min, max) and should match exactly.
         case ActivationType::Identity:
         case ActivationType::ReLU:
         case ActivationType::LeakyReLU:

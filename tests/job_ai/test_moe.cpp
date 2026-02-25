@@ -77,10 +77,9 @@ private:
 
 
 // examples
-TEST_CASE("SparseMoE: Deterministic Top-1 Routing", "[ai][moe][usage]")
+TEST_CASE("SparseMoE: Deterministic Top-1 Routing 4 threads", "[ai][moe][usage]")
 {
-    JobStealerCtx ctx(8);
-    // NEW: Create Workspace
+    JobStealerCtx ctx(4);
     Workspace ws(16 * 1024 * 1024);
 
     // Input Dim 4, 2 Experts, Top-1
@@ -124,7 +123,7 @@ TEST_CASE("SparseMoE: Deterministic Top-1 Routing", "[ai][moe][usage]")
 
 TEST_CASE("SparseMoE: Top-2 Routing (Mixing Experts)", "[ai][moe][usage]")
 {
-    JobStealerCtx ctx(8);
+    JobStealerCtx ctx(4);
     Workspace ws(16 * 1024 * 1024);
 
     // dim 4, 3 experts, top-2
@@ -200,6 +199,7 @@ TEST_CASE("SparseMoE: Missing Expert Implementation", "[ai][moe][edge]") {
 
 
 #ifdef JOB_TEST_BENCHMARKS
+#ifndef JOB_CI_BUILD
 TEST_CASE("SparseMoE: Throughput Benchmark (LLaMA-Small Scale)", "[ai][moe][bench]") {
     // simulating a small moe layer
     const int B = 128;
@@ -237,4 +237,5 @@ TEST_CASE("SparseMoE: Throughput Benchmark (LLaMA-Small Scale)", "[ai][moe][benc
         return output[0];
     };
 }
+#endif
 #endif

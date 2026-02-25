@@ -21,6 +21,11 @@ using namespace job::ai::learn;
 using namespace job::threads;
 
 inline std::string finalWords = "JOSEPHJoseph Odd Builder !";
+#ifdef JOB_CI_BUILD
+const int max_threads = 4
+#else
+const int max_threads = 8;
+#endif
 
 
 Genome buildAsciiLayers(uint32_t inputSize, uint32_t outputSize)
@@ -143,7 +148,7 @@ Genome buildPhysicsLanguageGenome(uint32_t inputSize, uint32_t /*outputSize*/, a
 
 TEST_CASE("Language Byte P=16, N=1000 : Trains using Byte Language", "[ai][coach][llm]")
 {
-    JobStealerCtx ctx(8);
+    JobStealerCtx ctx(max_threads);
 
     // Create the text_encoder
     auto learnCfg = LearnPresets::LanguageConfig(
@@ -197,7 +202,7 @@ TEST_CASE("Language Byte P=16, N=1000 : Trains using Byte Language", "[ai][coach
 
 TEST_CASE("Language(With Attention) P=512 N=1000 Model Byte Encodings. ", "[ai][coach][llm]")
 {
-    JobStealerCtx ctx(8);
+    JobStealerCtx ctx(max_threads);
     auto learnCfg = LearnPresets::LanguageConfig(
         finalWords.c_str(),
         job::ai::token::TokenType::Byte
@@ -253,7 +258,7 @@ TEST_CASE("Language(With Attention) P=512 N=1000 Model Byte Encodings. ", "[ai][
 
 TEST_CASE("Language Ascii: Trains the Ascii Language", "[ai][coach][llm]")
 {
-    JobStealerCtx ctx(8);
+    JobStealerCtx ctx(max_threads);
     auto learnCfg = LearnPresets::LanguageConfig(
         finalWords.c_str(),
         job::ai::token::TokenType::Ascii
@@ -298,7 +303,7 @@ TEST_CASE("Language Ascii: Trains the Ascii Language", "[ai][coach][llm]")
 
 TEST_CASE("Char Byte: Trains the Char Language", "[ai][coach][llm]")
 {
-    JobStealerCtx ctx(8);
+    JobStealerCtx ctx(max_threads);
     auto learnCfg = LearnPresets::LanguageConfig(
         finalWords.c_str(),
         job::ai::token::TokenType::Char
@@ -346,7 +351,7 @@ TEST_CASE("Char Byte: Trains the Char Language", "[ai][coach][llm]")
 
 TEST_CASE("Motif Tokens: Trains the Language Model", "[ai][coach][llm]")
 {
-    JobStealerCtx ctx(8);
+    JobStealerCtx ctx(max_threads);
     auto learnCfg = LearnPresets::LanguageConfig(
         finalWords.c_str(),
         job::ai::token::TokenType::Motif
@@ -400,7 +405,7 @@ TEST_CASE("Reincarnation: Saving and Loading the LLM", "[ai][llm][io]")
 
     // The First Life (Training)
     {
-        JobStealerCtx ctx(8);
+        JobStealerCtx ctx(max_threads);
         auto learnCfg = LearnPresets::LanguageConfig(
             finalWords.c_str(),
             job::ai::token::TokenType::Motif

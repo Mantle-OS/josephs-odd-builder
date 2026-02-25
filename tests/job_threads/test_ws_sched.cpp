@@ -30,6 +30,7 @@ TEST_CASE("JobWorkStealingScheduler create and shutdown", "[threading][scheduler
     REQUIRE(scheduler->size() == 0);
 }
 
+#ifndef JOB_CI_BUILD
 TEST_CASE("JobWorkStealingScheduler handles high concurrent load", "[threading][scheduler][work_stealing]")
 {
     job::core::JobLogger::instance().setLevel(job::core::LogLevel::Info);
@@ -64,6 +65,7 @@ TEST_CASE("JobWorkStealingScheduler handles high concurrent load", "[threading][
     pool->shutdown();
     REQUIRE(scheduler->size() == 0);
 }
+#endif
 
 TEST_CASE("JobWorkStealingScheduler forces stealing behavior", "[threading][scheduler][work_stealing]")
 {

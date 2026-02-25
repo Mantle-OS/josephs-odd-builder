@@ -131,9 +131,10 @@ TEST_CASE("Stencil Adapter: Zero Rate (Identity)", "[ai][stencil][edge]")
 }
 
 #ifdef JOB_TEST_BENCHMARKS
-TEST_CASE("Stencil Adapter: Throughput", "[ai][stencil][bench]")
+
+TEST_CASE("Stencil Adapter: Throughput 4 threads", "[ai][stencil][bench]")
 {
-    JobStealerCtx ctx(8);
+    JobStealerCtx ctx(4);
 
     StencilConfig cfg;
     cfg.steps = 1;

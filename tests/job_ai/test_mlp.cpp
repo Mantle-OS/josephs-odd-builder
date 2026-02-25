@@ -64,7 +64,7 @@ void randomize(Vec &v)
         x = dist(gen);
 }
 
-TEST_CASE("MLP: Correctness vs Naive", "[ai][mlp][correctness]")
+TEST_CASE("MLP: Correctness vs Naive | 4 threads", "[ai][mlp][correctness]")
 {
     const int B = 4;
     const int D = 32;
@@ -86,7 +86,7 @@ TEST_CASE("MLP: Correctness vs Naive", "[ai][mlp][correctness]")
     std::fill(Out_Ref.begin(), Out_Ref.end(), 0.0f);
     mlpNaive(B, D, H, X.data(), W1.data(), W2.data(), Out_Ref.data());
 
-    JobStealerCtx ctx(8);
+    JobStealerCtx ctx(4);
 
     mlpParallelForward(*ctx.pool, B, D, H, X.data(), W1.data(), W2.data(),
                 HiddenBuf.data(), Out_Opt.data(), ActivationType::ReLU);
@@ -111,7 +111,7 @@ TEST_CASE("MLP: Benchmark Standard (GPT-3 Medium Sized ReLU)", "[ai][mlp][bench]
     std::vector<float, Alloc> Hidden(B * H);
     std::vector<float, Alloc> Out(B * D);
 
-    JobStealerCtx ctx(8);
+    JobStealerCtx ctx(4);
 
     // FLOP Calculation:
     // 1. GEMM 1: 2 * B * D * H
@@ -169,7 +169,7 @@ TEST_CASE("MLP: Benchmark Standard (GPT-3 Medium Sized ReLU)", "[ai][mlp][bench]
 //     };
 // }
 
-TEST_CASE("MLP: The Show down", "[ai][mlp][bench][compare]")
+TEST_CASE("MLP: The Show down 4 threads", "[ai][mlp][bench][compare]")
 {
     // Smallish realistic unit: 16 Token, Small Embedding
     const int B = 16;    // 16 Token
@@ -184,26 +184,26 @@ TEST_CASE("MLP: The Show down", "[ai][mlp][bench][compare]")
     std::vector<float, Alloc> Out(B * D);
 
 
-    JobStealerCtx ctx(8);
+    JobStealerCtx ctx(4);
 
-    BENCHMARK("Naive") {
+    BENCHMARK("MLP Naive") {
         mlpNaive(B, D, H, X.data(), W1.data(), W2.data(), Out.data());
         return Out[0];
     };
 
-    BENCHMARK("ReLU (The Speed Demon)") {
+    BENCHMARK("MLP ReLU (The Speed Demon)") {
         mlpParallelForward(*ctx.pool, B, D, H, X.data(), W1.data(), W2.data(),
                     Hidden.data(), Out.data(), ActivationType::ReLU);
         return Out[0];
     };
 
-    BENCHMARK("GELU (The Transformer Standard)") {
+    BENCHMARK("MLP GELU (The Transformer Standard)") {
         mlpParallelForward(*ctx.pool, B, D, H, X.data(), W1.data(), W2.data(),
                     Hidden.data(), Out.data(), ActivationType::GELU);
         return Out[0];
     };
 
-    BENCHMARK("Swish (The LLaMA Style)") {
+    BENCHMARK("MLP Swish (The LLaMA Style)") {
         mlpParallelForward(*ctx.pool, B, D, H, X.data(), W1.data(), W2.data(),
                     Hidden.data(), Out.data(), ActivationType::Swish);
         return Out[0];

@@ -51,6 +51,7 @@ TEST_CASE("Barnes-Hut Adapter: Basic Gravity", "[ai][bh][usage]") {
 }
 
 #ifdef JOB_TEST_BENCHMARKS
+#ifndef JOB_CI_BUILD
 TEST_CASE("Barnes-Hut Adapter: Scaling Benchmark", "[ai][bh][bench]") {
     JobStealerCtx ctx(16);
 
@@ -90,5 +91,4 @@ TEST_CASE("Barnes-Hut Adapter: Scaling Benchmark", "[ai][bh][bench]") {
     BENCHMARK("BH N=16384") { run_bench(16384); };
 }
 #endif
-
-
+#endif
