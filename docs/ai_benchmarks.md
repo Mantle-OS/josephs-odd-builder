@@ -1,7 +1,7 @@
 # Benchmarks can be done by running the tests with 
 
 
-Benchmarks have been proformed on the following hardware. 
+Benchmarks have been performed on the following hardware. 
 
 * Ryzen 5900
 * Ryzen 5950X

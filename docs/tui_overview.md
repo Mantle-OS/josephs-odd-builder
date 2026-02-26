@@ -60,7 +60,7 @@ Writer for terminal output.
 - rectangles/boxes with a few border styles
 - foreground/background color application
 
-Wwrites ANSI escape sequences + text directly to `job::core::IODevice`.
+Writes ANSI escape sequences + text directly to `job::core::IODevice`.
 
 ## Event
 Input is translated into events:

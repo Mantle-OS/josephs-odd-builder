@@ -9,7 +9,7 @@ libraries and applications. I use it to test out ideas and algorithms.
 
 The foundational utility layer for the entire Job ecosystem, job_core provides the essential primitives 
 required for high performance systems programming. 
-It (try's to) establishes a unified execution environment by providing cache-aligned memory allocators, 
+It (tries to) establishes a unified execution environment by providing cache-aligned memory allocators, 
 high-resolution timers for schedulers, and a standardized logging framework. 
 Beyond utilities like CRC32 and PRNG seeding, it defines the IODevice abstraction—the critical interface shared by the IO and UART libraries to ensure consistent data 
 handling across different hardware backends.
@@ -24,7 +24,7 @@ Unlike (some)standard thread pools, it features a policy driven architecture sup
 FIFO,Round Robin, Work Stealing, and Deadline-aware (Sporadic) scheduling. 
 This flexibility allows the system to prioritize fairness or throughput depending on the task. 
 The library integrates an epoll-backed async IO event loop directly into the threading context, 
-consolidating periodic timers and filedescriptor readiness into a single pathway to prevent thread sprawl. 
+consolidating periodic timers and file descriptor readiness into a single pathway to prevent thread sprawl. 
 Beyond task management, it provides a robust suite of parallel utilities, including structured 
 parallelism (Parallel For/Reduce), Actor-model pipelines with backpressure, and specialized scientific solvers 
 for Monte Carlo simulations and parallel graph traversals (BFS/SSSP).
@@ -197,7 +197,7 @@ This is a rough outline. Do as you wish... pull requests welcome ....
 
 
 #### Qt Apps
-if you want to build the qt qml examnple app you need these. (some others might be needed)
+if you want to build the qt qml example app you need these. (some others might be needed)
 
 ```shell 
 sudo apt install qt6-base-dev libqt6gui6 qt6-declarative-dev qt6-3d-dev qt6-quick3d-dev qt6-graphs-dev \
