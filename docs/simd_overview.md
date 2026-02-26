@@ -10,7 +10,7 @@ A single “SIMD backend” type with:
 - basic conversions (float <-> int)
 - a few fast math approximations (exp/log/sin show up in the AVX path)
 
-The intent is too keep intrinsics out of the higher layers.
+The intent is to keep intrinsics out of the higher layers.
 
 ## Provider
 

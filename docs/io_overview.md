@@ -5,7 +5,7 @@ The io stack of job
 This module builds as `jobio` and links against `job_core` and `job_threads`.
 job:
 - `job::core` defines the job::core::IODevice because it is shared with `job::uart`
-- `job::threads` defines the job::threads::JobIoAsyncThread som io backends use this
+- `job::threads` defines the job::threads::JobIoAsyncThread some io backends use this
 
 
 ## IO factory (`IOFactory`)
