@@ -213,12 +213,12 @@ void Screen::putChar(char32_t ch, Attributes *style)
     // Insert Mode
     if (get_insertMode()) {
         for (int i = g_cols - 2; i >= col; --i) {
-            grid[row, i + 1] = grid[row, i];
+            grid(row, i + 1) = grid(row, i);
             markCellDirty(row, i + 1);
         }
-        grid[row, col].reset();
+        grid(row, col).reset();
     }
-    auto &cell = grid[row, col];
+    auto &cell = grid(row, col);
 
     // Respect write protection
     if (!cell.isProtectedForWrite()){
@@ -294,7 +294,7 @@ Cell *Screen::cellAt(int row, int col)
     auto &grid = activeGrid();
     if (row < 0 || row >= grid.rows() || col < 0 || col >= grid.columns())
         return nullptr;
-    return &grid[row, col];
+    return &grid(row, col);
 }
 
 void Screen::setScrollRegion(int top, int bottom)
@@ -907,7 +907,7 @@ void Screen::setLineDisplayMode(int row, ansi::LineDisplayMode mode)
 
     auto &buffer = activeGrid();
     for (int col = 0; col < activeGrid().columns(); ++col) {
-        auto &cell = buffer[row, col];
+        auto &cell = buffer(row, col);
         if (!cell.isProtectedForWrite()) {
             cell.setLineDisplayMode(mode);
             markCellDirty(row, col);
@@ -922,7 +922,7 @@ LineDisplayMode Screen::getLineDisplayMode(int row) const
     if (row < 0 || row >= activeGrid().rows())
         return LineDisplayMode::SingleWidth;
 
-    return activeGrid()[row, 0].getLineDisplayMode();
+    return activeGrid()(row, 0).getLineDisplayMode();
 }
 
 void Screen::setLineWidth(int row, int width)
@@ -932,7 +932,7 @@ void Screen::setLineWidth(int row, int width)
 
     auto &buffer = activeGrid();
     for (int col = 0; col < buffer.columns(); ++col) {
-        auto &cell = buffer[row, col];
+        auto &cell = buffer(row, col);
         if (!cell.isProtectedForWrite()) {
             cell.setLineWidth(width);
             markCellDirty(row, col);
@@ -949,7 +949,7 @@ void Screen::setLineHeight(int row, int height)
         return;
 
     for (int col = 0; col < buffer.columns(); ++col) {
-        auto &cell = buffer[row, col];
+        auto &cell = buffer(row, col);
         if (!cell.isProtectedForWrite()) {
             cell.setLineHeight(height);
             markCellDirty(row, col);
@@ -966,7 +966,7 @@ void Screen::setLineHeightPosition(int row, bool isTop)
         return;
 
     for (int col = 0; col < buffer.columns(); ++col) {
-        auto &cell = buffer[row, col];
+        auto &cell = buffer(row, col);
         if (!cell.isProtectedForWrite()) {
             cell.setLineHeightPosition(isTop);
             markCellDirty(row, col);
@@ -1009,7 +1009,7 @@ void Screen::clear()
 
     for (int row = 0; row < buffer.rows(); ++row) {
         for (int col = 0; col < buffer.columns(); ++col) {
-            Cell &cell = buffer[row, col];
+            Cell &cell = buffer(row, col);
 
             if (!cell.isProtectedForErase()) {
                 cell = Cell(U' ', m_currentAttributes);   //<- preserve active color/styles

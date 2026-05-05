@@ -25,7 +25,10 @@ public:
     virtual void onTokenTime([[maybe_unused]]uint64_t generation, [[maybe_unused]]uint64_t seed) {}
 
     float constexpr fitness() const noexcept{return m_fitness;}
-    bool  constexpr done() const noexcept{ return m_done.load(std::memory_order_acquire);}
+    inline bool  done() const noexcept
+    {
+        return m_done.load(std::memory_order_acquire);
+    }
 
 protected:
     float              m_fitness = 0.0f;

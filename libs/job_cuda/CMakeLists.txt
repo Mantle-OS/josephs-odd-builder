@@ -4,37 +4,44 @@ project(JosephOddBuild_Cuda
     LANGUAGES CXX CUDA
 )
 
-set(CMAKE_CUDA_STANDARD 20)
-set(CMAKE_CUDA_STANDARD_REQUIRED ON)
-set(CMAKE_CUDA_PROPAGATE_HOST_FLAGS OFF)
-
-# string(REPLACE "-march=native" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
-message(FATAL "CXX ${COMPILE_LANGUAGE_CUDA}")
-
-
 set(JOBCUDA_CU
     gemm_cuda.cu
+    cuda_bridge.cu
 )
 
 add_library(JosephsOddBuilder_Cuda SHARED ${JOBCUDA_CU})
-
-target_link_libraries(JosephsOddBuilder_Cuda PUBLIC
-    CUDA::cudart
-    CUDA::cublas
+target_compile_options(JosephsOddBuilder_Cuda PRIVATE
+    $<$<COMPILE_LANGUAGE:CUDA>:
+        -O3
+        --extended-lambda
+        -lineinfo
+        -Xcompiler=-march=native
+        -Xcompiler=-ffast-math
+        -Xcompiler=-funroll-loops
+        -Xcompiler=-fno-omit-frame-pointer
+        -Xcompiler=-Wall
+        -Xcompiler=-Wextra
+        -Xcompiler=-Werror
+    >
 )
+
 set_target_properties(JosephsOddBuilder_Cuda PROPERTIES
     VERSION ${PROJECT_VERSION}
     SOVERSION ${PROJECT_VERSION_MAJOR}
     OUTPUT_NAME "jobcuda"
-    # CUDA_ARCHITECTURES "89"
-    CUDA_RESOLVE_DEVICE_SYMBOLS ON
     CUDA_SEPARABLE_COMPILATION ON
+    CUDA_DEPENDENCIES_MAP OFF
 )
-
 
 target_include_directories(JosephsOddBuilder_Cuda PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobcoda/>
+)
+
+target_link_libraries(JosephsOddBuilder_Cuda PUBLIC
+    Threads::Threads
+    atomic
+    ${JOB_CUDA_LIBS}
 )
 
 install(TARGETS JosephsOddBuilder_Cuda
@@ -52,7 +59,6 @@ install(FILES ${JOBSIMD_HEADERS}
 set(PKGCONFIG_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/pkgconfig")
 set(PKGCONFIG_FILE "${CMAKE_CURRENT_BINARY_DIR}/jobcuda.pc")
 
-## TODO fix this as it needes to link to  cudart cublas
 configure_file(
     "${CMAKE_CURRENT_SOURCE_DIR}/jobcuda.pc.in"
     "${PKGCONFIG_FILE}"
@@ -65,4 +71,3 @@ install(EXPORT JosephsOddBuilderCudaTargets
     NAMESPACE JOB::
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/JosephsOddBuilderCuda
 )
-

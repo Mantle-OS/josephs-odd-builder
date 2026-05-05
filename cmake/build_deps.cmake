@@ -5,7 +5,10 @@
 
 # * DEBIAN based install the following
 # Note: tested on debian sid(atm)
-# sudo apt install libssl-dev libzstd-dev pkgconf libpkgconf-dev zlib1g-dev libsodium-dev libflatbuffers-dev flatbuffers-compiler nlohmann-json3-dev libyaml-cpp-dev libmsgpack-cxx-dev libcatch2-dev
+# sudo apt install libssl-dev libzstd-dev pkgconf libpkgconf-dev zlib1g-dev libsodium-dev libflatbuffers-dev flatbuffers-compiler nlohmann-json3-dev libyaml-cpp-dev libmsgpack-cxx-dev libcatch2-dev libggml-dev
+
+# for the nvidia stuff.(you need the upsteam nvida repo)
+# sudo apt install  libcusparse-13-1 libcusparse-dev-13-1  cublas13 libcublas13-dev-cuda-13 cuda-cudart-13-1 cuda-cudart-dev-13-1 libcurand-13-1 libcurand-dev-13-1
 
 # for the qt stuff
 # sudo apt install qt6-base-dev libqt6gui6 qt6-declarative-dev qt6-3d-dev qt6-quick3d-dev qt6-graphs-dev \
@@ -21,16 +24,6 @@ include(GNUInstallDirs)
 find_package(Threads REQUIRED)
 find_package(PkgConfig REQUIRED)
 
-if(JOB_CUDA)
-    find_package(CUDAToolkit REQUIRED)
-    set(JOB_CUDA_LIBS
-        CUDA::cudart
-        CUDA::cublas
-        CUDA::cusparse
-        CUDA::curand
-    )
-endif()
-
 ## CRYPTO
 pkg_check_modules(LibOpenSSL REQUIRED libssl)
 pkg_check_modules(LibCrypto  REQUIRED libcrypto)
@@ -45,6 +38,18 @@ pkg_check_modules(LibUdev REQUIRED libudev)
 pkg_check_modules(Flatbuffers  REQUIRED flatbuffers)
 pkg_check_modules(NlohmannJson REQUIRED nlohmann_json)
 pkg_check_modules(YAMLCpp      REQUIRED yaml-cpp)
+
+## more ai
+if(JOB_CUDA)
+    find_package(CUDAToolkit REQUIRED)
+    set(JOB_CUDA_LIBS
+        CUDA::cudart
+        CUDA::cublas
+        CUDA::cusparse
+        CUDA::curand
+    )
+endif()
+pkg_check_modules(LibGgml ggml)
 
 ## Tests
 pkg_check_modules(CatchTwo REQUIRED catch2-with-main)

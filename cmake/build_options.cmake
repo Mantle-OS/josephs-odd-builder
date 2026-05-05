@@ -2,12 +2,14 @@ include(CheckCXXCompilerFlag)
 ##############################
 # Compiler flags
 ##############################
-set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-set(CMAKE_QT_CREATOR_SKIP_MAINTENANCE_TOOL_PROVIDER ON)
+
+set(CMAKE_QT_CREATOR_ENABLE_MAINTENANCE_TOOL_PROVIDER OFF)
+set(CMAKE_QT_CREATOR_ENABLE_PACKAGE_MANAGER_SETUP OFF)
 
 if(POLICY CMP0135)
     cmake_policy(SET CMP0135 NEW) # for reproducible timestamps
@@ -62,7 +64,7 @@ endif()
 
 
 
-option(JOB_CUDA "Add nvidia cuda support " OFF)
+option(JOB_CUDA "Add nvidia cuda support " ON)
 option(JOB_QT_APPS "Build the Qt6 applications that are supported" OFF)
 
 option(JOB_CI_BUILD "Enable settings specific to CI environments" OFF)

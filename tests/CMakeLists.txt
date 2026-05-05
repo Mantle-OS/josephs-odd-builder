@@ -12,3 +12,6 @@ add_subdirectory(job_ansi)
 add_subdirectory(job_science)
 add_subdirectory(job_ai)
 
+if(JOB_CUDA)
+    add_subdirectory(job_cuda)
+endif()

@@ -72,10 +72,17 @@ struct Vec3f final {
     }
 
     // c++26 . . . . constexpr, noexcept FIXME when the day comes
-    [[nodiscard]] float length() const
+    [[nodiscard]] constexpr float length() const
     {
         return std::sqrt(x * x + y * y + z * z);
     }
+
+
+    // [[nodiscard]] constexpr float length() const noexcept {
+    //     float s = x*x + y*y + z*z;
+    //     return __builtin_sqrtf(s);
+    // }
+
 
     [[nodiscard]] constexpr float lengthSq() const noexcept
     {

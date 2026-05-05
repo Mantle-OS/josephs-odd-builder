@@ -16,6 +16,7 @@ public:
     using iterator       = std::vector<Cell>::iterator;
     using const_iterator = std::vector<Cell>::const_iterator;
 
+
     Grid() = default;
     Grid(int rows, int cols);
     Grid(const Grid&) = default;
@@ -25,11 +26,31 @@ public:
 
     ~Grid() = default;
 
-    [[nodiscard]] Cell &operator[](int row, int col) noexcept;
-    [[nodiscard]] const Cell &operator[](int row, int col) const noexcept;
+    // [[nodiscard]] Cell &operator[](int row, int col) noexcept;
+    // [[nodiscard]] const Cell &operator[](int row, int col) const noexcept;
 
-    [[nodiscard]] RowView operator[](int row) noexcept;
-    [[nodiscard]] ConstRowView operator[](int row) const noexcept;
+    [[nodiscard]] constexpr Cell &operator()(int row, int col) noexcept {
+        return m_cells[row * m_columns + col];
+    }
+
+    [[nodiscard]] constexpr const Cell &operator()(int row, int col) const noexcept {
+        return m_cells[row * m_columns + col];
+    }
+    // c++ 23
+    // [[nodiscard]] RowView operator[](int row) noexcept;
+    // [[nodiscard]] ConstRowView operator[](int row) const noexcept;
+
+
+
+    // This returns a span representing the whole row
+    [[nodiscard]] constexpr RowView operator[](int row) noexcept {
+        return RowView(m_cells.data() + (row * m_columns), m_columns);
+    }
+    [[nodiscard]] constexpr ConstRowView operator[](int row) const noexcept {
+        return ConstRowView(m_cells.data() + (row * m_columns), m_columns);
+    }
+
+
 
     [[nodiscard]] iterator begin() noexcept;
     [[nodiscard]] iterator end() noexcept;

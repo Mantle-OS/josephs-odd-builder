@@ -11,26 +11,26 @@ Grid::Grid(int rows, int cols)
     resize(std::max(1, rows), std::max(1, cols));
 }
 
-Grid::ConstRowView Grid::operator[](int row) const noexcept
-{
-    return { m_cells.data() + (row * m_columns), static_cast<size_t>(m_columns) };
-}
+// Grid::ConstRowView Grid::operator[](int row) const noexcept
+// {
+//     return { m_cells.data() + (row * m_columns), static_cast<size_t>(m_columns) };
+// }
 
-const Cell &Grid::operator[](int row, int col) const noexcept
-{
-    return m_cells[row * m_columns + col];
-}
+// const Cell &Grid::operator[](int row, int col) const noexcept
+// {
+//     return m_cells[row * m_columns + col];
+// }
 
-Cell &Grid::operator[](int row, int col) noexcept
-{
-    // Warning: No bounds check in raw [] operator for speed
-    return m_cells[row * m_columns + col];
-}
+// Cell &Grid::operator[](int row, int col) noexcept
+// {
+//     // Warning: No bounds check in raw [] operator for speed
+//     return m_cells[row * m_columns + col];
+// }
 
-Grid::RowView Grid::operator[](int row) noexcept
-{
-    return { m_cells.data() + (row * m_columns), static_cast<size_t>(m_columns) };
-}
+// Grid::RowView Grid::operator[](int row) noexcept
+// {
+//     return { m_cells.data() + (row * m_columns), static_cast<size_t>(m_columns) };
+// }
 
 Grid::iterator Grid::begin() noexcept
 {

@@ -2,6 +2,7 @@
 #include <cublas_v2.h>
 #include <stdexcept>
 
+
 namespace job::cuda {
 
 /**
@@ -9,8 +10,8 @@ namespace job::cuda {
  * Inputs A, B, and C are assumed to be in Row-Major order in GPU VRAM.
  */
 void sgemm(cublasHandle_t handle, int M, int N, int K,
-           float alpha, const float* A, const float* B,
-           float beta, float* C)
+           float alpha, const float *A, const float *B,
+           float beta, float *C)
 {
     // Row-Major: A(M,K), B(K,N), C(M,N)
     // We treat them as Column-Major: A^T(K,M), B^T(N,K), C^T(N,M)

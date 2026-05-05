@@ -5,7 +5,7 @@
 
 namespace job::core {
 
-[[nodiscard]] inline bool isSafeFinite(float f) noexcept
+[[nodiscard]] constexpr bool isSafeFinite(float f) noexcept
 {
     std::uint32_t u = std::bit_cast<std::uint32_t>(f);
     std::uint32_t exponent = (u & 0x7F800000) >> 23;
