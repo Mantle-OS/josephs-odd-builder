@@ -1,0 +1,15 @@
+tag: "ledger.audit_node"
+version: 1
+unit: "ledger"
+base: "audit_node"
+include_prefix: "aipkg"
+c_struct: "AiPkgAuditNode"
+out_base: "ledger_audit_node"
+fields:
+  - name: "sibling"
+    type: "bin[32]"
+    required: true
+  - name: "is_right"
+    type: "u32"
+    required: true
+    comment: "0=left sibling, 1=right sibling"

@@ -13,7 +13,7 @@ ThreadPool::Ptr ThreadPool::create(ISchedPolicy::Ptr scheduler, size_t threadCou
     return std::shared_ptr<ThreadPool>(new ThreadPool{std::move(scheduler), threadCount, options});
 }
 
-ThreadPool::ThreadPool( ISchedPolicy::Ptr scheduler, size_t threadCount, const JobThreadOptions &options) :
+ThreadPool::ThreadPool(ISchedPolicy::Ptr scheduler, size_t threadCount, const JobThreadOptions &options) :
     m_scheduler(std::move(scheduler)),
     m_threadOptions(options)
 {

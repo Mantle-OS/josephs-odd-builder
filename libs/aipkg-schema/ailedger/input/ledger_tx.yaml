@@ -1,0 +1,23 @@
+tag: "ledger.tx"
+version: 1
+unit: "ledger"
+base: "tx"
+c_struct: "AiPkgTx"
+include_prefix: "aipkg"
+out_base: "ledger_tx"
+fields:
+  - name: "from_pub"
+    type: "bin[32]"
+    required: true
+  - name: "to_pub"
+    type: "bin[32]"
+    required: true
+  - name: "amount"
+    type: "u64"
+    required: true
+  - name: "nonce"
+    type: "u64"
+    required: true
+  - name: "sig_from"
+    type: "bin[64]"
+    required: true

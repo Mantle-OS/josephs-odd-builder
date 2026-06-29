@@ -3,7 +3,6 @@
 
 #include <sstream>
 
-#include <job_logger.h>
 
 namespace job::serializer::msg_pack {
 

@@ -1,12 +1,11 @@
 #include "writer.h"
 #include "iserializer.h"
-
-#include <job_logger.h>
+#include "job_serializer_logger.h"
 
 namespace job::serializer {
 
 Writer::Writer(const std::filesystem::path &path) :
-    io::FileIO{path, io::FileMode::RegularFile, true}
+   m_path{path}
 {
 }
 
@@ -16,7 +15,7 @@ bool Writer::writeSchema(const Schema &schema, SerializeFormat mode) noexcept
 
     do {
         if (!schema.isValid()) {
-            JOB_LOG_ERROR("[writer] invalid schema, aborting write: {}", pathString());
+            JOB_SER_ERROR("[writer] invalid schema, aborting write: {}", pathString());
             break;
         }
 
@@ -30,7 +29,7 @@ bool Writer::writeSchema(const Schema &schema, SerializeFormat mode) noexcept
             else if (ext == ".json")
                 useMode = SerializeFormat::Json;
             else {
-                JOB_LOG_WARN("[writer] unknown extension '{}', defaulting to YAML", ext.c_str());
+                JOB_SER_WARN("[writer] unknown extension '{}', defaulting to YAML", ext.c_str());
                 useMode = SerializeFormat::Yaml;
             }
         }
@@ -49,7 +48,7 @@ bool Writer::writeSchema(const Schema &schema, SerializeFormat mode) noexcept
             ret = writeText(schema);
             break;
         default:
-            JOB_LOG_ERROR("[writer] invalid writer mode");
+            JOB_SER_ERROR("[writer] invalid writer mode");
             break;
         }
 
@@ -65,18 +64,18 @@ bool Writer::writeEmitter(Emitter &emitter,
 {
     auto [headerContent, sourceContent] = emitter.render(schema);
 
-    if(isOpen())
+    if(m_open)
         closeDevice();
 
-    setPath(header_file, io::OpenType::Truncate);
-    if (isOpen()) {
+    setPath(header_file, WriteType::Truncate);
+    if (m_open) {
         if (write(headerContent.data(), headerContent.size()) < 0) {
-            JOB_LOG_ERROR("[writer] failed to write header file: {}", pathString());
+            JOB_SER_ERROR("[writer] failed to write header file: {}", pathString());
             return false;
         }else{
             closeDevice();
             if(!flush()){
-                JOB_LOG_ERROR("[writer] could not flush the {}", pathString());
+                JOB_SER_ERROR("[writer] could not flush the {}", pathString());
                 return false;
             }
         }
@@ -84,15 +83,15 @@ bool Writer::writeEmitter(Emitter &emitter,
         return false;
     }
 
-    setPath(source_file, io::OpenType::Truncate);
-    if(isOpen()){
+    setPath(source_file, WriteType::Truncate);
+    if(m_open){
         if (write(sourceContent.data(), sourceContent.size()) < 0) {
-            JOB_LOG_ERROR("[writer] failed to write source file : {}", pathString());
+            JOB_SER_ERROR("[writer] failed to write source file : {}", pathString());
             return false;
         }else{
             closeDevice();
             if(!flush()){
-                JOB_LOG_ERROR("[writer] could not flush the {}", pathString());
+                JOB_SER_ERROR("[writer] could not flush the {}", pathString());
                 return false;
             }
         }
@@ -116,8 +115,8 @@ bool Writer::writeRuntime(ISerializer &ser,
         return false;
 
 
-    setPath(path(), io::OpenType::Truncate);
-    if(isOpen()){
+    setPath(path(), WriteType::Truncate);
+    if(m_open){
         if (write(reinterpret_cast<const char*>(buf.data()), buf.size()) < 0)
             return false;
 
@@ -131,34 +130,106 @@ bool Writer::writeRuntime(ISerializer &ser,
     return true;
 }
 
+std::filesystem::path Writer::path()
+{
+    return m_path;
+}
+
+std::string Writer::pathString() const
+{
+    return m_path.string();
+}
+
+ssize_t Writer::write(const char *data, size_t size)
+{
+    if (!m_open)
+        return -1;
+
+
+    std::lock_guard<std::mutex> lock(m_mutex);
+    if (m_output.write(data, size)) {
+        return size;
+    } else {
+        return -1;
+    }
+}
+
+bool Writer::flush()
+{
+    std::lock_guard<std::mutex> lock(m_mutex);
+    bool ret = true;
+
+    if (!m_open)
+        return true;
+
+    if (m_writeMode && m_output.is_open()) {
+        m_output.flush();
+        ret = !m_output.fail();
+    }
+    return ret;
+}
+
+void Writer::setPath(const std::filesystem::path &path, WriteType openType) noexcept
+{
+    if (m_open)
+        closeDevice();
+
+    m_path = path;
+    m_writeMode = (openType != WriteType::ReadOnly);
+
+    if (openType != WriteType::ReadOnly && !std::filesystem::exists(path)) {
+        std::ofstream(path.string()); // Create
+        JOB_SER_INFO("[Serlizer Writer] Created file: {}", path.string());
+    }
+
+    switch (openType) {
+    case WriteType::Truncate:
+        m_output.open(path, std::ios::out | std::ios::binary | std::ios::trunc);
+        m_open = m_output.is_open();
+        break;
+    case WriteType::Append:
+        m_output.open(path, std::ios::out | std::ios::binary | std::ios::app);
+        m_open = m_output.is_open();
+        break;
+    case WriteType::ReadOnly:
+        m_input.open(path, std::ios::in | std::ios::binary);
+        m_open = m_input.is_open();
+        break;
+    }
+
+    if (!m_open) {
+        JOB_SER_ERROR("[FileIO] Failed to open file: {}", pathString());
+    }
+}
+
 bool Writer::writeYaml(const Schema &schema) noexcept
 {
     if(!schema.isValid()){
-        JOB_LOG_ERROR("[writer] schema is invalid {}");
+        JOB_SER_ERROR("[writer] schema is invalid {}");
         return false;
     }
     YAML::Emitter emitter;
     Schema::to_yaml(emitter, schema);
     const std::string content = emitter.c_str();
     if (content.empty()) {
-        JOB_LOG_ERROR("[writer] empty YAML content for {}", pathString());
+        JOB_SER_ERROR("[writer] empty YAML content for {}", pathString());
         return false;
     }
 
-    setPath(path(), io::OpenType::Truncate);
-    if (isOpen()) {
+    setPath(path(), WriteType::Truncate);
+    if (m_open) {
         if (write(content.data(), content.size()) < 0) {
-            JOB_LOG_ERROR("[writer] failed to write YAML schema: {}", pathString());
+            JOB_SER_ERROR("[writer] failed to write YAML schema: {}", pathString());
             return false;
         }
 
         closeDevice();
         if(!flush()){
-            JOB_LOG_INFO("[writer] Could not write to disk YAML schema: {}", pathString());
+            JOB_SER_INFO("[writer] Could not write to disk YAML schema: {}", pathString());
             return false;
         }
     } else {
-        JOB_LOG_ERROR("[writer] failed to open file for writing: {}", pathString());
+        JOB_SER_ERROR("[writer] failed to open file for writing: {}", pathString());
         return false;
     }
 
@@ -168,25 +239,26 @@ bool Writer::writeYaml(const Schema &schema) noexcept
 bool Writer::writeJson(const Schema &schema) noexcept
 {
     if(!schema.isValid()){
-        JOB_LOG_ERROR("[writer] schema is invalid {}");
+        JOB_SER_ERROR("[writer] schema is invalid {}");
         return false;
     }
     nlohmann::json j;
     Schema::to_json(j, schema);
-    setPath(path(), io::OpenType::Truncate);
-    if (isOpen()) {
+    setPath(m_path, WriteType::Truncate);
+
+    if (m_open) {
         std::string jsonStr = j.dump(4);
         if (write(jsonStr.data(), jsonStr.size()) < 0) {
-            JOB_LOG_ERROR("[writer] failed to write JSON schema: {}", pathString());
+            JOB_SER_ERROR("[writer] failed to write JSON schema: {}", pathString());
             return false;
         }
         closeDevice();
         if(!flush()){
-            JOB_LOG_ERROR("[writer] could not flush data to disk {}", pathString());
+            JOB_SER_ERROR("[writer] could not flush data to disk {}", pathString());
             return false;
         }
     } else {
-        JOB_LOG_ERROR("[writer] failed to open file for writing: {}", pathString());
+        JOB_SER_ERROR("[writer] failed to open file for writing: {}", pathString());
         return false;
     }
 
@@ -204,6 +276,25 @@ bool Writer::writeBinary([[maybe_unused]] const Schema &schema) noexcept
 {
     bool ret = false;
     return ret;
+}
+
+void Writer::closeDevice()
+{
+    std::lock_guard<std::mutex> lock(m_mutex);
+
+    if (!m_open)
+        return;
+
+    if (m_output.is_open()) {
+        m_output.flush();
+        m_output.close();
+    }
+    if (m_input.is_open())
+        m_input.close();
+
+    m_open = false;
+
+    // unlock ?
 }
 
 } // namespace job::serializer

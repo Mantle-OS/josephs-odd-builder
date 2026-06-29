@@ -1,0 +1,17 @@
+tag: "ledger.devsig"
+version: 1
+unit: "ledger"
+base: "devsig"
+include_prefix: "aipkg"
+c_struct: "AiPkgDevSig"
+out_base: "ledger_devsig"
+fields:
+  - name: "dev_pub"
+    type: "bin[32]"
+    required: true
+  - name: "manifest_sha256"
+    type: "bin[32]"
+    required: true
+  - name: "sig_by_dev"
+    type: "bin[64]"
+    required: true

@@ -308,8 +308,8 @@ TEST_CASE("MotifToken benchmarks", "[token][motif][benchmark]")
     // Benchmark: mutation/learning (how expensive is "get smarter")
     // -----------------------
 
+    job::threads::JobStealerCtx ctx(4);
     BENCHMARK("motif mutate x50 (corpus=TEST*500)") {
-        job::threads::JobStealerCtx ctx(4);
         MotifToken t;
         std::string corpus;
         corpus.reserve(2000);

@@ -1,0 +1,26 @@
+tag: "ledger.attestation"
+version: 1
+unit: "ledger"
+base: "attestation"
+include_prefix: "aipkg"
+c_struct: "AiPkgAttestation"
+out_base: "ledger_attestation"
+fields:
+  - name: "pkg_id"
+    type: "str"
+    required: true
+  - name: "version"
+    type: "str"
+    required: true
+  - name: "manifest_sha256"
+    type: "bin[32]"
+    required: true
+  - name: "signer_pub"
+    type: "bin[32]"
+    required: true
+  - name: "signature"
+    type: "bin[64]"
+    required: true
+  - name: "ts_ms"
+    type: "i64"
+    required: true

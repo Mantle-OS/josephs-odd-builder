@@ -2,7 +2,7 @@
 #include "job_util_msgpack.h"
 
 #include <msgpack.hpp>
-#include <job_logger.h>
+#include <job_serializer_logger.h>
 
 namespace job::serializer::msg_pack {
 
@@ -24,7 +24,7 @@ namespace job::serializer::msg_pack {
                 continue;
             }
             if (!JobUtilMsgPack::packFieldValue(*fv_opt, pk)) {
-                JOB_LOG_WARN("[msgpack] Failed to pack field: {}", f.name);
+                JOB_SER_WARN("[msgpack] Failed to pack field: {}", f.name);
                 pk.pack_nil();
             }
         }
@@ -33,7 +33,7 @@ namespace job::serializer::msg_pack {
         return true;
 
     } catch(const std::exception &e) {
-        JOB_LOG_ERROR("[msgpack] encodeBinary error: {}", e.what());
+        JOB_SER_ERROR("[msgpack] encodeBinary error: {}", e.what());
         return false;
     }
 }
@@ -42,7 +42,7 @@ bool JobMsgPackSerializer::decodeBinary(const Schema &schema, RuntimeObject &out
 {
     try {
         if (inBuffer.empty()) {
-            JOB_LOG_ERROR("[msgpack] decodeBinary buffer is empty");
+            JOB_SER_ERROR("[msgpack] decodeBinary buffer is empty");
             return false;
         }
 
@@ -50,7 +50,7 @@ bool JobMsgPackSerializer::decodeBinary(const Schema &schema, RuntimeObject &out
         msgpack::object root = oh.get();
 
         if (root.type != msgpack::type::MAP) {
-            JOB_LOG_ERROR("[msgpack] Root object is not a map");
+            JOB_SER_ERROR("[msgpack] Root object is not a map");
             return false;
         }
         for (const auto &f : schema.fields) {
@@ -67,7 +67,7 @@ bool JobMsgPackSerializer::decodeBinary(const Schema &schema, RuntimeObject &out
 
             if (!found) {
                 if (f.required) {
-                    JOB_LOG_ERROR("[msgpack] Missing required field: {}", f.name);
+                    JOB_SER_ERROR("[msgpack] Missing required field: {}", f.name);
                     return false;
                 }
                 continue;
@@ -75,7 +75,7 @@ bool JobMsgPackSerializer::decodeBinary(const Schema &schema, RuntimeObject &out
 
             FieldValue fv;
             if (!JobUtilMsgPack::unpackFieldValue(val_obj, fv)) {
-                JOB_LOG_WARN("[msgpack] Failed to unpack field: {}", f.name);
+                JOB_SER_WARN("[msgpack] Failed to unpack field: {}", f.name);
                 continue;
             }
 
@@ -84,7 +84,7 @@ bool JobMsgPackSerializer::decodeBinary(const Schema &schema, RuntimeObject &out
         return true;
 
     } catch (const std::exception &e) {
-        JOB_LOG_ERROR("[msgpack] decodeBinary error: {}", e.what());
+        JOB_SER_ERROR("[msgpack] decodeBinary error: {}", e.what());
         return false;
     }
 }

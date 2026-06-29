@@ -65,7 +65,11 @@ endif()
 
 
 option(JOB_CUDA "Add nvidia cuda support " ON)
-option(JOB_QT_APPS "Build the Qt6 applications that are supported" OFF)
+option(JOB_QT_APPS "Build the Qt6 applications that are supported" ON)
+option(JOB_QT_AI "Build the QtAi Modules and example applications" ON)
+
+option(JOB_SER_MSGPACK_BINDINGS "Enable MsgPack backend for Job Serlizer" ON)
+option(JOB_SER_FLATBUFFERS_BINDINGS "Enable FlatBuffers backend" OFF)
 
 option(JOB_CI_BUILD "Enable settings specific to CI environments" OFF)
 if(JOB_CI_BUILD)

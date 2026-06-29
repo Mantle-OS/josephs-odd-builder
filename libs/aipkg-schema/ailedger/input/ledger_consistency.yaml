@@ -1,0 +1,12 @@
+tag: "ledger.consistency"
+version: 1
+unit: "ledger"
+base: "consistency"
+include_prefix: "aipkg"
+c_struct: "AiPkgConsistencyProof"
+out_base: "ledger_consistency"
+fields:
+  - name: "nodes"
+    type: "list<bin[32]>"
+    required: false
+    comment: "consistency proof nodes"

@@ -4,17 +4,10 @@ project(JosephsOddBuilder_Serializer
     LANGUAGES CXX
 )
 
-option(MSGPACK_BINDINGS "Enable MsgPack backend" ON)
-option(FLATBUFFERS_BINDINGS "Enable FlatBuffers backend" OFF)
 
-set(JOBSER_DEPS
-    ${YAMLCpp_LIBRARIES}
-    JosephsOddBuilder_Core
-    JosephsOddBuilder_Threads
-    JosephsOddBuilder_IO
-)
 
 set(JOBSER_SOURCES
+    job_serializer_logger.cpp
     job_serializer_utils.cpp
     job_field.cpp
     schema.cpp
@@ -24,10 +17,12 @@ set(JOBSER_SOURCES
     iserializer.cpp
     emitters/emitter.cpp
     emitters/cpp_emitter.cpp
+    # emitters/qt_emitter.cpp
 )
 
 
 set(JOBSER_HEADERS
+    job_serializer_logger.h
     spdx_helper.h
     job_serializer_utils.h
     job_field.h
@@ -38,13 +33,14 @@ set(JOBSER_HEADERS
     iserializer.h
     emitters/emitter.h
     emitters/cpp_emitter.h
+    # emitters/qt_emitter.h
 )
 
-if(MSGPACK_BINDINGS)
+if(JOB_SER_MSGPACK_BINDINGS)
     add_subdirectory(job_msgpack)
 endif()
 
-if(FLATBUFFERS_BINDINGS)
+if(JOB_SER_FLATBUFFERS_BINDINGS)
     add_subdirectory(job_flatbuffers)
 endif()
 
@@ -71,9 +67,6 @@ target_include_directories(JosephsOddBuilder_Serializer PRIVATE
 
 target_link_libraries(JosephsOddBuilder_Serializer PRIVATE
     ${YAMLCpp_LIBRARIES}
-    JosephsOddBuilder_Core
-    JosephsOddBuilder_IO
-    JosephsOddBuilder_Threads
 )
 
 install(TARGETS JosephsOddBuilder_Serializer
@@ -102,4 +95,3 @@ install(EXPORT JosephsOddBuilderSerializerTargets
     NAMESPACE JOB::
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/JosephsOddBuilderSerializer
 )
-# CHECKPOINT: v1

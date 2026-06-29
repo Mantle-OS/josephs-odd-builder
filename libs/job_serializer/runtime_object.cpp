@@ -1,6 +1,5 @@
 #include "runtime_object.h"
-
-#include <job_logger.h>
+#include "job_serializer_logger.h"
 
 namespace job::serializer {
 
@@ -42,7 +41,7 @@ bool RuntimeObject::setField(const std::string &name, const FieldValue &val) noe
 
     do {
         if (name.empty()) {
-            JOB_LOG_WARN("[runtime] cannot set empty field name");
+            JOB_SER_WARN("[runtime] cannot set empty field name");
             break;
         }
 
@@ -50,7 +49,7 @@ bool RuntimeObject::setField(const std::string &name, const FieldValue &val) noe
             m_fields[name] = val;
             ret = true;
         } catch (const std::exception &e) {
-            JOB_LOG_ERROR("[runtime] failed to set field '{}': {}", name, e.what());
+            JOB_SER_ERROR("[runtime] failed to set field '{}': {}", name, e.what());
         }
 
     } while (0);
@@ -80,7 +79,7 @@ bool RuntimeObject::removeField(const std::string &name) noexcept
 void RuntimeObject::clear() noexcept
 {
     m_fields.clear();
-    JOB_LOG_DEBUG("[runtime] cleared all fields");
+    JOB_SER_DEBUG("[runtime] cleared all fields");
 }
 
 const std::unordered_map<std::string, FieldValue> &RuntimeObject::fields() const noexcept

@@ -1,0 +1,25 @@
+tag: "ledger.devlink"
+version: 1
+unit: "ledger"
+base: "devlink"
+include_prefix: "aipkg"
+c_struct: "AiPkgDevLink"
+out_base: "ledger_devlink"
+fields:
+  - name: "provider"
+    type: "str"
+    required: true
+  - name: "project_id"
+    type: "str"
+    required: true
+  - name: "dev_pub"
+    type: "bin[32]"
+    required: true
+  - name: "proof"
+    type: "struct"
+    ref_sym: "AiPkgDevProof"
+    ref_include: "ledger_devproof.hpp"
+    required: false
+  - name: "ts_ms"
+    type: "i64"
+    required: true

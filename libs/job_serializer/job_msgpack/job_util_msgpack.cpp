@@ -1,6 +1,6 @@
 #include "job_util_msgpack.h"
 
-#include <job_logger.h>
+#include <job_serializer_logger.h>
 
 namespace job::serializer::msg_pack {
 
@@ -25,7 +25,7 @@ std::string JobUtilMsgPack::getCppType(const Field &f)
         return "std::vector<" + f.ref_sym.value_or("UNKNOWN_STRUCT") + ">";
     }
 
-    JOB_LOG_WARN( "[JobUtilMsgPack] Could not gather the CPP type for {} This is not good .... not good at all", static_cast<int>(f.kind));
+    JOB_SER_WARN( "[JobUtilMsgPack] Could not gather the CPP type for {} This is not good .... not good at all", static_cast<int>(f.kind));
     return "void"; // Should not happen
 }
 
@@ -35,11 +35,19 @@ std::string JobUtilMsgPack::getPackFunc(const Field &f)
     ss << "        // Pack field: " << f.name << "\n";
     ss << "        pk.pack_str(" << f.name.size() << ");\n";
     ss << "        pk.pack_str_body(\"" << f.name << "\", " << f.name.size() << ");\n";
-    if (f.kind == FieldKind::ListStruct || f.kind == FieldKind::Struct)
-        ss << "        " << f.name << ".pack_msgpack(pk);\n";
-    else
-        ss << "        pk.pack(" << f.name << ");\n";
 
+    if (f.kind == FieldKind::ListStruct) {
+        ss << "        pk.pack_array(static_cast<uint32_t>(" << f.name << ".size()));\n";
+        ss << "        for (const auto& item : " << f.name << ") {\n";
+        ss << "            item.pack_msgpack(pk);\n";
+        ss << "        }\n";
+    }
+    else if (f.kind == FieldKind::Struct) {
+        ss << "        " << f.name << ".pack_msgpack(pk);\n";
+    }
+    else {
+        ss << "        pk.pack(" << f.name << ");\n";
+    }
 
     return ss.str();
 }
@@ -50,10 +58,23 @@ std::string JobUtilMsgPack::getUnpackFunc(const Field &f)
     ss << "        // Unpack field: " << f.name << "\n";
     ss << "        if (key == \"" << f.name << "\") {\n";
 
-    if (f.kind == FieldKind::ListStruct || f.kind == FieldKind::Struct)
+    if (f.kind == FieldKind::ListStruct) {
+        ss << "            if (val_obj.type == msgpack::type::ARRAY) {\n";
+        ss << "                " << f.name << ".clear();\n";
+        ss << "                " << f.name << ".reserve(val_obj.via.array.size);\n";
+        ss << "                for (uint32_t i = 0; i < val_obj.via.array.size; ++i) {\n";
+        ss << "                    " << f.ref_sym.value() << " item;\n";
+        ss << "                    item.unpack_msgpack(val_obj.via.array.ptr[i]);\n";
+        ss << "                    " << f.name << ".push_back(item);\n";
+        ss << "                }\n";
+        ss << "            }\n";
+    }
+    else if (f.kind == FieldKind::Struct) {
         ss << "            " << f.name << ".unpack_msgpack(val_obj);\n";
-    else
+    }
+    else {
         ss << "            val_obj.convert(" << f.name << ");\n";
+    }
 
     ss << "        }";
     return ss.str();
@@ -132,7 +153,7 @@ bool JobUtilMsgPack::unpackFieldValue(const msgpack::object &obj, FieldValue &ou
         break;
     }
     default:
-        JOB_LOG_WARN("[msgpack] Unsupported msgpack type: {}",  static_cast<int>(obj.type));
+        JOB_SER_WARN("[msgpack] Unsupported msgpack type: {}",  static_cast<int>(obj.type));
         return false;
     }
     return true;

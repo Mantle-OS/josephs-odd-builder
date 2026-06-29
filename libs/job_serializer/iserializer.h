@@ -4,8 +4,6 @@
 
 #include <yaml-cpp/yaml.h>
 
-#include <job_logger.h>
-
 #include "job_serializer_utils.h"
 #include "runtime_object.h"
 

@@ -1,0 +1,14 @@
+tag: "pkg.depends"
+version: 1
+unit: "pkg"
+base: "depends"
+include_prefix: "aipkg"
+c_struct: "AiPkgDepends"
+out_base: "pkg_depends"
+fields:
+  - name: "name"
+    type: "str"
+    required: true
+  - name: "version"
+    type: "str"
+    required: true

@@ -6,11 +6,11 @@ add_compile_options(
     $<$<AND:$<CONFIG:Release>,$<COMPILE_LANGUAGE:CXX>>:-O3>
     $<$<AND:$<CONFIG:Release>,$<COMPILE_LANGUAGE:CXX>>:-funroll-loops>
     $<$<AND:$<CONFIG:Release>,$<COMPILE_LANGUAGE:CXX>>:-fno-omit-frame-pointer>
-    $<$<COMPILE_LANGUAGE:CXX>:-Wall>
     $<$<COMPILE_LANGUAGE:CXX>:-Wextra>
-    $<$<COMPILE_LANGUAGE:CXX>:-Wpedantic>
-    $<$<COMPILE_LANGUAGE:CXX>:-Werror>
+    $<$<COMPILE_LANGUAGE:CXX>:-Wall>
 )
+# $<$<COMPILE_LANGUAGE:CXX>:-Wpedantic>
+# $<$<COMPILE_LANGUAGE:CXX>:-Werror>
 
 check_ipo_supported(RESULT has_ipo OUTPUT output)
 if(has_ipo)

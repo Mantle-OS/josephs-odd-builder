@@ -1,0 +1,13 @@
+tag: "ledger.audit_path"
+version: 1
+unit: "ledger"
+base: "audit_path"
+include_prefix: "aipkg"
+c_struct: "AiPkgAuditPath"
+out_base: "ledger_audit_path"
+fields:
+  - name: "nodes"
+    type: "list<struct>"
+    ref_sym: "AiPkgAuditNode"
+    ref_include: "ledger_audit_node.hpp"
+    required: false

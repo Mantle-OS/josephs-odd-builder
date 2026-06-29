@@ -12,6 +12,7 @@ add_custom_target(Documentation SOURCES
     threading_overview.md
     tui_overview.md
     uart_overview.md
+    qtai.md
 )
 
 add_custom_target(AI_Documentation SOURCES

@@ -7,5 +7,5 @@ Name: jobserializer
 Description: Serializer library for JOB (Joseph's Odd Builder)
 Version: @PROJECT_VERSION@
 Requires: yaml-cpp
-Libs: -L${libdir} -ljobserializer -ljobcore -ljobio -ljobthreads
+Libs: -L${libdir} -lyaml-cpp
 Cflags: -I${includedir}

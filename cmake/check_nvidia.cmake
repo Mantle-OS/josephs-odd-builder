@@ -18,17 +18,6 @@ if(JOB_CUDA)
     set(CMAKE_CUDA_ARCHITECTURES    "${JOB_CUDA_ARCHITECTURES}")
     set(CMAKE_CUDA_PROPAGATE_HOST_FLAGS OFF)
     enable_language(CUDA)
-
-    # if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-    #     list(APPEND JOB_CUDA_FLAGS -G)
-    # else()
-    #     list(APPEND JOB_CUDA_FLAGS -lineinfo)
-    # endif()
-
-    # set(CMAKE_CUDA_FLAGS ${JOB_CUDA_FLAGS})
-
-    # message(STATUS JOSERPH ${CMAKE_CUDA_FLAGS})
-
 else()
     message(STATUS "CUDA Disabled: set JOB_CUDA_BUILD=ON if you want to use that. see cmake/build_options.txt")
 endif()

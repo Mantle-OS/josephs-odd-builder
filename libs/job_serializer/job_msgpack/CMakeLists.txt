@@ -42,9 +42,6 @@ target_link_libraries(JosephsOddBuilder_Serializer_MsgPack
         JosephsOddBuilder_Serializer
     PRIVATE
         ${YAMLCpp_LIBRARIES}
-        JosephsOddBuilder_Core
-        JosephsOddBuilder_IO
-        JosephsOddBuilder_Threads
         msgpack-cxx
         Boost::boost
 )
@@ -82,4 +79,4 @@ install(EXPORT JosephsOddBuilderSerializerMsgPackTargets
     NAMESPACE JOB::
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/JosephsOddBuilderSerializerMsgPack
 )
-# CHECKPOINT: v1
+

@@ -1,6 +1,5 @@
 #include "emitter.h"
-
-#include <job_logger.h>
+#include "job_serializer_logger.h"
 
 namespace job::serializer
 {
@@ -9,7 +8,7 @@ std::pair<std::string, std::string> Emitter::render( const Schema &schema) noexc
 {
     std::pair<std::string, std::string> ret;
     if (!schema.isValid()){
-        JOB_LOG_WARN("Schema is invalid not return the header and source");
+        JOB_SER_WARN("Schema is invalid not return the header and source");
         return ret;
     }
 
@@ -23,7 +22,7 @@ std::string Emitter::renderSingle(const Schema &schema) noexcept
 {
     std::string ret;
     if (!schema.isValid()){
-        JOB_LOG_WARN("Schema is invalid not return the header and source");
+        JOB_SER_WARN("Schema is invalid not return the header and source");
         return ret;
     }
 

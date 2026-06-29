@@ -1,8 +1,7 @@
 #include "schema.h"
+#include "job_serializer_logger.h"
 
 #include <yaml-cpp/yaml.h>
-
-#include <job_logger.h>
 
 namespace job::serializer {
 using json = nlohmann::json;
@@ -51,7 +50,7 @@ bool Schema::parse(const nlohmann::json &root, Schema &out)
     try {
         s = root.get<Schema>();
     } catch (const std::exception &e) {
-        JOB_LOG_ERROR("[schema] Failed to parse JSON: {}", e.what());
+        JOB_SER_ERROR("[schema] Failed to parse JSON: {}", e.what());
         return false;
     }
 
@@ -62,7 +61,7 @@ bool Schema::parse(const nlohmann::json &root, Schema &out)
         s.src_name = s.out_base + ".cpp";
 
     if (!s.isValid()) {
-        JOB_LOG_ERROR("[schema] Parsed JSON schema is not valid");
+        JOB_SER_ERROR("[schema] Parsed JSON schema is not valid");
         s.dump();
         return false;
     }
@@ -102,22 +101,22 @@ void Schema::to_yaml(YAML::Emitter &emitter, const Schema &s) noexcept
 
 void Schema::dump() noexcept
 {
-    JOB_LOG_INFO("----- [Schema Dump] -----");
-    JOB_LOG_INFO("tag: {}", tag);
-    JOB_LOG_INFO("version: {}", version);
-    JOB_LOG_INFO("unit: {}", unit);
-    JOB_LOG_INFO("base: {}", base);
-    JOB_LOG_INFO("c_struct: {}", c_struct);
-    JOB_LOG_INFO("include_prefix: {}", include_prefix);
-    JOB_LOG_INFO("out_base: {}", out_base);
-    JOB_LOG_INFO("hdr_name: {}", hdr_name.string());
-    JOB_LOG_INFO("src_name: {}", src_name.string());
-    JOB_LOG_INFO("fields: {}", fields.size());
+    JOB_SER_INFO("----- [Schema Dump] -----");
+    JOB_SER_INFO("tag: {}", tag);
+    JOB_SER_INFO("version: {}", version);
+    JOB_SER_INFO("unit: {}", unit);
+    JOB_SER_INFO("base: {}", base);
+    JOB_SER_INFO("c_struct: {}", c_struct);
+    JOB_SER_INFO("include_prefix: {}", include_prefix);
+    JOB_SER_INFO("out_base: {}", out_base);
+    JOB_SER_INFO("hdr_name: {}", hdr_name.string());
+    JOB_SER_INFO("src_name: {}", src_name.string());
+    JOB_SER_INFO("fields: {}", fields.size());
 
     for (const auto &f : fields)
         f.dump();
 
-    JOB_LOG_INFO("-------------------------");
+    JOB_SER_INFO("-------------------------");
 }
 
 //////////////////
@@ -130,13 +129,13 @@ bool Schema::parse(const YAML::Node &root, Schema &out) noexcept
 
     do {
         if (!root || !root.IsMap()) {
-            JOB_LOG_ERROR("[schema] YAML root node is not a map");
+            JOB_SER_ERROR("[schema] YAML root node is not a map");
             break;
         }
 
         auto getString = [&](const char* key) {
             if (!root[key]) {
-                JOB_LOG_WARN("[schema] YAML missing required key: {}", key);
+                JOB_SER_WARN("[schema] YAML missing required key: {}", key);
                 return std::string{};
             }
             return root[key].as<std::string>("");
@@ -155,7 +154,7 @@ bool Schema::parse(const YAML::Node &root, Schema &out) noexcept
         s.version = root["version"].as<int>(0);
 
         if (!Field::from_yaml(root["fields"], s.fields)) {
-            JOB_LOG_ERROR("[schema] Failed to parse 'fields' from YAML");
+            JOB_SER_ERROR("[schema] Failed to parse 'fields' from YAML");
             break;
         }
 
@@ -165,7 +164,7 @@ bool Schema::parse(const YAML::Node &root, Schema &out) noexcept
         s.schema_path = root["schema_path"] ? root["schema_path"].as<std::string>("") : "";
 
         if (!s.isValid()) {
-            JOB_LOG_ERROR("[schema] Parsed YAML schema is not valid");
+            JOB_SER_ERROR("[schema] Parsed YAML schema is not valid");
             s.dump();
             break;
         }
@@ -205,7 +204,7 @@ bool Schema::isValid() const noexcept
             break;
 
         if (fields.empty()) {
-            JOB_LOG_WARN("[schema] Validation failed: Schema contains no fields.");
+            JOB_SER_WARN("[schema] Validation failed: Schema contains no fields.");
             break;
         }
 

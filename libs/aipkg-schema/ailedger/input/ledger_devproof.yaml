@@ -1,0 +1,21 @@
+tag: "ledger.devproof"
+version: 1
+unit: "ledger"
+base: "devproof"
+include_prefix: "aipkg"
+c_struct: "AiPkgDevProof"
+out_base: "ledger_devproof"
+fields:
+  - name: "kind"
+    type: "u32"
+    required: true
+    comment: "OAUTH=1,DNS=2,SIG=3"
+  - name: "proof_data1"
+    type: "str"
+    required: false
+  - name: "proof_data2"
+    type: "str"
+    required: false
+  - name: "proof_sig"
+    type: "bin[64]"
+    required: false

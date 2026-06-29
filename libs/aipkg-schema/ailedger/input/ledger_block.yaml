@@ -1,0 +1,26 @@
+tag: "ledger.block"
+version: 1
+unit: "ledger"
+base: "block"
+include_prefix: "aipkg"
+c_struct: "AiPkgBlock"
+out_base: "ledger_block"
+
+fields:
+  - name: "height"
+    type: "u64"
+    required: true
+  - name: "prev"
+    type: "bin[32]"
+    required: true
+  - name: "sth"
+    type: "struct"
+    ref_sym: "AiPkgSTH"
+    ref_include: "ledger_sth.hpp"
+    required: true
+  - name: "mint_pub"
+    type: "bin[32]"
+    required: true
+  - name: "sig"
+    type: "bin[64]"
+    required: true

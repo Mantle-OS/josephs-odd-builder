@@ -1,0 +1,26 @@
+tag: "ledger.delegate"
+version: 1
+unit: "ledger"
+base: "delegate"
+include_prefix: "aipkg"
+c_struct: "AiPkgDelegate"
+out_base: "ledger_delegate"
+fields:
+  - name: "dev_pub"
+    type: "bin[32]"
+    required: true
+  - name: "builder_pub"
+    type: "bin[32]"
+    required: true
+  - name: "project_id"
+    type: "str"
+    required: true
+  - name: "not_before_ms"
+    type: "i64"
+    required: true
+  - name: "not_after_ms"
+    type: "i64"
+    required: true
+  - name: "sig_by_dev"
+    type: "bin[64]"
+    required: true

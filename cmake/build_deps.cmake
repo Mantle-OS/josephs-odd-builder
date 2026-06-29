@@ -48,8 +48,30 @@ if(JOB_CUDA)
         CUDA::cusparse
         CUDA::curand
     )
+
 endif()
-pkg_check_modules(LibGgml ggml)
+
+# pkg_check_modules(LibGgml REQUIRED ggml)
+# find_library(LibGgmlBase NAMES libggml-base ggml-base)
+# if(LibGgmlBase)
+#     message(STATUS "Found GGML Base: ${LibGgmlBase}")
+# else()
+#     message(FATAL_ERROR "LibGgmlBase not found!")
+# endif()
 
 ## Tests
 pkg_check_modules(CatchTwo REQUIRED catch2-with-main)
+
+
+if(JOB_QT_AI)
+    find_package(Qt6 6.2 COMPONENTS
+        Core
+        Gui
+        Network
+        Concurrent
+        Qml
+        Quick
+        QuickControls2
+      REQUIRED
+    )
+endif()

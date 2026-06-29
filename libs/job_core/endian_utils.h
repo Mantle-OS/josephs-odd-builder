@@ -61,4 +61,24 @@ constexpr uint32_t fromLE32(uint32_t v) noexcept
         return byteswap_internal(v);
 }
 
+
+constexpr uint64_t toLE64(uint64_t v) noexcept
+{
+    if constexpr (std::endian::native == std::endian::little)
+        return v;
+    else
+        return byteswap_internal(v);
+}
+
+constexpr uint64_t fromLE64(uint64_t v) noexcept
+{
+    if constexpr (std::endian::native == std::endian::little)
+        return v;
+    else
+        return byteswap_internal(v);
+}
+
+
+
+
 }

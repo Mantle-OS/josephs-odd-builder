@@ -96,6 +96,13 @@ set(JOBAI_LAYERS_HEADERS
     layers/layer_factory.h
     # layers/layer_lora.h # coming soon near some frozen weights near you
 
+    ## diffision
+    # layers/conv_ggml.h
+    # layers/linear_ggml.h
+    # layers/norm_ggml.h
+    # layers/unet_block.h
+    # layers/unet_layer.h
+
 )
 set(JOBAI_LAYERS_SOURCES
     layers/layer_factory.cpp
@@ -144,6 +151,10 @@ set(JOBAI_LEARNER_HEADERS
     learner/learn_cart_pole.h
     learner/learn_bard.h
     learner/learn_factory.h
+
+
+    # learner/learn_diffusion.h
+
 )
 set(JOBAI_LEARNER_SOURCES)
 
@@ -173,8 +184,8 @@ set(JOBAI_TOKEN_HEADERS
 
 
     token/token_factory.h
-    token/bpe_token.h           # JUNK
-    # token/unigram_token.h       # JUNK
+    token/bpe_token.h
+    # token/unigram_token.h
 )
 set(JOBAI_TOKEN_SOURCES)
 
@@ -214,10 +225,15 @@ set(JOBAI_COMP_HEADERS
     comp/swish.h
     comp/tanh.h
     comp/activation.h
+
+
+# comp/k_sampler.h
+# comp/noise_scheduler.h
+
+
+
 )
 set(JOBAI_COMP_SOURCES)
-
-
 
 # evo
 set(JOBAI_EVO_HEADERS
@@ -257,7 +273,19 @@ set(JOBAI_CACHE_HEADERS
 set(JOBAI_CACHE_SOURCES)
 
 
-
+# 
+## Reading writing models
+# set(JOBAI_MODEL_IO_HEADERS
+#     model-io/tensor_store.h
+#     model-io/gguf_loader.h
+#     model-io/gguf_writer.h
+#     model-io/safetensors_loader.h
+# )
+# set(JOBAI_MODEL_IO_SOURCES
+#     model-io/gguf_writer.cpp
+#     model-io/gguf_loader.cpp
+#     model-io/safetensors_loader.cpp
+# )
 
 ################### END IMP,DECL ################################
 
@@ -277,6 +305,8 @@ add_library(JosephsOddBuilder_Ai SHARED
     ${JOBAI_EVO_HEADERS}        ${JOBAI_EVO_SOURCES}
     ${JOBAI_INFER_HEADERS}      ${JOBAI_INFER_SOURCES}
     ${JOBAI_CACHE_HEADERS}      ${JOBAI_CACHE_SOURCES}
+    #
+    # ${JOBAI_MODEL_IO_HEADERS}   ${JOBAI_MODEL_IO_SOURCES}
 )
 
 target_compile_options(JosephsOddBuilder_Ai PRIVATE ${JOB_CXX_FLAGS})
@@ -316,6 +346,8 @@ target_include_directories(JosephsOddBuilder_Ai PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/evo>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/infer>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/cache>
+    # $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/jobai/model-io>
+
     # INSTALL PATHS
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobai>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobai/adapters>
@@ -332,6 +364,7 @@ target_include_directories(JosephsOddBuilder_Ai PUBLIC
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobai/evo>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobai/infer>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobai/cache>
+    # $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobai/model-io>
 )
 
 
@@ -352,6 +385,8 @@ install(FILES ${JOBAI_COMP_HEADERS}     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/
 install(FILES ${JOBAI_EVO_HEADERS}      DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobai/evo)
 install(FILES ${JOBAI_INFER_HEADERS}    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobai/infer)
 install(FILES ${JOBAI_CACHE_HEADERS}    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobai/cache)
+# install(FILES ${JOBAI_MODEL_IO_HEADERS} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobai/model-io)
+
 
 ## PKGCONFIG
 set(PKGCONFIG_FILE "${CMAKE_CURRENT_BINARY_DIR}/jobai.pc")

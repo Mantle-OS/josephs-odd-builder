@@ -4,6 +4,7 @@
 #include <job_logger.h>
 
 // core token stuff
+#include "bpe_token.h"
 #include "itoken.h"
 #include "token_type.h"
 
@@ -12,7 +13,7 @@
 #include "ascii_token.h"
 #include "char_token.h"
 #include "motif_token.h"
-// #include "bpe_token.h"
+#include "bpe_token.h"
 
 namespace job::ai::token {
 
@@ -32,6 +33,7 @@ namespace job::ai::token {
         return std::make_unique<MotifToken>();
 
     case TokenType::BPE:
+        return std::make_unique<BPEToken>();
     default:
         JOB_LOG_ERROR("Unknown Tokenizer Type: {}", static_cast<uint8_t>(type));
         return nullptr;

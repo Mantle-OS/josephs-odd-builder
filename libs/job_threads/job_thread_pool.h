@@ -130,9 +130,9 @@ private:
         return m_taskShards[taskId % kShardCount];
     }
 
-    JobSem m_workSemaphore;
-    std::atomic<int> m_progress{0};
-    std::atomic<double> m_loadAvg{0.0};
+    JobSem                                      m_workSemaphore;
+    std::atomic<int>                            m_progress{0};
+    std::atomic<double>                         m_loadAvg{0.0};
 
     std::vector<JobThread::Ptr>                 m_workers;
     ISchedPolicy::Ptr                           m_scheduler;

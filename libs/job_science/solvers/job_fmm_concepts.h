@@ -99,4 +99,4 @@ struct FmmNode {
     }
 };
 
-} // namespace job::threads
+} // namespace job::science

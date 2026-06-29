@@ -1,0 +1,22 @@
+tag: "pkg.file"
+version: 1
+unit: "pkg"
+base: "file"
+include_prefix: "aipkg"
+c_struct: "AiPkgFile"
+out_base: "pkg_file"
+fields:
+  - name: "name"
+    type: "str"
+    required: true
+  - name: "enabled"
+    type: "bool"
+    required: true
+  - name: "size"
+    type: "u64"
+    required: false
+    comment: "after install"
+  - name: "sha"
+    type: "u32"
+    required: false
+    comment: "after install the blake9 no really needed here"

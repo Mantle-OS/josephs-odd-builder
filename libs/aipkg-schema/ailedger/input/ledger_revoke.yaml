@@ -1,0 +1,31 @@
+tag: "ledger.revoke"
+version: 1
+unit: "ledger"
+base: "revoke"
+include_prefix: "aipkg"
+c_struct: "AiPkgRevoke"
+out_base: "ledger_revoke"
+fields:
+- name: "kind"
+  type: "u32"
+  required: true
+  comment: "KEY=1,ATTESTATION=2,PACKAGE=3"
+- name: "target_hash"
+  type: "bin[32]"
+  required: false
+  comment: "for kind=KEY or kind=ATTESTATION"
+- name: "pkg_id"
+  type: "str"
+  required: false
+  comment: "only when kind=PACKAGE"
+- name: "version"
+  type: "str"
+  required: false
+  comment: "only when kind=PACKAGE"
+- name: "reason"
+  type: "u32"
+  required: true
+  comment: "COMPROMISE=1,SUPERSEDED=2,POLICY=3"
+- name: "ts_ms"
+  type: "i64"
+  required: true

@@ -9,8 +9,6 @@
 
 #include <yaml-cpp/yaml.h>
 
-#include <job_logger.h>
-
 namespace job::serializer {
 
 enum class FieldKind : uint8_t {
@@ -47,7 +45,8 @@ enum class SerializeLanguage: uint8_t {
     LANG_JAVA,
     LANG_PYTHON,
     LANG_GO,
-    LANG_RUST
+    LANG_RUST,
+    LANG_QT
 };
 
 enum class SerializeLicenseType : uint8_t {

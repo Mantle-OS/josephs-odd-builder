@@ -1,7 +1,6 @@
 #pragma once
 #include <msgpack.hpp>
-
-#include <job_logger.h>
+#include <job_serializer_logger.h>
 
 #include <iserializer.h>
 

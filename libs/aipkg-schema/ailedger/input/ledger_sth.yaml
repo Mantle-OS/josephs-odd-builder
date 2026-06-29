@@ -1,0 +1,23 @@
+tag: "ledger.sth"
+version: 1
+unit: "ledger"
+base: "sth"
+include_prefix: "aipkg"
+c_struct: "AiPkgSTH"
+out_base: "ledger_sth"
+fields:
+  - name: "size"
+    type: "u64"
+    required: true
+  - name: "root"
+    type: "bin[32]"
+    required: true
+  - name: "ts_ms"
+    type: "u64"
+    required: true
+  - name: "first"
+    type: "u64"
+    required: true
+  - name: "last"
+    type: "u64"
+    required: true

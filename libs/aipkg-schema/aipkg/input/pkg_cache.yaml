@@ -1,0 +1,47 @@
+tag: "pkg.cache"
+version: 1
+unit: "pkg"
+base: "cache"
+include_prefix: "aipkg"
+c_struct: "AiPkgCache"
+out_base: "pkg_cache"
+
+fields:
+  - name: "project_name"
+    type: "str"
+    required: true
+  - name: "version"
+    type: "str"
+    required: true
+  - name: "description"
+    type: "str"
+    required: false
+  - name: "authors_name"
+    type: "str"
+    required: false
+  - name: "authors_email"
+    type: "str"
+    required: false
+  - name: "sha"
+    type: "str"
+    required: false
+    comment: "After packaged up blake.."
+  - name: "sections"
+    type: "list<str>"
+    required: false
+    comment: "img2txt, txt2img, llm , low_vram, etc"
+  - name: "packages"
+    type: "list<struct>"
+    ref_sym: "AiPkgPackage"
+    ref_include: "pkg_package.hpp"
+    required: true
+  - name: "depends"
+    type: "list<struct>"
+    ref_sym: "AiPkgDepends"
+    ref_include: "pkg_depends.hpp"
+    required: false
+  - name: "recommended"
+    type: "list<struct>"
+    ref_sym: "AiPkgDepends"
+    ref_include: "pkg_depends.hpp"
+    required: false

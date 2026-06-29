@@ -1,6 +1,5 @@
 #pragma once
 
-#include <job_logger.h>
 
 #include <emitters/cpp_emitter.h>
 

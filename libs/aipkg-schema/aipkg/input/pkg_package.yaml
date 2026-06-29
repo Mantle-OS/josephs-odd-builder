@@ -1,0 +1,49 @@
+tag: "pkg.package"
+version: 1
+unit: "pkg"
+base: "package"
+include_prefix: "aipkg"
+c_struct: "AiPkgPackage"
+out_base: "pkg_package"
+fields:
+  - name: "type"
+    type: "u32"
+    required: true
+    comment: "CHECKPOINTS=0, UNET=1, TEXTENCODER=2, LORA=3, EMBEDDING=4, CONTROLNET=5, UPSCALE=6, VAE=7, AUDIO_VAE=8 .... "
+  - name: "provider"
+    type: "u32"
+    required: true
+    comment: "HUGGING_FACE=0, GITHUB=1, so on later"
+  - name: "url"
+    type: "str"
+    required: true
+    comment: "hf = Comfy-Org/z_image_turbo while git is the whole url"
+  - name: "sha"
+    type: "str"
+    required: true
+    comment: "The top level sha of the repo not the files. sha example with hugging face this is the rev and with git it is the commit sha"
+  - name: "license"
+    type: "str"
+    required: true
+    comment: "The license of the package type. This is upstream"
+  - name: "created_at"
+    type: "str"
+    required: false
+  - name: "last_modified"
+    type: "str"
+    required: false
+  - name: "gated"
+    type: "bool"
+    required: false
+    comment: "Sometimes users have to agree to terms on huggingface"
+  - name: "breaks"
+    type: "list<str>"
+    required: false
+    comment: "list of other packages that this one breaks"
+  - name: "files"
+    type: "list<struct>"
+    ref_sym: "AiPkgFile"
+    ref_include: "pkg_file.hpp"
+    required: true
+    comment: "each of the files and if they are enabled etc"
+

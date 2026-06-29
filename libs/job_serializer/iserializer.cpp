@@ -2,8 +2,7 @@
 
 #include <nlohmann/json.hpp>
 
-#include <job_logger.h>
-
+#include "job_serializer_logger.h"
 #include "schema.h"
 #include "job_serializer_utils.h"
 
@@ -26,7 +25,7 @@ using json = nlohmann::json;
             for (const auto& item : std::get<FieldValue::List>(fv.value)) {
                 nlohmann::json j_item;
                 if (!fieldValueToJson(item, j_item))  {
-                    JOB_LOG_WARN("[serializer] Failed to serialize item in list");
+                    JOB_SER_WARN("[serializer] Failed to serialize item in list");
                     continue;
                 }
                 out_j.push_back(j_item);
@@ -37,7 +36,7 @@ using json = nlohmann::json;
             for (const auto& [key, val] : std::get<FieldValue::Struct>(fv.value)) {
                 nlohmann::json j_val;
                 if (!fieldValueToJson(val, j_val))  {
-                    JOB_LOG_WARN("[serializer] Failed to serialize value for key '{}'", key);
+                    JOB_SER_WARN("[serializer] Failed to serialize value for key '{}'", key);
                     continue;
                 }
                 out_j[key] = j_val;
@@ -47,7 +46,7 @@ using json = nlohmann::json;
         }
         return true;
     } catch (const std::exception &e) {
-        JOB_LOG_ERROR("[serializer] FieldValue to JSON conversion error: {}", e.what());
+        JOB_SER_ERROR("[serializer] FieldValue to JSON conversion error: {}", e.what());
         return false;
     }
 }
@@ -89,7 +88,7 @@ static bool jsonToFieldValue_DumbRecursive(const json& j_val, FieldValue& out_fv
         }
         return true;
     } catch(const std::exception& e) {
-        JOB_LOG_ERROR("[serializer] Recursive JSON parse error: {}", e.what());
+        JOB_SER_ERROR("[serializer] Recursive JSON parse error: {}", e.what());
         return false;
     }
 }
@@ -126,7 +125,7 @@ static bool jsonToFieldValue_DumbRecursive(const json& j_val, FieldValue& out_fv
             out_emitter << YAML::BeginSeq;
             for (const auto& item : std::get<FieldValue::List>(fv.value)) {
                 if (!fieldValueToYaml(item, out_emitter))
-                    JOB_LOG_WARN("[serializer] Failed to serialize item in YAML list");
+                    JOB_SER_WARN("[serializer] Failed to serialize item in YAML list");
             }
             out_emitter << YAML::EndSeq;
         } else if (fv.isStruct()) {
@@ -135,7 +134,7 @@ static bool jsonToFieldValue_DumbRecursive(const json& j_val, FieldValue& out_fv
                 out_emitter << YAML::Key << key;
                 out_emitter << YAML::Value;
                 if (!fieldValueToYaml(val, out_emitter))
-                    JOB_LOG_WARN("[serializer] Failed to serialize value for key '{}' in YAML map", key);
+                    JOB_SER_WARN("[serializer] Failed to serialize value for key '{}' in YAML map", key);
             }
             out_emitter << YAML::EndMap;
         } else {
@@ -143,7 +142,7 @@ static bool jsonToFieldValue_DumbRecursive(const json& j_val, FieldValue& out_fv
         }
         return true;
     } catch (const std::exception &e) {
-        JOB_LOG_ERROR("[serializer] FieldValue to YAML conversion error: {}", e.what());
+        JOB_SER_ERROR("[serializer] FieldValue to YAML conversion error: {}", e.what());
         return false;
     }
 }
@@ -182,7 +181,7 @@ static bool yamlToFieldValue_DumbRecursive(const YAML::Node& y_val, FieldValue& 
         }
         return true;
     }  catch(const std::exception& e) {
-        JOB_LOG_ERROR("[serializer] Recursive YAML parse error: {}", e.what());
+        JOB_SER_ERROR("[serializer] Recursive YAML parse error: {}", e.what());
         return false;
     }
 }
@@ -198,7 +197,7 @@ bool ISerializer::encode( const Schema &schema, const RuntimeObject &object,
 
     do {
         if (!schema.isValid()) {
-            JOB_LOG_ERROR("[serializer] invalid schema, cannot encode");
+            JOB_SER_ERROR("[serializer] invalid schema, cannot encode");
             break;
         }
 
@@ -216,7 +215,7 @@ bool ISerializer::encode( const Schema &schema, const RuntimeObject &object,
             ret = encodeText(schema, object, outBuffer);
             break;
         default:
-            JOB_LOG_ERROR("[serializer] unknown format {}", static_cast<int>(fmt));
+            JOB_SER_ERROR("[serializer] unknown format {}", static_cast<int>(fmt));
             break;
         }
 
@@ -232,12 +231,12 @@ bool ISerializer::decode(const Schema &schema, RuntimeObject &outObject,
 
     do {
         if (!schema.isValid()) {
-            JOB_LOG_ERROR("[serializer] invalid schema, cannot decode");
+            JOB_SER_ERROR("[serializer] invalid schema, cannot decode");
             break;
         }
 
         if (inBuffer.empty()) {
-            JOB_LOG_ERROR("[serializer] input buffer is empty");
+            JOB_SER_ERROR("[serializer] input buffer is empty");
             break;
         }
 
@@ -255,7 +254,7 @@ bool ISerializer::decode(const Schema &schema, RuntimeObject &outObject,
             ret = decodeText(schema, outObject, inBuffer);
             break;
         default:
-            JOB_LOG_ERROR("[serializer] unknown format {}", static_cast<int>(fmt));
+            JOB_SER_ERROR("[serializer] unknown format {}", static_cast<int>(fmt));
             break;
         }
 
@@ -275,7 +274,7 @@ bool ISerializer::encodeJson( const Schema &schema, const RuntimeObject &object,
                 auto opt_val = object.getField(field.name);
                 if (!opt_val) {
                     if (field.required) {
-                        JOB_LOG_WARN("[serializer] JSON encode: missing required field '{}'", field.name);
+                        JOB_SER_WARN("[serializer] JSON encode: missing required field '{}'", field.name);
                         j[field.name] = nullptr;
                     }
                     continue;
@@ -283,7 +282,7 @@ bool ISerializer::encodeJson( const Schema &schema, const RuntimeObject &object,
 
                 json j_val;
                 if (!fieldValueToJson(*opt_val, j_val)) {
-                    JOB_LOG_ERROR("[serializer] JSON encode: failed to convert field '{}'", field.name);
+                    JOB_SER_ERROR("[serializer] JSON encode: failed to convert field '{}'", field.name);
                     continue;
                 }
                 j[field.name] = j_val;
@@ -293,7 +292,7 @@ bool ISerializer::encodeJson( const Schema &schema, const RuntimeObject &object,
             outBuffer.assign(dump.begin(), dump.end());
             ret = true;
         } catch (const std::exception &e) {
-            JOB_LOG_ERROR("[serializer] JSON encode error: {}", e.what());
+            JOB_SER_ERROR("[serializer] JSON encode error: {}", e.what());
         }
 
     } while (0);
@@ -308,7 +307,7 @@ bool ISerializer::decodeJson( const Schema &schema, RuntimeObject &outObject, co
     do {
         try {
             if (inBuffer.empty()) {
-                JOB_LOG_ERROR("[serializer] empty JSON buffer");
+                JOB_SER_ERROR("[serializer] empty JSON buffer");
                 break;
             }
 
@@ -316,7 +315,7 @@ bool ISerializer::decodeJson( const Schema &schema, RuntimeObject &outObject, co
             json j = json::parse(str);
 
             if (!j.is_object()) {
-                JOB_LOG_ERROR("[serializer] JSON root is not an object");
+                JOB_SER_ERROR("[serializer] JSON root is not an object");
                 break;
             }
 
@@ -326,20 +325,20 @@ bool ISerializer::decodeJson( const Schema &schema, RuntimeObject &outObject, co
             for (const auto& field : schema.fields) {
                 if (!j.contains(field.name)) {
                     if (field.required)
-                        JOB_LOG_WARN("[serializer] JSON decode: missing required field '{}'", field.name);
+                        JOB_SER_WARN("[serializer] JSON decode: missing required field '{}'", field.name);
                     continue;
                 }
 
                 FieldValue fv;
                 if (!jsonToFieldValue_DumbRecursive(j[field.name], fv)) {
-                    JOB_LOG_ERROR("[serializer] JSON decode: failed to parse field '{}'", field.name);
+                    JOB_SER_ERROR("[serializer] JSON decode: failed to parse field '{}'", field.name);
                     continue;
                 }
                 outObject.setField(field.name, fv);
             }
             ret = true;
         } catch (const std::exception &e) {
-            JOB_LOG_ERROR("[serializer] JSON decode error: {}", e.what());
+            JOB_SER_ERROR("[serializer] JSON decode error: {}", e.what());
         }
     } while (0);
 
@@ -358,7 +357,7 @@ bool ISerializer::encodeYaml( const Schema &schema, const RuntimeObject &object,
                 auto opt_val = object.getField(field.name);
                 if (!opt_val) {
                     if (field.required) {
-                        JOB_LOG_WARN("[serializer] YAML encode: missing required field '{}'", field.name);
+                        JOB_SER_WARN("[serializer] YAML encode: missing required field '{}'", field.name);
                         emitter << YAML::Key << field.name << YAML::Value << YAML::Null;
                     }
                     continue;
@@ -367,14 +366,14 @@ bool ISerializer::encodeYaml( const Schema &schema, const RuntimeObject &object,
                 emitter << YAML::Key << field.name;
                 emitter << YAML::Value;
                 if (!fieldValueToYaml(*opt_val, emitter)) {
-                    JOB_LOG_ERROR("[serializer] YAML encode: failed to convert field '{}'", field.name);
+                    JOB_SER_ERROR("[serializer] YAML encode: failed to convert field '{}'", field.name);
                     continue;
                 }
             }
 
             emitter << YAML::EndMap;
             if (!emitter.good()) {
-                JOB_LOG_ERROR("[serializer] YAML emitter is in a bad state after encoding");
+                JOB_SER_ERROR("[serializer] YAML emitter is in a bad state after encoding");
                 break;
             }
 
@@ -382,7 +381,7 @@ bool ISerializer::encodeYaml( const Schema &schema, const RuntimeObject &object,
             outBuffer.assign(str.begin(), str.end());
             ret = true;
         } catch (const std::exception &e) {
-            JOB_LOG_ERROR("[serializer] YAML encode error: {}", e.what());
+            JOB_SER_ERROR("[serializer] YAML encode error: {}", e.what());
         }
     } while (0);
 
@@ -395,7 +394,7 @@ bool ISerializer::decodeYaml( const Schema &schema, RuntimeObject &outObject, co
     do {
         try {
             if (inBuffer.empty()) {
-                JOB_LOG_ERROR("[serializer] empty YAML buffer");
+                JOB_SER_ERROR("[serializer] empty YAML buffer");
                 break;
             }
 
@@ -403,7 +402,7 @@ bool ISerializer::decodeYaml( const Schema &schema, RuntimeObject &outObject, co
             YAML::Node root = YAML::Load(str);
 
             if (!root.IsMap()) {
-                JOB_LOG_ERROR("[serializer] YAML root is not a map");
+                JOB_SER_ERROR("[serializer] YAML root is not a map");
                 break;
             }
 
@@ -411,13 +410,13 @@ bool ISerializer::decodeYaml( const Schema &schema, RuntimeObject &outObject, co
             for (const auto& field : schema.fields) {
                 if (!root[field.name]) {
                     if (field.required)
-                        JOB_LOG_WARN("[serializer] YAML decode: missing required field '{}'", field.name);
+                        JOB_SER_WARN("[serializer] YAML decode: missing required field '{}'", field.name);
                     continue;
                 }
 
                 FieldValue fv;
                 if (!yamlToFieldValue_DumbRecursive(root[field.name], fv)) {
-                    JOB_LOG_ERROR("[serializer] YAML decode: failed to parse field '{}'", field.name);
+                    JOB_SER_ERROR("[serializer] YAML decode: failed to parse field '{}'", field.name);
                     continue;
                 }
 
@@ -426,7 +425,7 @@ bool ISerializer::decodeYaml( const Schema &schema, RuntimeObject &outObject, co
 
             ret = true;
         } catch (const std::exception &e) {
-            JOB_LOG_ERROR("[serializer] YAML decode error: {}", e.what());
+            JOB_SER_ERROR("[serializer] YAML decode error: {}", e.what());
         }
     } while (0);
 
@@ -436,25 +435,25 @@ bool ISerializer::decodeYaml( const Schema &schema, RuntimeObject &outObject, co
 
 bool ISerializer::encodeBinary( [[maybe_unused]] const Schema &schema, [[maybe_unused]] const RuntimeObject &object, [[maybe_unused]] std::vector<uint8_t> &outBuffer) noexcept
 {
-    JOB_LOG_ERROR("[serializer] encodeBinary is not implemented in the base class");
+    JOB_SER_ERROR("[serializer] encodeBinary is not implemented in the base class");
     return false;
 }
 
 bool ISerializer::decodeBinary( [[maybe_unused]] const Schema &schema, [[maybe_unused]] RuntimeObject &outObject, [[maybe_unused]] const std::vector<uint8_t> &inBuffer) noexcept
 {
-    JOB_LOG_ERROR("[serializer] decodeBinary is not implemented in the base class");
+    JOB_SER_ERROR("[serializer] decodeBinary is not implemented in the base class");
     return false;
 }
 
 bool ISerializer::encodeText( [[maybe_unused]] const Schema &schema, [[maybe_unused]] const RuntimeObject &object, [[maybe_unused]] std::vector<uint8_t> &outBuffer) noexcept
 {
-    JOB_LOG_ERROR("[serializer] encodeText is not implemented in the base class");
+    JOB_SER_ERROR("[serializer] encodeText is not implemented in the base class");
     return false;
 }
 
 bool ISerializer::decodeText( [[maybe_unused]] const Schema &schema, [[maybe_unused]] RuntimeObject &outObject, [[maybe_unused]] const std::vector<uint8_t> &inBuffer) noexcept
 {
-    JOB_LOG_ERROR("[serializer] decodeText is not implemented in the base class");
+    JOB_SER_ERROR("[serializer] decodeText is not implemented in the base class");
     return false;
 }
 
