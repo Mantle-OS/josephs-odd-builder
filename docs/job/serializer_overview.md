@@ -96,3 +96,57 @@ CLI tool that:
 - writes generated header + source to an output directory
 
 The example schemas live under `apps/job_msg_gen_example/`.
+
+
+## CMake helper: `job_msgpack_gen_lib`
+
+`job_msgpack_gen_lib` is a CMake helper for projects that want to build a generated MessagePack schema library.
+
+It is defined in:
+
+```text
+cmake/job_msgpack_gen_lib.cmake
+```
+
+The helper reads one or more schema files, runs `job_msg_gen`, generates C++ source/header files, and builds them into a static or shared library.
+
+Example shape:
+
+```cmake
+job_msgpack_gen_lib(
+    NAME my_schema
+    VERSION 0.1
+    DESCRIPTION "Generated schema library"
+    SCHEMA_FILES
+        schema/foo.yaml
+        schema/bar.yaml
+    DEPENDENCIES
+        SomeOtherTarget
+)
+```
+
+This creates a target named:
+
+```text
+my_schema_lib
+```
+
+The generated files are written under the current build directory in a subdirectory named after `NAME`.
+
+The helper links the generated library against:
+
+* `JosephsOddBuilder_Serializer`
+* `JosephsOddBuilder_Serializer_MsgPack`
+* `msgpack-cxx`
+* `Boost::boost`
+* `Threads::Threads`
+* YAML support
+
+Optional arguments:
+
+* `BUILD_SHARED` — build the generated schema library as shared instead of static
+* `DEPENDENCIES` — additional link targets
+* `TARGET_EXTRA_INCLUDE` — extra include directories for the generated target
+
+This helper is mainly used when a schema should become a normal C++ library target that can be linked by other JOB components.
+

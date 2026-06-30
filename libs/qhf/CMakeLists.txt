@@ -5,16 +5,6 @@ project(qt-huggingface
 
 set(CMAKE_AUTOMOC ON)
 
-find_package(Qt6 6.2 COMPONENTS
-    Core
-    Gui
-    Network
-    Quick
-    Qml
-    Concurrent
-  REQUIRED
-)
-
 set(QHF_HEADERS
     huggingfaceapi.h                    # hugging face api callback functions all functions here return a QFuture<QJsonObject> |  90% done
     huggingfacefilemanifest.h           # file mainifest from huggings faces api calls | schema started
@@ -37,11 +27,10 @@ set(QHF_CXX
     huggingfacerepoinfo.cpp
 )
 
-set(QHF_QML
-    ## later
-)
+# set(QHF_QML ## later )
 
 qt_add_library(qt-huggingface STATIC)
+
 qt_add_qml_module(qt-huggingface
     URI QHF
     VERSION 1.0
@@ -62,7 +51,7 @@ target_link_libraries(qt-huggingface PRIVATE
     ${LibSodium_LIBRARIES}
     ${LibZstd_LIBRARIES}
     ${YAMLCpp_LIBRARIES}
-    qt-ai-utils qml-ai-utils
+    qt-ai-utils qml-ai-utils qml-ai-utilsplugin
     qt-sodium
     Qt6::Core
     Qt6::Gui

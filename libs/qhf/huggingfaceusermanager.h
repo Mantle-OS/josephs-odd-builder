@@ -25,10 +25,10 @@ class HuggingFaceUserManager : public QObject
     QML_UNCREATABLE("Please use HuggingFaceHub.userManager" )
 public:
     explicit HuggingFaceUserManager(QObject *parent = nullptr) :
+        QObject{parent},
         m_anonymousUser{new HuggingFaceUser{this}},
         m_currentUser{nullptr},
-        m_users{new ObjectListModel<HuggingFaceUser>{this, "display", "uid"}},
-        QObject{parent}
+        m_users{new ObjectListModel<HuggingFaceUser>{this, "display", "uid"}}
     {
         m_anonymousUser->set_uid("anonymous");
         m_anonymousUser->set_authDisplayName("anonymous");
@@ -69,7 +69,7 @@ public:
             api->set_anonymous(true);
             api->set_token("NONE");
 
-            api->login().then([this](QJsonObject obj) {
+            api->login().then([this]([[maybe_unused]]QJsonObject obj) {
                 Q_EMIT loggedIn(true);
             });
             return;
@@ -141,9 +141,9 @@ public:
     void useAnonymous()
     {
         if(m_currentUser->get_uid() != "anonymous"){
-            if(m_currentUser->get_isLoggedIn())
+            if(m_currentUser->get_isLoggedIn()){
                 m_currentUser->set_isLoggedIn(false);
-                //
+            }
         }
         set_currentUser(m_anonymousUser);
         Q_EMIT loggedIn(true);

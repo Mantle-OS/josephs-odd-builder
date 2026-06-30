@@ -26,6 +26,8 @@ public:
 
 private:
     sd_embedding_t m_embeddings{nullptr, nullptr};
+    QByteArray  tmp_embeddingName;
+    QByteArray  tmp_embeddingPath;
 };
 
 #endif // QSDEMBEDDING_H

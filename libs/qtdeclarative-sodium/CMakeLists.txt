@@ -5,18 +5,6 @@ project(qtdeclarative-sodium
 
 set(CMAKE_AUTOMOC ON)
 
-find_package(Qt6 6.2 COMPONENTS
-    Core
-    Gui
-    Quick
-    QuickControls2
-    Qml
-  REQUIRED
-)
-
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(LibSodium  REQUIRED libsodium)
-
 set(QDEC_SODIUM_HEADERS
     qmlsodiumbox.h
     qmlsodiumpasswordutils.h

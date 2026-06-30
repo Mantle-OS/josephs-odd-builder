@@ -1,0 +1,38 @@
+tag: "session.session_vault"
+version: 1
+unit: "session"
+base: "session_vault"
+c_struct: "AiSessionVault"
+include_prefix: "aisession"
+out_base: "session_vault"
+fields:
+  - name: "schema_version"
+    type: "u32"
+    required: true
+  - name: "user_id"
+    type: "str"
+    required: true
+  - name: "display_name"
+    type: "str"
+    required: true
+  - name: "created_at"
+    type: "str"
+    required: false
+  - name: "updated_at"
+    type: "str"
+    required: false
+  - name: "keys"
+    type: "list<struct>"
+    required: true
+    ref_include: "session_key.hpp"
+    ref_sym: "AiSessionKey"
+  - name: "credentials"
+    type: "list<struct>"
+    required: false
+    ref_include: "session_credential.hpp"
+    ref_sym: "AiSessionCredential"
+  - name: "providers"
+    type: "list<struct>"
+    required: false
+    ref_include: "session_provider.hpp"
+    ref_sym: "AiSessionProvider"

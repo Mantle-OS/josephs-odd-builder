@@ -1,5 +1,6 @@
 #include "qsdimggenparams.h"
 QSdImgGenParams::QSdImgGenParams(QObject *parent) :
+    QSdBaseParam{parent},
     m_loras{new ObjectListModel<QSdLora>{this, "display", "path"}},
     m_initImage{new QSdImage{}},
     m_refImages{new QSdImage{}},
@@ -9,8 +10,7 @@ QSdImgGenParams::QSdImgGenParams(QObject *parent) :
     m_pmParams{new QSdPmParams{this}},
     m_vaeTilingParams{new QSdTilingParams{this}},
     m_cache{new QSdCacheParams{this}},
-    m_hires{new QSdHiResParams{this}},
-    QSdBaseParam{parent}
+    m_hires{new QSdHiResParams{this}}
 {
 
 

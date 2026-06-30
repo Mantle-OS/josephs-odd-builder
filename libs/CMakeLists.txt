@@ -23,12 +23,14 @@ if(JOB_QT_AI)
 
     add_subdirectory(qaiutils)
     add_subdirectory(qzstd)
+    add_subdirectory(qhf)
+
+    add_subdirectory(qsessionmanager)
 
     add_subdirectory(qllama)
     # add_subdirectory(qggml)
     add_subdirectory(qsodium)
     add_subdirectory(qtdeclarative-sodium)
 
-    add_subdirectory(qhf)
     add_subdirectory(qsd)
 endif()

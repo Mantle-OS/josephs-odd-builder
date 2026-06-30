@@ -76,7 +76,6 @@ public:
             return;
         }
 
-        // Resolves your FIXME block cleanly via the enum wrapper utility mapping
         QImage::Format fmt = formatFromChannel(static_cast<QSdEnums::QSdImageChannel>(other.channel));
         if (fmt == QImage::Format_Invalid) {
             fmt = QImage::Format_RGB888; // Fail-safe fallback
@@ -100,7 +99,10 @@ public:
         set_sourcePath("");
     }
 
-    quint8* data() const { return m_nativeImage.isNull() ? nullptr : const_cast<uint8_t*>(m_nativeImage.bits()); }
+    quint8 *data() const
+    {
+        return m_nativeImage.isNull() ? nullptr : const_cast<uint8_t*>(m_nativeImage.bits());
+    }
 
     void setData(quint8 *newData)
     {
@@ -123,9 +125,9 @@ public:
     Q_INVOKABLE bool loadFromFile(const QString &filePath)
     {
         QImage loaded;
-        if (!loaded.load(filePath)) return false;
+        if (!loaded.load(filePath))
+            return false;
 
-        // Force multi-platform target channel alignment
         m_nativeImage = loaded.convertToFormat(loaded.hasAlphaChannel() ?
                                                    QImage::Format_RGBA8888 : QImage::Format_RGB888);
 
@@ -160,7 +162,7 @@ public:
 
         QString finalFilePath = filePath;
 
-        // 1. Check if the exact requested filename already exists
+        // Check if the exact requested filename already exists
         if (QFile::exists(filePath)) {
             int highestIndex = 0;
 
@@ -191,7 +193,7 @@ public:
             finalFilePath = dir.absoluteFilePath(QString("%1%2.%3").arg(baseName, suffix, extension));
         }
 
-        // 2. Perform the actual hardware write operation via QImage
+        // Perform the actual hardware write operation via QImage
         // Qt automatically determines the compression algorithm from the file extension
         bool success = m_nativeImage.save(finalFilePath);
 
@@ -274,12 +276,20 @@ protected:
 
         // Only upload the texture to the GPU hardware layers if the pixels actually changed
         if (m_imageChanged) {
-            // Automatically instantiates the underlying texture resource depending on backend (Vulkan/OpenGL/DirectX)
-            QSGTexture *texture = window()->createTextureFromImage(m_nativeImage);
 
-            // Ownership transfer: node deletes the texture wrapper automatically when done
-            node->setOwnsTexture(true);
+
+            QSGTexture *texture = window()->createTextureFromImage(m_nativeImage);
             node->setTexture(texture);
+            node->setOwnsTexture(true);
+
+
+            // // Automatically instantiates the underlying texture resource depending on backend (Vulkan/OpenGL/DirectX)
+            // QSGTexture *texture = window()->createTextureFromImage(m_nativeImage);
+            // // Ownership transfer: node deletes the texture wrapper automatically when done
+            // node->setOwnsTexture(true);
+            // node->setTexture(texture);
+
+
             m_imageChanged = false;
         }
 

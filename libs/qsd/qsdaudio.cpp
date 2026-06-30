@@ -37,10 +37,8 @@ void QSdAudio::setAudio(sd_audio_t other)
 void QSdAudio::resetAudio()
 {
     m_audio = {0, 0, 0, nullptr};
-    if(m_data){
-        m_data = nullptr;
-        Q_EMIT dataChanged();
-    }
+    m_data = nullptr;
+    Q_EMIT dataChanged();
 }
 
 float *QSdAudio::data() const

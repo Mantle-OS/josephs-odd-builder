@@ -12,18 +12,14 @@ set(QLLAMA_HEADERS
     qllamamodelparams.h
     qllamaadapterlora.h
     qllamacontextparams.h
-    qllamaadapterlora.h
     qllamasampler.h
     qllmacontext.h
     qllamamodel.h
     qllamavocab.h
-    # qllamatoken.h
     qllamaengine.h
     qllamalocalengine.h
     qllamaclientengine.h
     qllamaserverengine.h
-    # qllamachat.h
-
 )
 
 set(QLLAMA_CXX
@@ -37,8 +33,6 @@ set(QLLAMA_CXX
     qllmacontext.cpp
     qllamamodel.cpp
     qllamavocab.cpp
-    # qllamatoken.cpp
-    # qllamachat.cpp
     qllamaengine.cpp
     qllamalocalengine.cpp
     qllamaclientengine.cpp

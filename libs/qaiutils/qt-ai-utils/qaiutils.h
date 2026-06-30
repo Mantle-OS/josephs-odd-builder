@@ -36,6 +36,9 @@ public:
     static QString pluginsDir;
     static QString extraQmlDir;
 
+    static QString userDir;
+    static QString userJson;
+
     static void debugPaths();
     static bool createDefaultDirs();
     static bool createDirFromFile(const QString &fileName);

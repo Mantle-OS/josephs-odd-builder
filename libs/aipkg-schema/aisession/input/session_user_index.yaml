@@ -1,0 +1,16 @@
+tag: "session.session_user_index"
+version: 1
+unit: "session"
+base: "session_user_index"
+c_struct: "AiSessionUserIndex"
+include_prefix: "aisession"
+out_base: "session_user_index"
+fields:
+  - name: "schema_version"
+    type: "u32"
+    required: true
+  - name: "users"
+    type: "list<struct>"
+    required: true
+    ref_include: "session_user.hpp"
+    ref_sym: "AiSessionUser"

@@ -14,13 +14,13 @@ sd_embedding_t QSdEmbedding::embeddings()
 {
     sd_embedding_t ret = {nullptr, nullptr};
     if(!m_embeddingName.isEmpty()){
-        const std::string c_name = m_embeddingName.toStdString();
-        ret.name = c_name.c_str();
+        tmp_embeddingName = m_embeddingName.toLocal8Bit();
+        ret.name = tmp_embeddingName.constData();
     }
 
     if(!m_embeddingPath.isEmpty()){
-        const std::string cpath = m_embeddingPath.toStdString();
-        ret.path = cpath.c_str();
+        tmp_embeddingPath = m_embeddingPath.toLocal8Bit();
+        ret.path = tmp_embeddingPath.constData();
     }
 
     return ret;

@@ -42,7 +42,7 @@ public:
     Q_INVOKABLE void clearKvCache();
     Q_INVOKABLE bool syncActiveLoRAs();
 
-    // High performance synchronous evaluation primitives
+    // "High performance" synchronous evaluation primitives
     Q_INVOKABLE int sampleNextToken(QLlamaSampler *sampler, const QList<int> &inputTokens);
 
     // Opaque handle accessor

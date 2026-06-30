@@ -28,9 +28,6 @@ public:
     [[nodiscard]] qint64 bytesToWrite() const override;
     [[nodiscard]] bool atEnd() const override;
 
-    // TODO I need to implement this do this after API and conncurent things get worked out
-    // virtual bool waitForBytesWritten(int msecs = -1) override
-    // virtual bool waitForReadyRead(int msecs = -1) override
 
 Q_SIGNALS:
     void compressionLevelChanged(int level);
@@ -58,7 +55,7 @@ private:
     QByteArray m_outBuffer;
 
     size_t m_inBufferPos = 0;
-    size_t m_inBufferSize = 0; // Renamed from m_outBufferPos
+    size_t m_inBufferSize = 0;
 
     bool m_decompressionFinished = false;
 };

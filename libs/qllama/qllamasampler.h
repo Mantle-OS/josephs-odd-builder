@@ -20,7 +20,7 @@ class QLlamaSampler : public QLlamaBase
     QP_RW(double, temperature,    0.80)
     QP_RW(quint32, seed,          42)
 
-    // 2. Advanced Heuristics (XTC Truncation Boundaries)
+    // XTC Truncation Boundaries
     QP_RW(double, xtcProbability, 0.00) // 0 = disabled
     QP_RW(double, xtcThreshold,   0.10)
 
@@ -28,7 +28,7 @@ class QLlamaSampler : public QLlamaBase
     QP_RW(double, mirostatTau,    5.0)  // target entropy
     QP_RW(double, mirostatEta,    0.1)  // learning rate
 
-    // 4. Fallback Token Strategy Toggle
+    // Fallback
     QP_RW(bool,   useGreedy,      false) // If true, forces absolute argmax step bypassing the chain
 
 public:

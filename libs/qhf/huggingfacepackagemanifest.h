@@ -40,9 +40,9 @@ class HuggingFacePackageManifest : public QObject
 
 public:
     explicit HuggingFacePackageManifest(QObject *parent = nullptr) :
+        QObject{parent},
         m_siblings{new ObjectListModel<HuggingFaceFileManifest>{ this, "display", "rfilename"} },
-        m_branches{new ObjectListModel<HuggingFaceRepoBranch>{this, "display", "name"}},
-        QObject{parent}
+        m_branches{new ObjectListModel<HuggingFaceRepoBranch>{this, "display", "name"}}
     {
 
     }

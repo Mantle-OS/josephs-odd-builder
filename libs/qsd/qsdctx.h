@@ -231,6 +231,8 @@ private:
                                                 sd_img_gen_params_t params,
                                                 QSdImage* target,
                                                 bool autoSave);
+
+    // BROKEN just gonna use qggml
     void fillBackend(){
         if(m_ctx){
             // Now we can fill the backend manager

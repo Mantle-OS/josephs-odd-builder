@@ -1,8 +1,8 @@
 #include "qsdguidanceparams.h"
 
 QSdGuidanceParams::QSdGuidanceParams(QObject *parent) :
-    m_slg{new QSdSlgParams{this}},
-    QSdBaseParam{parent}
+    QSdBaseParam{parent},
+    m_slg{new QSdSlgParams{this}}
 {
     // m_slg->setSlgParams(&m_guidanceParams->slg);
     resetGuidanceParams();

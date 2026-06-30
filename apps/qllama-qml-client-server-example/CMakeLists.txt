@@ -15,7 +15,6 @@ qt_add_qml_module(qllama-qml-client-server-example
     VERSION 1.0
     QML_FILES
         main.qml
-        QML_FILES ChatView.qml
 )
 
 target_link_libraries(qllama-qml-client-server-example PRIVATE

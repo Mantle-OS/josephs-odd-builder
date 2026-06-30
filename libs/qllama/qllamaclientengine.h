@@ -43,7 +43,7 @@ private:
     };
 
     void processNextNetworkRequest();
-
+    // FIXME there is cross thread waky things goiing on I must rebuild replay but this works for now as it is one then another
     QNetworkAccessManager *m_nam              = nullptr;
     QNetworkReply         *m_currentReply     = nullptr;
     StreamReqItem         *m_currentReqItem   = nullptr;

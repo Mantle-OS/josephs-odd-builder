@@ -1,0 +1,40 @@
+tag: "session.user"
+version: 1
+unit: "session"
+base: "user"
+c_struct: "AiSessionUser"
+include_prefix: "aisession"
+out_base: "session_user"
+fields:
+  - name: "user_id"
+    type: "str"
+    required: true
+    comment: "Stable local user id."
+  - name: "display_name"
+    type: "str"
+    required: true
+  - name: "icon"
+    type: "str"
+    required: false
+  - name: "vault_path"
+    type: "str"
+    required: true
+    comment: "Path to encrypted/compressed private vault."
+  - name: "password_hash"
+    type: "str"
+    required: true
+    comment: "Argon2id modular crypt string from crypto_pwhash_str."
+  - name: "kdf_alg"
+    type: "u32"
+    required: true
+    comment: "ARGON2ID13=0"
+  - name: "kdf_salt"
+    type: "bin[16]"
+    required: true
+    comment: "crypto_pwhash_SALTBYTES salt used to derive the vault key."
+  - name: "created_at"
+    type: "str"
+    required: false
+  - name: "last_login"
+    type: "str"
+    required: false

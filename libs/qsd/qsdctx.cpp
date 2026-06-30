@@ -1,11 +1,11 @@
 #include "qsdctx.h"
 
 QSD::QSD(QObject *parent) :
+    QObject{parent},
     m_ContextParams{new QSdCtxParams{this}},
     m_ImageGenerationParams{new QSdImgGenParams{this}},
     m_VideoGenerationParams{new QSdVidGenParams{this}},
-    m_Backend{new ObjectListModel<QSdBackendDevice>{this, "", ""}},
-    QObject{parent}
+    m_Backend{new ObjectListModel<QSdBackendDevice>{this, "", ""}}
 {
 
     QAiUtils::debugPaths();
@@ -138,7 +138,7 @@ void QSD::setTotalSteps(int newTotalSteps)
     if (m_totalSteps == newTotalSteps)
         return;
     m_totalSteps = newTotalSteps;
-    Q_EMIT totalSteps();
+    Q_EMIT totalStepsChanged();
 }
 
 float QSD::progressionTime() const

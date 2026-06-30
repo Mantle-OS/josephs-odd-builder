@@ -31,11 +31,12 @@ public:
         m_userManager{new HuggingFaceUserManager{this}},
         m_downloadManager{new QDownloader{this}},
         m_api{new HuggingFaceApi{this}}
-    {}
-    ~HuggingFaceHub()
     {
         connect(m_userManager, &HuggingFaceUserManager::loggedIn,
                 this, &HuggingFaceHub::loggedIn);
+    }
+    ~HuggingFaceHub()
+    {
     }
 
     Q_INVOKABLE void login(){

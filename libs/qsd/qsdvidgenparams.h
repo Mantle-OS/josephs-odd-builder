@@ -14,7 +14,7 @@
 #include "qsdlora.h"
 #include "qsdsampleparams.h"
 #include "qsdtilingparams.h"
-
+// NOT TESTED YET
 class QSdVidGenParams : public QObject
 {
     Q_OBJECT

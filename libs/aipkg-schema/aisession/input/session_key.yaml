@@ -1,0 +1,29 @@
+# session_key.yaml
+tag: "session.session_key"
+version: 1
+unit: "session"
+base: "session_key"
+c_struct: "AiSessionKey"
+include_prefix: "aisession"
+out_base: "session_key"
+fields:
+  - name: "key_id"
+    type: "str"
+    required: true
+  - name: "kind"
+    type: "u32"
+    required: true
+    comment: "IDENTITY=0, PACKAGE_SIGNING=1, LEDGER_SIGNING=2"
+  - name: "public_key"
+    type: "bin"
+    required: true
+  - name: "secret_key"
+    type: "bin"
+    required: true
+    comment: "Loaded into QSecureMem after vault unlock."
+  - name: "created_at"
+    type: "str"
+    required: false
+  - name: "enabled"
+    type: "bool"
+    required: true

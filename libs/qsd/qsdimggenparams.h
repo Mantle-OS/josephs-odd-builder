@@ -60,7 +60,7 @@ public:
         for (QSdLora *i : m_loras->toList()) {
             sd_lora_t lo = i->lora();
             m_loraVec.push_back(i->lora());
-            // FIXME
+            // FIXME LATER
         }
 
         ret.loras      = m_loraVec.empty() ? nullptr : m_loraVec.data();
@@ -105,7 +105,7 @@ public:
     {
 
         if(other.loras){
-            for(int i = 0; i < other.lora_count; i++){
+            for(uint32_t i = 0; i < other.lora_count; i++){
                 QString lora_fileName = QString::fromLatin1(other.loras[i].path);
                 QSdLora *nLora = m_loras->getByUid(lora_fileName);
                 if(nLora == Q_NULLPTR){

@@ -12,7 +12,7 @@ class QSdAudio : public QSdBaseParam
     QP_RW(quint32,  channels,        0)
     QP_RW(quint64,  sampleCount,     0)
 
-    Q_PROPERTY(float *data READ data NOTIFY dataChanged FINAL)
+    // Q_PROPERTY(float *data READ data NOTIFY dataChanged FINAL) // ## not really for QML land
 
     QML_ELEMENT
 public:

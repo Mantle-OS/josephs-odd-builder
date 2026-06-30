@@ -65,6 +65,8 @@ bool QAiUtils::createDefaultDirs(){
     dirs.append(QAiUtils::pluginsDir);
     dirs.append(QAiUtils::extraQmlDir);
 
+    dirs.append(QAiUtils::userDir);
+
     for (const QString &dir : dirs)
         if(createDir(dir))
             ret = ret + 1;
@@ -199,6 +201,11 @@ QAiUtils::QAiUtils()
     pluginsDir              = QString("%1/plugins").arg(QAiUtils::appRuntimeDir);
     extraQmlDir             = QString("%1/qml").arg(QAiUtils::appRuntimeDir);
 
+
+    userDir                 = QString("%1/users").arg(baseDir);
+    userJson                = QString("%1/users.json").arg(userDir);
+
+
 }
 
 QString QAiUtils::appName               = "qt-stable-diffusion";
@@ -227,3 +234,6 @@ QString QAiUtils::packagesDir           = QStandardPaths::writableLocation(QStan
 
 QString QAiUtils::pluginsDir            = QString("%1/plugins").arg(appRuntimeDir);
 QString QAiUtils::extraQmlDir           = QString("%1/qml").arg(appRuntimeDir);
+
+QString QAiUtils::userDir               = QString("%1/users").arg(baseDir);
+QString QAiUtils::userJson              = QString("%1/users.json").arg(userDir);

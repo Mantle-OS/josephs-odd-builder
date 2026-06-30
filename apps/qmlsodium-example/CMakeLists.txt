@@ -5,17 +5,6 @@ project(qml-sodium-example
 
 set(CMAKE_AUTOMOC ON)
 
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(LibSodium  REQUIRED libsodium)
-
-find_package(Qt6 6.2 COMPONENTS
-    Core
-    Gui
-    Quick
-    Qml
-  REQUIRED
-)
-
 set(SODIUM_EXAMPLE_QML
     main.qml
     SecureBox.qml    # showing how QmlSodiumBox Element works

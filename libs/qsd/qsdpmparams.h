@@ -14,7 +14,7 @@
 class QSdPmParams : public QSdBaseParam
 {
     Q_OBJECT
-    QP_PTR_RO(QSdImage, idImages)
+    QP_PTR_RO(QSdImage, idImages) // owned
 
     QP_RW(int,          idImagesCount,  0       )
     QP_RW(QString,      idEmbedPath,    ""      )
@@ -22,8 +22,8 @@ class QSdPmParams : public QSdBaseParam
     QML_ELEMENT
 public:
     explicit QSdPmParams(QObject *parent = nullptr):
-        m_idImages{new QSdImage{}},
-        QSdBaseParam{parent}
+        QSdBaseParam{parent},
+        m_idImages{new QSdImage{}}
     {
         resetPmParams();
     }

@@ -4,16 +4,6 @@ project(qt-stable-diffusion-example
 )
 
 set(CMAKE_AUTOMOC ON)
-find_package(yaml-cpp REQUIRED)
-find_package(Qt6 6.2 COMPONENTS
-    Core
-    Gui
-    Network
-    Quick
-    Qml
-    Concurrent
-  REQUIRED
-)
 
 set(QSD_EXAMPLE_QML
     main.qml
