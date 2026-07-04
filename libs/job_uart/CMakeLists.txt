@@ -42,6 +42,7 @@ target_include_directories(JosephsOddBuilder_Uart PRIVATE
 target_link_libraries(JosephsOddBuilder_Uart PRIVATE
     ${LibUdev_LIBRARIES}
     JosephsOddBuilder_Core
+    JosephsOddBuilder_IO
     JosephsOddBuilder_Threads
 )
 

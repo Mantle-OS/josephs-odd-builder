@@ -12,6 +12,8 @@ set(JOBIO_SOURCES
     job_shared_memory.cpp
 )
 set(JOBIO_HEADERS
+    io_base.h
+    job_permissions.h
     pty_io.h
     file_io.h
     mock_io.h

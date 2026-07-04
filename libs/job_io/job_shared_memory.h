@@ -87,7 +87,7 @@ public:
     [[nodiscard]] const void *data() const;
 
     // Header access for diagnostics
-    [[nodiscard]] const threads::JobSharedMemoryHeader *header() const;
+    [[nodiscard]] const JobSharedMemoryHeader *header() const;
 
     // Utils for ring buffer stats
     [[nodiscard]] size_t availableToRead();
@@ -98,7 +98,7 @@ private:
     size_t                          m_requested_size{0};
     int                             m_shm_fd{-1};
     void                            *m_mapped_ptr{MAP_FAILED};
-    threads::JobSharedMemoryHeader  *m_header{nullptr};
+    JobSharedMemoryHeader           *m_header{nullptr};
     uint8_t                         *m_data_ptr{nullptr};
     bool                            m_nonBlocking{false};
     SharedMemoryMode                m_mode{SharedMemoryMode::Read};

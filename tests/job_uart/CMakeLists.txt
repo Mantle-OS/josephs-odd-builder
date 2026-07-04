@@ -12,6 +12,7 @@ target_link_libraries(test_job_uart PRIVATE
     ${CatchTwo_LIBRARIES}
     ${LibUdev_LIBRARIES}
     JosephsOddBuilder_Threads
+    JosephsOddBuilder_IO
     JosephsOddBuilder_Uart
 )
 

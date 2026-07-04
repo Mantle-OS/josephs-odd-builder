@@ -26,6 +26,8 @@ public:
 
     // main method that copys the SecureMem this is called from Qml
     QmlSecureMem *get_password() noexcept;
+
+    // pass the pointer from the secure text input to here and copy it up
     Q_INVOKABLE bool setPassword(QmlSecureMem *source) noexcept;
 
     Q_INVOKABLE bool encryptString(const QString &plainText);

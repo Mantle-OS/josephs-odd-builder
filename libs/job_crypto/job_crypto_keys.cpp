@@ -4,6 +4,10 @@
 #include <iostream>
 
 #include <sodium.h>
+#include <sodium/crypto_kx.h>
+#include <sodium/crypto_sign.h>
+#include <sodium/utils.h>
+
 
 #include "job_crypto_init.h"
 #include "job_crypto_utils.h"
@@ -26,6 +30,16 @@ JobCryptoKeys::JobCryptoKeys()
         baseConfig = std::filesystem::current_path() / "config" / "jobcrypto";
     }
     m_keysDirs.push_back(baseConfig);
+}
+
+bool JobCryptoKeys::setPublicKey(const std::vector<unsigned char> &publicKeyBytes) noexcept
+{
+    if (publicKeyBytes.empty())
+        return false;
+
+    m_publicKey = std::string(reinterpret_cast<const char*>(publicKeyBytes.data()),
+                              publicKeyBytes.size());
+    return true;
 }
 
 void JobCryptoKeys::setPrivateKey(const JobSecureMem &privKey)

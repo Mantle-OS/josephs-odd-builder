@@ -12,11 +12,9 @@ set(JOBCORE_SOURCES
 set(JOBCORE_HEADERS
     crc32.h
     endian_utils.h
-    real_type.h      ## REMOVE ME FIXME
-    io_base.h
+    real_type.h
     job_logger.h
     job_timer.h
-    job_permissions.h
     job_assert.h
     split_mix64.h
     aligned_allocator.h

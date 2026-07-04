@@ -20,9 +20,134 @@ QmlSecureMemInput::~QmlSecureMemInput()
     secureWipe();
 }
 
-QColor QmlSecureMemInput::borderColor() const noexcept noexcept
+int QmlSecureMemInput::length() const noexcept
+{
+    return m_maskCount;
+}
+
+QColor QmlSecureMemInput::borderColor() const noexcept
 {
     return m_borderColor;
+}
+
+void QmlSecureMemInput::setBorderColor(const QColor &color)
+{
+    if (m_borderColor != color) {
+        m_borderColor = color;
+        Q_EMIT borderColorChanged();
+        update();
+    }
+}
+
+void QmlSecureMemInput::setMaskColor(const QColor &color) {
+    if (m_maskColor != color) {
+        m_maskColor = color;
+        Q_EMIT maskColorChanged();
+        update();
+    }
+}
+
+void QmlSecureMemInput::secureWipe() noexcept
+{
+    bool rearmed = false;
+
+    if (m_secureBuffer && m_secureBuffer->mem()) {
+        m_secureBuffer->mem()->clear();
+        rearmed = m_secureBuffer->mem()->allocate(kSecureInputCapacity);
+    }
+
+    m_byteCount = 0;
+    m_maskCount = 0;
+    m_inputByteLengths.clear();
+
+    Q_EMIT lengthChanged();
+    Q_EMIT secureWipeExecuted();
+    update();
+
+    if (!rearmed) {
+        // LOG: QmlSecureMemInput failed to re-arm secure buffer after wipe.
+    }
+}
+
+void QmlSecureMemInput::focusInEvent(QFocusEvent *event)
+{
+    update();
+    QQuickItem::focusInEvent(event);
+}
+
+void QmlSecureMemInput::focusOutEvent(QFocusEvent *event)
+{
+    update();
+    QQuickItem::focusOutEvent(event);
+}
+
+void QmlSecureMemInput::keyPressEvent(QKeyEvent *event)
+{
+    if (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter) {
+        Q_EMIT  returnPressed();
+        event->accept();
+        return;
+    }
+
+    if (event->key() == Qt::Key_Backspace) {
+        if (!m_inputByteLengths.empty()) {
+            uint8_t const bytesToRemove = m_inputByteLengths.back();
+            m_inputByteLengths.pop_back();
+
+            m_byteCount -= bytesToRemove;
+            --m_maskCount;
+
+            // Zero out memory slice "safely"
+            std::memset( m_secureBuffer->mem()->data() + m_byteCount, 0, bytesToRemove );
+
+            Q_EMIT lengthChanged();
+            update();
+        }
+
+        event->accept();
+        return;
+    }
+
+    QString const text = event->text();
+    if (!text.isEmpty()) {
+        QByteArray const rawBytes = text.toUtf8();
+
+        if (rawBytes.isEmpty()) {
+            event->accept();
+            return;
+        }
+
+        if (rawBytes.size() > std::numeric_limits<uint8_t>::max()) {
+            event->accept();
+            return;
+        }
+
+        // Check bounds
+        if (static_cast<size_t>(m_byteCount + rawBytes.size()) <= static_cast<size_t>(m_secureBuffer->mem()->size())) {
+            std::memcpy(
+                m_secureBuffer->mem()->data() + m_byteCount,
+                rawBytes.constData(),
+                static_cast<size_t>(rawBytes.size())
+                );
+
+            m_byteCount += rawBytes.size();
+            ++m_maskCount;
+            m_inputByteLengths.push_back(static_cast<uint8_t>(rawBytes.size()));
+
+            Q_EMIT lengthChanged();
+            update();
+        }
+
+        event->accept();
+        return;
+    }
+
+    QQuickItem::keyPressEvent(event);
+}
+
+QColor QmlSecureMemInput::maskColor() const noexcept
+{
+    return m_maskColor;
 }
 
 QSGNode *QmlSecureMemInput::updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *)

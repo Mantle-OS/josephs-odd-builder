@@ -1,6 +1,8 @@
 #pragma once
-#include <cstdint>
+
 #include <bit>
+#include <cstdint>
+#include <limits>
 #include <type_traits>
 
 namespace job::core {
@@ -11,6 +13,7 @@ namespace job::core {
 //
 // SplitMix64 walks into a bar... The bartender says "Why the long face?"
 // "I'm 64 bits, but everyone still treats me like I'm just a stepping stone to something better."
+
 struct SplitMix64 {
     uint64_t m_state;
 
@@ -51,7 +54,8 @@ struct SplitMix64 {
         return min + nextDouble() * (max - min);
     }
 
-    constexpr void seed(uint64_t s) {
+    constexpr void seed(uint64_t s)
+    {
         m_state = s;
     }
 
@@ -61,20 +65,34 @@ struct SplitMix64 {
         if (maxExclusive == 0)
             return 0;
 
+#if defined(__SIZEOF_INT128__)
         // Lemire: uniform in [0, maxExclusive)
         uint64_t x = next();
         __uint128_t m = static_cast<__uint128_t>(x) * maxExclusive;
         uint64_t l = static_cast<uint64_t>(m);
 
         if (l < maxExclusive) {
-            const uint64_t t = (0ull - maxExclusive) % maxExclusive;
+            uint64_t const t = (0ull - maxExclusive) % maxExclusive;
             while (l < t) {
                 x = next();
                 m = static_cast<__uint128_t>(x) * maxExclusive;
                 l = static_cast<uint64_t>(m);
             }
         }
+
         return static_cast<uint64_t>(m >> 64);
+#else
+        // Portable rejection sampling fallback -- same wraparound trick as the
+        // 128-bit path above. It rejects the low tail instead of using a wide
+        // multiply, because some compilers came to the party without a 128-bit hat.
+        uint64_t const threshold = (0ull - maxExclusive) % maxExclusive;
+
+        uint64_t x = next();
+        while (x < threshold)
+            x = next();
+
+        return x % maxExclusive;
+#endif
     }
 
     // Uniform integer in [min, max]. If max < min, returns min.
@@ -85,10 +103,10 @@ struct SplitMix64 {
 
         // Handle full-range case without (max-min+1) overflow.
         // If min==0 && max==UINT64_MAX, every uint64_t is valid: return next().
-        if (min == 0 && max == UINT64_MAX)
+        if (min == 0 && max == std::numeric_limits<uint64_t>::max())
             return next();
 
-        const uint64_t span = (max - min) + 1; // safe now (not full range)
+        uint64_t const span = (max - min) + 1; // safe now (not full range)
         return min + rangeIndex(span);
     }
 

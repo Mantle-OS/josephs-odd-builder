@@ -10,8 +10,11 @@
 #include <utility>
 #include <vector>
 
+#include <sodium/crypto_sign.h>
+
 #include <iostream>
 
+#include "job_crypto_utils.h"
 #include "job_secure_mem.h"
 
 namespace job::crypto {
@@ -34,14 +37,102 @@ public:
 
     [[nodiscard]] std::string publicKey() const noexcept { return m_publicKey; }
     void setPublicKey(const std::string &pubKey) { m_publicKey = pubKey; }
-    [[nodiscard]] bool setPublicKey(const std::vector<unsigned char> &publicKeyBytes) noexcept {
-        if (publicKeyBytes.empty())
+    [[nodiscard]] bool setPublicKey(const std::vector<unsigned char> &publicKeyBytes) noexcept;
+    [[nodiscard]] std::string publicKeyData(const std::filesystem::path &pub) noexcept
+    {
+        std::error_code existsEc;
+        if (pub.empty() || !std::filesystem::exists(pub, existsEc))
+            return {};
+
+        std::ifstream file(pub, std::ios::binary);
+        if (!file)
+            return {};
+
+        std::ostringstream content;
+        content << file.rdbuf();
+
+        std::vector<unsigned char> pubKeyBin;
+        if (!crypto::utils::base64ToBin(pubKeyBin, content.str()))
+            return {};
+
+        return crypto::utils::toBase64(pubKeyBin);
+    }
+    [[nodiscard]] bool validPublicKey(const std::filesystem::path &publicKeyFile) noexcept
+    {
+        std::error_code existsEc;
+        if (publicKeyFile.empty() || !std::filesystem::exists(publicKeyFile, existsEc))
             return false;
 
-        m_publicKey = std::string(reinterpret_cast<const char*>(publicKeyBytes.data()),
-                                  publicKeyBytes.size());
-        return true;
+        std::ifstream file(publicKeyFile, std::ios::binary);
+        if (!file)
+            return false;
+
+        std::ostringstream content;
+        content << file.rdbuf();
+
+        std::vector<unsigned char> pubKeyBin;
+        if (!crypto::utils::base64ToBin(pubKeyBin, content.str()))
+            return false;
+
+        return pubKeyBin.size() == crypto_sign_PUBLICKEYBYTES;
     }
+
+    [[nodiscard]] bool privateKeyMatchesPublicKey(KeyType type) const noexcept
+    {
+        std::vector<unsigned char> pubKeyBin;
+        if (!crypto::utils::base64ToBin(pubKeyBin, publicKey()))
+            return false;
+
+        switch (type) {
+        case KeyType::Exchange: {
+            if (privateKey().size() != crypto_kx_SECRETKEYBYTES ||
+                pubKeyBin.size() != crypto_kx_PUBLICKEYBYTES)
+                return false;
+
+            unsigned char derivedPub[crypto_kx_PUBLICKEYBYTES];
+
+            if (crypto_scalarmult_base(derivedPub, privateKey().data()) != 0)
+                return false;
+
+            bool const matches = sodium_memcmp(
+                                     derivedPub,
+                                     pubKeyBin.data(),
+                                     crypto_kx_PUBLICKEYBYTES
+                                     ) == 0;
+
+            sodium_memzero(derivedPub, sizeof(derivedPub));
+            return matches;
+        }
+
+        case KeyType::Sign: {
+            if (privateKey().size() != crypto_sign_SECRETKEYBYTES ||
+                pubKeyBin.size() != crypto_sign_PUBLICKEYBYTES)
+                return false;
+
+            unsigned char derivedPub[crypto_sign_PUBLICKEYBYTES];
+            unsigned char derivedSk[crypto_sign_SECRETKEYBYTES];
+
+            if (crypto_sign_seed_keypair(derivedPub, derivedSk, privateKey().data()) != 0) {
+                sodium_memzero(derivedSk, sizeof(derivedSk));
+                sodium_memzero(derivedPub, sizeof(derivedPub));
+                return false;
+            }
+
+            bool const matches = sodium_memcmp(
+                                     derivedPub,
+                                     pubKeyBin.data(),
+                                     crypto_sign_PUBLICKEYBYTES
+                                     ) == 0;
+
+            sodium_memzero(derivedSk, sizeof(derivedSk));
+            sodium_memzero(derivedPub, sizeof(derivedPub));
+            return matches;
+        }
+        }
+
+        return false;
+    }
+
 
     [[nodiscard]] JobSecureMem privateKey() const noexcept { return m_privateKey; }
     void setPrivateKey(const JobSecureMem &privKey);
@@ -108,8 +199,9 @@ public:
         if (priFile.fail())
             return false;
 
-        std::cout << "[DEBUG SAVE] Private Key Size in memory: " << m_privateKey.size() << "\n";
-
+#ifndef NDEBUG
+        // std::cout << "[DEBUG SAVE] Private Key Size in memory: " << m_privateKey.size() << "\n";
+#endif
 
         return true;
     }

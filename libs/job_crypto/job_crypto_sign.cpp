@@ -41,7 +41,7 @@ bool JobCryptoSign::signFile(const std::string &filePath, std::string &outSignat
 
     if (!isValid() || privateKey().size() != crypto_sign_SECRETKEYBYTES) {
 #ifndef NDEBUG
-        std::cerr << "[jobcrypto::JobCryptoSign] Invalid state envelope context or unexpected private key dimensions.\n"; // BOOM
+        std::cerr << "[jobcrypto::JobCryptoSign] Invalid state envelope context or unexpected private key dimensions.\n";
 #endif
         return false;
     }
@@ -103,30 +103,6 @@ bool JobCryptoSign::signAssociatedFile(const std::string &associatedPath, std::s
 }
 
 
-// bool JobCryptoSign::verifyFile(const std::string &filePath, const std::string &signatureBase64) noexcept
-// {
-//     std::vector<unsigned char> sigBin;
-//     if (!crypto::utils::base64ToBin(sigBin, signatureBase64) || sigBin.size() != crypto_sign_BYTES)
-//         return false;
-
-//     std::vector<unsigned char> pubKeyBin;
-//     if (!crypto::utils::base64ToBin(pubKeyBin, publicKey()) || pubKeyBin.size() != crypto_sign_PUBLICKEYBYTES)
-//         return false;
-
-//     std::ifstream stream(filePath, std::ios::binary);
-//     if (!stream.is_open())
-//         return false;
-
-//     crypto_sign_state state;
-//     crypto_sign_init(&state);
-
-//     std::vector<char> buffer(kChunkSize);
-//     while (stream.read(buffer.data(), kChunkSize) || stream.gcount() > 0)
-//         crypto_sign_update(&state, reinterpret_cast<const unsigned char*>(buffer.data()), stream.gcount());
-
-//     int const result = crypto_sign_final_verify(&state, sigBin.data(), pubKeyBin.data());
-//     return (result == 0);
-// }
 
 bool JobCryptoSign::verifyAssociatedFile(const std::string &signatureBase64) noexcept
 {

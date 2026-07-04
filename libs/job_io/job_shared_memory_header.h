@@ -5,7 +5,7 @@
 
 #include <endian_utils.h>
 
-namespace job::threads {
+namespace job::io {
 struct alignas(64)  JobSharedMemoryHeader {
     // static vars
     static constexpr uint32_t       kSmMagic            = 0x534D454D;           // "SMEM" (shared memory)

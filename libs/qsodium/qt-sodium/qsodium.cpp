@@ -18,23 +18,6 @@ bool QSodium::isInitialized() const noexcept
     return m_cryptoBackend.isInitialized();
 }
 
-// bool QSodium::verifyFileSignature(const QString &filePath,
-//                                   const QString &publicKeyBase64,
-//                                   const QString &signatureBase64) noexcept
-// {
-//     if (!isInitialized())
-//         return false;
-
-//     // Decode base64 strings down to clean native data bytes
-//     QByteArray const pubKeyBytes = QByteArray::fromBase64(publicKeyBase64.toUtf8());
-//     QByteArray const signatureBytes = QByteArray::fromBase64(signatureBase64.toUtf8());
-
-//     std::vector<unsigned char> const nativePubKey(pubKeyBytes.constData(), pubKeyBytes.constData() + pubKeyBytes.size());
-//     std::vector<unsigned char> const nativeSignature(signatureBytes.constData(), signatureBytes.constData() + signatureBytes.size());
-
-//     return m_cryptoBackend.verifyFileSignature(filePath.toStdString(), nativePubKey, nativeSignature);
-// }
-
 QString QSodium::computeFileBlake2b(const QString &filePath) noexcept
 {
     if (!isInitialized())

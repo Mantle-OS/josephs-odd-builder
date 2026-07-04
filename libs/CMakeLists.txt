@@ -1,6 +1,7 @@
 add_subdirectory(job_core)
 add_subdirectory(job_threads)
 add_subdirectory(job_crypto)
+add_subdirectory(job_zstd)
 add_subdirectory(job_simd)
 if(JOB_CUDA)
     add_subdirectory(job_cuda)

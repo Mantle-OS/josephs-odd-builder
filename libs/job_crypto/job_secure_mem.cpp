@@ -182,6 +182,7 @@ std::string JobSecureMem::toBase64(int variant) const
     return out;
 }
 
+// job_secure_mem.cpp
 bool JobSecureMem::fromBase64(const std::string &encoded, int variant)
 {
     if (encoded.empty())
@@ -194,24 +195,29 @@ bool JobSecureMem::fromBase64(const std::string &encoded, int variant)
     if (sodium_base642bin(temp.data(), temp.size(),
                           encoded.c_str(), encoded.size(),
                           nullptr, &dec_len, nullptr, variant) != 0) {
+        sodium_memzero(temp.data(), temp.size());
         return false;
     }
 
     if (!allocate(dec_len)) {
+        sodium_memzero(temp.data(), temp.size());
         return false;
     }
     if (dec_len > 0 && m_data)
         std::memcpy(m_data, temp.data(), dec_len);
+
+    sodium_memzero(temp.data(), temp.size());
     return true;
 }
 
 std::string JobSecureMem::fromBase64toString(const std::string &encoded, int variant) const
 {
+#if defined(JOB_SECUREMEM_ALLOW_STRING) && !defined(NDEBUG)
     if (encoded.empty())
         return {};
 
     size_t const max_dec = (encoded.size() * 3) / 4 + 3;
-    JobSecureMem decodedBuffer(max_dec); // Allocated inside locked, non-swappable space
+    JobSecureMem decodedBuffer(max_dec);
 
     size_t outLen = 0;
     if (sodium_base642bin(decodedBuffer.data(), decodedBuffer.size(),
@@ -221,6 +227,11 @@ std::string JobSecureMem::fromBase64toString(const std::string &encoded, int var
         return std::string(reinterpret_cast<char*>(decodedBuffer.data()), outLen);
     }
     return {};
+#else
+    static_cast<void>(encoded);
+    static_cast<void>(variant);
+    throw std::runtime_error("JobSecureMem::fromBase64toString() disabled in production builds");
+#endif
 }
 
 bool JobSecureMem::operator==(const JobSecureMem &other) const noexcept

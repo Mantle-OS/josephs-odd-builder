@@ -52,15 +52,6 @@ endif()
 
 
 
-option(JOB_TEST_BENCHMARKS "build and run the benchhmarks in the tests" ON)
-if(CMAKE_BUILD_TYPE STREQUAL "Release" AND JOB_TEST_BENCHMARKS)
-    message("-- Building benchmarks into tests")
-    add_compile_definitions(JOB_TEST_BENCHMARKS)
-elseif(NOT CMAKE_BUILD_TYPE STREQUAL "Release" AND JOB_TEST_BENCHMARKS)
-    message("-- Invaild Build type for for benchmarks")
-else()
-    message("-- Not adding tests for benchmarks")
-endif()
 
 
 
@@ -74,4 +65,14 @@ option(JOB_SER_FLATBUFFERS_BINDINGS "Enable FlatBuffers backend" OFF)
 option(JOB_CI_BUILD "Enable settings specific to CI environments" OFF)
 if(JOB_CI_BUILD)
     add_compile_definitions(JOB_CI_BUILD)
+endif()
+
+option(JOB_TEST_BENCHMARKS "build and run the benchhmarks in the tests" ON)
+if(CMAKE_BUILD_TYPE STREQUAL "Release" AND JOB_TEST_BENCHMARKS)
+    message("-- Building benchmarks into tests")
+    add_compile_definitions(JOB_TEST_BENCHMARKS)
+elseif(NOT CMAKE_BUILD_TYPE STREQUAL "Release" AND JOB_TEST_BENCHMARKS)
+    message("-- Invaild Build type for for benchmarks")
+else()
+    message("-- Not adding tests for benchmarks")
 endif()

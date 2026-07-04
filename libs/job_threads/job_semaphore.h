@@ -420,4 +420,4 @@ private:
     std::string m_name;                 // for named semaphores
 };
 
-} // namespace job::core
+} // namespace job::threads
