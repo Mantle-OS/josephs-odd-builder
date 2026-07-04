@@ -14,8 +14,7 @@ qt_add_executable(qzstd-example
 target_link_libraries(qzstd-example PRIVATE
     Qt::Core
     Qt::Concurrent
-    ${LibSodium_LIBRARIES}
-    qt-sodium
+    ${LibSodium_LIBRARIES} JosephsOddBuilder_Crypto qt-sodium
     qt-zstd
 )
 

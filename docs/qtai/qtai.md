@@ -6,6 +6,8 @@ QtAI is currently an early alpha project under active development. APIs, library
 
 # QtAI
 
+Unlike JobAI  QtAi is for desktop builds and not emnbedded boards.
+
 QtAI is a collection of modern C++ and Qt libraries for building local AI applications without requiring Python. It provides reusable libraries for inference, model management, cryptography, sessions, package management, downloads, and Qt/QML integration.
 
 Unlike Job::AI, which targets constrained Unix-like systems and embedded AI infrastructure, QtAI targets Qt-based applications running on more capable hardware. QtAI is designed around native C++, Qt, and QML while remaining independent of Python.

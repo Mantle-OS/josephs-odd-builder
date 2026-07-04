@@ -17,7 +17,7 @@ Sodium support is split into two libraries:
 | Library                | Purpose                                          |
 | ---------------------- | ------------------------------------------------ |
 | `qt-sodium`            | C++ / QtCore library documented here.            |
-| `qtdeclarative-sodium` | QML-facing sodium helpers documented separately. |
+| `qml-sodium`           | QML-facing sodium helpers documented separately. |
 
 This document only covers the C++ side.
 

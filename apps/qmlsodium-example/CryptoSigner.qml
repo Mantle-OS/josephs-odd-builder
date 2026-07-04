@@ -33,7 +33,7 @@ Page {
                 Button {
                     text: qsTr("Browse...")
                     onClicked: {
-                        fileToSignPicker.fileToSign = true
+                        fileToSignPicker.fileToSign = 0
                         fileToSignPicker.open()
                     }
                 }
@@ -44,26 +44,36 @@ Page {
                 Label {
                     id: publicKeyLabel
                     property string publicKeyFilePath: ""
-                    text: qsTr("Public Key (B64): ") + publicKeyFilePath ;
+                    text: qsTr("Public Key File: ") + publicKeyFilePath ;
                     Layout.fillWidth: true
                 }
                 Button {
                     text: qsTr("Open Public Key File...")
                     onClicked: {
-                        fileToSignPicker.fileToSign = false
+                        fileToSignPicker.fileToSign = 1
                         fileToSignPicker.open()
                     }
                 }
                 Item { Layout.fillWidth: true } // Spacer
             }
 
-            TextArea {
-                id: pubKeyField
-                Layout.fillWidth: true
-                Layout.preferredHeight: 60
-                text: signer.publicKeyBase64
-                placeholderText: "Paste key or load key data from file above..."
-                onTextChanged: signer.publicKeyBase64 = text
+
+            RowLayout {
+                spacing: 10
+                Label {
+                    id: privateKeyLabel
+                    property string privateKeyFilePath: ""
+                    text: qsTr("Private Key File: ") + privateKeyFilePath ;
+                    Layout.fillWidth: true
+                }
+                Button {
+                    text: qsTr("Open Private Key File...")
+                    onClicked: {
+                        fileToSignPicker.fileToSign = 2
+                        fileToSignPicker.open()
+                    }
+                }
+                Item { Layout.fillWidth: true } // Spacer
             }
 
             RowLayout {
@@ -86,10 +96,12 @@ Page {
                     text: qsTr("Sign File")
                     onClicked: {
                         signDialog.title = qsTr("Signature Computation Pass")
-                        if (signer.signFile()) {
-                            signDialog.informativeText = qsTr("Success: Detached signature updated.")
+                        if(!signer.hasKeys()){
+                            signDialog.informativeText = qsTr("Failure: Could not load keys. make sure that you have picked out a public and private key")
                         } else {
-                            signDialog.informativeText = qsTr("Failed: Check key context and file location.")
+                            signer.signFile() ?
+                                signDialog.informativeText = qsTr("Success: Detached signature updated.") :
+                                signDialog.informativeText = qsTr("Failed: Check key context and file location.")
                         }
                         signDialog.open()
                     }
@@ -99,10 +111,12 @@ Page {
                     text: qsTr("Sign Associated File")
                     onClicked: {
                         signDialog.title = qsTr("Associated Key Sync Pass")
-                        if (signer.signAssociatedFile()) {
-                            signDialog.informativeText = qsTr("Success: Signature verified via binding.")
+                        if(!signer.hasKeys()){
+                            signDialog.informativeText = qsTr("Failure: Could not load keys. make sure that you have picked out a public and private key")
                         } else {
-                            signDialog.informativeText = qsTr("Failed: Action signature mismatch.")
+                            signer.signAssociatedFile() ?
+                                signDialog.informativeText = qsTr("Success: Signature verified via binding.") :
+                                signDialog.informativeText = qsTr("Failed: Action signature mismatch.")
                         }
                         signDialog.open()
                     }
@@ -112,10 +126,12 @@ Page {
                     text: qsTr("Verify Signature")
                     onClicked: {
                         signDialog.title = qsTr("Cryptographic Verification")
-                        if (signer.verifyAssociatedFile()) {
-                            signDialog.informativeText = qsTr("MATCH: Manifest verification successful.")
-                        } else {
-                            signDialog.informativeText = qsTr("REJECTED: Signature invalid or file altered.")
+                        if(!signer.hasKeys()){
+                            signDialog.informativeText = qsTr("Failure: Could not load keys. make sure that you have picked out a public and private key")
+                        }else{
+                            signer.verifyAssociatedFile() ?
+                                signDialog.informativeText = qsTr("MATCH: Manifest verification successful.") :
+                                signDialog.informativeText = qsTr("REJECTED: Signature invalid or file altered.")
                         }
                         signDialog.open()
                     }
@@ -126,11 +142,9 @@ Page {
                     onClicked: {
                         signDialog.title = qsTr("Hardware Checksum Compute")
                         let hashResult = signer.computeFileBlake2b()
-                        if (hashResult.length > 0) {
-                            signDialog.informativeText = qsTr("BLAKE2b Checksum:\n") + hashResult
-                        } else {
-                            signDialog.informativeText = qsTr("Hashed pass loop dropped.")
-                        }
+                        hashResult.length > 0 ?
+                                    signDialog.informativeText = qsTr("BLAKE2b Checksum:\n") + hashResult :
+                                    signDialog.informativeText = qsTr("Hashed pass loop dropped.")
                         signDialog.open()
                     }
                 }
@@ -140,25 +154,21 @@ Page {
 
     FileDialog {
         id: fileToSignPicker
-        property bool fileToSign: true
+        property int fileToSign: 0 //  0 = file to sign | 1 = pub key | 2 = pri key
 
         onAccepted: {
             let pathStr = selectedFile.toString()
-            if (pathStr.startsWith("file://")) {
+            if (pathStr.startsWith("file://"))
                 pathStr = pathStr.replace("file://", "")
-            }
 
-            if (fileToSign) {
+            if (fileToSign == 0) {
                 signer.filePath = pathStr
-            } else {
-                // Pipe the string straight to C++ and let the property notifications handle the UI text dump
-                if (!signer.loadPublicKeyFromFile(pathStr)) {
-                    signDialog.title = qsTr("File Load Error")
-                    signDialog.informativeText = qsTr("Could not read public key text from target file.")
-                    signDialog.open()
-                }
+            } else if (fileToSign == 1){
+                signer.publicKey = pathStr;
                 publicKeyLabel.publicKeyFilePath = pathStr
-
+            } else if (fileToSign == 2){
+                privateKeyLabel.privateKeyFilePath = pathStr
+                signer.privateKey = pathStr;
             }
         }
     }

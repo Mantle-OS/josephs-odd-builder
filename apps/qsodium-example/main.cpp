@@ -7,7 +7,7 @@
 
 #include <qsodium.h>
 
-static const QString kPass        = "secret_words";
+static const QString kPassText    = "secret_words";
 static const QString kDataToTest  = "HuggingFace Token: hf_ABC123XYZ789SecureManifestTokenData";
 static const QString kKeysDir     = "testKeys";
 static const QString ktestFile    = "test.txt";
@@ -89,9 +89,9 @@ int main(int argc, char *argv[])
     }
     qDebug() << "[+] TEST PASS: QSodium Engine service online.";
 
-    // Kews
+
     QSodiumCryptoSign signEngine;
-    if (!signEngine.createKeys(QSodiumKeys::KeyType::Sign)) {
+    if (!signEngine.createKeys(job::crypto::JobCryptoKeys::KeyType::Sign)) {
         qCritical() << "[-] TEST FAIL: Failed to generate Ed25519 signature keys.";
         return -1;
     }
@@ -109,18 +109,17 @@ int main(int argc, char *argv[])
     }
 
     QString signatureBase64;
-    // Fixed: Signature matching exactly your 2-argument member function layout
     if (!signEngine.signFile(testFile, signatureBase64)) {
         qCritical() << "[-] TEST FAIL: Digital signature calculation loop failed.";
         return -1;
     }
     qDebug() << "[+] TEST PASS: Document streaming signature computed.";
+
+    // Run verification pass via service orchestrator API OKAY EWE KNOW IT IS HERE AND I DID CHANGE THIS API LATE LAST NIGHT
     qDebug() << "    > Detached Signature (Base64):" << signatureBase64;
 
-
-
-    // Run verification pass via service orchestrator API
-    bool const sigValid = sodiumEngine.verifyFileSignature(testFile, signEngine.publicKey(), signatureBase64);
+    // Simple is as simple does
+    bool const sigValid = signEngine.verifyFile(testFile,  signatureBase64);
     if (!sigValid) {
         qCritical() << "[-] TEST FAIL: Core signature verification loop rejected authentic file.";
         return -1;
@@ -138,6 +137,10 @@ int main(int argc, char *argv[])
 
     QByteArray const randomSalt = QExtraRandom::randomSalt();
     QSecureMem derivedVaultKey;
+
+    const QByteArray passBytes = kPassText.toUtf8();
+    QSecureMem kPass(passBytes.size());
+    kPass.copyFrom(passBytes.constData(), passBytes.size());
 
     bool const keyDerived = QSodiumPasswordUtils::deriveKeyFromPassword(derivedVaultKey, kPass, randomSalt);
     if (!keyDerived || derivedVaultKey.size() != crypto_secretbox_KEYBYTES) {

@@ -24,6 +24,7 @@ class HuggingFaceHub : public QObject
     QP_PTR_RO(QDownloader,              downloadManager )
     QML_ELEMENT
     QML_SINGLETON
+
 public:
     explicit HuggingFaceHub(QObject *parent = nullptr) :
         QObject{parent},
@@ -61,6 +62,20 @@ public:
                 }
             });
         }
+    }
+
+public Q_SLOTS:
+    void handleSessionChanged(QAiUserSession *activeSession) noexcept
+    {
+        if (!activeSession || !activeSession->isActive()) {
+            m_userManager->useAnonymous();
+            m_api->setSecureSession(nullptr);
+            return;
+        }
+        m_userManager->syncFromGlobalSession(activeSession);
+        m_api->setSecureSession(activeSession, QStringLiteral("default"));
+
+        qDebug() << "[+] QHF Hub: Successfully attached to live global session channel.";
     }
 
 

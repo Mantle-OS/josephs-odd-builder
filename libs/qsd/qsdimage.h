@@ -276,20 +276,9 @@ protected:
 
         // Only upload the texture to the GPU hardware layers if the pixels actually changed
         if (m_imageChanged) {
-
-
             QSGTexture *texture = window()->createTextureFromImage(m_nativeImage);
             node->setTexture(texture);
             node->setOwnsTexture(true);
-
-
-            // // Automatically instantiates the underlying texture resource depending on backend (Vulkan/OpenGL/DirectX)
-            // QSGTexture *texture = window()->createTextureFromImage(m_nativeImage);
-            // // Ownership transfer: node deletes the texture wrapper automatically when done
-            // node->setOwnsTexture(true);
-            // node->setTexture(texture);
-
-
             m_imageChanged = false;
         }
 

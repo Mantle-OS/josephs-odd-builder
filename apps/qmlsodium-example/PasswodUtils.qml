@@ -7,10 +7,7 @@ import Sodium
 Page {
     id: rootPasswordUtilsPage
 
-    QmlSodiumPasswordUtils {
-        id: pwdUtils
-        // QP_RW(QString, password, "")
-    }
+    QmlSodiumPasswordUtils { id: passUtils }
 
     Item {
         width: parent.width * 0.80
@@ -23,21 +20,40 @@ Page {
 
             RowLayout {
                 spacing: 10
-                Label { text: qsTr("Password Input:"); Layout.preferredWidth: 120 }
-                SecureTextField {
-                    id: passwordInput
-                    Layout.fillWidth: true
-                    // placeholderText: "Type password entropy string..."
+                Layout.fillWidth: true
 
-                    onValueCommitted: (clearText) => {
-                        pwdUtils.password = clearText
+                Label {
+                    text: qsTr("Password Input:")
+                    Layout.preferredWidth: 120
+                }
+
+                QmlSecureMemInput {
+                    id: passUtilsField
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 32
+
+                    onReturnPressed: {
+                        if (passUtils.setPassword(passUtilsField.memory)) {
+                            passUtilsField.secureWipe()
+                            utilsDialog.title = qsTr("Password Buffer")
+                            utilsDialog.informativeText = qsTr("Password copied into secure memory.")
+                            utilsDialog.open()
+                        } else {
+                            console.error("Secure password memory copy failed.")
+                        }
                     }
                 }
             }
 
             RowLayout {
                 spacing: 10
-                Label { text: qsTr("Storage Crypt Hash:"); Layout.preferredWidth: 120 }
+                Layout.fillWidth: true
+
+                Label {
+                    text: qsTr("Storage Crypt Hash:")
+                    Layout.preferredWidth: 120
+                }
+
                 TextArea {
                     id: cryptHashField
                     Layout.fillWidth: true
@@ -53,40 +69,60 @@ Page {
 
                 Button {
                     text: qsTr("Hash for Storage")
+
                     onClicked: {
                         utilsDialog.title = qsTr("Argon2id Hash Routine")
 
-                        // Compute using the state currently bound to the backend
-                        let resultStr = pwdUtils.hashForStorage();
+                        const resultStr = passUtils.hashForStorage()
 
                         if (resultStr.length > 0) {
-                            cryptHashField.text = resultStr;
-                            utilsDialog.informativeText = qsTr("Success: Password securely salted and processed. Crypt string output populated below.");
+                            cryptHashField.text = resultStr
+                            passUtils.clearPassword()
+
+                            utilsDialog.informativeText =
+                                qsTr("Success: Password securely salted and processed. Crypt string output populated below.")
                         } else {
-                            utilsDialog.informativeText = qsTr("Aborted: Current password buffer property is empty.");
+                            utilsDialog.informativeText =
+                                qsTr("Aborted: Current password buffer is empty.")
                         }
-                        utilsDialog.open();
+
+                        utilsDialog.open()
                     }
                 }
 
                 Button {
                     text: qsTr("Verify Against Storage")
+
                     onClicked: {
                         utilsDialog.title = qsTr("Authentication Match Pass")
 
                         if (cryptHashField.text.length === 0) {
-                            utilsDialog.informativeText = qsTr("Error: Please provide a valid storage crypt string to match against.");
+                            utilsDialog.informativeText = qsTr("Error: Please provide a valid storage crypt string to match against.")
                         } else {
-                            // Run deep verification check via C++ stack
-                            let match = pwdUtils.verifyAgainstStorage(cryptHashField.text);
+                            const match = passUtils.verifyAgainstStorage(cryptHashField.text)
+                            passUtils.clearPassword()
 
                             if (match) {
-                                utilsDialog.informativeText = qsTr("ACCESS GRANTED: Password entropy safely matches target Argon2id parameters.");
+                                utilsDialog.informativeText = qsTr("ACCESS GRANTED: Password matches target Argon2id parameters.")
                             } else {
-                                utilsDialog.informativeText = qsTr("ACCESS DENIED: Password mismatch or storage string is malformed.");
+                                utilsDialog.informativeText = qsTr("ACCESS DENIED: Password mismatch or storage string is malformed.")
                             }
                         }
-                        utilsDialog.open();
+
+                        utilsDialog.open()
+                    }
+                }
+
+                Button {
+                    text: qsTr("Clear Password")
+
+                    onClicked: {
+                        passUtilsField.secureWipe()
+                        passUtils.clearPassword()
+
+                        utilsDialog.title = qsTr("Password Buffer")
+                        utilsDialog.informativeText = qsTr("Password buffers cleared.")
+                        utilsDialog.open()
                     }
                 }
             }

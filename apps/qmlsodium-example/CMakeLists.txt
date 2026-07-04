@@ -29,9 +29,8 @@ target_link_libraries(qml-sodium-example PRIVATE
     Qt6::Gui
     Qt6::Quick
     Qt6::Qml
-    ${LibSodium_LIBRARIES}
+    ${LibSodium_LIBRARIES} JosephsOddBuilder_Crypto qt-sodium qml-sodium qml-sodiumplugin
     qt-ai-utils qml-ai-utils qml-ai-utilsplugin
-    qt-sodium qtdeclarative-sodium qtdeclarative-sodiumplugin
 )
 
 include(GNUInstallDirs)

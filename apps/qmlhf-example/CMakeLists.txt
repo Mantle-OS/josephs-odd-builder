@@ -42,6 +42,7 @@ target_link_libraries(qt-huggingface-example PRIVATE
     Qt6::Quick
     Qt6::Qml
     ${LibZstd_LIBRARIES}
+    ${LibSodium_LIBRARIES} JosephsOddBuilder_Crypto qt-sodium
     qt-ai-utils qml-ai-utils qml-ai-utilsplugin
     qt-huggingfaceplugin
 )

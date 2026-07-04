@@ -44,7 +44,7 @@ add_library(qt-zstd STATIC
 target_link_libraries(qt-zstd PRIVATE
     Qt6::Core
     Qt6::Concurrent
-    ${LibSodium_LIBRARIES} qt-sodium
+    ${LibSodium_LIBRARIES} JosephsOddBuilder_Crypto qt-sodium
     ${LibZstd_LIBRARIES}
 )
 
@@ -88,8 +88,6 @@ target_link_libraries(qml-zstd PRIVATE
     Qt6::Quick
     Qt6::QuickControls2
     Qt6::Qml
-    ${LibSodium_LIBRARIES}
-    qt-sodium
-    ${LibZstd_LIBRARIES}
-    qt-zstd
+    ${LibSodium_LIBRARIES} JosephsOddBuilder_Crypto qt-sodium
+    ${LibZstd_LIBRARIES}  qt-zstd
 )

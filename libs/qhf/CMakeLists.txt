@@ -48,11 +48,11 @@ target_include_directories(qt-huggingface PUBLIC
 )
 
 target_link_libraries(qt-huggingface PRIVATE
-    ${LibSodium_LIBRARIES}
+    ${LibSodium_LIBRARIES} JosephsOddBuilder_Crypto qt-sodium
     ${LibZstd_LIBRARIES}
     ${YAMLCpp_LIBRARIES}
     qt-ai-utils qml-ai-utils qml-ai-utilsplugin
-    qt-sodium
+    qt-session-manager
     Qt6::Core
     Qt6::Gui
     Qt6::Network

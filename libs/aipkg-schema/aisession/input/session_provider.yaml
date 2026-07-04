@@ -7,23 +7,18 @@ c_struct: "AiSessionProvider"
 include_prefix: "aisession"
 out_base: "session_provider"
 fields:
-  - key: 1
-    name: "provider"
+  - name: "provider"
     type: "u32"
     required: true
-  - key: 2
-    name: "account_name"
+  - name: "account_name"
     type: "str"
     required: true
-  - key: 3
-    name: "username"
+  - name: "username"
     type: "str"
     required: false
-  - key: 4
-    name: "credential_id"
+  - name: "credential_id"
     type: "str"
     required: false
-  - key: 5
-    name: "enabled"
+  - name: "enabled"
     type: "bool"
     required: true

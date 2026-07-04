@@ -5,14 +5,28 @@ project(JosephsOddBuilder_Crypto
 )
 
 set(JOBCRYPTO_HEADERS
+    job_crypto_utils.h
     job_crypto_init.h
     job_secure_mem.h
     job_random.h
+    job_crypto_keys.h
+    job_crypto_sign.h
+    job_password_utils.h
+    job_secret_box.h
+    job_hash.h
+    job_crypto.h
 )
 
 set(JOBCRYPTO_SOURCES
     job_crypto_init.cpp
     job_secure_mem.cpp
+    job_random.cpp
+    job_crypto_keys.cpp
+    job_crypto_sign.cpp
+    job_password_utils.cpp
+    job_secret_box.cpp
+    job_hash.cpp
+    job_crypto.cpp
 )
 
 add_library(JosephsOddBuilder_Crypto SHARED
@@ -30,7 +44,6 @@ target_link_libraries(JosephsOddBuilder_Crypto PUBLIC
     Threads::Threads
     atomic
     ${LibSodium_LIBRARIES}
-    JosephsOddBuilder_Core
 )
 
 target_include_directories(JosephsOddBuilder_Crypto PRIVATE

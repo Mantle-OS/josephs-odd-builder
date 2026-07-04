@@ -6,17 +6,20 @@ project(qt6-session-manager
 set(CMAKE_AUTOMOC ON)
 
 set(QTSESS_HEADERS
-    qt-session-manager/qaisessionmanager.h
+    qt-session-manager/qaitypes.h
+    qt-session-manager/qaisessionworker.h
     qt-session-manager/qaiusersession.h
     qt-session-manager/qaisessionvault.h
     qt-session-manager/qaisessionuser.h
+    qt-session-manager/qaisessionmanager.h
 )
 
 set(QTSESS_CXX
-    qt-session-manager/qaisessionmanager.cpp
+    qt-session-manager/qaisessionworker.cpp
     qt-session-manager/qaiusersession.cpp
     qt-session-manager/qaisessionvault.cpp
     qt-session-manager/qaisessionuser.cpp
+    qt-session-manager/qaisessionmanager.cpp
 )
 
 add_library(qt-session-manager STATIC
@@ -33,7 +36,7 @@ target_link_libraries(qt-session-manager
         aisession_lib
     PRIVATE
         Qt6::Concurrent
-        ${LibSodium_LIBRARIES}
+        ${LibSodium_LIBRARIES} JosephsOddBuilder_Crypto
         ${LibZstd_LIBRARIES}
 )
 
@@ -46,7 +49,7 @@ target_include_directories(qt-session-manager PUBLIC
 #===================================================================================================================================
 
 set(QMLSESS_HEADERS
-    # qml-session-manager/....
+    # qml-session-manager/.... which will be inherit of qaisessionmanager.cpp which will will start to expose things
 )
 set(QMLSESS_CXX
 
@@ -78,7 +81,7 @@ target_link_libraries(qml-session-manager PRIVATE
     Qt6::QuickControls2
     Qt6::Qml
     qt-ai-utils qml-ai-utils qml-ai-utilsplugin
-    ${LibSodium_LIBRARIES} qt-sodium qtdeclarative-sodium qtdeclarative-sodiumplugin
+    ${LibSodium_LIBRARIES} JosephsOddBuilder_Crypto qt-sodium qml-sodium qml-sodiumplugin
     ${LibZstd_LIBRARIES} qt-zstd qml-zstdplugin
     aisession_lib
 )

@@ -2,32 +2,37 @@
 #define QAISESSIONUSER_H
 
 #include <QObject>
-
+#include <QString>
+#include <QByteArray>
+#include <property-macros.h>
 #include <aisession/session_user.hpp>
-
-using namespace job::serializer::generated;
+namespace jsgen = job::serializer::generated;
 class QAiSessionUser : public QObject
 {
     Q_OBJECT
+
+    // Map your property getters to match the underlying fields
+    QP_RO(QString, userId, "")
+    QP_RO(QString, displayName, "")
+    QP_RO(QString, icon, "")
+    QP_RO(QString, vaultPath, "")
+
 public:
     explicit QAiSessionUser(QObject *parent = nullptr);
+    ~QAiSessionUser() noexcept override;
+
+    QAiSessionUser(const QAiSessionUser &) = delete;
+    QAiSessionUser &operator=(const QAiSessionUser &) = delete;
+
+    void updateFromStruct(const jsgen::AiSessionUser &userStruct) noexcept;
+
+    // Direct read-only accessors for internal crypto logic if needed by the manager
+    [[nodiscard]] std::string passwordHash() const noexcept { return m_user.password_hash; }
+    [[nodiscard]] std::array<uint8_t, 16> kdfSalt() const noexcept { return m_user.kdf_salt; }
+    [[nodiscard]] uint32_t kdfAlg() const noexcept { return m_user.kdf_alg; }
 
 private:
-    AiSessionUser m_user;
-    // std::string user_id;
-    // std::string display_name;
-    // std::string icon;
-    // // Path to encrypted/compressed private vault.
-    // std::string vault_path;
-    // // Argon2id modular crypt string from crypto_pwhash_str.
-    // std::string password_hash;
-    // // ARGON2ID13=0
-    // uint32_t kdf_alg;
-    // // crypto_pwhash_SALTBYTES salt used to derive the vault key.
-    // std::array<uint8_t, 16> kdf_salt;
-    // std::string created_at;
-    // std::string last_login;
-
+    jsgen::AiSessionUser m_user;
 };
 
 #endif // QAISESSIONUSER_H

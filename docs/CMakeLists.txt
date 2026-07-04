@@ -4,7 +4,7 @@ add_custom_target(JOB_Documentation SOURCES
     job/job.md
     job/ansi_overview.md
     job/core_overview.md
-    job/crypto_overview.md
+    job/crypto_overview.md # Been refactored and is now cross platform
     job/io_overview.md
     job/net_overview.md
     job/science_overview.md
@@ -36,19 +36,15 @@ add_custom_target(QTAI_Documentation SOURCES
     qtai/qtai.md
     qtai/qt-ai-utils.md
     qtai/qml-ai-utils.md
-    qtai/qsodium.md
-    qtai/qml-sodium.md
+    qtai/qsodium.md    ## been upgraded
+    qtai/qml-sodium.md ## been upgraded
     qtai/qzstd.md
     qtai/qml-zstd.md
     qtai/qhuggingface.md
     qtai/qllama.md
     qtai/qstable-diffusion.md
-    #
-    qtai/qai-schema.md # Working on main landing page for generated schema code
-    qtai/qai-schema/ailedger.md # Done
-    qtai/qai-schema/aipkg.md    # done
-    qtai/qai-schema/aisession.md #DONE
-
-    # qtai/qsession.md
-    # qtai/qaipkg.md
+    qtai/qai-schema.md
+    qtai/qai-schema/aisession.md
+    qtai/qai-schema/ailedger.md
+    qtai/qai-schema/aipkg.md
 )

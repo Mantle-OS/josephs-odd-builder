@@ -5,37 +5,31 @@
 #include <QFuture>
 #include <QJsonObject>
 #include <QJsonArray>
+#include <QJsonDocument>
+#include <QList>
+#include <QtConcurrent>
 
+// Utils
 #include <qaiutils.h>
 #include <property-macros.h>
 
-#include "qaiusersession.h"
+// genreated scheam
+#include <aisession/session_vault.hpp>
+
+// Sodium side
+#include <qsecuremem.h>
+
+// Local to this lib
 #include "qaisessionvault.h"
+#include "qaiusersession.h"
+
+namespace jsergen = job::serializer::generated;
 class QAiSessionManager : public QObject
 {
     Q_OBJECT
-    Q_PROPERTY(QAiSessionState sessionState READ sessionState NOTIFY sessionStateChanged FINAL)
     QP_RO(bool, hasUsers, false)
+
 public:
-    explicit QAiSessionManager(QObject *parent = nullptr) :
-          QObject{parent}
-    {
-        if( !QAiUtils::createDefaultDirs() ){
-            // LOG
-        }
-
-        if(!QAiUtils::fileExists(QAiUtils::userJson)){
-            setSessionState(QAiSessionState::NoUsers);
-        }else{
-            // Okay we want to setup the object so taht the qml pl;ugin will get the QJsonObject back.
-            // setHasUsers(true);
-            loadUsers();
-
-        }
-
-    }
-
-    ~QAiSessionManager() noexcept override;
     enum QAiSessionState {
         NoUsers,
         ScanningUsers,
@@ -48,122 +42,45 @@ public:
     };
     Q_ENUM(QAiSessionState)
 
+protected:
+    QP_RW(QAiSessionState, sessionState, QAiSessionManager::LoggedOut)
+
+public:
+    explicit QAiSessionManager(QObject *parent = nullptr);
+    ~QAiSessionManager() noexcept override;
 
 
+    QAiSessionManager(const QAiSessionManager &) = delete;
+    QAiSessionManager &operator=(const QAiSessionManager &) = delete;
 
-    bool loadUsers(){
-        setSessionState(QAiSessionState::ScanningUsers);
-        auto txt = QAiUtils::readTextFile(QAiUtils::userJson);
-        // QJsonApiClient
-        QJsonParseError jerr;
-        QJsonDocument doc = QJsonDocument::fromJson(txt.toLatin1(), &jerr);
-        if(doc.isNull()){
-           // yikes
-        } else {
-            int nUsers = 0;
-            QJsonObject obj = doc.object();
-            if(!obj.isEmpty() && obj.contains("users")){
-                QJsonArray jarry = obj["users"].toArray();
-                if(!jarry.isEmpty()){
-                    for(auto userObjVal : jarry){
-                        QJsonObject userObj = userObjVal.toObject();
-                        if(!userObj.isEmpty()){
-                            if(userObj.contains("uid") && userObj.contains("icon")){
-                                nUsers++;
-                                // Okay we emit the json object so that the QmlPlugin gets it in fills its MVC
-                                Q_EMIT foundUser(userObj);
-                            }
-                        }else{
-                            //YIKES
-                        }
-                    }
-                } else{
-                    // YIKES
-                }
-            }else{
-                //yikes
-            }
+    [[nodiscard]] QAiUserSession *currentSession() const noexcept;
 
-            if(nUsers > 0){
-                set_hasUsers(true);
-                m_initList = obj;
-            }else{
-                set_hasUsers(false);
-                //YIKES
-            }
+    // Threaded execution states via QtConcurrent workers
+    [[nodiscard]] QFuture<bool> signup(const QString &userId,
+                                       const QString &displayName,
+                                       const QSecureMem &password);
 
+    // Visualizing the inner manager linkage pass
+    QFuture<bool> login(const QString &userId, const QSecureMem &password);
 
-        }
-        return m_hasUsers;
-    }
+    [[nodiscard]] QFuture<bool> logout();
 
-    bool appendUserToJson(const QString &uid, const QString &name, const QString &icon, bool write = true){
-        if(!m_initList.isEmpty() && m_initList.contains("users")){
-            QJsonArray jarry = m_initList["users"].toArray();
-            int jarrySize = jarry.size();
-            if(!jarry.isEmpty()){
-                QJsonObject userObj;
-                userObj["uid"] = uid;
-                userObj["name"] = name;
-                userObj["icon"] = icon;
-                jarry.append(QJsonValue(userObj));
-            }
-
-            if(jarrySize == (jarry.size() - 1)){
-                if(write){
-                    QJsonDocument jdoc;
-                    jdoc.setObject(m_initList);
-                    if(QAiUtils::writeTextFile(QAiUtils::userJson, jdoc.toJson(QJsonDocument::Compact)))
-                        return true;
-                }else{
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
-
-
-    QFuture<bool> signup(const QString &userId,
-                         const QString &displayName,
-                         const QSecureMem &password);
-
-    QFuture<bool> login(const QString &userId,
-                        const QSecureMem &password);
-
-    QFuture<bool> logout();
-
-    QAiUserSession *currentSession() const noexcept
-    {
-        return m_currentSession;
-    }
-
-    QAiSessionState sessionState() const
-    {
-        return m_sessionState;
-    }
-
-    void setSessionState(QAiSessionState newSessionState)
-    {
-        if (m_sessionState != newSessionState){
-            m_sessionState = newSessionState;
-            Q_EMIT sessionStateChanged();
-        }
-    }
+public Q_SLOTS:
+    bool loadUsers();
 
 Q_SIGNALS:
-    void sessionStateChanged();
-    void foundUser(QJsonObject);
+    void foundUser(const QJsonObject &userObj);
+    void initializationFailed(const QString &reason);
 
 private:
-    QList<QAiUserSession*> m_users;
-    QAiUserSession *m_currentSession = nullptr;
-    QAiSessionVault *m_vault = nullptr;
+    bool appendUserToJson(const QString &uid, const QString &name, const QString &icon);
+    void initializeEmptyUserIndex();
 
-    QAiSessionState m_sessionState = QAiSessionState::LoggedOut;
-    QJsonObject m_initList{}; // example {[{"name" : "johnDoe", "icon" : "/usr/share/icons/default.png" }. {}]}
+    QAiUserSession        *m_currentSession{nullptr};
+    QAiSessionVault       *m_vault{nullptr};
+    QJsonObject            m_initList{};
 
+    QList<QAiUserSession*> m_cachedUsers;
 };
 
 #endif // QAISESSIONMANAGER_H

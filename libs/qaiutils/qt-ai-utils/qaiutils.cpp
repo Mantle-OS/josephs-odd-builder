@@ -174,7 +174,7 @@ bool QAiUtils::dirExists(const QString &dirPath) {
 
 QAiUtils::QAiUtils()
 {
-    appName                 = "qt-stable-diffusion";
+    appName                 = "qtai";
     baseDir                 = QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation).append("/" + appName);
 
     configsDir              = QString("%1/configs").arg(QAiUtils::baseDir);
@@ -208,7 +208,7 @@ QAiUtils::QAiUtils()
 
 }
 
-QString QAiUtils::appName               = "qt-stable-diffusion";
+QString QAiUtils::appName               = "qtai";
 QString QAiUtils::baseDir               = QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation).append("/" + appName);
 
 QString QAiUtils::configsDir            = QString("%1/configs").arg(baseDir);
@@ -237,3 +237,4 @@ QString QAiUtils::extraQmlDir           = QString("%1/qml").arg(appRuntimeDir);
 
 QString QAiUtils::userDir               = QString("%1/users").arg(baseDir);
 QString QAiUtils::userJson              = QString("%1/users.json").arg(userDir);
+

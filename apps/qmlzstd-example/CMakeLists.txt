@@ -27,8 +27,7 @@ target_link_libraries(qml-zstd-example PRIVATE
     Qt6::Quick
     Qt6::Qml
     ${LibZstd_LIBRARIES}
-    ${LibSodium_LIBRARIES}
-    qt-sodium qtdeclarative-sodium qtdeclarative-sodiumplugin
+    ${LibSodium_LIBRARIES} JosephsOddBuilder_Crypto qt-sodium qml-sodium qml-sodiumplugin
     qt-zstd qml-zstd qml-zstdplugin
 )
 

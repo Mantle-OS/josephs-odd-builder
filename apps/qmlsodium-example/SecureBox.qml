@@ -7,10 +7,7 @@ import Sodium
 // QmlSodiumBox
 
 Page {
-
-    QmlSodiumBox{
-        id: box
-    }
+    QmlSodiumBox{ id: box }
     Item{
         width: parent.width * 0.80
         height: parent.height * 0.80
@@ -20,10 +17,17 @@ Page {
             // QP_RW(QString, password,   "")
             RowLayout{
                 Label{text: qsTr("Password")}
-                SecureTextField {
+                QmlSecureMemInput{
                     id: encStrTextField
                     Layout.fillWidth: true
-                    onValueCommitted: (clearText) => { box.password = clearText }
+                    onReturnPressed: {
+                        if (box.setPassword(encStrTextField.memory)) {
+                            encStrTextField.secureWipe()
+                            box.encryptString()
+                        } else {
+                            console.error("Secure password memory copy failed.")
+                        }
+                    }
                 }
             }
 

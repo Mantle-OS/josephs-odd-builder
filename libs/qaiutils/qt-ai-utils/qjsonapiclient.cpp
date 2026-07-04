@@ -238,24 +238,34 @@ void QJsonApiClient::processReq()
         QMetaObject::invokeMethod(this, "processReq", Qt::QueuedConnection);
         return;
     }
-
-    switch(m_authtype){
+    switch(m_currentReqItem->authType) {
     case None:
         break;
     case Bearer:
-        req.setRawHeader("Authorization", QByteArray("Bearer " + m_token.toLocal8Bit()));
+        if (!m_token.isEmpty() && m_token != "NONE") {
+            req.setRawHeader("Authorization", QByteArray("Bearer " + m_token.toLocal8Bit()));
+        }
         break;
     case Token:
-        req.setRawHeader("Authorization", QByteArray("Token " + m_token.toLocal8Bit()));
+        if (!m_token.isEmpty() && m_token != "NONE") {
+            req.setRawHeader("Authorization", QByteArray("Token " + m_token.toLocal8Bit()));
+        }
         break;
     case Basic:
-        req.setRawHeader("Authorization", QByteArray("Basic " + m_token.toLocal8Bit()));
+        if (!m_token.isEmpty() && m_token != "NONE") {
+            req.setRawHeader("Authorization", QByteArray("Basic " + m_token.toLocal8Bit()));
+        }
         break;
     }
 
-    if(!m_headers.isEmpty())
-        for (auto i = m_headers.cbegin(), end = m_headers.cend(); i != end; ++i)
+    // Invoke secure injection hook
+    prepareSecureHeaders(req, m_currentReqItem->authType);
+
+    if(!m_headers.isEmpty()){
+        for (auto i = m_headers.cbegin(), end = m_headers.cend(); i != end; ++i){
             req.setRawHeader(i.key().toLocal8Bit(), i.value().toLocal8Bit());
+        }
+    }
 
     QNetworkReply *reply = nullptr;
     QJsonDocument jdoc;

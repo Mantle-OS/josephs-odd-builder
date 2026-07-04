@@ -15,7 +15,7 @@
 #include <sodium/crypto_secretbox.h>
 #endif
 
-static const QString kPass        = "secret_words";
+static const QString kPassText    = "secret_words";
 static const QString kDataToTest  = "HuggingFace Token: hf_ABC123XYZ789SecureManifestTokenData";
 static const QString kKeysDir     = "testKeys";
 static const QString ktestFile    = "test.txt";
@@ -258,10 +258,15 @@ int main(int argc, char *argv[])
         qCritical() << "[-] TEST FAIL: Failed to generate Ed25519 signature keys.";
         return -1;
     }
-    QString const sigPublicKeyStr = signEngine.publicKey();
+    QString const sigPublicKeyStr = signEngine.pubKey();
     QSecureMem const sigPrivateKeyContainer = signEngine.privateKey();
     QByteArray const randomSalt = QByteArray::fromHex("0123456789abcdef0123456789abcdef"); // Static testing salt
     QSecureMem derivedVaultKey;
+
+    const QByteArray passBytes = kPassText.toUtf8();
+    QSecureMem kPass(passBytes.size());
+    kPass.copyFrom(passBytes.constData(), passBytes.size());
+
     if (!QSodiumPasswordUtils::deriveKeyFromPassword(derivedVaultKey, kPass, randomSalt)) {
         qCritical() << "[-] TEST FAIL: Argon2id context calculation failed.";
         return -1;

@@ -227,7 +227,7 @@ public:
 
         if(!m_spaces.isEmpty()){
             QJsonArray spaceArr{};
-            for(const QString space : m_spaces){
+            for(const QString &space : m_spaces){
                 spaceArr.append(QJsonValue(space).toString());
             }
             ret["spaces"] = spaceArr;

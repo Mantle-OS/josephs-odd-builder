@@ -2,7 +2,7 @@
 
 `job_ai` is a vertically integrated, C++23 high-performance AI engine. It is designed to bypass the traditional 
 deep learning stack in favor of hardware native execution, physics informed algorithms, and forward-only 
-evolutionary learning.
+evolutionary learning. runs on 128MB or ram can train on less than 512MB of ram
 
 ## Core Infrastructure
 ### [Coordinates](docs/job/ai/cords.md)

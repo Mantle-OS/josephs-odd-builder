@@ -11,8 +11,7 @@ qt_add_executable(qsodium-example
 
 target_link_libraries(qsodium-example PRIVATE
     Qt::Core
-    ${LibSodium_LIBRARIES}
-    qt-sodium
+    ${LibSodium_LIBRARIES} JosephsOddBuilder_Crypto qt-sodium
 )
 
 install(TARGETS qsodium-example

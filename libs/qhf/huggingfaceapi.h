@@ -1,6 +1,9 @@
 #ifndef HUGGINGFACEAPI_H
 #define HUGGINGFACEAPI_H
 
+#include "qaitypes.h"
+#include "qaiusersession.h"
+#include "qsecuremem.h"
 #include <QObject>
 #include <QFuture>
 #include <QJsonObject>
@@ -39,6 +42,15 @@ public:
         Space
     };
     Q_ENUM(RepoType)
+
+
+    void setSecureSession(const QAiUserSession *session, const QString &profileName = "default") noexcept {
+        m_activeSession = session;
+        m_profileName = profileName;
+    }
+
+
+
 
     QFuture<QJsonObject> trending()
     {
@@ -241,23 +253,45 @@ public:
     }
 
 protected:
+    void prepareSecureHeaders(QNetworkRequest &req, QJsonApiClient::AuthType authType) override
+    {
+        if (authType == QJsonApiClient::None)
+            return;
+
+        // If a secure global session is active, override m_token lookup logic completely
+        if (m_activeSession && m_activeSession->isActive()) {
+            QSecureMem secureToken = m_activeSession->credential(QAi::Provider::HuggingFace, m_profileName);
+
+            if (!secureToken.isEmpty()) {
+                QByteArray authHeaderHeaderValue = "Bearer ";
+                secureToken.appendTo(&authHeaderHeaderValue);
+
+                req.setRawHeader("Authorization", authHeaderHeaderValue);
+
+                // Securely scrub the temporary compilation buffer array instantly
+                sodium_memzero(authHeaderHeaderValue.data(), authHeaderHeaderValue.size());
+                return;
+            }
+        }
+    }
     QString apiPath(const QString &path) const
     {
         QString p = path;
-
         while (p.startsWith(QLatin1Char('/')))
             p.remove(0, 1);
-
         return QStringLiteral("%1/%2").arg(khfApiBasePath, p);
     }
 
     QJsonApiClient::AuthType authForRequest() const
     {
-        if (get_token().isEmpty())
-            return QJsonApiClient::None;
-
-        return QJsonApiClient::Bearer;
+        if (!get_token().isEmpty() || (m_activeSession && m_activeSession->isActive()))
+            return QJsonApiClient::Bearer;
+         return QJsonApiClient::None;
     }
+
+private:
+    const QAiUserSession* m_activeSession{nullptr};
+    QString               m_profileName{"default"};
 };
 
 #endif // HUGGINGFACEAPI_H

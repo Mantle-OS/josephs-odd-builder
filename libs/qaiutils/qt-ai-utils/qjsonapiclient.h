@@ -61,6 +61,10 @@ public:
 protected:
   QP_RW(AuthType, authtype, AuthType::None)
   QUrl setupUrl();
+  virtual void prepareSecureHeaders(QNetworkRequest &req, QJsonApiClient::AuthType authType) {
+      Q_UNUSED(req);
+      Q_UNUSED(authType);
+  }
 
 Q_SIGNALS:
     void headersChanged();
