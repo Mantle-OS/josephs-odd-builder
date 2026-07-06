@@ -7,6 +7,10 @@ import QZstd
 Page {
     id: compressionPage
 
+    QmlCompressor {
+        id: compressor
+    }
+
     Item {
         width: parent.width   * 0.80
         height: parent.height * 0.80
@@ -15,35 +19,27 @@ Page {
         ColumnLayout {
             anchors.fill: parent
             spacing: 15
-
-            QmlCompressor {
-                id: compressor
-                // Bindings listen directly to these properties
-                compressionLevel: Math.round(levelSlider.value)
-
-                onFinished: {
-                    if (compressor.errorString === "") {
-                        compressorDialog.text = qsTr("Success")
-                        compressorDialog.informativeText = qsTr("Package compiled successfully!")
-                    } else {
-                        compressorDialog.text = qsTr("Error Encountered")
-                        compressorDialog.informativeText = compressor.errorString
-                    }
-                    compressorDialog.open()
-                }
+            Label {
+                text: qsTr("Blocking compression")
+                font.pixelSize: 20
+                font.bold: true
             }
-
+            Label {
+                Layout.fillWidth: true
+                wrapMode: Text.WordWrap
+                text: qsTr("Compresses a folder into a single .zst archive. This runs synchronously on the UI thread, the window will not respond while it works, that is deliberate, this page exists to show the plain blocking API without any async machinery involved.")
+                font.pixelSize: 13
+                opacity: 0.75
+            }
             RowLayout {
                 Layout.fillWidth: true
-                Label { text: qsTr("Progression:") }
-
+                Label { text: qsTr("Progress:") }
                 ProgressBar {
                     Layout.fillWidth: true
                     value: compressor.current
                     from: 0
                     to: compressor.total > 0 ? compressor.total : 100
                 }
-
                 Label {
                     text: compressor.total > 0 ? Math.round((compressor.current / compressor.total) * 100) + "%" : "0%"
                 }
@@ -67,35 +63,30 @@ Page {
 
             RowLayout {
                 Layout.fillWidth: true
-                Label { text: qsTr("Compression Level (%1):").arg(Math.round(levelSlider.value)) }
-                Slider {
-                    id: levelSlider
+                Label {
                     Layout.fillWidth: true
-                    from: 0
-                    to: 22
-                    stepSize: 1
-                    value: 5
+                    text: qsTr("Compression level: %1").arg(compressor.compressionLevel)
+                }
+                Button {
+                    text: qsTr("Options...")
+                    onClicked: optionsPopup.open()
                 }
             }
 
             Item { Layout.fillHeight: true }
 
             Button {
-                text: qsTr("Start Compression Pipeline")
+                text: qsTr("Start compression")
                 Layout.alignment: Qt.AlignHCenter
                 Layout.preferredWidth: 250
-                enabled: compressorPrivate.hasFolder && (compressor.current === 0 || compressor.current === compressor.total)
+                enabled: compressorPrivate.hasFolder
                 onClicked: {
-                    compressorDialog.text = ""
-                    compressorDialog.informativeText = ""
-
-                    // Fire up the concurrent executor job
-                    if(!compressor.compress()){
-                        compressorDialog.text = qsTr("Error In Compression")
+                    if (compressor.compress()) {
+                        compressorDialog.text = qsTr("Compression complete")
+                        compressorDialog.informativeText = qsTr("Package compiled successfully.")
+                    } else {
+                        compressorDialog.text = qsTr("Compression failed")
                         compressorDialog.informativeText = compressor.errorString
-                    }else{
-                        compressorDialog.text = qsTr("Compression Passed")
-                        compressorDialog.informativeText = qsTr("Package compiled successfully!")
                     }
                     compressorDialog.open()
                 }
@@ -105,21 +96,15 @@ Page {
 
     FolderDialog {
         id: compressorFolderPicker
-        title: qsTr("Select Input Target Directory")
+        title: qsTr("Select input target directory")
         onAccepted: {
-            // Convert file:// URL string layout into clear system native paths
-            let cleanPath = selectedFolder.toString();
-            if (cleanPath.startsWith("file://")) {
-                cleanPath = cleanPath.replace("file://", "");
-            }
+            let cleanPath = selectedFolder.toString()
+            if (cleanPath.startsWith("file://"))
+                cleanPath = cleanPath.replace("file://", "")
 
-            // Set input tracking target
-            compressor.input = cleanPath;
-
-            // Derive output payload companion asset name target seamlessly
-            compressor.output = cleanPath + ".zst";
-
-            compressorPrivate.hasFolder = true;
+            compressor.input = cleanPath
+            compressor.output = cleanPath + ".zst"
+            compressorPrivate.hasFolder = true
         }
     }
 
@@ -131,5 +116,13 @@ Page {
     Item {
         id: compressorPrivate
         property bool hasFolder: false
+    }
+
+    ZStdOptionsPopup {
+        id: optionsPopup
+        target: compressor
+        width: parent.width * 0.98
+        height: parent.height * 0.98
+        anchors.centerIn: parent
     }
 }

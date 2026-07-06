@@ -1,31 +1,34 @@
-#ifndef QZSTDDECOMPRESSORCRYPTO_H
-#define QZSTDDECOMPRESSORCRYPTO_H
-
-#include "qzstddecompressor.h"
-#include <qsodiumsecretbox.h>
+#pragma once
 #include <qsecuremem.h>
 
-class QZstdDecompressorCrypto : public QZstdDecompressor
+#include <job_zstd_decompressor_crypto.h>
+
+#include "qzstdoptions.h"
+
+class QZstdDecompressorCrypto : public  job::zstd::JobZstdDecompressorCrypto
 {
-    Q_OBJECT
 public:
-    explicit QZstdDecompressorCrypto(QObject *parent = nullptr);
-    ~QZstdDecompressorCrypto() override = default;
+    explicit QZstdDecompressorCrypto();
+    QZstdDecompressorCrypto(QZstdOptions *opts);
+    ~QZstdDecompressorCrypto();
+    QZstdDecompressorCrypto(const QZstdDecompressorCrypto &) = delete;
+    QZstdDecompressorCrypto(QZstdDecompressorCrypto &&) noexcept = delete;
+    QZstdDecompressorCrypto &operator=(const QZstdDecompressorCrypto &) = delete;
+    QZstdDecompressorCrypto &operator=(QZstdDecompressorCrypto &&) noexcept = delete;
 
-    QSecureMem decryptionKey() const;
-    void setDecryptionKey(const QSecureMem &key);
-    void setDecryptionKeyB64(const QString &base64Key);
+    [[nodiscard]] const QSecureMem &decryptionKey() const noexcept;
+    void setDecryptionKey(const QSecureMem &key) noexcept;
 
-public Q_SLOTS:
-    bool execute() override final;
-    bool decompressFolder() override final;
-    bool decompressFile() override final;
+    [[nodiscard]] QZstdOptions *options() const;
+    void setOptions(QZstdOptions *other);
 
-Q_SIGNALS:
-    void decryptionKeyChanged();
+    [[nodiscard]] bool decryptAndDecompress() noexcept;
 
 private:
-    QSecureMem m_decryptionKey;
+    void disconnectOptionConnections() noexcept;
+    void setupOptionConnections() noexcept;
+    QZstdOptions    *m_opts         = nullptr;
+    bool            m_ownsOpts      = true;
+    QSecureMem      m_decryptionKey;
 };
 
-#endif // QZSTDDECOMPRESSORCRYPTO_H

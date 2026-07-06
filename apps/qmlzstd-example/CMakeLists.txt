@@ -18,6 +18,8 @@ qt_add_qml_module(qml-zstd-example
         ZStdPage.qml
         ZStdCompressPage.qml
         ZStdDecompressPage.qml
+        ZstdCrypto.qml
+        About.qml
 )
 
 target_link_libraries(qml-zstd-example PRIVATE
@@ -26,9 +28,8 @@ target_link_libraries(qml-zstd-example PRIVATE
     Qt6::Concurrent
     Qt6::Quick
     Qt6::Qml
-    ${LibZstd_LIBRARIES}
     ${LibSodium_LIBRARIES} JosephsOddBuilder_Crypto qt-sodium qml-sodium qml-sodiumplugin
-    qt-zstd qml-zstd qml-zstdplugin
+    ${LibZstd_LIBRARIES}   JosephsOddBuilder_Zstd   qt-zstd   qml-zstd   qml-zstdplugin
 )
 
 install(TARGETS qml-zstd-example

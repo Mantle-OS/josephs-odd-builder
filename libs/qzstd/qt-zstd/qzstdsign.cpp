@@ -1,137 +1,114 @@
 #include "qzstdsign.h"
-#include <QFile>
-#include <QFileInfo>
-#include <QTextStream>
-#include <QDebug>
+#include <filesystem>
+#include <QObject>
 
-QZstdSign::QZstdSign(QObject *parent) :
-    QZstdOptions{parent},
-    m_signer{new QSodiumCryptoSign{}}
+QZstdSign::QZstdSign() :
+    m_opts{new QZstdOptions{}},
+    m_ownsOpts(true)
 {
+    setupOptionConnections();
 }
 
 QZstdSign::~QZstdSign()
 {
-    // Not owned in the QObjectTree
-    if (m_signer) {
-        delete m_signer;
-        m_signer = nullptr;
-    }
+    disconnectOptionConnections();
+    if(m_ownsOpts && m_opts)
+        delete m_opts;
+
+    m_opts = nullptr;
 }
 
-void QZstdSign::setSigningKeyPair(const QString& publicKey, const QSecureMem& privateKey)
+QString QZstdSign::publicKeyFile() const noexcept
 {
-    if (m_signer) {
-        m_signer->setPublicKey(publicKey);
-        m_signer->setPrivateKey(privateKey);
-    }
+    return QString::fromStdString(job::zstd::JobZstdSign::publicKeyFile().string());
 }
 
-void QZstdSign::setVerificationKey(const QString& publicKey)
+bool QZstdSign::setPublicKeyFile(const QString &publicKeyFile) noexcept
 {
-    if (m_signer)
-        m_signer->setPublicKey(publicKey);
+    syncOptions();
+    std::filesystem::path p(publicKeyFile.toStdString());
+    return job::zstd::JobZstdSign::setPublicKeyFile(p);
 }
 
-bool QZstdSign::execute()
+QString QZstdSign::privateKeyFile() const noexcept
 {
-    return sign();
+    return QString::fromStdString(job::zstd::JobZstdSign::privateKeyFile().string());
 }
 
-bool QZstdSign::sign()
+bool QZstdSign::setPrivateKeyFile(const QString &privateKeyFile) noexcept
 {
-    if (input().isEmpty() || output().isEmpty()) {
-        setErrorString(QStringLiteral("Input or output pathways are unconfigured."));
-        return false;
-    }
-
-    QFile fileToSign(input());
-    if (!fileToSign.exists()) {
-        setErrorString(QStringLiteral("Target data file does not exist."));
-        return false;
-    }
-
-    setTotal(static_cast<int>(fileToSign.size()));
-    setCurrent(0);
-
-    QString signatureBase64;
-    bool const successful = m_signer->signFile(input(), signatureBase64);
-
-    if (!successful) {
-        setErrorString(QStringLiteral("Crypto signing runtime failure. Ensure private key parameters are locked in."));
-        return false;
-    }
-
-    QFile sigFile(output());
-    if (!sigFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        setErrorString(sigFile.errorString());
-        return false;
-    }
-
-    QTextStream out(&sigFile);
-    out << signatureBase64;
-    sigFile.flush();
-    sigFile.close();
-
-    setCurrent(total());
-    // Q_EMIT finished();  // Therre was a issue here let's let others handle the "finished"
-    return true;
+    syncOptions();
+    std::filesystem::path p(privateKeyFile.toStdString());
+    return job::zstd::JobZstdSign::setPrivateKeyFile(p);
 }
 
-bool QZstdSign::verify()
+bool QZstdSign::signFile(const QString &inPath, const QString &outPath, bool overwrite)
 {
-    if (input().isEmpty()) {
-        setErrorString(QStringLiteral("Verification source (.sig) pathway is missing."));
-        return false;
-    }
-
-    if (!input().endsWith(QStringLiteral(".sig"), Qt::CaseInsensitive)) {
-        setErrorString(QStringLiteral("Verification input pathway must target a valid '.sig' companion asset."));
-        return false;
-    }
-
-    QString const dataFilePath = input().left(input().length() - 4);
-    QFile targetDataFile(dataFilePath);
-    if (!targetDataFile.exists()) {
-        setErrorString(QStringLiteral("Target payload matching this signature could not be located on disk."));
-        return false;
-    }
-
-    QFile sigFile(input());
-    if (!sigFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        setErrorString(sigFile.errorString());
-        return false;
-    }
-
-    QTextStream in(&sigFile);
-    QString const signatureBase64 = in.readAll().trimmed();
-    sigFile.close();
-
-    if (signatureBase64.isEmpty()) {
-        setErrorString(QStringLiteral("Signature companion payload is empty."));
-        return false;
-    }
-
-    setTotal(static_cast<int>(targetDataFile.size()));
-    setCurrent(0);
-
-    bool const signatureValid = m_signer->verifyFile(dataFilePath, signatureBase64);
-
-    if (!signatureValid) {
-        setErrorString(QStringLiteral("Digital signature validation failed! Content payload has been compromised."));
-        return false;
-    }
-
-    setCurrent(total());
-    // Q_EMIT finished(); // Therre was a issue here let's let others handle the "finished"
-    return true;
+    syncOptions();
+    std::filesystem::path in(inPath.toStdString());
+    std::filesystem::path out(outPath.toStdString());
+    return job::zstd::JobZstdSign::signFile(in, out, overwrite);
 }
 
-void QZstdSign::setSigningKeyPairB64(const QString &publicKey, const QString &privateKeyB64) {
-    m_signer->setPublicKey(publicKey);
-
-    QSecureMem privKey;
-    if (privKey.fromBase64(privateKeyB64))
-        m_signer->setPrivateKey(privKey);
+bool QZstdSign::verifyFile(const QString &filePath, const QString &signatureBase64) noexcept
+{
+    syncOptions();
+    std::filesystem::path p(filePath.toStdString());
+    std::string sig = signatureBase64.toStdString();
+    return job::zstd::JobZstdSign::verifyFile(p, sig);
 }
 
+void QZstdSign::syncOptions(){
+    setInput(m_opts->get_input().toStdString());
+    setOutput(m_opts->get_output().toStdString());
+    // These do not matter but whatever
+    setCompressionLevel(m_opts->get_compressionLevel());
+    setPreserveEmptyDirectories(m_opts->get_preserveEmptyDirectories());
+    setPreserveSymlinks(m_opts->get_preserveSymlinks());
+    setRecursiveDirectories(m_opts->get_recursiveDirectories());
+}
+
+void QZstdSign::disconnectOptionConnections() noexcept
+{
+    if(!m_opts)
+        return;
+    QObject::disconnect(m_opts, &QZstdOptions::inputChanged, m_opts, nullptr);
+    QObject::disconnect(m_opts, &QZstdOptions::outputChanged, m_opts, nullptr);
+    QObject::disconnect(m_opts, &QZstdOptions::compressionLevelChanged, m_opts, nullptr);
+    QObject::disconnect(m_opts, &QZstdOptions::preserveEmptyDirectoriesChanged, m_opts, nullptr);
+    QObject::disconnect(m_opts, &QZstdOptions::preserveSymlinksChanged, m_opts, nullptr);
+    QObject::disconnect(m_opts, &QZstdOptions::recursiveDirectoriesChanged, m_opts, nullptr);
+}
+
+void QZstdSign::setupOptionConnections() noexcept
+{
+    QObject::connect(m_opts, &QZstdOptions::inputChanged,
+                     m_opts, [this](const QString &path) {
+                         setInput(path.toStdString());
+                     });
+
+    QObject::connect(m_opts, &QZstdOptions::outputChanged,
+                     m_opts, [this](const QString &path) {
+                         setOutput(path.toStdString());
+                     });
+
+    QObject::connect(m_opts, &QZstdOptions::compressionLevelChanged,
+                     m_opts, [this](int level) {
+                         setCompressionLevel(level);
+                     });
+
+    QObject::connect(m_opts, &QZstdOptions::preserveEmptyDirectoriesChanged,
+                     m_opts, [this](bool value) {
+                         setPreserveEmptyDirectories(value);
+                     });
+
+    QObject::connect(m_opts, &QZstdOptions::preserveSymlinksChanged,
+                     m_opts, [this](bool value) {
+                         setPreserveSymlinks(value);
+                     });
+
+    QObject::connect(m_opts, &QZstdOptions::recursiveDirectoriesChanged,
+                     m_opts, [this](bool value) {
+                         setRecursiveDirectories(value);
+                     });
+}

@@ -1,28 +1,37 @@
 #pragma once
 
-#include "qzstdcompressor.h"
-#include <qsodiumsecretbox.h>
+#include "qzstdoptions.h"
+#include <job_zstd_compressor_crypto.h>
 #include <qsecuremem.h>
 
-class QZstdCompressorCrypto : public QZstdCompressor
+#include <QObject>
+#include <QString>
+
+class QZstdCompressorCrypto : public job::zstd::JobZstdCompressorCrypto
 {
-    Q_OBJECT
 public:
-    explicit QZstdCompressorCrypto(QObject *parent = nullptr);
-    ~QZstdCompressorCrypto() override = default;
+    explicit QZstdCompressorCrypto();
+    QZstdCompressorCrypto(QZstdOptions *opts);
+    ~QZstdCompressorCrypto();
+    QZstdCompressorCrypto(const QZstdCompressorCrypto &) = delete;
+    QZstdCompressorCrypto(QZstdCompressorCrypto &&) noexcept = delete;
+    QZstdCompressorCrypto &operator=(const QZstdCompressorCrypto &) = delete;
+    QZstdCompressorCrypto &operator=(QZstdCompressorCrypto &&) noexcept = delete;
 
-    QSecureMem encryptionKey() const;
-    void setEncryptionKey(const QSecureMem &key);
-    void setEncryptionKeyB64(const QString &base64Key);
+    [[nodiscard]] const QSecureMem &encryptionKey() const noexcept;
+    void setEncryptionKey(const QSecureMem &key) noexcept;
 
-public Q_SLOTS:
-    bool execute() override final;
-    bool compressFolder() override final;
-    bool compressFile() override final;
+    [[nodiscard]] QZstdOptions *options() const;
+    void setOptions(QZstdOptions *other);
 
-Q_SIGNALS:
-    void encryptionKeyChanged();
+    [[nodiscard]] bool compressAndEncrypt() noexcept;
 
 private:
+    // func
+    void disconnectOptionConnections() noexcept;
+    void setupOptionConnections() noexcept;
+    //  mem
+    QZstdOptions *m_opts = nullptr;
+    bool m_ownsOpts = true;
     QSecureMem m_encryptionKey;
 };

@@ -1,18 +1,29 @@
-#ifndef QZSTDCOMPRESSOR_H
-#define QZSTDCOMPRESSOR_H
+#pragma once
+
+#include <job_zstd_compressor.h>
 
 #include "qzstdoptions.h"
 
-class QZstdCompressor : public QZstdOptions
+class QZstdCompressor : public job::zstd::JobZstdCompressor
 {
-    Q_OBJECT
-public:
-    explicit QZstdCompressor(QObject *parent = nullptr);
-    ~QZstdCompressor() override = default;
 
-public Q_SLOTS:
-    virtual bool execute();
-    virtual bool compressFolder();
-    virtual bool compressFile();
+public:
+    explicit QZstdCompressor();
+    QZstdCompressor(QZstdOptions *opts = nullptr);
+    ~QZstdCompressor();
+    QZstdCompressor(const QZstdCompressor &) = delete;
+    QZstdCompressor(QZstdCompressor &&) noexcept = delete;
+    QZstdCompressor &operator=(const QZstdCompressor &) = delete;
+    QZstdCompressor &operator=(QZstdCompressor &&) noexcept = delete;
+
+    [[nodiscard]] bool compress() noexcept;
+    [[nodiscard]] QZstdOptions *options() const;
+    void setOptions(QZstdOptions *other);
+    void freeOptions();
+
+private:
+    void setupOptionConnections() noexcept;
+    void disconnectOptionConnections() noexcept;
+    QZstdOptions    *m_opts     = nullptr;
+    bool            m_ownsOpts  = true;
 };
-#endif // QZSTDCOMPRESSOR_H

@@ -1,10 +1,10 @@
 # QSodium
 
-`QSodium` is a Qt/C++ library built on top of libsodium.
+`QSodium` is a Qt/C++ library that provides a Qt-friendly interface for common cryptographic tasks: secure memory, key handling, password hashing, file signatures, hashing, random bytes, and symmetric encryption.
 
-It provides a QtCore-only interface for common cryptographic tasks such as secure memory, key handling, password hashing, file signatures, hashing, random bytes, and symmetric encryption.
+**This library does not implement any cryptography itself.** Every class here is a thin Qt-facing shim over [`job::crypto`](../job/crypto_overview.md) — QString/QByteArray/QDir conversions in, `job::crypto` types out. All real cryptographic work happens in `job_crypto`; this library exists so Qt/QML code never has to touch `std::string`/`std::vector<unsigned char>` directly.
 
-QSodium is not AI-specific. It lives in the QtAI tree because QtAI needs these primitives for sessions, packages, signatures, encrypted data, and local configuration. The library can also be used by other Qt projects that need a small Qt-friendly wrapper around libsodium.
+QSodium is not AI-specific. It lives in the QtAI tree because QtAI needs these primitives for sessions, packages, signatures, encrypted data, and local configuration.
 
 If you are looking for a QML interface, see [qml-sodium.md](qml-sodium.md).
 
@@ -12,12 +12,10 @@ If you are looking for a QML interface, see [qml-sodium.md](qml-sodium.md).
 
 ## Library split
 
-Sodium support is split into two libraries:
-
-| Library                | Purpose                                          |
-| ---------------------- | ------------------------------------------------ |
-| `qt-sodium`            | C++ / QtCore library documented here.            |
-| `qml-sodium`           | QML-facing sodium helpers documented separately. |
+| Library      | Purpose                                          |
+| ------------ | ------------------------------------------------ |
+| `qt-sodium`  | C++ / QtCore library documented here.            |
+| `qml-sodium` | QML-facing sodium helpers documented separately. |
 
 This document only covers the C++ side.
 
@@ -25,134 +23,109 @@ This document only covers the C++ side.
 
 ## Dependencies
 
-`qt-sodium` depends on:
+`qt-sodium` links against:
 
-* Qt Core
-* libsodium
+* Qt6::Core
+* `job_crypto` (all cryptographic logic lives here — see [crypto_overview.md](../job/crypto_overview.md))
+* libsodium directly
 
 It does not require Qt Quick, Qt QML, Qt Widgets, or any AI runtime.
 
 ---
 
+## Two binding patterns
+
+Classes in this library bind to their `job::crypto` counterpart one of two ways:
+
+* **Direct inheritance** — `QSecureMem : public job::crypto::JobSecureMem`, `QSodiumCryptoSign : public job::crypto::JobCryptoSign`. The Qt class *is a* `job::crypto` object with Qt-flavored methods added on top.
+* **Owned-pointer composition** — `QSodiumKeys` holds a `job::crypto::JobCryptoKeys*` it allocates and frees itself. Used where the class isn't meant to be substitutable for its `job::crypto` counterpart.
+
+`QSodium` itself holds its `job::crypto::JobCrypto` backend by value, since it's a `QObject` and can't inherit implementation from a non-`QObject` base the way `QSecureMem`/`QSodiumCryptoSign` do.
+
+---
+
 ## QSodium
 
-`QSodium` is the QObject entry point for the C++ library.
+The `QObject` entry point and public API umbrella — `#include <qsodium.h>` pulls in every other class in this library.
 
-It checks whether libsodium is initialized and initializes it if needed. It also exposes a small set of convenience functions for common operations:
+* checks/reports libsodium initialization (via `job::crypto::JobCrypto`)
+* `computeFileBlake2b()` — hex-string BLAKE2b of a file
+* `encryptConfig()` / `decryptConfig()` — static convenience wrappers around `JobSecretBox`, converting `QByteArray` <-> `std::vector<unsigned char>` at the boundary
 
-* Verify a detached file signature.
-* Compute a BLAKE2b file hash.
-* Encrypt a small payload.
-* Decrypt a small payload.
-
-The lower-level classes can also be used directly.
+The lower-level classes below can also be used directly without going through `QSodium`.
 
 ---
 
 ## QSecureMem
 
-`QSecureMem` is an RAII buffer for sensitive byte data.
+`job::crypto::JobSecureMem`, inherited directly — an RAII buffer for sensitive byte data (secure allocation, zero-on-release, constant-time comparison), with Qt-flavored accessors added on top.
 
-It uses libsodium secure allocation, clears memory before release, and supports constant-time comparison.
+* `toBase64()` / `fromBase64()` — the normal path for moving key material to/from `QString`
+* `toString()` / `fromBase64toString()` — pass straight through to the inherited `job::crypto::JobSecureMem` versions, which are gated behind `JOB_SECUREMEM_ALLOW_STRING` and `!NDEBUG` and throw otherwise. There is no separate Qt-level gating macro — the guard is entirely `job_crypto`'s.
+* `appendTo(QByteArray*)` — appends the raw secure bytes onto an existing `QByteArray`
 
-Typical uses include:
-
-* Private keys
-* Derived keys
-* Decrypted payloads
-* Short-lived secret material
-
-`QSecureMem` helps reduce accidental secret retention in normal heap memory, but it does not make every copy safe. Once data is converted to `QString`, `std::string`, or an ordinary `QByteArray`, it is regular application memory again.
-
-String conversion is gated by `QSECUREMEM_ALLOW_STRING`.
+`QSecureMem` reduces accidental secret retention versus plain heap memory, but that protection ends the moment data is copied into a `QString`/`std::string`/ordinary `QByteArray` — those are regular application memory again, unprotected.
 
 ---
 
 ## QSodiumKeys
 
-`QSodiumKeys` manages asymmetric key material.
+Wraps `job::crypto::JobCryptoKeys` (owned by pointer) — asymmetric keypair management.
 
-It supports:
-
-* Ed25519 signing keys
-* X25519 key exchange keys
-* Random key generation
-* Seed-based key generation
-* Client/server session key derivation
-
-Public keys are stored as Base64 `QString` values. Private keys are stored in `QSecureMem`.
+* `KeyType` is a direct alias of `job::crypto::JobCryptoKeys::KeyType` (`Exchange` / X25519, `Sign` / Ed25519) — not a redeclared Qt enum
+* `createKeys()` / `createSeedKeys()` — fresh or deterministic keypair generation
+* `createKeysAndSave()` / `saveKeys()` / `loadKeysFromDisk()` — round-trip a keypair to/from disk, translating `QString`/`QDir` paths to `std::filesystem::path`
+* `createClientSessionKeys()` / `createServerSessionKeys()` — X25519 session key derivation against a peer's public key
+* Public keys are Base64 `QString`; private keys are `QSecureMem`
 
 ---
 
 ## QSodiumCryptoSign
 
-`QSodiumCryptoSign` builds on `QSodiumKeys` and provides detached file signing and verification.
+`job::crypto::JobCryptoSign`, inherited directly — detached Ed25519 file signing and verification. Because `JobCryptoSign` itself extends `JobCryptoKeys`, this class also gets key management (`loadKeys()`, `setPublicKey()`, `addKeyDirectory()`) for free through the inheritance chain, not by re-wrapping `QSodiumKeys`.
 
-Files are read in chunks instead of being loaded completely into memory.
+* `signFile()` / `verifyFile()` — files are streamed in chunks, never loaded whole into memory
+* `signAssociatedFile()` — signs a file already associated with an open handle
+* `pubKey()` — `QString` accessor (named distinctly from the inherited `publicKey()`, which returns `std::string`)
 
-This is useful for:
-
-* Package files
-* Manifests
-* Compressed archives
-* Cached files
-* Any file that needs a detached signature
-
-This class signs the bytes on disk. It does not canonicalize JSON, YAML, line endings, or metadata before signing.
+This signs the bytes on disk as-is. It does not canonicalize JSON, YAML, line endings, or metadata before signing — the caller is responsible for signing a stable, canonical representation if that matters for their use case.
 
 ---
 
 ## QSodiumPasswordUtils
 
-`QSodiumPasswordUtils` provides password hashing, password verification, and password-derived keys.
+Static-only wrapper over `job::crypto::JobPasswordUtils` — Argon2id password handling.
 
-It supports two separate jobs:
+* `hashPasswordForStorage()` / `verifyPasswordAgainstStorage()` — password hashing for storage and verification
+* `deriveKeyFromPassword()` — derives a `QSecureMem` key from a password + salt, sized for `QSodiumSecretBox`
 
-* Hash a password for storage.
-* Derive a symmetric key from a password and salt.
-
-The derived key is written to `QSecureMem` and is sized for SecretBox usage.
-
-Do not use a stored password hash as an encryption key. Password verification and key derivation are different workflows.
+Do not use a stored password hash as an encryption key — password verification and key derivation are different workflows with different security properties, even though both start from the same password.
 
 ---
 
 ## QSodiumSecretBox
 
-`QSodiumSecretBox` provides symmetric authenticated encryption.
+Static-only wrapper over `job::crypto::JobSecretBox` — symmetric authenticated encryption.
 
-It can:
+* `generateNonce()` — fresh random nonce per call
+* `encrypt()` / `decrypt()` — key is `QSecureMem` in and out; plaintext/ciphertext are ordinary `QByteArray`
 
-* Generate a nonce.
-* Encrypt a payload.
-* Decrypt and authenticate a payload.
-
-The key is supplied as `QSecureMem`. Decrypted plaintext is returned in `QSecureMem`.
-
-The input plaintext and ciphertext are ordinary `QByteArray` values, so callers should avoid keeping sensitive plaintext around longer than needed.
+As with `job::crypto::JobSecretBox`, nonce discipline (never reuse a nonce with the same key) is the caller's responsibility — this class does not track or enforce uniqueness. Because plaintext here travels as `QByteArray`, not `QSecureMem`, callers should avoid keeping sensitive plaintext in it any longer than necessary.
 
 ---
 
 ## QSodiumHash
 
-`QSodiumHash` provides BLAKE2b hashing through libsodium's generic hash API.
+Static-only wrapper over `job::crypto::JobHash` — BLAKE2b hashing via libsodium's generic hash API.
 
-It supports:
-
-* Hashing a memory buffer.
-* Hashing a file.
-* Streaming file hashing in fixed-size chunks.
-* Configurable digest size within libsodium limits.
-
-This is used for integrity checks, package verification, cache validation, and manifest data.
+* `hashBuffer()` / `hashFile()` — both support an optional keyed-MAC mode via an optional `QByteArray` key
+* used for integrity checks, package verification, cache validation, manifest data
 
 ---
 
 ## QExtraRandom
 
-`QExtraRandom` provides random byte helpers used by the rest of the library.
-
-It is used for salts, nonces, and other random data needed by sodium workflows.
+Static-only wrapper over `job::crypto::JobRandom` — every method is a direct one-line delegation (secure bytes, uniform/normal/bernoulli distributions, global seed control), with `randomSalt()` converting the result to `QByteArray`.
 
 ---
 
@@ -170,8 +143,7 @@ password
 Detached file signature:
 
 ```text
-QSodiumKeys
-  -> QSodiumCryptoSign
+QSodiumKeys / QSodiumCryptoSign
   -> signature
   -> verify later
 ```
@@ -183,11 +155,3 @@ file
   -> QSodiumHash
   -> digest
 ```
-
----
-
-## Notes
-
-QSodium is intentionally small. It does not try to wrap every libsodium API.
-
-The current goal is to provide the pieces needed by QtAI libraries and applications without pulling crypto code into each library separately.

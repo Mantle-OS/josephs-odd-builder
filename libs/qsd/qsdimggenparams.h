@@ -58,7 +58,7 @@ public:
         //+ high_noise_lora_map.size()
         m_loraVec.reserve(m_loras->size() );
         for (QSdLora *i : m_loras->toList()) {
-            sd_lora_t lo = i->lora();
+            // sd_lora_t lo = i->lora();
             m_loraVec.push_back(i->lora());
             // FIXME LATER
         }

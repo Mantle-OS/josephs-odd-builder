@@ -27,6 +27,7 @@ public:
 
 private:
     job::crypto::JobSecureMem m_encryptionKey;
+
 };
 
 } // namespace job::zstd

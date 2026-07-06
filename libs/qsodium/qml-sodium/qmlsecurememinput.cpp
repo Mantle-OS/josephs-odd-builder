@@ -4,11 +4,11 @@
 
 QmlSecureMemInput::QmlSecureMemInput(QQuickItem *parent) :
     QQuickItem{parent},
-    m_secureBuffer{new QmlSecureMem{this}}
+     m_memory{new QmlSecureMem{this}}
 {
     setImplicitWidth(240);
     setImplicitHeight(32);
-    // m_secureBuffer->mem()->() (64) // Pre-allocates QmlSecureMem -->  via QSecureMem{64} -> JobSecureMem
+    //  m_memory->mem()->() (64) // Pre-allocates QmlSecureMem -->  via QSecureMem{64} -> JobSecureMem
     setFlag(ItemHasContents, true);
     setFlag(ItemIsFocusScope, true);
     setAcceptedMouseButtons(Qt::LeftButton);
@@ -51,9 +51,9 @@ void QmlSecureMemInput::secureWipe() noexcept
 {
     bool rearmed = false;
 
-    if (m_secureBuffer && m_secureBuffer->mem()) {
-        m_secureBuffer->mem()->clear();
-        rearmed = m_secureBuffer->mem()->allocate(kSecureInputCapacity);
+    if ( m_memory &&  m_memory->mem()) {
+         m_memory->mem()->clear();
+        rearmed =  m_memory->mem()->allocate(kSecureInputCapacity);
     }
 
     m_byteCount = 0;
@@ -98,7 +98,7 @@ void QmlSecureMemInput::keyPressEvent(QKeyEvent *event)
             --m_maskCount;
 
             // Zero out memory slice "safely"
-            std::memset( m_secureBuffer->mem()->data() + m_byteCount, 0, bytesToRemove );
+            std::memset(  m_memory->mem()->data() + m_byteCount, 0, bytesToRemove );
 
             Q_EMIT lengthChanged();
             update();
@@ -123,9 +123,9 @@ void QmlSecureMemInput::keyPressEvent(QKeyEvent *event)
         }
 
         // Check bounds
-        if (static_cast<size_t>(m_byteCount + rawBytes.size()) <= static_cast<size_t>(m_secureBuffer->mem()->size())) {
+        if (static_cast<size_t>(m_byteCount + rawBytes.size()) <= static_cast<size_t>( m_memory->mem()->size())) {
             std::memcpy(
-                m_secureBuffer->mem()->data() + m_byteCount,
+                 m_memory->mem()->data() + m_byteCount,
                 rawBytes.constData(),
                 static_cast<size_t>(rawBytes.size())
                 );
@@ -143,6 +143,12 @@ void QmlSecureMemInput::keyPressEvent(QKeyEvent *event)
     }
 
     QQuickItem::keyPressEvent(event);
+}
+
+void QmlSecureMemInput::mousePressEvent(QMouseEvent *event)
+{
+    forceActiveFocus();
+    event->accept();
 }
 
 QColor QmlSecureMemInput::maskColor() const noexcept

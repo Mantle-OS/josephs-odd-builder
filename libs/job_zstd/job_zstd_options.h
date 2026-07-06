@@ -21,7 +21,7 @@ public:
     [[nodiscard]] static int minCompressionLevel() noexcept;
     [[nodiscard]] static int maxCompressionLevel() noexcept;
 
-    static constexpr int qtDataStreamVersion() noexcept { return 21; }
+    // static constexpr int qtDataStreamVersion() noexcept { return 21; }
 
     [[nodiscard]] const std::string &input() const noexcept;
     bool setInput(const std::string &newInput);

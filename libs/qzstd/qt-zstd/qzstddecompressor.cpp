@@ -1,208 +1,116 @@
 #include "qzstddecompressor.h"
-#include "qzstdio.h"
-#include <QFile>
-#include <QFileInfo>
-#include <QDir>
-#include <QDataStream>
-
-QZstdDecompressor::QZstdDecompressor(QObject *parent):
-    QZstdOptions{parent}
+#include <QObject>
+ QZstdDecompressor:: QZstdDecompressor() :
+    m_opts{new QZstdOptions{nullptr}},
+    m_ownsOpts(true)
 {
-
+    disconnectOptionConnections();
+    setupOptionConnections();
+    setOnFinished([this]() {
+        if (m_opts)
+            Q_EMIT m_opts->finished();
+    });
 }
 
-bool QZstdDecompressor::execute()
+QZstdDecompressor::QZstdDecompressor(QZstdOptions *opts):
+    m_ownsOpts(false)
 {
-    if (input().isEmpty() || output().isEmpty()) {
-        setErrorString(QStringLiteral("Input or output pathways are completely unconfigured."));
-        return false;
-    }
-
-    QFileInfo const srcInfo(input());
-    if (!srcInfo.exists() || srcInfo.isDir()) {
-        setErrorString(QStringLiteral("Source input archive file does not exist or is a directory path."));
-        return false;
-    }
-
-    // Sniff the file signature to determine the unpacking profile
-    QFile probeFile(input());
-    if (!probeFile.open(QIODevice::ReadOnly)) {
-        setErrorString(probeFile.errorString());
-        return false;
-    }
-
-    QZstdIO zstdDevice(&probeFile);
-    if (!zstdDevice.open(QIODevice::ReadOnly)) {
-        setErrorString(zstdDevice.errorString());
-        return false;
-    }
-
-    QDataStream in(&zstdDevice);
-    in.setVersion(headerVersion());
-
-    QString magicTag;
-    // Peek at the beginning of the stream layout via the deserializer block
-    in >> magicTag;
-    zstdDevice.close();
-    probeFile.close();
-
-    // Route based on format sniff detection
-    // FIXME use the new QZstdIO::magicDirString()
-    if (magicTag == QStringLiteral("JOBZDIR1"))
-        return decompressFolder();
-
-    return decompressFile();
+    setOnFinished(nullptr);
+    setOptions(opts);
+    setOnFinished([this]() {
+        if (m_opts)
+            Q_EMIT m_opts->finished();
+    });
 }
 
-bool QZstdDecompressor::decompressFolder()
+ QZstdDecompressor::~ QZstdDecompressor()
 {
-    QFile srcFile(input());
-    if (!srcFile.open(QIODevice::ReadOnly)) {
-        setErrorString(srcFile.errorString());
-        return false;
-    }
-
-    QZstdIO zstdDevice(&srcFile);
-    if (!zstdDevice.open(QIODevice::ReadOnly)) {
-        setErrorString(zstdDevice.errorString());
-        return false;
-    }
-
-    // Map progress updates against compressed archive file sizing bounds
-    setTotal(static_cast<int>(qMin<qint64>(srcFile.size(), INT_MAX)));
-    setCurrent(0);
-
-    QDataStream in(&zstdDevice);
-    in.setVersion(headerVersion());
-
-    QString magicTag;
-    quint64 totalFiles = 0;
-
-    // Discard magic header tag and extract total count payload metadata
-    in >> magicTag;
-    in >> totalFiles;
-
-    // The output() parameter acts as our target destination extraction folder
-    QDir baseDir(output());
-    if (!baseDir.exists() && !baseDir.mkpath(baseDir.absolutePath())) {
-        setErrorString(QStringLiteral("Failed to allocate extraction target folder destination path tree."));
-        zstdDevice.close();
-        return false;
-    }
-
-    char buffer[65536];
-
-    for (quint64 i = 0; i < totalFiles; ++i) {
-        QString relativePath;
-        quint64 fileLength = 0;
-
-        in >> relativePath;
-        in >> fileLength;
-
-        QString const targetFilePath = baseDir.absoluteFilePath(relativePath);
-        QFileInfo const targetInfo(targetFilePath);
-        QDir const parentDir = targetInfo.absoluteDir();
-
-        // Regenerate child subdirectory trees if missing
-        if (!parentDir.exists() && !parentDir.mkpath(parentDir.absolutePath())) {
-            setErrorString(QStringLiteral("Failed to compose child package filesystem layout hierarchies."));
-            zstdDevice.close();
-            return false;
-        }
-
-        QFile targetFile(targetFilePath);
-        if (!targetFile.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
-            setErrorString(targetFile.errorString());
-            zstdDevice.close();
-            return false;
-        }
-
-        quint64 bytesRemaining = fileLength;
-        while (bytesRemaining > 0) {
-            qint64 const chunkToRead = static_cast<qint64>(qMin<quint64>(bytesRemaining, sizeof(buffer)));
-
-            // Synchronized with QDataStream structure out of the compressor
-            int const bytesRead = in.readRawData(buffer, static_cast<int>(chunkToRead));
-
-            if (bytesRead <= 0) {
-                setErrorString(QStringLiteral("Archive format payload stream broken or unexpected EOF reached."));
-                targetFile.close();
-                zstdDevice.close();
-                return false;
-            }
-
-            if (targetFile.write(buffer, bytesRead) != bytesRead) {
-                setErrorString(targetFile.errorString());
-                targetFile.close();
-                zstdDevice.close();
-                return false;
-            }
-
-            bytesRemaining -= bytesRead;
-        }
-
-        targetFile.close();
-        setCurrent(static_cast<int>(qMin<qint64>(srcFile.pos(), INT_MAX)));
-    }
-
-    zstdDevice.close();
-    Q_EMIT finished();
-    return true;
+    disconnectOptionConnections();
+    setOnFinished(nullptr);
+    if (m_ownsOpts && m_opts)
+        delete m_opts;
+    m_opts = nullptr;
 }
 
-bool QZstdDecompressor::decompressFile()
+bool  QZstdDecompressor::decompress() noexcept
 {
-    QFile srcFile(input());
-    QFile dstFile(output());
+    const bool ok = execute();
 
-    if (!srcFile.open(QIODevice::ReadOnly)) {
-        setErrorString(srcFile.errorString());
-        return false;
-    }
+    if (m_opts && *m_opts != *this)
+        *m_opts = *this;
 
-    if (!dstFile.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
-        setErrorString(dstFile.errorString());
-        return false;
-    }
+    return ok;
+}
 
-    QZstdIO zstdDevice(&srcFile);
-    if (!zstdDevice.open(QIODevice::ReadOnly)) {
-        setErrorString(zstdDevice.errorString());
-        return false;
-    }
+QZstdOptions * QZstdDecompressor::options() const
+{
+    return m_opts;
+}
 
-    // BACKLOG setup the header
+void  QZstdDecompressor::setOptions(QZstdOptions *other)
+{
+    if (!other || m_opts == other)
+        return;
 
-    setTotal(static_cast<int>(qMin<qint64>(srcFile.size(), INT_MAX)));
-    setCurrent(0);
+    // dissconnect the old shit
+    disconnectOptionConnections();
+    if(m_ownsOpts)
+        delete m_opts;
 
-    char buffer[65536];
-    while (!zstdDevice.atEnd()) {
-        qint64 const bytesRead = zstdDevice.read(buffer, sizeof(buffer));
+    m_opts = other;
+    m_ownsOpts = false;
+    // setup the new connections
+    setupOptionConnections();
 
-        if (bytesRead < 0) {
-            setErrorString(zstdDevice.errorString());
-            zstdDevice.close();
-            dstFile.close();
-            return false;
-        }
+    setInput(m_opts->get_input().toStdString());
+    setOutput(m_opts->get_output().toStdString());
+    setCompressionLevel(m_opts->get_compressionLevel());
+    setPreserveEmptyDirectories(m_opts->get_preserveEmptyDirectories());
+    setPreserveSymlinks(m_opts->get_preserveSymlinks());
+    setRecursiveDirectories(m_opts->get_recursiveDirectories());
+}
 
-        if (bytesRead == 0)
-            break;
+void  QZstdDecompressor::disconnectOptionConnections() noexcept
+{
+    if(!m_opts)
+        return;
+    QObject::disconnect(m_opts, &QZstdOptions::inputChanged, m_opts, nullptr);
+    QObject::disconnect(m_opts, &QZstdOptions::outputChanged, m_opts, nullptr);
+    QObject::disconnect(m_opts, &QZstdOptions::compressionLevelChanged, m_opts, nullptr);
+    QObject::disconnect(m_opts, &QZstdOptions::preserveEmptyDirectoriesChanged, m_opts, nullptr);
+    QObject::disconnect(m_opts, &QZstdOptions::preserveSymlinksChanged, m_opts, nullptr);
+    QObject::disconnect(m_opts, &QZstdOptions::recursiveDirectoriesChanged, m_opts, nullptr);
+}
 
-        if (dstFile.write(buffer, bytesRead) != bytesRead) {
-            setErrorString(dstFile.errorString());
-            zstdDevice.close();
-            dstFile.close();
-            return false;
-        }
+void  QZstdDecompressor::setupOptionConnections() noexcept
+{
+    QObject::connect(m_opts, &QZstdOptions::inputChanged,
+                     m_opts, [this](const QString &path) {
+                         setInput(path.toStdString());
+                     });
 
-        setCurrent(static_cast<int>(qMin<qint64>(srcFile.pos(), INT_MAX)));
-    }
+    QObject::connect(m_opts, &QZstdOptions::outputChanged,
+                     m_opts, [this](const QString &path) {
+                         setOutput(path.toStdString());
+                     });
 
-    zstdDevice.close();
-    dstFile.close();
+    QObject::connect(m_opts, &QZstdOptions::compressionLevelChanged,
+                     m_opts, [this](int level) {
+                         setCompressionLevel(level);
+                     });
 
-    Q_EMIT finished();
-    return true;
+    QObject::connect(m_opts, &QZstdOptions::preserveEmptyDirectoriesChanged,
+                     m_opts, [this](bool value) {
+                         setPreserveEmptyDirectories(value);
+                     });
+
+    QObject::connect(m_opts, &QZstdOptions::preserveSymlinksChanged,
+                     m_opts, [this](bool value) {
+                         setPreserveSymlinks(value);
+                     });
+
+    QObject::connect(m_opts, &QZstdOptions::recursiveDirectoriesChanged,
+                     m_opts, [this](bool value) {
+                         setRecursiveDirectories(value);
+                     });
 }

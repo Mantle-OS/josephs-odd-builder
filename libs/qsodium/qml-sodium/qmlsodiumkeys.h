@@ -2,6 +2,7 @@
 #define QMLSODIUMKEYS_H
 
 #include <QObject>
+#include <QStandardPaths>
 #include <QQmlEngine>
 
 #include <property-macros.h>
@@ -12,7 +13,7 @@ class QmlSodiumKeys : public QObject
 {
     Q_OBJECT
 
-    QP_RW(QString, keyDir, "")
+    QP_RW(QString, keyDir, QStandardPaths::writableLocation(QStandardPaths::TempLocation))
     QP_RW(QString, publicKeyFile, "")
     QP_RW(QString, privateKeyFile, "")
     QP_RW(QString, publicKeyBase64, "")

@@ -1,223 +1,141 @@
 #include "qzstdcompressorcrypto.h"
-#include "qzstdio.h"
-#include <QFile>
-#include <QFileInfo>
-#include <QDir>
-#include <QDirIterator>
-#include <QDataStream>
 
-QZstdCompressorCrypto::QZstdCompressorCrypto(QObject *parent) :
-    QZstdCompressor{parent}
+QZstdCompressorCrypto::QZstdCompressorCrypto() :
+    m_opts{new QZstdOptions{}},
+    m_ownsOpts(true)
 {
-
+    setupOptionConnections();
+    setOnFinished([this]() {
+        if (m_opts)
+            Q_EMIT m_opts->finished();
+    });
 }
 
-QSecureMem QZstdCompressorCrypto::encryptionKey() const
+QZstdCompressorCrypto::QZstdCompressorCrypto(QZstdOptions *opts) :
+    m_ownsOpts(false)
+{
+    setOnFinished(nullptr);
+    setOptions(opts);
+    setOnFinished([this]() {
+        if (m_opts)
+            Q_EMIT m_opts->finished();
+    });
+}
+
+QZstdCompressorCrypto::~QZstdCompressorCrypto()
+{
+    setOnFinished(nullptr);
+    disconnectOptionConnections();
+
+    if(m_ownsOpts && m_opts)
+        delete m_opts;
+
+    m_opts = nullptr;
+}
+
+const QSecureMem &QZstdCompressorCrypto::encryptionKey() const noexcept
 {
     return m_encryptionKey;
 }
 
-void QZstdCompressorCrypto::setEncryptionKey(const QSecureMem &key)
+void QZstdCompressorCrypto::setEncryptionKey(const QSecureMem &key) noexcept
 {
-    if (m_encryptionKey.data() != key.data()) {
-        m_encryptionKey = key;
-        Q_EMIT encryptionKeyChanged();
-    }
+    if(m_encryptionKey == key)
+        return;
+
+    m_encryptionKey = key;
+    job::zstd::JobZstdCompressorCrypto::setEncryptionKey(m_encryptionKey);
 }
 
-void QZstdCompressorCrypto::setEncryptionKeyB64(const QString &base64Key)
+QZstdOptions *QZstdCompressorCrypto::options() const
 {
-    QSecureMem decryptedKey;
-    if (decryptedKey.fromBase64(base64Key))
-        setEncryptionKey(decryptedKey);
-    else
-        qWarning() << "[QZstdCompressorCrypto] Failed to decode base64 encryption key material.";
+    return m_opts;
 }
 
-bool QZstdCompressorCrypto::execute()
+void QZstdCompressorCrypto::setOptions(QZstdOptions *other)
 {
-    if (input().isEmpty() || output().isEmpty()) {
-        setErrorString(QStringLiteral("Input or output pathways are unconfigured."));
-        return false;
-    }
+    if (!other || m_opts == other)
+        return;
 
-    if (m_encryptionKey.isEmpty()) {
-        setErrorString(QStringLiteral("Cryptographic pipeline missing secure encryption key context."));
-        return false;
-    }
+    // dissconnect the old shit
+    disconnectOptionConnections();
 
-    QFileInfo const fi(input());
-    if (!fi.exists()) {
-        setErrorString(QStringLiteral("Source input layout path does not exist."));
-        return false;
-    }
+    if(m_ownsOpts)
+        delete m_opts;
+    m_opts = other;
 
-    // Ensure our parent destination directory structure exists cleanly
-    QFileInfo const dstInfo(output());
-    QDir const parentDir = dstInfo.absoluteDir();
-    if (!parentDir.exists() && !parentDir.mkpath(parentDir.absolutePath())) {
-        setErrorString(QStringLiteral("Failed to generate directory tree layout for destination container."));
-        return false;
-    }
+    m_ownsOpts = false;
 
-    if (fi.isDir())
-        return compressFolder();
+    // setup the new connections
+    setupOptionConnections();
 
-    return compressFile();
+    setInput(m_opts->get_input().toStdString());
+    setOutput(m_opts->get_output().toStdString());
+    setCompressionLevel(m_opts->get_compressionLevel());
+    setPreserveEmptyDirectories(m_opts->get_preserveEmptyDirectories());
+    setPreserveSymlinks(m_opts->get_preserveSymlinks());
+    setRecursiveDirectories(m_opts->get_recursiveDirectories());
 }
 
-bool QZstdCompressorCrypto::compressFolder()
+
+bool QZstdCompressorCrypto::compressAndEncrypt() noexcept
 {
-    QFile dst(output());
+    if (!m_opts)
+        return false; // no options object to report through at all
 
-    if (!dst.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
-        setErrorString(dst.errorString());
+    if (!hasKeys()) {
+        setErrorString("Cryptographic pipeline missing a valid encryption key call setEncryptionKey() first.");
+        *m_opts = *this;
         return false;
     }
 
-    QZstdIO zstd(&dst);
-    zstd.setCompressionLevel(compressionLevel());
-    if (!zstd.open(QIODevice::WriteOnly)) {
-        setErrorString(zstd.errorString());
-        return false;
-    }
-
-    QVector<QFileInfo> files;
-    qint64 totalBytes = 0;
-
-    QDirIterator it(input(), QDir::Files, QDirIterator::Subdirectories);
-    while (it.hasNext()) {
-        it.next();
-        QFileInfo fi = it.fileInfo();
-        files.push_back(fi);
-        totalBytes += fi.size();
-    }
-
-    setTotal(static_cast<int>(qMin<qint64>(totalBytes, INT_MAX)));
-    setCurrent(0);
-
-    QDataStream out(&zstd);
-    out.setVersion(QZstdOptions::headerVersion());
-
-    // JOBZCRYPDIR1
-    out << QZstdOptions::magicDirString();
-    out << quint64(files.size());
-
-    QDir const root(input());
-    char readBuffer[65536];
-    qint64 done = 0;
-
-    QSodiumSecretBox box;
-    for (const QFileInfo &fi : files) {
-        QString const relPath = root.relativeFilePath(fi.absoluteFilePath());
-
-        QFile src(fi.absoluteFilePath());
-        if (!src.open(QIODevice::ReadOnly)) {
-            setErrorString(src.errorString());
-            zstd.close();
-            return false;
-        }
-
-        out << relPath;
-        out << quint64(src.size());
-
-        while (!src.atEnd()) {
-            qint64 const n = src.read(readBuffer, sizeof(readBuffer));
-            if (n < 0) {
-                setErrorString(src.errorString());
-                zstd.close();
-                return false;
-            }
-            if (n == 0) break;
-
-            QByteArray const plainChunk = QByteArray::fromRawData(readBuffer, static_cast<int>(n));
-            QByteArray encryptedChunk;
-            QByteArray chunkNonce;
-
-            if (!box.encrypt(plainChunk, m_encryptionKey,
-                             encryptedChunk, chunkNonce)) {
-                setErrorString(QStringLiteral("Symmetric encryption wrapper operation failed inside streaming loop."));
-                zstd.close();
-                return false;
-            }
-
-            // Stream both components sequentially into the frame wrapper
-            out << chunkNonce;
-            out << encryptedChunk;
-
-            done += n;
-            setCurrent(static_cast<int>(qMin<qint64>(done, INT_MAX)));
-        }
-    }
-
-    zstd.close();
-    Q_EMIT finished();
-    return true;
+    bool const ok = execute();
+    *m_opts = *this;
+    Q_EMIT m_opts->finished();
+    return ok;
+}
+void QZstdCompressorCrypto::disconnectOptionConnections() noexcept
+{
+    if(!m_opts)
+        return;
+    QObject::disconnect(m_opts, &QZstdOptions::inputChanged, m_opts, nullptr);
+    QObject::disconnect(m_opts, &QZstdOptions::outputChanged, m_opts, nullptr);
+    QObject::disconnect(m_opts, &QZstdOptions::compressionLevelChanged, m_opts, nullptr);
+    QObject::disconnect(m_opts, &QZstdOptions::preserveEmptyDirectoriesChanged, m_opts, nullptr);
+    QObject::disconnect(m_opts, &QZstdOptions::preserveSymlinksChanged, m_opts, nullptr);
+    QObject::disconnect(m_opts, &QZstdOptions::recursiveDirectoriesChanged, m_opts, nullptr);
 }
 
-bool QZstdCompressorCrypto::compressFile()
+void QZstdCompressorCrypto::setupOptionConnections() noexcept
 {
-    QFile src(input());
-    QFile dst(output());
+    QObject::connect(m_opts, &QZstdOptions::inputChanged,
+                     m_opts, [this](const QString &path) {
+                         setInput(path.toStdString());
+                     });
 
-    if (!src.open(QIODevice::ReadOnly)) {
-        setErrorString(src.errorString());
-        return false;
-    }
+    QObject::connect(m_opts, &QZstdOptions::outputChanged,
+                     m_opts, [this](const QString &path) {
+                         setOutput(path.toStdString());
+                     });
 
-    if (!dst.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
-        setErrorString(dst.errorString());
-        return false;
-    }
+    QObject::connect(m_opts, &QZstdOptions::compressionLevelChanged,
+                     m_opts, [this](int level) {
+                         setCompressionLevel(level);
+                     });
 
-    QZstdIO zstd(&dst);
-    zstd.setCompressionLevel(compressionLevel());
+    QObject::connect(m_opts, &QZstdOptions::preserveEmptyDirectoriesChanged,
+                     m_opts, [this](bool value) {
+                         setPreserveEmptyDirectories(value);
+                     });
 
-    if (!zstd.open(QIODevice::WriteOnly)) {
-        setErrorString(zstd.errorString());
-        return false;
-    }
+    QObject::connect(m_opts, &QZstdOptions::preserveSymlinksChanged,
+                     m_opts, [this](bool value) {
+                         setPreserveSymlinks(value);
+                     });
 
-    setTotal(static_cast<int>(qMin<qint64>(src.size(), INT_MAX)));
-    setCurrent(0);
-
-    QDataStream out(&zstd);
-    out.setVersion(QZstdOptions::headerVersion());
-
-    // "JOBZCRYPFILE1"
-    out << QZstdOptions::magicFileString();
-
-    char readBuffer[65536];
-    qint64 done = 0;
-    QSodiumSecretBox box;
-
-    while (!src.atEnd()) {
-        qint64 const n = src.read(readBuffer, sizeof(readBuffer));
-        if (n < 0) {
-            setErrorString(src.errorString());
-            zstd.close();
-            return false;
-        }
-        if (n == 0) break;
-
-        QByteArray const plainChunk = QByteArray::fromRawData(readBuffer, static_cast<int>(n));
-        QByteArray encryptedChunk;
-        QByteArray chunkNonce;
-
-        if (!box.encrypt(plainChunk, m_encryptionKey, encryptedChunk, chunkNonce)) {
-            setErrorString(QStringLiteral("Symmetric encryption operation failed during flat file processing."));
-            zstd.close();
-            return false;
-        }
-
-        out << chunkNonce;
-        out << encryptedChunk;
-
-        done += n;
-        setCurrent(static_cast<int>(qMin<qint64>(done, INT_MAX)));
-    }
-
-    zstd.close();
-    Q_EMIT finished();
-    return true;
+    QObject::connect(m_opts, &QZstdOptions::recursiveDirectoriesChanged,
+                     m_opts, [this](bool value) {
+                         setRecursiveDirectories(value);
+                     });
 }
+

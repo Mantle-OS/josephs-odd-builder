@@ -38,9 +38,7 @@ Provides QML-facing helper objects for paths, path lists, string lists, and shar
 
 ## QSodium
 
-A Qt-friendly cryptography library built on top of libsodium.
-
-Provides secure memory, password hashing, authenticated encryption, digital signatures, hashing, random number generation, and key management. QSodium is a general-purpose cryptography library and is not specific to AI applications.
+A Qt-friendly cryptography library built on top of libsodium. Provides secure memory, password hashing, authenticated encryption, digital signatures, hashing, random number generation, and key management. QSodium is a general-purpose cryptography library and is not specific to AI applications
 
 * [See also](docs/qtai/qsodium.md)
 
@@ -50,9 +48,7 @@ Provides secure memory, password hashing, authenticated encryption, digital sign
 
 ## QmlSodium
 
-A QML interface built on top of `qt-sodium`.
-
-Provides declarative QML elements for common cryptographic workflows including password handling, authenticated encryption, digital signatures, hashing, and key management. QmlSodium is intended for Qt Quick applications and uses the underlying `qt-sodium` library for all cryptographic operations.
+"A QML interface built on top of qt-sodium. Provides declarative QML elements for common cryptographic workflows including password handling, authenticated encryption, digital signatures, hashing, and key management. QmlSodium is intended for Qt Quick applications and uses the underlying qt-sodium library for all cryptographic operation
 
 * [See also](docs/qtai/qml-sodium.md)
 

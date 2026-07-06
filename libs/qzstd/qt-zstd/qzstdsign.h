@@ -1,21 +1,35 @@
 #pragma once
+#include <QString>
 
-#include "qzstdoptions.h"
-#include <qsodiumcryptosign.h>
 #include <qsecuremem.h>
 
-class QZstdSign : public QZstdOptions
-{
-    Q_OBJECT
+#include <job_zstd_sign.h>
+
+#include "qzstdoptions.h"
+
+class QZstdSign : public job::zstd::JobZstdSign
+{    
 public:
-    explicit QZstdSign(QObject *parent = nullptr);
-    ~QZstdSign() override;
-    void setSigningKeyPair(const QString& publicKey, const QSecureMem& privateKey);
-    void setVerificationKey(const QString& publicKey);
-    bool execute();
-    bool sign();
-    bool verify();
-    void setSigningKeyPairB64(const QString& publicKey, const QString& privateKeyB64);
+    explicit QZstdSign();
+    QZstdSign(const QZstdSign &) = delete;
+    QZstdSign(QZstdSign &&) noexcept = delete;
+    QZstdSign &operator=(const QZstdSign &) = delete;
+    QZstdSign &operator=(QZstdSign &&) noexcept = delete;
+    ~QZstdSign();
+
+    [[nodiscard]] QString publicKeyFile() const noexcept;
+    [[nodiscard]] bool setPublicKeyFile(const QString &publicKeyFile) noexcept;
+
+    [[nodiscard]] QString privateKeyFile() const noexcept;
+    [[nodiscard]] bool setPrivateKeyFile(const QString &privateKeyFile) noexcept;
+
+    [[nodiscard]] bool signFile(const QString &inPath, const QString &outPath, bool overwrite = true);
+    [[nodiscard]] bool verifyFile(const QString  &filePath, const QString &signatureBase64) noexcept;
+
 private:
-    QSodiumCryptoSign *m_signer = nullptr; // We own this
+    void syncOptions();
+    void disconnectOptionConnections() noexcept;
+    void setupOptionConnections() noexcept;
+    QZstdOptions *m_opts = nullptr;
+    bool m_ownsOpts = true;
 };

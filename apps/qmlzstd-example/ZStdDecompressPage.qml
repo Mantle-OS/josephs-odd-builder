@@ -8,6 +8,9 @@ import QZstd
 Page {
     id: decompressionPage
 
+    QmlDecompressor { id: decompressor }
+
+
     Item {
         width: parent.width   * 0.80
         height: parent.height * 0.80
@@ -16,20 +19,27 @@ Page {
         ColumnLayout {
             anchors.fill: parent
             spacing: 15
-
-            QmlDecompressor { id: decompressor }
-
+            Label {
+                text: qsTr("Blocking decompression")
+                font.pixelSize: 20
+                font.bold: true
+            }
+            Label {
+                Layout.fillWidth: true
+                wrapMode: Text.WordWrap
+                text: qsTr("Extracts a .zst archive back into a folder. Same blocking behavior as the compression tab, the call returns only once extraction has fully finished.")
+                font.pixelSize: 13
+                opacity: 0.75
+            }
             RowLayout {
                 Layout.fillWidth: true
                 Label { text: qsTr("Progression:") }
-
                 ProgressBar {
                     Layout.fillWidth: true
                     value: decompressor.current
                     from: 0
                     to: decompressor.total > 0 ? decompressor.total : 100
                 }
-
                 Label {
                     text: decompressor.total > 0 ?
                               Math.round((decompressor.current / decompressor.total) * 100) + "%" :
@@ -41,39 +51,45 @@ Page {
                 Layout.fillWidth: true
                 Label {
                     text: decompressorPrivate.hasFile ?
-                              qsTr("Target Archive: ") + decompressor.input :
+                              qsTr("Target archive: ") + decompressor.input :
                               qsTr("No compressed archive selected.")
                     Layout.fillWidth: true
                     elide: Text.ElideMiddle
                     wrapMode: Text.WordWrap
                 }
                 Button {
-                    text: qsTr("Browse Archives...")
+                    text: qsTr("Browse archives...")
                     onClicked: decompressorFilePicker.open()
                 }
             }
 
-            Item { Layout.fillHeight: true } // Spacer pushing action button down
+            RowLayout {
+                Layout.fillWidth: true
+                Label {
+                    Layout.fillWidth: true
+                    text: qsTr("Preserve symlinks: %1").arg(decompressor.preserveSymlinks ? qsTr("yes") : qsTr("no"))
+                }
+                Button {
+                    text: qsTr("Options...")
+                    onClicked: optionsPopup.open()
+                }
+            }
+
+            Item { Layout.fillHeight: true }
 
             Button {
-                text: qsTr("Start Decompression Pipeline")
+                text: qsTr("Start decompression")
                 Layout.alignment: Qt.AlignHCenter
                 Layout.preferredWidth: 250
                 enabled: decompressorPrivate.hasFile
-
                 onClicked: {
-                    decompressorDialog.text = ""
-                    decompressorDialog.informativeText = ""
-
-                    // Single-threaded blocking execution pass
-                    if (!decompressor.decompress()) {
-                        decompressorDialog.text = qsTr("Error In Decompression")
-                        decompressorDialog.informativeText = decompressor.errorString
+                    if (decompressor.decompress()) {
+                        decompressorDialog.text = qsTr("Decompression complete")
+                        decompressorDialog.informativeText = qsTr("Archive decompressed successfully.")
                     } else {
-                        decompressorDialog.text = qsTr("Success")
-                        decompressorDialog.informativeText = qsTr("Archive decompressed successfully!")
+                        decompressorDialog.text = qsTr("Decompression failed")
+                        decompressorDialog.informativeText = decompressor.errorString
                     }
-
                     decompressorDialog.open()
                 }
             }
@@ -82,26 +98,21 @@ Page {
 
     FileDialog {
         id: decompressorFilePicker
-        title: qsTr("Select Zstd Archive for Extraction")
-        // currentFolder: StandardPaths.writableLocation(StandardPaths.DownloadLocation)[0]
+        title: qsTr("Select Zstd archive for extraction")
         currentFolder: StandardPaths.standardLocations(StandardPaths.DownloadLocation)[0]
         nameFilters: [ "Zstd compressed archives (*.zst)", "All files (*)" ]
-
         onAccepted: {
-            let cleanPath = selectedFile.toString();
-            if (cleanPath.startsWith("file://")) {
-                cleanPath = cleanPath.replace("file://", "");
-            }
+            let cleanPath = selectedFile.toString()
+            if (cleanPath.startsWith("file://"))
+                cleanPath = cleanPath.replace("file://", "")
 
-            // Assign archive to input stream context
-            decompressor.input = cleanPath;
+            decompressor.input = cleanPath
             if (cleanPath.endsWith(".zst")) {
-                decompressor.output = cleanPath.substring(0, cleanPath.length - 4);
+                decompressor.output = cleanPath.substring(0, cleanPath.length - 4)
             } else {
-                decompressor.output = cleanPath + ".extracted";
+                decompressor.output = cleanPath + ".extracted"
             }
-
-            decompressorPrivate.hasFile = true;
+            decompressorPrivate.hasFile = true
         }
     }
 
@@ -110,9 +121,16 @@ Page {
         buttons: MessageDialog.Ok
     }
 
-    // Private Component Scope Tracking State
     Item {
         id: decompressorPrivate
         property bool hasFile: false
+    }
+
+    ZStdOptionsPopup {
+        id: optionsPopup
+        target: decompressor
+        width: parent.width * 0.98
+        height: parent.height * 0.98
+        anchors.centerIn: parent
     }
 }

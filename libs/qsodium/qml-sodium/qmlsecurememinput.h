@@ -33,7 +33,7 @@ class QmlSecureMemInput : public QQuickItem
     Q_PROPERTY(int length READ length NOTIFY lengthChanged)
     Q_PROPERTY(QColor borderColor READ borderColor WRITE setBorderColor NOTIFY borderColorChanged)
     Q_PROPERTY(QColor maskColor READ maskColor WRITE setMaskColor NOTIFY maskColorChanged)
-    QP_PTR_RO(QmlSecureMem, secureBuffer)
+    QP_PTR_RO(QmlSecureMem, memory)
     QML_ELEMENT
     static constexpr size_t kSecureInputCapacity = 64;
 
@@ -61,17 +61,11 @@ protected:
     void focusInEvent(QFocusEvent *event) override;
     void focusOutEvent(QFocusEvent *event) override;
     void keyPressEvent(QKeyEvent *event) override;
-
-    void mousePressEvent(QMouseEvent *event) override
-    {
-        forceActiveFocus();
-        event->accept();
-    }
+    void mousePressEvent(QMouseEvent *event) override;
 
     QSGNode *updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *data) override;
 
 private:
-    // QmlSecureMem m_secureBuffer;
     int m_byteCount = 0;
     int m_maskCount = 0;
     std::vector<uint8_t> m_inputByteLengths;

@@ -5,10 +5,6 @@ project(qt6-sodium
 
 set(CMAKE_AUTOMOC ON)
 
-option(QSECUREMEM_ALLOW_STRING "Allow for gated strings" OFF)
-if(QSECUREMEM_ALLOW_STRING)
-    add_compile_definitions(QSECUREMEM_ALLOW_STRING=1)
-endif()
 
 set(QSODIUM_HEADERS
     qt-sodium/qsecuremem.h
@@ -52,8 +48,8 @@ target_link_libraries(qt-sodium PRIVATE
 # =======START QML BINDINGS=================
 
 set(QDEC_SODIUM_HEADERS
+
     qml-sodium/qmlsodiumbox.h
-    qml-sodium/qmlsodiumpasswordutils.h
     qml-sodium/qmlsodiumcryptosign.h
     qml-sodium/qmlsodiumpasswordutils.h
     qml-sodium/qmlsodiumhash.h
@@ -64,7 +60,6 @@ set(QDEC_SODIUM_HEADERS
 
 set(QDEC_SODIUM_CXX
     qml-sodium/qmlsodiumbox.cpp
-    qml-sodium/qmlsodiumpasswordutils.cpp
     qml-sodium/qmlsodiumcryptosign.cpp
     qml-sodium/qmlsodiumpasswordutils.cpp
     qml-sodium/qmlsodiumhash.cpp

@@ -25,16 +25,23 @@ ApplicationWindow {
         TabButton{
             text: qsTr("Blocking Decompress")
         }
-
+        TabButton{
+            text: qsTr("Blocking ZstdCrypto")
+        }
+        TabButton{
+            text: qsTr("About")
+        }
     }
 
     StackLayout{
         id: stackView
         currentIndex: bar.currentIndex
         anchors.fill: parent
-        ZStdPage{} // Will be the Async
-        ZStdCompressPage{} // DONE
-        ZStdDecompressPage{} // UP NEXT
+        ZStdPage{} //Async
+        ZStdCompressPage{} // Vlocking
+        ZStdDecompressPage{} // blocking
+        ZstdCrypto{}
+        About{}
     }
 }
 

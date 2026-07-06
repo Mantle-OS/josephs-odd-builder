@@ -4,37 +4,24 @@ project(qt6-zstd
 )
 
 set(CMAKE_AUTOMOC ON)
-option(QZSTD_SODIUM_SUPPORT "Adds supports for encryption and decryption" ON)
 
 set(QTZSTD_HEADERS
-    qt-zstd/qzstdio.h           ## QIoDevice Implementation
-    qt-zstd/qzstdoptions.h      ## Base Core members
-    qt-zstd/qzstdcompressor.h   ## non encyption zstd compressor
-    qt-zstd/qzstddecompressor.h ## non encyption zstd decompressor
-    qt-zstd/qzstd.h             ## Threads and API to the whole lib
+    qt-zstd/qzstdoptions.h                  ## Base Core members
+    qt-zstd/qzstdcompressor.h               ## non encyption zstd compressor
+    qt-zstd/qzstddecompressor.h             ## non encyption zstd decompressor
+    qt-zstd/qzstdcompressorcrypto.h         ## Compress with encryption
+    qt-zstd/qzstddecompressorcrypto.h       ## DeCompress with encryption
+    qt-zstd/qzstdsign.h                     ## sign and verify the intergrerty of the archive
+    qt-zstd/qzstd.h                         ## Threads and API to the whole lib
 )
 set(QTZSTD_CXX
-    qt-zstd/qzstdio.cpp
-    qt-zstd/qzstdoptions.cpp
     qt-zstd/qzstdcompressor.cpp
     qt-zstd/qzstddecompressor.cpp
+    qt-zstd/qzstdcompressorcrypto.cpp
+    qt-zstd/qzstddecompressorcrypto.cpp
+    qt-zstd/qzstdsign.cpp
     qt-zstd/qzstd.cpp
 )
-
-if(QZSTD_SODIUM_SUPPORT)
-    add_compile_definitions(QZSTD_SODIUM_SUPPORT=1)
-    list(APPEND QTZSTD_CXX
-        qt-zstd/qzstdcompressorcrypto.cpp       ## Compress with encryption
-        qt-zstd/qzstddecompressorcrypto.cpp     ## DeCompress with encryption
-        qt-zstd/qzstdsign.cpp                   ## sign and verify the intergrerty of the archive
-    )
-
-    list(APPEND QTZSTD_HEADERS
-        qt-zstd/qzstdcompressorcrypto.h
-        qt-zstd/qzstddecompressorcrypto.h
-        qt-zstd/qzstdsign.h
-    )
-endif()
 
 add_library(qt-zstd STATIC
     ${QTZSTD_HEADERS}
@@ -43,9 +30,9 @@ add_library(qt-zstd STATIC
 
 target_link_libraries(qt-zstd PRIVATE
     Qt6::Core
-    Qt6::Concurrent
+    qt-ai-utils
     ${LibSodium_LIBRARIES} JosephsOddBuilder_Crypto qt-sodium
-    ${LibZstd_LIBRARIES}
+    ${LibZstd_LIBRARIES} JosephsOddBuilder_Zstd
 )
 
 target_include_directories(qt-zstd PUBLIC
@@ -57,12 +44,22 @@ target_include_directories(qt-zstd PUBLIC
 #===================================================================================================================================
 
 set(QMLZSTD_HEADERS
+
+    qml-zstd/qmlcompressor.h
+    qml-zstd/qmlcryptcompressor.h
+
+    qml-zstd/qmldecompressor.h
+    qml-zstd/qmlcryptodecompressor.h
+
     qml-zstd/qmlzstd.h
 )
+
 set(QMLZSTD_CXX
     qml-zstd/qmlzstd.cpp
 )
-# set(QMLZSTD_QML)
+set(QMLZSTD_QML
+    qml-zstd/ZStdOptionsPopup.qml
+)
 qt_add_library(qml-zstd STATIC)
 qt_add_qml_module(qml-zstd
     URI QZstd
@@ -70,8 +67,8 @@ qt_add_qml_module(qml-zstd
     SOURCES
       ${QMLZSTD_HEADERS}
       ${QMLZSTD_CXX}
-    # QML_FILES
-    #   ${QMLZSTD_QML}
+    QML_FILES
+      ${QMLZSTD_QML}
 )
 
 target_include_directories(qml-zstd PUBLIC
@@ -88,6 +85,7 @@ target_link_libraries(qml-zstd PRIVATE
     Qt6::Quick
     Qt6::QuickControls2
     Qt6::Qml
-    ${LibSodium_LIBRARIES} JosephsOddBuilder_Crypto qt-sodium
-    ${LibZstd_LIBRARIES}  qt-zstd
+    qt-ai-utils
+    ${LibSodium_LIBRARIES} JosephsOddBuilder_Crypto qt-sodium qml-sodium qml-sodiumplugin
+    ${LibZstd_LIBRARIES} JosephsOddBuilder_Zstd qt-zstd
 )

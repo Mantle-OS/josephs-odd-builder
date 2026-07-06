@@ -27,10 +27,9 @@ QSdImgGenParams::~QSdImgGenParams()
     if(!m_loras->isEmpty()){
         m_loras->clear();
     }
-    if(m_loras){
-        delete m_loras;
-        m_loras = nullptr;
-    }
+    // JIC parent moved
+    delete m_loras;
+    m_loras = nullptr;
 
     if (m_initImage){
         delete m_initImage;

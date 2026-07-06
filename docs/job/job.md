@@ -153,10 +153,36 @@ job_tui allows for the creation of complex, interactive terminal applications wi
 
 ---
 
-## Job's basic crypto library 
-job_crypto library is a very small and simple crypto library.  
+## Job's crypto library
+
+job_crypto is the cryptographic foundation of the job stack, 
+built on libsodium with no other job::* library dependencies. 
+
+It covers secure memory (locked, zeroed-on-release buffers), 
+
+asymmetric keypair management and Ed25519 file signing, BLAKE2b hashing, 
+
+symmetric authenticated encryption, and Argon2id password hashing and key derivation. 
+
+Every other library that needs real cryptography job_zstd's encrypted archives, job_net's password-protected URLs 
+
+builds on top of job_crypto rather than duplicating any of this.
 
 [This doc goes into more detail.](docs/job/crypto_overview.md)
 
 ---
+
+
+## Job's Zstd library
+
+job_zstd is a pure C++ compression library built on Zstandard, with no Qt dependency at all. It compresses single files and whole directory trees into a single self-describing archive, where every entry (a file, a directory, an empty directory, or a symlink) carries its own type tag, so an archive never needs outside context to know what it contains.
+
+The library builds directly on job_crypto for its cryptographic layer. Encryption and detached Ed25519 signing are not bolted on as an afterthought, they are treated as first-class operations, since job_zstd is meant to serve as the transport format for the aipkg package ledger system, where the contents of an archive need to be verifiable, not just recoverable.
+
+Compression and decompression are implemented as std::streambuf based transports layered on top of one another, which is what allows encryption to sit as an outer wrapper around an otherwise ordinary compressed stream without either side needing to know about the other. The library also includes hardening against path traversal and symlink based extraction attacks, since it may end up extracting archives whose contents were not necessarily authored by someone already trusted.
+
+[This doc goes into more detail.](docs/job/zstd_overview.md)
+
+---
+
 

@@ -1,72 +1,79 @@
 #pragma once
 
 #include <QObject>
+#include <QDebug>
 #include <qqmlregistration.h>
 
-#include <qt-zstd/qzstd.h>
-#include <qt-zstd/qzstdcompressor.h>
-#include <qt-zstd/qzstddecompressor.h>
+#include <qmlsecuremem.h>
+#include <qmlsodiumkeys.h>
+#include <qzstd.h>
 
 class QmlZstd : public QZstd
 {
     Q_OBJECT
-    Q_PROPERTY(bool hasSodium READ hasSodium NOTIFY hasSodiumChanged FINAL)
-
+    Q_PROPERTY(QmlSodiumKeys *signingKeys READ signingKeys CONSTANT)
+    Q_PROPERTY(QmlSecureMem *encryptionKey READ get_encryptionKey NOTIFY encryptionKeyChanged)
     QML_ELEMENT
     QML_SINGLETON
+
 public:
     explicit QmlZstd(QObject *parent = nullptr) :
-        QZstd{parent}
+        QZstd{parent},
+        m_signingKeys{new QmlSodiumKeys{this}},
+        m_encryptionKey{new QmlSecureMem{this}}
     {
+        connect(m_signingKeys, &QmlSodiumKeys::publicKeyFileChanged,
+                this, [this](const QString &path) {
+                    if (!setPublicKeyFile(path))
+                        qWarning() << "[QmlZstd] Failed to set public key file:" << path;
+                });
 
+        connect(m_signingKeys, &QmlSodiumKeys::privateKeyFileChanged,
+                this, [this](const QString &path) {
+                    if (!setPrivateKeyFile(path))
+                        qWarning() << "[QmlZstd] Failed to set private key file (check it exists and matches the current public key):" << path;
+                });
     }
-    ~QmlZstd() override = default;
 
-#ifdef QZSTD_SODIUM_SUPPORT
-    bool hasSodium() const
+    ~QmlZstd() override
     {
+        if (m_encryptionKey && m_encryptionKey->mem())
+            m_encryptionKey->mem()->clear();
+    }
+
+    QmlSodiumKeys *signingKeys() const noexcept { return m_signingKeys; }
+    QmlSecureMem *get_encryptionKey() noexcept { return m_encryptionKey; }
+
+    Q_INVOKABLE bool setEncryptionKey(QmlSecureMem *source) noexcept
+    {
+        if (!source || !source->internalBuffer() || !m_encryptionKey)
+            return false;
+
+        QSecureMem *src = source->internalBuffer();
+        QSecureMem *dst = m_encryptionKey->internalBuffer();
+
+        if (!src || !dst || src->empty())
+            return false;
+
+        dst->clear();
+
+        if (!dst->allocate(src->size()))
+            return false;
+
+        dst->copyFrom(src->data(), src->size());
+
+        // QZstd::setPrivateKey is inherited, this is the real backend push.
+        setPrivateKey(*dst);
+
+        Q_EMIT encryptionKeyChanged();
         return true;
     }
-#else
-    bool hasSodium() const
-    {
-        return false;
-    }
-#endif
 
 Q_SIGNALS:
-    void hasSodiumChanged();
+    void encryptionKeyChanged();
 
 private:
-#ifdef QZSTD_SODIUM_SUPPORT
-    bool m_hasSodium = true;
-#else
-    bool m_hasSodium = false;
-#endif
+    QmlSodiumKeys *m_signingKeys = nullptr;   // owned, parented to this
+    QmlSecureMem *m_encryptionKey = nullptr;  // owned, parented to this
 };
 
-
-class QmlCompressor : public QZstdCompressor
-{
-    Q_OBJECT
-    QML_ELEMENT
-public:
-    explicit QmlCompressor(QObject *parent = nullptr) :
-        QZstdCompressor(parent)
-    {}
-    ~QmlCompressor() override = default;
-
-    Q_INVOKABLE bool compress() { return execute();}
-};
-
-class QmlDecompressor : public QZstdDecompressor
-{
-    Q_OBJECT
-    QML_ELEMENT
-public:
-    explicit QmlDecompressor(QObject *parent = nullptr) :
-        QZstdDecompressor(parent) {}
-    ~QmlDecompressor() override = default;
-
-    Q_INVOKABLE bool decompress() { return execute();}
-};

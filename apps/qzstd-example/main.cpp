@@ -1,44 +1,48 @@
 #include <QCoreApplication>
 #include <QFile>
 #include <QDir>
+#include <QFileInfo>
 #include <QStandardPaths>
 #include <QDebug>
 #include <QTextStream>
 #include <QEventLoop>
+#include <QByteArray>
+#include <functional>
 
 #include <qzstd.h>
-#include <qzstdio.h>
-
-#ifdef QZSTD_SODIUM_SUPPORT
-#include <qsodium.h>
+#include <qsodiumkeys.h>
+#include <qsodiumpasswordutils.h>
+#include <qextrarandom.h>
 #include <qsecuremem.h>
-#include <sodium/crypto_secretbox.h>
-#endif
 
-static const QString kPassText    = "secret_words";
-static const QString kDataToTest  = "HuggingFace Token: hf_ABC123XYZ789SecureManifestTokenData";
-static const QString kKeysDir     = "testKeys";
-static const QString ktestFile    = "test.txt";
+static const QString kPassText   = "secret_words";
+static const QString kDataToTest = "HuggingFace Token: hf_ABC123XYZ789SecureManifestTokenData";
+static const QString kKeysDir    = "testKeys";
+static const QString ktestFile   = "test.txt";
+static const QString kPubKeyName = "identity.pub";
+static const QString kPriKeyName = "identity.key";
 
-bool createDirFromFile(const QString &fileName) {
+bool createDirFromFile(const QString &fileName)
+{
     QFileInfo fi(fileName);
     QDir d = fi.absoluteDir();
-    if (!d.exists()) {
+    if (!d.exists())
         return d.mkpath(d.absolutePath());
-    }
     return true;
 }
 
-bool createDir(const QString &dirName) {
+bool createDir(const QString &dirName)
+{
     QDir d(dirName);
-    if (!d.exists()) {
+    if (!d.exists())
         return d.mkpath(dirName);
-    }
     return true;
 }
 
-bool writeTextFile(const QString &fileName, const QString &content) {
-    if (!createDirFromFile(fileName)) return false;
+bool writeTextFile(const QString &fileName, const QString &content)
+{
+    if (!createDirFromFile(fileName))
+        return false;
 
     QFile f(fileName);
     if (f.open(QIODevice::WriteOnly | QIODevice::Text)) {
@@ -51,7 +55,8 @@ bool writeTextFile(const QString &fileName, const QString &content) {
     return false;
 }
 
-QString readTextFile(const QString &fileName) {
+QString readTextFile(const QString &fileName)
+{
     QFile f(fileName);
     if (f.open(QIODevice::ReadOnly | QIODevice::Text)) {
         QTextStream in(&f);
@@ -62,11 +67,13 @@ QString readTextFile(const QString &fileName) {
     return {};
 }
 
-bool dirExists(const QString &path) {
+bool dirExists(const QString &path)
+{
     return QFile::exists(path) && QFileInfo(path).isDir();
 }
 
-void setupWorkArea(const QString &tPath, const QString &kPath, const QString &compressDir) {
+void setupWorkArea(const QString &tPath, const QString &kPath, const QString &compressDir)
+{
     if (dirExists(tPath)) {
         QDir dir(tPath);
         dir.removeRecursively();
@@ -76,14 +83,34 @@ void setupWorkArea(const QString &tPath, const QString &kPath, const QString &co
     createDir(compressDir);
 }
 
+// Runs one QZstd operation to completion on a local event loop, adequate
+// for a command line example. A real GUI app would connect to
+// QZstd::finished directly and never block like this at all, the whole
+// point of QZstd is to NOT need a loop like this in real usage.
+bool runAndCheck(QZstd &engine, const std::function<void()> &trigger, const QString &label)
+{
+    QEventLoop loop;
+    QObject::connect(&engine, &QZstd::finished, &loop, &QEventLoop::quit);
+
+    trigger();
+    loop.exec();
+
+    if (!engine.get_errorString().isEmpty()) {
+        qCritical() << "[-]" << label << "FAILED ->" << engine.get_errorString();
+        return false;
+    }
+
+    qDebug() << "[+] TEST PASS:" << label;
+    return true;
+}
+
 int main(int argc, char *argv[])
 {
     QCoreApplication a(argc, argv);
 
     QString baseTmp = QStandardPaths::writableLocation(QStandardPaths::TempLocation);
-    if (baseTmp.isEmpty()) {
+    if (baseTmp.isEmpty())
         baseTmp = "/tmp";
-    }
 
     QString const testPath = baseTmp + "/qzstd-example";
     QString const keysPath = testPath + "/" + kKeysDir;
@@ -91,246 +118,111 @@ int main(int argc, char *argv[])
     QString const testDir  = testPath + "/test_dir";
 
     setupWorkArea(testPath, keysPath, testDir);
-
-    // Populate baseline text payload for extraction validation checks
     writeTextFile(testFile, kDataToTest);
 
     qDebug() << "=======================================================";
-    qDebug() << " STARTING   TESTS                                      ";
+    qDebug() << " STARTING QZSTD (plain) TESTS";
     qDebug() << "=======================================================";
 
-
     {
-        QString const ioCompressedFile = testPath + "/qzstdio_direct_test.txt.zst";
-        QString const ioExtractedFile  = testPath + "/qzstdio_direct_extracted.txt";
+        QZstd engine(nullptr);
+        engine.set_input(testFile);
+        engine.set_output(testPath + "/vanilla_test.txt.zst");
+        engine.set_compressionLevel(5);
 
-        qDebug() << "[+] Executing direct QZstdIO streaming compression task...";
-
-        QFile srcFile(testFile);
-        QFile compressedFile(ioCompressedFile);
-
-        if (!srcFile.open(QIODevice::ReadOnly)) {
-            qCritical() << "[-] QZstdIO TEST FAIL: Could not open source file ->" << srcFile.errorString();
+        qDebug() << "[+] Running plain async compression...";
+        if (!runAndCheck(engine, [&]() { engine.compress(); }, "Plain compression"))
             return -1;
-        }
 
-        if (!compressedFile.open(QIODevice::WriteOnly)) {
-            qCritical() << "[-] QZstdIO TEST FAIL: Could not open compressed output file ->" << compressedFile.errorString();
+        engine.set_input(testPath + "/vanilla_test.txt.zst");
+        engine.set_output(testPath + "/vanilla_extracted.txt");
+
+        qDebug() << "[+] Running plain async decompression...";
+        if (!runAndCheck(engine, [&]() { engine.decompress(); }, "Plain decompression"))
             return -1;
-        }
-
-        QZstdIO zstdWriter(&compressedFile);
-        zstdWriter.setCompressionLevel(5);
-
-        if (!zstdWriter.open(QIODevice::WriteOnly)) {
-            qCritical() << "[-] QZstdIO TEST FAIL: Could not open QZstdIO writer ->" << zstdWriter.errorString();
-            return -1;
-        }
-
-        char buffer[65536];
-
-        while (!srcFile.atEnd()) {
-            qint64 const bytesRead = srcFile.read(buffer, sizeof(buffer));
-
-            if (bytesRead < 0) {
-                qCritical() << "[-] QZstdIO TEST FAIL: Source read error ->" << srcFile.errorString();
-                return -1;
-            }
-
-            if (bytesRead == 0)
-                break;
-
-            qint64 const bytesWritten = zstdWriter.write(buffer, bytesRead);
-            if (bytesWritten != bytesRead) {
-                qCritical() << "[-] QZstdIO TEST FAIL: Zstd write error ->" << zstdWriter.errorString();
-                return -1;
-            }
-        }
-
-        zstdWriter.close();
-        compressedFile.close();
-        srcFile.close();
-
-        if (!QFileInfo::exists(ioCompressedFile) || QFileInfo(ioCompressedFile).size() <= 0) {
-            qCritical() << "[-] QZstdIO TEST FAIL: Compressed output file was not created or is empty.";
-            return -1;
-        }
-
-        qDebug() << "[+] Executing direct QZstdIO streaming decompression task...";
-
-        QFile compressedInput(ioCompressedFile);
-        QFile extractedFile(ioExtractedFile);
-
-        if (!compressedInput.open(QIODevice::ReadOnly)) {
-            qCritical() << "[-] QZstdIO TEST FAIL: Could not open compressed input file ->" << compressedInput.errorString();
-            return -1;
-        }
-
-        if (!extractedFile.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
-            qCritical() << "[-] QZstdIO TEST FAIL: Could not open extracted output file ->" << extractedFile.errorString();
-            return -1;
-        }
-
-        QZstdIO zstdReader(&compressedInput);
-
-        if (!zstdReader.open(QIODevice::ReadOnly)) {
-            qCritical() << "[-] QZstdIO TEST FAIL: Could not open QZstdIO reader ->" << zstdReader.errorString();
-            return -1;
-        }
-
-        while (!zstdReader.atEnd()) {
-            qint64 const bytesRead = zstdReader.read(buffer, sizeof(buffer));
-
-            if (bytesRead < 0) {
-                qCritical() << "[-] QZstdIO TEST FAIL: Zstd read error ->" << zstdReader.errorString();
-                return -1;
-            }
-
-            if (bytesRead == 0)
-                break;
-
-            qint64 const bytesWritten = extractedFile.write(buffer, bytesRead);
-            if (bytesWritten != bytesRead) {
-                qCritical() << "[-] QZstdIO TEST FAIL: Extracted write error ->" << extractedFile.errorString();
-                return -1;
-            }
-        }
-
-        zstdReader.close();
-        extractedFile.close();
-        compressedInput.close();
-
-        QString const ioExtractedContent = readTextFile(ioExtractedFile);
-        if (ioExtractedContent != kDataToTest) {
-            qCritical() << "[-] QZstdIO TEST FAIL: Direct stream extracted content mismatch.";
-            return -1;
-        }
-
-        qDebug() << "[+] TEST PASS: Direct QZstdIO streaming round-trip verified.";
-    }
-
-
-
-    {
-        QZstd engine;
-        engine.setInput(testFile);
-        engine.setOutput(testPath + "/vanilla_test.txt.zst");
-        engine.setCompressionLevel(5);
-
-        QEventLoop loop;
-        QObject::connect(&engine, &QZstd::finished, &loop, &QEventLoop::quit);
-
-        qDebug() << "[+] Executing pure asynchronous compression task...";
-        engine.compress();
-        loop.exec();
-
-        if (!engine.errorString().isEmpty()) {
-            qCritical() << "[-] CORE TEST FAIL: Compression engine error ->" << engine.errorString();
-            return -1;
-        }
-
-        // Reverse the stream for data integrity parity check
-        engine.setInput(testPath + "/vanilla_test.txt.zst");
-        engine.setOutput(testPath + "/vanilla_extracted.txt");
-
-        engine.decompress();
-        loop.exec();
-
-        if (!engine.errorString().isEmpty()) {
-            qCritical() << "[-] CORE TEST FAIL: Decompression engine error ->" << engine.errorString();
-            return -1;
-        }
 
         QString const extractedContent = readTextFile(testPath + "/vanilla_extracted.txt");
         if (extractedContent != kDataToTest) {
-            qCritical() << "[-] CORE TEST FAIL: Extracted plain text corrupt or modified.";
+            qCritical() << "[-] Plain round trip content mismatch.";
             return -1;
         }
-        qDebug() << "[+] TEST PASS: Pure stateless decompression loop verified.";
+        qDebug() << "[+] TEST PASS: Plain round trip content verified.";
     }
 
-#ifdef QZSTD_SODIUM_SUPPORT
-    qDebug() << "-------------------------------------------------------";
-    qDebug() << " RE-RUNNING SECURITY TASKS                             ";
-    qDebug() << "-------------------------------------------------------";
-    QSodiumCryptoSign signEngine;
-    if (!signEngine.createKeys(QSodiumKeys::KeyType::Sign)) {
-        qCritical() << "[-] TEST FAIL: Failed to generate Ed25519 signature keys.";
-        return -1;
-    }
-    QString const sigPublicKeyStr = signEngine.pubKey();
-    QSecureMem const sigPrivateKeyContainer = signEngine.privateKey();
-    QByteArray const randomSalt = QByteArray::fromHex("0123456789abcdef0123456789abcdef"); // Static testing salt
-    QSecureMem derivedVaultKey;
+    qDebug() << "=======================================================";
+    qDebug() << " STARTING QZSTD (signed + encrypted) TESTS";
+    qDebug() << "=======================================================";
 
-    const QByteArray passBytes = kPassText.toUtf8();
-    QSecureMem kPass(passBytes.size());
-    kPass.copyFrom(passBytes.constData(), passBytes.size());
-
-    if (!QSodiumPasswordUtils::deriveKeyFromPassword(derivedVaultKey, kPass, randomSalt)) {
-        qCritical() << "[-] TEST FAIL: Argon2id context calculation failed.";
+    // Signing keys are file based, QZstd's signing API only ever speaks in
+    // paths, so generate a real Ed25519 keypair and save it to disk.
+    QSodiumKeys signingKeys;
+    if (!signingKeys.createKeys(QSodiumKeys::KeyType::Sign)) {
+        qCritical() << "[-] Failed to generate Ed25519 signing keys.";
         return -1;
     }
 
-    QString const privateSignKeyB64 = sigPrivateKeyContainer.toBase64();
-    QString const secretBoxKeyB64   = derivedVaultKey.toBase64();
+    if (!signingKeys.saveKeys(keysPath, kPubKeyName, kPriKeyName)) {
+        qCritical() << "[-] Failed to save signing keys to disk.";
+        return -1;
+    }
+
+    QString const pubKeyFile = keysPath + "/" + kPubKeyName;
+    QString const priKeyFile = keysPath + "/" + kPriKeyName;
+
+    // The symmetric encryption key stays entirely in memory, password
+    // derived, never written to a file.
+    QByteArray const passBytes = kPassText.toUtf8();
+    QSecureMem password(static_cast<size_t>(passBytes.size()));
+    password.copyFrom(passBytes.constData(), static_cast<size_t>(passBytes.size()));
+
+    QByteArray const salt = QExtraRandom::randomSalt();
+
+    QSecureMem encryptionKey;
+    if (!QSodiumPasswordUtils::deriveKeyFromPassword(encryptionKey, password, salt)) {
+        qCritical() << "[-] Argon2id key derivation failed.";
+        return -1;
+    }
 
     {
-        // Copy original test file into test directory folder row to validate polymorphic directory packaging
         QString const copyTarget = testDir + "/" + ktestFile;
         writeTextFile(copyTarget, kDataToTest);
 
-        QZstd cryptoEngine;
-        cryptoEngine.setInput(testDir); // Directing target input to the directory tree block
-        cryptoEngine.setOutput(testPath + "/secure_package.pkg");
-        cryptoEngine.setCompressionLevel(9);
+        QZstd engine(nullptr);
+        engine.set_input(testDir);
+        engine.set_output(testPath + "/secure_package.pkg");
+        engine.set_compressionLevel(9);
 
-        cryptoEngine.setPublicKey(sigPublicKeyStr);
-        cryptoEngine.setSignatureKey(privateSignKeyB64);
-        cryptoEngine.setPrivateKey(secretBoxKeyB64);
-
-        QEventLoop cryptoLoop;
-        QObject::connect(&cryptoEngine, &QZstd::finished,
-                         &cryptoLoop, &QEventLoop::quit);
-
-        qDebug() << "[+] Running Airtight Pipeline: Compress -> Encrypt -> Detached Sign...";
-        cryptoEngine.compress(true /* sign */, true /* encrypt */);
-        cryptoLoop.exec();
-
-        if (!cryptoEngine.errorString().isEmpty()) {
-            qCritical() << "[-] CRYPTO FAIL: Secure save pipeline broke ->" << cryptoEngine.errorString();
+        if (!engine.setPublicKeyFile(pubKeyFile) || !engine.setPrivateKeyFile(priKeyFile)) {
+            qCritical() << "[-] Failed to load signing keys into QZstd.";
             return -1;
         }
-        qDebug() << "[+] TEST PASS: Authenticated packages successfully compiled and signed.";
 
-        // Reset and clear local configuration buffers to test parsing pipeline
+        engine.setPrivateKey(encryptionKey);
+
+        qDebug() << "[+] Running pipeline: compress -> encrypt -> sign...";
+        if (!runAndCheck(engine, [&]() { engine.compress(true /* sign */, true /* encrypt */); }, "Compress + encrypt + sign"))
+            return -1;
+
         QString const secureExtractOut = testPath + "/secure_extracted_dir";
-        cryptoEngine.setInput(testPath + "/secure_package.pkg");
-        cryptoEngine.setOutput(secureExtractOut);
+        engine.set_input(testPath + "/secure_package.pkg");
+        engine.set_output(secureExtractOut);
 
-        qDebug() << "[+] Running Extraction Pipeline: Verify Signature -> Decrypt Box -> Decompress Stream...";
-        cryptoEngine.decompress(true /* verify */, true /* decrypt */);
-        cryptoLoop.exec();
-
-        if (!cryptoEngine.errorString().isEmpty()) {
-            qCritical() << "[-] CRYPTO FAIL: Secure load pipeline rejected asset ->" << cryptoEngine.errorString();
+        qDebug() << "[+] Running pipeline: verify -> decrypt -> decompress...";
+        if (!runAndCheck(engine, [&]() { engine.decompress(true /* verify */, true /* decrypt */); }, "Verify + decrypt + decompress"))
             return -1;
-        }
 
-        // FIXED: Query the exact relative path layout written by the decompressFolder routine!
         QString const decryptedContent = readTextFile(secureExtractOut + "/" + ktestFile).trimmed();
         if (decryptedContent != kDataToTest.trimmed()) {
-            qCritical() << "[-] CRYPTO FAIL: Memory array validation checks mismatch.";
+            qCritical() << "[-] Decrypted content mismatch.";
             qCritical() << "    Expected:" << kDataToTest;
             qCritical() << "    Got:     " << decryptedContent;
             return -1;
         }
-        qDebug() << "[+] TEST PASS: Cryptographic operations executed without standard heap leaks!";
+        qDebug() << "[+] TEST PASS: Signed and encrypted round trip verified.";
     }
-#endif
 
     qDebug() << "=======================================================";
-    qDebug() << " ALL TESTS PASSED SUCCESSFULLY                         ";
+    qDebug() << " ALL TESTS PASSED SUCCESSFULLY";
     qDebug() << "=======================================================";
 
     QDir(testPath).removeRecursively();

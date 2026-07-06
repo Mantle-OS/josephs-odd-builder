@@ -13,6 +13,7 @@ add_custom_target(JOB_Documentation SOURCES
     job/threading_overview.md
     job/tui_overview.md
     job/uart_overview.md
+    job/zstd_overview.md
 )
 
 add_custom_target(JOB_AI_Documentation SOURCES

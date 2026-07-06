@@ -9,6 +9,12 @@ class JobZstdCompressor : public JobZstdOptions
 public:
     JobZstdCompressor() = default;
     ~JobZstdCompressor() override = default;
+
+    JobZstdCompressor(const JobZstdCompressor &) = default;
+    JobZstdCompressor(JobZstdCompressor &&) noexcept = default;
+    JobZstdCompressor &operator=(const JobZstdCompressor &) = default;
+    JobZstdCompressor &operator=(JobZstdCompressor &&) noexcept = default;
+
     virtual bool execute();
     virtual bool compressFolder();
     virtual bool compressFile();

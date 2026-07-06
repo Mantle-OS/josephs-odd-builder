@@ -23,15 +23,15 @@ if(JOB_QT_AI)
     endif()
 
     add_subdirectory(qaiutils)
-    add_subdirectory(qzstd)
-    add_subdirectory(qhf)
-
-    add_subdirectory(qsessionmanager)
-
-    add_subdirectory(qllama)
-    # add_subdirectory(qggml)
     add_subdirectory(qsodium)
+    add_subdirectory(qzstd)
+
+    # add_subdirectory(qsd)
+    # add_subdirectory(qllama)
+    # add_subdirectory(qhf)
+    # add_subdirectory(qsessionmanager)
+
+    # add_subdirectory(qggml)
 
 
-    add_subdirectory(qsd)
 endif()

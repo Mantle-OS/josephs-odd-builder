@@ -1,264 +1,141 @@
 #include "qzstddecompressorcrypto.h"
-#include "qzstdio.h"
-#include <QFile>
-#include <QFileInfo>
-#include <QDir>
-#include <QDataStream>
-#include <QDebug>
-#include <sodium/crypto_secretbox.h>
 
-QZstdDecompressorCrypto::QZstdDecompressorCrypto(QObject *parent) :
-    QZstdDecompressor{parent}
+QZstdDecompressorCrypto::QZstdDecompressorCrypto() :
+    m_opts{new QZstdOptions{}},
+    m_ownsOpts(true)
 {
-
+    setupOptionConnections();
+    setOnFinished([this]() {
+        if (m_opts)
+            Q_EMIT m_opts->finished();
+    });
 }
 
-QSecureMem QZstdDecompressorCrypto::decryptionKey() const
+QZstdDecompressorCrypto::QZstdDecompressorCrypto(QZstdOptions *opts) :
+    m_ownsOpts(false)
+{
+    setOnFinished(nullptr);
+    setOptions(opts);
+    setOnFinished([this]() {
+        if (m_opts)
+            Q_EMIT m_opts->finished();
+    });
+}
+
+QZstdDecompressorCrypto::~QZstdDecompressorCrypto()
+{
+    disconnectOptionConnections();
+    setOnFinished(nullptr);
+    if(m_ownsOpts && m_opts)
+        delete m_opts;
+    m_opts = nullptr;
+}
+
+const QSecureMem &QZstdDecompressorCrypto::decryptionKey() const noexcept
 {
     return m_decryptionKey;
 }
 
-void QZstdDecompressorCrypto::setDecryptionKey(const QSecureMem &key)
+void QZstdDecompressorCrypto::setDecryptionKey(const QSecureMem &key) noexcept
 {
-    if (m_decryptionKey.data() != key.data()) {
-        m_decryptionKey = key;
-        Q_EMIT decryptionKeyChanged();
-    }
-}
+    if(m_decryptionKey == key)
+        return;
 
-void QZstdDecompressorCrypto::setDecryptionKeyB64(const QString &base64Key)
-{
-    QSecureMem decryptedKey;
-    if (decryptedKey.fromBase64(base64Key)) {
-        setDecryptionKey(decryptedKey);
-    } else {
-        // I hate my life backup ......
-        // Fallback to checking raw text characters if Base64 decoding fails
-        if (decryptedKey.allocate(crypto_secretbox_KEYBYTES)) {
-            QByteArray rawBytes = base64Key.toUtf8().left(crypto_secretbox_KEYBYTES);
-            std::memcpy(decryptedKey.data(), rawBytes.constData(), rawBytes.size());
-            setDecryptionKey(decryptedKey);
-        }
-    }
+    m_decryptionKey = key;
+    job::zstd::JobZstdDecompressorCrypto::setDecryptionKey(m_decryptionKey);
 }
 
 
-bool QZstdDecompressorCrypto::execute()
+QZstdOptions *QZstdDecompressorCrypto::options() const
 {
-    if (input().isEmpty() || output().isEmpty()) {
-        setErrorString(QStringLiteral("Input or output pathways are completely unconfigured."));
-        return false;
-    }
-
-    if (m_decryptionKey.isEmpty()) {
-        setErrorString(QStringLiteral("Cryptographic pipeline missing secure decryption key context."));
-        return false;
-    }
-
-    QFileInfo const srcInfo(input());
-    if (!srcInfo.exists() || srcInfo.isDir()) {
-        setErrorString(QStringLiteral("Source input archive file does not exist or is a directory path."));
-        return false;
-    }
-
-    QFile probeFile(input());
-    if (!probeFile.open(QIODevice::ReadOnly)) {
-        setErrorString(probeFile.errorString());
-        return false;
-    }
-
-    QZstdIO zstdDevice(&probeFile);
-    if (!zstdDevice.open(QIODevice::ReadOnly)) {
-        setErrorString(zstdDevice.errorString());
-        return false;
-    }
-
-    QDataStream in(&zstdDevice);
-    in.setVersion(QZstdOptions::headerVersion());
-
-    QString magicTag;
-    in >> magicTag;
-    zstdDevice.close();
-    probeFile.close();
-
-    if (magicTag == QZstdOptions::magicDirString()) {
-        return decompressFolder();
-    } else if (magicTag == QZstdOptions::magicFileString()) {
-        return decompressFile();
-    }else{
-        // BAIL ?
-        setErrorString(QStringLiteral("No header in the peek of the execute"));
-        return false;
-    }
-
-    setErrorString(QStringLiteral("The file target is unrecognized or lacks cryptographic header identifiers."));
-    return false;
+    return m_opts;
 }
 
-bool QZstdDecompressorCrypto::decompressFolder()
+
+void QZstdDecompressorCrypto::setOptions(QZstdOptions *other)
 {
-    QFile srcFile(input());
-    if (!srcFile.open(QIODevice::ReadOnly)) {
-        setErrorString(srcFile.errorString());
-        return false;
-    }
+    if (!other || m_opts == other)
+        return;
 
-    QZstdIO zstdDevice(&srcFile);
-    if (!zstdDevice.open(QIODevice::ReadOnly)) {
-        setErrorString(zstdDevice.errorString());
-        return false;
-    }
+    // dissconnect the old shit
+    disconnectOptionConnections();
+    if(m_ownsOpts)
+        delete m_opts;
+    m_opts = other;
 
-    setTotal(static_cast<int>(qMin<qint64>(srcFile.size(), INT_MAX)));
-    setCurrent(0);
+    // setup the new connections
+    setupOptionConnections();
 
-    QDataStream in(&zstdDevice);
-    in.setVersion(QZstdOptions::headerVersion());
-
-    QString magicTag;
-    quint64 totalFiles = 0;
-
-    in >> magicTag;
-
-    // Double check header here ?
-    in >> totalFiles;
-
-    QDir baseDir(output());
-    if (!baseDir.exists() && !baseDir.mkpath(baseDir.absolutePath())) {
-        setErrorString(QStringLiteral("Failed to allocate extraction target folder destination."));
-        zstdDevice.close();
-        return false;
-    }
-
-    QSodiumSecretBox box;
-
-    for (quint64 i = 0; i < totalFiles; ++i) {
-        QString relativePath;
-        quint64 fileLength = 0;
-
-        in >> relativePath;
-        in >> fileLength;
-
-        QString const targetFilePath = baseDir.absoluteFilePath(relativePath);
-        QFileInfo const targetInfo(targetFilePath);
-        QDir const parentDir = targetInfo.absoluteDir();
-
-        if (!parentDir.exists() && !parentDir.mkpath(parentDir.absolutePath())) {
-            setErrorString(QStringLiteral("Failed to compose child layout directory structures."));
-            zstdDevice.close();
-            return false;
-        }
-
-        QFile targetFile(targetFilePath);
-        if (!targetFile.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
-            setErrorString(targetFile.errorString());
-            zstdDevice.close();
-            return false;
-        }
-
-        quint64 bytesWrittenForFile = 0;
-        while (bytesWrittenForFile < fileLength) {
-            QByteArray chunkNonce;
-            QByteArray encryptedChunk;
-
-            in >> chunkNonce;
-            in >> encryptedChunk;
-
-            if (in.status() != QDataStream::Ok || encryptedChunk.isEmpty()) {
-                setErrorString(QStringLiteral("Archive format payload stream broken or unexpected EOF reached."));
-                targetFile.close();
-                zstdDevice.close();
-                return false;
-            }
-
-            QSecureMem plainChunk;
-            if (!box.decrypt(encryptedChunk, m_decryptionKey, chunkNonce, plainChunk)) {
-                setErrorString(QStringLiteral("Folder block decryption failed. MAC validation rejected the frame."));
-                targetFile.close();
-                zstdDevice.close();
-                return false;
-            }
-
-            if (targetFile.write(reinterpret_cast<const char*>(plainChunk.data()), plainChunk.size()) != static_cast<qint64>(plainChunk.size())) {
-                setErrorString(targetFile.errorString());
-                targetFile.close();
-                zstdDevice.close();
-                return false;
-            }
-
-            // Securely advance uncompressed file progress tracking thresholds
-            bytesWrittenForFile += plainChunk.size();
-        }
-        targetFile.close();
-        setCurrent(static_cast<int>(qMin<qint64>(srcFile.pos(), INT_MAX)));
-    }
-
-    zstdDevice.close();
-    Q_EMIT finished();
-    return true;
+    setInput(m_opts->get_input().toStdString());
+    setOutput(m_opts->get_output().toStdString());
+    setCompressionLevel(m_opts->get_compressionLevel());
+    setPreserveEmptyDirectories(m_opts->get_preserveEmptyDirectories());
+    setPreserveSymlinks(m_opts->get_preserveSymlinks());
+    setRecursiveDirectories(m_opts->get_recursiveDirectories());
 }
 
-bool QZstdDecompressorCrypto::decompressFile()
+
+
+bool QZstdDecompressorCrypto::decryptAndDecompress() noexcept
 {
-    QFile srcFile(input());
-    QFile dstFile(output());
+    if(!m_opts)
+        return false;
 
-    if (!srcFile.open(QIODevice::ReadOnly)) {
-        setErrorString(srcFile.errorString());
+    if (!hasKeys()) {
+        setErrorString("Cryptographic pipeline missing a valid encryption key call setEncryptionKey() first.");
+        *m_opts = *this;
         return false;
     }
 
-    if (!dstFile.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
-        setErrorString(dstFile.errorString());
-        return false;
-    }
+    bool ok = execute();
+    if (m_opts && *m_opts != *this)
+        *m_opts = *this;
 
-    QZstdIO zstdDevice(&srcFile);
-    if (!zstdDevice.open(QIODevice::ReadOnly)) {
-        setErrorString(zstdDevice.errorString());
-        return false;
-    }
-
-    setTotal(static_cast<int>(qMin<qint64>(srcFile.size(), INT_MAX)));
-    setCurrent(0);
-
-    QDataStream in(&zstdDevice);
-    in.setVersion(QZstdOptions::headerVersion());
-
-    QString magicTag;
-    in >> magicTag; // Consume the "JOBZCRYPFILE1" tag
-
-    QSodiumSecretBox box;
-
-    while (!in.atEnd()) {
-        QByteArray chunkNonce;
-        QByteArray encryptedChunk;
-
-        in >> chunkNonce;
-        if (chunkNonce.isEmpty() && in.atEnd()) break;
-        in >> encryptedChunk;
-
-        QSecureMem plainChunk;
-        if (!box.decrypt(encryptedChunk, m_decryptionKey, chunkNonce, plainChunk)) {
-            setErrorString(QStringLiteral("File payload decryption failed. MAC checking validation mismatch."));
-            dstFile.close();
-            zstdDevice.close();
-            return false;
-        }
-
-        if (dstFile.write(reinterpret_cast<const char*>(plainChunk.data()), plainChunk.size()) != static_cast<qint64>(plainChunk.size())) {
-            setErrorString(dstFile.errorString());
-            dstFile.close();
-            zstdDevice.close();
-            return false;
-        }
-
-        setCurrent(static_cast<int>(qMin<qint64>(srcFile.pos(), INT_MAX)));
-    }
-
-    zstdDevice.close();
-    dstFile.close();
-
-    Q_EMIT finished();
-    return true;
+    return ok;
 }
+
+void QZstdDecompressorCrypto::disconnectOptionConnections() noexcept
+{
+    if(!m_opts)
+        return;
+    QObject::disconnect(m_opts, &QZstdOptions::inputChanged, m_opts, nullptr);
+    QObject::disconnect(m_opts, &QZstdOptions::outputChanged, m_opts, nullptr);
+    QObject::disconnect(m_opts, &QZstdOptions::compressionLevelChanged, m_opts, nullptr);
+    QObject::disconnect(m_opts, &QZstdOptions::preserveEmptyDirectoriesChanged, m_opts, nullptr);
+    QObject::disconnect(m_opts, &QZstdOptions::preserveSymlinksChanged, m_opts, nullptr);
+    QObject::disconnect(m_opts, &QZstdOptions::recursiveDirectoriesChanged, m_opts, nullptr);
+}
+
+void QZstdDecompressorCrypto::setupOptionConnections() noexcept
+{
+    QObject::connect(m_opts, &QZstdOptions::inputChanged,
+                     m_opts, [this](const QString &path) {
+                         setInput(path.toStdString());
+                     });
+
+    QObject::connect(m_opts, &QZstdOptions::outputChanged,
+                     m_opts, [this](const QString &path) {
+                         setOutput(path.toStdString());
+                     });
+
+    QObject::connect(m_opts, &QZstdOptions::compressionLevelChanged,
+                     m_opts, [this](int level) {
+                         setCompressionLevel(level);
+                     });
+
+    QObject::connect(m_opts, &QZstdOptions::preserveEmptyDirectoriesChanged,
+                     m_opts, [this](bool value) {
+                         setPreserveEmptyDirectories(value);
+                     });
+
+    QObject::connect(m_opts, &QZstdOptions::preserveSymlinksChanged,
+                     m_opts, [this](bool value) {
+                         setPreserveSymlinks(value);
+                     });
+
+    QObject::connect(m_opts, &QZstdOptions::recursiveDirectoriesChanged,
+                     m_opts, [this](bool value) {
+                         setRecursiveDirectories(value);
+                     });
+}
+

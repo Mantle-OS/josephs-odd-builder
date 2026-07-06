@@ -42,10 +42,10 @@ class QSD : public QObject
     Q_PROPERTY(int      totalSteps          READ totalSteps         NOTIFY totalStepsChanged        FINAL   )
     Q_PROPERTY(float    progressionTime     READ progressionTime    NOTIFY progressionTimeChanged   FINAL   )
     // Params
-    QP_PTR_RO(QSdCtxParams,                      ContextParams                                              )
-    QP_PTR_RO(QSdImgGenParams,                   ImageGenerationParams                                      )
-    QP_PTR_RO(QSdVidGenParams,                   VideoGenerationParams                                      )
-    QP_PTR_RO(ObjectListModel<QSdBackendDevice>, Backend                                                    )
+    QP_PTR_RO(QSdCtxParams,                      ContextParams                                              ) // inherits QSdBaseParam
+    QP_PTR_RO(QSdImgGenParams,                   ImageGenerationParams                                      ) // inherits QSdBaseParam
+    QP_PTR_RO(QSdVidGenParams,                   VideoGenerationParams                                      ) // inherits QSdBaseParam
+    QP_PTR_RO(ObjectListModel<QSdBackendDevice>, Backend                                                    ) // QSdBackendDevice inherits QSdBaseParam
 
 
     QML_ELEMENT

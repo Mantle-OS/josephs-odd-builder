@@ -1,82 +1,152 @@
 #pragma once
-
 #include <QObject>
-#include <QFutureWatcher>
-#include <QtConcurrent/QtConcurrent>
 
-#include "qzstdcompressor.h"
-#include "qzstddecompressor.h"
+#include <pointer-macros.h>
+
+#include <qsecuremem.h>
+
+#include <job_zstd.h>
+
 #include "qzstdoptions.h"
-
-#ifdef QZSTD_SODIUM_SUPPORT
-#include "qzstdcompressorcrypto.h"
-#include "qzstddecompressorcrypto.h"
-#include "qzstdsign.h"
-#endif
-
 
 class QZstd : public QZstdOptions
 {
     Q_OBJECT
 
-#ifdef QZSTD_SODIUM_SUPPORT
-    Q_PROPERTY(QString publicKey READ publicKey WRITE setPublicKey NOTIFY publicKeyChanged FINAL)
-    Q_PROPERTY(QString privateKey READ privateKey WRITE setPrivateKey NOTIFY privateKeyChanged FINAL)
-    Q_PROPERTY(QString signatureKey READ signatureKey WRITE setSignatureKey NOTIFY signatureKeyChanged FINAL)
-#endif
-
 public:
-    explicit QZstd(QObject *parent = nullptr);
-    ~QZstd() override;
+    explicit QZstd(QObject *parent) :
+        QZstdOptions{parent},
+        m_zstd{new job::zstd::JobZstd{}}
+    {
+        connect(this, &QZstdOptions::inputChanged,
+                this, [this](const QString &path) {
+                    if(m_zstd)
+                        m_zstd->setInput(path.toStdString());
+                });
 
-    Q_INVOKABLE void decompress();
-    Q_INVOKABLE void compress();
+        connect(this, &QZstdOptions::outputChanged,
+                this, [this](const QString &path) {
+                    if(m_zstd)
+                        m_zstd->setOutput(path.toStdString());
+                });
 
-#ifdef QZSTD_SODIUM_SUPPORT
-    Q_INVOKABLE void decompress(bool verify, bool decrypt);
-    Q_INVOKABLE void compress(bool sign, bool encrypt);
+        connect(this, &QZstdOptions::compressionLevelChanged,
+                this, [this](int level) {
+                    if(m_zstd)
+                        m_zstd->setCompressionLevel(level);
+                });
 
-    QString publicKey() const;
-    void setPublicKey(const QString &pubKey);
+        connect(this, &QZstdOptions::preserveEmptyDirectoriesChanged,
+                this, [this](bool value) {
+                    if(m_zstd)
+                        m_zstd->setPreserveEmptyDirectories(value);
+                });
 
-    QString privateKey() const;
-    void setPrivateKey(const QString &privKey);
-    QString signatureKey() const;
-    void setSignatureKey(const QString &sigKey);
+        connect(this, &QZstdOptions::preserveSymlinksChanged,
+                this, [this](bool value) {
+                    if(m_zstd)
+                        m_zstd->setPreserveSymlinks(value);
+                });
+
+        connect(this, &QZstdOptions::recursiveDirectoriesChanged,
+                this, [this](bool value) {
+                    if(m_zstd)
+                        m_zstd->setRecursiveDirectories(value);
+                });
+
+        m_zstd->setOnFinished([this]() {
+            int const cur = m_zstd->current();
+            int const tot = m_zstd->total();
+            QString const err = QString::fromStdString(m_zstd->errorString());
+            QMetaObject::invokeMethod(this, [this, cur, tot, err]() {
+                set_current(cur);
+                set_total(tot);
+                set_errorString(err);
+                Q_EMIT finished();
+            }, Qt::QueuedConnection);
+        });
+    }
+    ~QZstd()
+    {
+        if(m_zstd){
+            delete m_zstd;
+            m_zstd = nullptr;
+        }
+    }
+
+    Q_INVOKABLE void compress()
+    {
+        if(m_zstd)
+            m_zstd->compress();
+    }
+    Q_INVOKABLE void decompress()
+    {
+        if(m_zstd)
+            m_zstd->decompress();
+    }
+
+    Q_INVOKABLE void compress(bool sign, bool encrypt)
+    {
+        if(m_zstd)
+            m_zstd->compress(sign, encrypt);
+    }
+    Q_INVOKABLE void decompress(bool verify, bool decrypt)
+    {
+        if(m_zstd)
+            m_zstd->decompress(verify, decrypt);
+    }
+
+    [[nodiscard]] QString publicKeyFile() const noexcept
+    {
+        if(m_zstd)
+            return QString::fromStdString(m_zstd->publicKeyFile());
+        return {};
+    }
+    [[nodiscard]] bool setPublicKeyFile([[maybe_unused]] const QString &pubKey) noexcept{
+        if(!m_zstd)
+            return false;
+        std::filesystem::path p(pubKey.toStdString());
+        return m_zstd->setPublicKeyFile(p);
+    }
+
+    [[nodiscard]] QString privateKeyFile() const noexcept
+    {
+        if(m_zstd)
+            return QString::fromStdString(m_zstd->privateKeyFile().string());
+        return {};
+    }
+    [[nodiscard]] bool setPrivateKeyFile([[maybe_unused]]const QString &privKey) noexcept
+    {
+        if(!m_zstd)
+            return false;
+
+        std::filesystem::path p(privKey.toStdString());
+        return m_zstd->setPrivateKeyFile(p);
+    }
+
+    [[nodiscard]]const QSecureMem &privateKey() const noexcept
+    {
+        return m_privateKey;
+    }
+
+    void setPrivateKey(const QSecureMem &key) noexcept
+    {
+        if(!m_zstd)
+            return;
+
+        if(m_privateKey == key)
+            return;
+
+        m_privateKey = key;
+        m_zstd->setPrivateKey(m_privateKey);
+        Q_EMIT privateKeyChanged();
+
+    }
 
 Q_SIGNALS:
-    void signatureKeyChanged();
-    void publicKeyChanged();
     void privateKeyChanged();
-#endif
 
 private:
-    void setupTaskConnections(QZstdOptions* task, QFutureWatcher<bool>* watcher);
-
-#ifdef QZSTD_SODIUM_SUPPORT
-    QSecureMem getSecurePrivateKey() const;
-    QSecureMem getSecureEncryptionKey() const; // Maps password/raw bytes context safely
-#endif
-
-private:
-    QZstdCompressor *m_compress = nullptr;
-    QFutureWatcher<bool> m_compressWatcher;
-
-    QZstdDecompressor *m_decompress = nullptr;
-    QFutureWatcher<bool> m_decompressWatcher;
-
-#ifdef QZSTD_SODIUM_SUPPORT
-    QZstdCompressorCrypto *m_compressCrypto = nullptr;
-    QFutureWatcher<bool> m_compressCryptoWatcher;
-
-    QZstdDecompressorCrypto *m_decompressCrypto = nullptr;
-    QFutureWatcher<bool> m_decompressCryptoWatcher;
-
-    QZstdSign *m_signer = nullptr;
-    QFutureWatcher<bool> m_signerWatcher;
-
-    QString m_publicKey;
-    QString m_privateKey;
-    QString m_signatureKey;
-#endif
+    job::zstd::JobZstd      *m_zstd         = nullptr;
+    QSecureMem              m_privateKey;
 };

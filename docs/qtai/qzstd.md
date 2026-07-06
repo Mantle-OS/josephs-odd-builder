@@ -1,218 +1,82 @@
 # QZstd
 
-`qt-zstd` is a Qt/C++ library built on top of Zstandard.
+`QZstd` is the Qt/C++ layer over [`job_zstd`](../job/zstd_overview.md).
 
-It provides classes for compressing and decompressing files and directories, streaming compressed data through `QIODevice`, and asynchronous compression tasks. When built with sodium support enabled, the library also provides authenticated encryption and archive signing through `qt-sodium`.
+**This library does not implement any compression, encryption, or signing itself.** Every real operation happens in `job_zstd`, this library exists so Qt/QML code can drive that engine through `QString`/`QSecureMem`/`Q_PROPERTY` instead of `std::string`/`std::filesystem::path`/plain C++ getters.
 
-`qt-zstd` is not AI-specific. It lives in the QtAI project because many QtAI libraries work with models, packages, datasets, and other assets that benefit from compression and integrity verification.
-
-If you are looking for the QML interface, see [qml-zstd](docs/qtai/qml-zstd.md).
+If you are looking for a QML interface, see [qml-zstd.md](qml-zstd.md).
 
 ---
 
-# Design
+## Library split
 
-The library is organized into a small set of focused classes.
+| Library     | Purpose                                          |
+| ----------- | ------------------------------------------------ |
+| `qt-zstd`   | C++ / QtCore library documented here.            |
+| `qml-zstd`  | QML-facing elements documented separately.       |
 
-Low-level classes perform the compression work directly, while `QZstd` provides the asynchronous interface used by applications and the QML layer.
-
-When sodium support is enabled, additional worker classes provide encrypted archives and detached signatures without changing the standard compression workflow.
-
----
-
-# Dependencies
-
-`qt-zstd` depends on:
-
-* Qt Core
-* Qt Concurrent
-* Zstandard
-
-Optional:
-
-* `qt-sodium`
-* libsodium
-
-The sodium dependency is optional and is only required when encrypted archives or archive signing are enabled.
+This document only covers the C++ side.
 
 ---
 
-# Library Layout
+## Dependencies
 
-## QZstd
+`qt-zstd` links against:
 
-`QZstd` is the main entry point for the library.
-
-It inherits the common properties from `QZstdOptions`, owns the worker objects, and executes compression tasks asynchronously using `QtConcurrent` and `QFutureWatcher`.
-
-Applications will normally use this class instead of the lower-level worker classes.
-
-For standard archives it provides:
-
-* Compression
-* Decompression
-
-When sodium support is enabled it also supports:
-
-* Compression with signing
-* Compression with encryption
-* Decompression with signature verification
-* Decompression with decryption
+* Qt6::Core
+* `job_zstd` (all compression/crypto/signing logic lives here, see [zstd_overview.md](../job/zstd_overview.md))
+* `job_crypto`, libsodium, `qt-sodium` (for `QSecureMem`, used to carry key material without ever passing through a `QString`)
 
 ---
 
-## QZstdOptions
+## Two ownership patterns
 
-`QZstdOptions` provides the common state shared by the library.
+Every class here relates to its `job::zstd::` counterpart one of two ways, and which one matters for how state actually flows.
 
-It contains properties such as:
+* **Direct inheritance** — `QZstdCompressor : public job::zstd::JobZstdCompressor`, and the same for `QZstdDecompressor`, `QZstdCompressorCrypto`, `QZstdDecompressorCrypto`, `QZstdSign`. The Qt class *is* the real backend, blocking calls run directly on it, no pointer indirection. Each of these separately owns a `QZstdOptions*` purely as a QML-facing mirror of its own state, `input`/`output`/`compressionLevel`/etc, kept in sync by hand after every blocking call, `*m_opts = *this` followed by a manual `Q_EMIT m_opts->finished()`. That emit is deliberately manual, not wired through `setOnFinished()`, since these calls are synchronous, there is no background thread whose completion needs signalling, and wiring it through the callback caused a real ordering bug, the sync running one line after the emit rather than before it.
+* **Composition** — `QZstd` alone. It inherits `QZstdOptions` for its own QML property surface, but holds `job::zstd::JobZstd*` by pointer rather than inheriting it, because `JobZstd` is the one class in the whole stack that genuinely runs on a background thread via `std::async`. Its `notifyFinished()` callback fires from that thread, so `QZstd` has to do a real cross-thread hop, `QMetaObject::invokeMethod(this, ..., Qt::QueuedConnection)`, to safely marshal state and the `finished()` emit back onto its own thread.
 
-* Input path
-* Output path
-* Compression level
-* Progress
-* Error reporting
+## Ownership tracking for externally-supplied options
 
-The worker classes and the asynchronous `QZstd` engine inherit from this class so applications interact with a consistent interface.
+Every class using the first pattern also supports `setOptions(QZstdOptions*)`, letting a caller (in practice, a QML wrapper that itself inherits `QZstdOptions`) hand over a `QZstdOptions*` it does not want copied, only shared. This is what `QmlCompressor` and friends do, they pass `this` down so their own inherited `QZstdOptions` base becomes the same object the backend reads and writes.
 
----
+That introduces a real ownership question a plain pointer cannot answer on its own, was this `QZstdOptions*` allocated by the backend itself, in which case it must be deleted, or handed in from outside, in which case deleting it would destroy an object still in the middle of being torn down by its own owner, a genuine double-free/self-destruction hazard, not a hypothetical one. Every class using this pattern tracks a `bool m_ownsOpts`, `true` only when the class's own default constructor allocated the options object, `false` the moment `setOptions()` accepts an externally-supplied one. Every delete of `m_opts`, in `setOptions()` itself and in the destructor, is guarded by this flag, never by a null check alone, since a borrowed pointer is just as often non-null as an owned one.
 
-## QZstdIO
+## Options mirror
 
-`QZstdIO` is a `QIODevice` implementation for streaming compressed data.
+### QZstdOptions
+Pure `QObject` property shell, no `job::zstd::` backend of its own.
 
-It wraps another `QIODevice` and performs compression or decompression as data is written or read.
+* `input`, `output`, `compressionLevel`, `preserveEmptyDirectories`, `preserveSymlinks`, `recursiveDirectories` are read-write, matching `job::zstd::JobZstdOptions` field for field
+* `current`, `total`, `errorString` are read-only from QML's side, they only ever change as a reflection of real backend state, never as user input
+* `finished` signal, the one thing every wrapper class below actually fires
 
-This class is intended for applications that need streaming support rather than file-based compression.
+## Blocking pipeline
 
----
+### QZstdCompressor / QZstdDecompressor
+Thin, fully blocking wrappers over `job::zstd::JobZstdCompressor`/`JobZstdDecompressor`.
 
-## QZstdCompressor
+* `compress()` / `decompress()` call `execute()` directly and return its result, no threading, the calling thread blocks for the full duration
+* both connect their owned `QZstdOptions`'s property-changed signals straight into the real backend's setters, so setting `compressor.input = "..."` from QML immediately reaches the C++ object doing the actual work
 
-`QZstdCompressor` performs blocking compression operations.
+### QZstdCompressorCrypto / QZstdDecompressorCrypto
+Same shape, adds a `QSecureMem` key.
 
-It provides support for compressing:
+* `setEncryptionKey()` / `setDecryptionKey()` take `QSecureMem` directly, never a string, matching `job::zstd::JobZstdCompressorCrypto`/`DecompressorCrypto`'s own in-memory key model
+* `compressAndEncrypt()` / `decryptAndDecompress()` still sync and report through `m_opts` on a missing-key failure, not just on success, a caller checking `errorString()` after a `false` return gets a real explanation either way
 
-* Individual files
-* Directory trees
+### QZstdSign
+Thin wrapper over `job::zstd::JobZstdSign`, file-path keys only, matching the underlying class exactly.
 
-This class is normally used internally by `QZstd` but may also be used directly when blocking behavior is desired.
+* `publicKeyFile()` / `setPublicKeyFile()`, `privateKeyFile()` / `setPrivateKeyFile()` read and write real files on disk
+* deliberately has no in-memory key setter, that capability already exists elsewhere in the stack (`QSodiumKeys`/`QSecureMem`), duplicating it here would give the same keys two different, potentially inconsistent representations
 
----
+## Async orchestration
 
-## QZstdDecompressor
+### QZstd
+The one class that composes rather than inherits, wrapping `job::zstd::JobZstd`'s `std::async`-based pipeline.
 
-`QZstdDecompressor` performs blocking decompression operations.
-
-It provides support for extracting:
-
-* Individual files
-* Directory trees
-
-Like the compressor, this class is typically used through `QZstd`.
-
----
-
-## QZstdCompressorCrypto
-
-When sodium support is enabled, `QZstdCompressorCrypto` extends the standard compressor with authenticated encryption.
-
-Encryption keys are stored internally using `QSecureMem` and may be supplied directly or as Base64 encoded values.
-
----
-
-## QZstdDecompressorCrypto
-
-`QZstdDecompressorCrypto` extends the standard decompressor with authenticated decryption.
-
-Encrypted archives are verified during the decryption process before the compressed data is extracted.
-
----
-
-## QZstdSign
-
-`QZstdSign` provides detached archive signing and signature verification.
-
-It uses the signing support provided by `qt-sodium` and is used by the secure archive workflow when signing or verification has been requested.
-
----
-
-# Compression Modes
-
-Depending on the build configuration and application requirements, `qt-zstd` supports several workflows.
-
-Standard archive:
-
-```text
-File / Directory
-        │
-        ▼
-   Compress
-        │
-        ▼
-      Archive
-```
-
-Encrypted archive:
-
-```text
-File / Directory
-        │
-        ▼
- Compress
-        │
-        ▼
- Encrypt
-        │
-        ▼
-   Archive
-```
-
-Signed archive:
-
-```text
-File / Directory
-        │
-        ▼
- Compress
-        │
-        ▼
-    Sign
-        │
-        ▼
-   Archive
-```
-
-Signed and encrypted archive:
-
-```text
-File / Directory
-        │
-        ▼
- Compress
-        │
-        ▼
- Encrypt
-        │
-        ▼
-    Sign
-        │
-        ▼
-   Archive
-```
-
----
-
-# Current Limitations
-
-Directory compression is still under active development.
-
-The current implementation preserves file contents but does not yet rebuild all filesystem metadata such as symbolic links during extraction. This functionality is planned for a future revision.
-
----
-
-# See Also
-
-* [QtAI Overview](docs/qtai//qtai.md)
-* [QSodium](docs/qtai/qsodium.md)
-* [QML Zstd](docs/qtai/qml-zstd.md)
+* `compress()` / `decompress()` run the plain pipeline; `compress(bool sign, bool encrypt)` / `decompress(bool verify, bool decrypt)` run the full crypto-and-signing pipeline in whichever combination is requested
+* `publicKeyFile()` / `setPublicKeyFile()`, `privateKeyFile()` / `setPrivateKeyFile()` forward straight to the owned `job::zstd::JobZstd`'s own file-based signing key setters
+* `getPrivateKey()` / `setPrivateKey(QSecureMem)` carries the symmetric encryption key, independent of the signing keypair
+* `finished` fires only after a real cross-thread hop, state, `current`/`total`/`errorString`, is read from the background thread the instant the operation completes, then handed across via `QMetaObject::invokeMethod(..., Qt::QueuedConnection)` before the signal emits on `QZstd`'s own thread
