@@ -90,7 +90,8 @@ std::streamsize JobZstdEncryptingTransport::xsputn(const char *s, std::streamsiz
         if (m_bufferFill == m_chunkSize) {
             bool const ok = encryptAndWriteChunk(reinterpret_cast<const char *>(m_buffer.data()), m_bufferFill);
 
-            // Scrubbed unconditionally, a chunk that failed to make it downstream is not a reason to leave its plaintext sitting around any longer than one that succeeded.
+            // Scrubbed unconditionally, a chunk that failed to make it downstream is not a reason to leave its plaintext
+            // sitting around any longer than one that succeeded.
             sodium_memzero(m_buffer.data(), m_buffer.size());
             m_bufferFill = 0;
 

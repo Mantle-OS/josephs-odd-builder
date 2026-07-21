@@ -3,10 +3,11 @@
 #include <cstdint>
 #include <memory>
 
+#include "jobthreads_export.h"
 // This is meant to be a inhherited(always) Not a real interface!!
 
 namespace job::threads  {
-class JobIDescriptor {
+class JOBTHREADS_EXPORT JobIDescriptor {
 public:
     using Ptr = std::shared_ptr<JobIDescriptor>;
     virtual ~JobIDescriptor() = default;

@@ -4,7 +4,7 @@
 namespace job::simd {
 
 // EXP Schraudolph "Fast Math/BitHack"
-static inline f32 exp_schraudolph(f32 x)
+[[nodiscard]] static inline f32 exp_schraudolph(f32 x) noexcept
 {
     // clamp x to prevent overflow/underflow (-87 to 87)
     auto lo = SIMD::set1(-87.0f);
@@ -27,29 +27,54 @@ static inline f32 exp_schraudolph(f32 x)
     return SIMD::cast_to_float(i_result);
 }
 
-// useful if schraudolph's stepwise nature causes quantization noise.
-static inline f32 exp_poly5(f32 x)
+// Fifth-degree exp approximation using range reduction and Horner's scheme.
+[[nodiscard]] static inline f32 exp_poly5(f32 x) noexcept
 {
+    auto lo = SIMD::set1(-87.5f);
+    auto hi = SIMD::set1(87.5f);
+    x = SIMD::max(lo, SIMD::min(hi, x));
+
+    auto log2E = SIMD::set1(1.4426950408889634f);
+
+    // x = k * ln(2) + r
+    auto kFloat = SIMD::round<RoundingMode::Nearest>(
+        SIMD::mul(x, log2E));
+
+    auto k = SIMD::cvt_f32_i32(kFloat);
+    auto r = SIMD::mul_plus(
+        kFloat,
+        SIMD::set1(-0.693145751953125f),
+        x);
+
+    r = SIMD::mul_plus(
+        kFloat,
+        SIMD::set1(-1.428606765330187e-6f),
+        r);
+
     auto c0 = SIMD::set1(1.0f);
     auto c1 = SIMD::set1(1.0f);
     auto c2 = SIMD::set1(0.5f);
-    auto c3 = SIMD::set1(0.166666667f);
-    auto c4 = SIMD::set1(0.041666667f);
-    auto c5 = SIMD::set1(0.008333333f);
+    auto c3 = SIMD::set1(0.1666666666666667f);
+    auto c4 = SIMD::set1(0.0416666666666667f);
+    auto c5 = SIMD::set1(0.0083333333333333f);
 
-    x = SIMD::max(SIMD::set1(-80.0f), SIMD::min(SIMD::set1(80.0f), x));
+    // exp(r) = 1 + r + r²/2! + r³/3! + r⁴/4! + r⁵/5!
+    auto polynomial = SIMD::mul_plus(r, c5, c4);
+    polynomial = SIMD::mul_plus(r, polynomial, c3);
+    polynomial = SIMD::mul_plus(r, polynomial, c2);
+    polynomial = SIMD::mul_plus(r, polynomial, c1);
+    polynomial = SIMD::mul_plus(r, polynomial, c0);
 
-    // Horner's Scheme
-    auto term = SIMD::mul_plus(x, c5, c4);
-    term = SIMD::mul_plus(x, term, c3);
-    term = SIMD::mul_plus(x, term, c2);
-    term = SIMD::mul_plus(x, term, c1);
-    term = SIMD::mul_plus(x, term, c0);
-    return term;
+    // exp(x) = exp(r) * 2^k
+    auto exponentShift = SIMD::slli_epi32(k, 23);
+    auto polynomialBits = SIMD::cast_to_int(polynomial);
+    auto resultBits = SIMD::add_i32(polynomialBits, exponentShift);
+
+    return SIMD::cast_to_float(resultBits);
 }
 
 // Uses Estrin's Scheme (Degree 6) for maximum Instruction Level Parallelism
-static inline f32 exp_estrin(f32 x)
+[[nodiscard]] static inline f32 exp_estrin(f32 x) noexcept
 {
     //    exp(88) overflows float, exp(-88) underflows to zero
     auto lo = SIMD::set1(-87.5f);
@@ -103,7 +128,7 @@ static inline f32 exp_estrin(f32 x)
 
 
 // FIXME not tested on NEON or 512
-static inline f32 avx_log(f32 x)
+[[nodiscard]] static inline f32 avx_log(f32 x) noexcept // noexcept relies on the x<=0
 {
 
     auto one  = SIMD::set1(1.0f);
@@ -181,8 +206,9 @@ static inline f32 avx_log(f32 x)
 
 
 
-__attribute__((always_inline))
-inline float hsum(f32 x) {
+[[nodiscard]]  __attribute__((always_inline))
+inline float hsum(f32 x) noexcept
+{
     alignas(sizeof(float) * SIMD::width()) float tmp[SIMD::width()];
     SIMD::mov(tmp, x);
     float s = 0.0f;

@@ -6,5 +6,6 @@ includedir=@CMAKE_INSTALL_FULL_INCLUDEDIR@/jobzstd
 Name: jobzstd
 Description: Compression library for JOB (Joseph's Odd Builder)
 Version: @PROJECT_VERSION@
-Libs: -L${libdir} -ljobcrypto -lpthread -lsodium -lzstd
+Requires: jobcrypto sodium zstd
+Libs: -L${libdir} -ljobcrypto -lpthread -lsodium -lzstd -ljobzstd
 Cflags: -I${includedir}

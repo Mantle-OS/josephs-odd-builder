@@ -213,7 +213,7 @@ JobZstdIO::int_type JobZstdIO::underflow()
 }
 
 // The fast lane: bulk reads (istream::read(), sgetn()). Decompresses straight
-// into the caller's buffer -- no detour through m_outBuffer, no extra memcpy.
+// into the caller's buffer, no detour through m_outBuffer, no extra memcpy.
 std::streamsize JobZstdIO::xsgetn(char *s, std::streamsize count)
 {
     if (count <= 0 || !m_dStream || !m_mode || *m_mode != Mode::ReadOnly || m_truncated)
@@ -285,7 +285,7 @@ std::streamsize JobZstdIO::xsputn(const char *s, std::streamsize count)
         std::size_t const compressResult = ZSTD_compressStream(m_cStream, &output, &input);
         if (ZSTD_isError(compressResult)) {
             m_errorString = ZSTD_getErrorName(compressResult);
-            // m_decodeFailed = true;
+            // FIXME LATER  m_decodeFailed = true;
             ZSTD_freeCStream(m_cStream);
             m_cStream = nullptr;
             return static_cast<std::streamsize>(input.pos);

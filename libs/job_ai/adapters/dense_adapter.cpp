@@ -5,10 +5,11 @@
 
 #include <aligned_allocator.h>
 
+#include <simd_for.h>
+
 #include "gemm.h"
 
 #include "matrix.h"
-#include "simd_for.h"
 
 namespace job::ai::adapters {
 using namespace job::simd;
@@ -45,7 +46,7 @@ void DenseAdapter::adapt([[maybe_unused]]threads::ThreadPool &pool,
 {
 
     const size_t B = static_cast<size_t>(shape.batch);
-    for (size_t i = 0 ; i <= B; ++i)
+    for (size_t i = 0 ; i < B; ++i)
         apply(shape, sources, targets, values, output, i);
 }
 
@@ -63,7 +64,7 @@ void DenseAdapter::apply(const cords::AttentionShape &shape, const cords::ViewR 
     std::vector<float, core::AlignedAllocator<float, 64>> kT(S * D);
     std::vector<float, core::AlignedAllocator<float, 64>> scores(S * S);
 
-    // Transpose K -> KT
+    // Transpose K -> KT write a real transpose later [[COME_BACK]]
     // (This is memory bound, scalar is usually fine for "Dense" baseline)
     for(int i = 0; i < S; ++i)
         for(int j=0; j<D; ++j)
@@ -73,10 +74,10 @@ void DenseAdapter::apply(const cords::AttentionShape &shape, const cords::ViewR 
     cords::Matrix KT(kT.data(), D, S);
     cords::Matrix S_Mat(scores.data(), S, S);
 
-    // 1. Compute Scores: S = Q * K^T
+    // Compute Scores: S = Q * K^T
     comp::sgemmMatrix(Q, KT, S_Mat, m_cfg.scale, 0.0f);
 
-    // 2. Softmax (Row-wise)
+    // Softmax (Row-wise)
     // We use the new SIMD tools here to kill the bottleneck.
     for(int i = 0; i < S; ++i) {
         float *row = scores.data() + i * S;
@@ -109,9 +110,8 @@ void DenseAdapter::apply(const cords::AttentionShape &shape, const cords::ViewR 
         // Horizontal Sum
         float sum = job::simd::hsum(v_sum);
         // Add tail elements to sum (since v_sum only tracked vector parts)
-        // Wait, simd_for doesn't reduce tails into v_sum.
+        // Wait, simd_for doesn't reduce tails into v_sum ?  [[COME_BACK]]
         // We need to accumulate tails manually or redesign the lambda capture.
-        // Let's stick to the pattern used in FlashAttention:
         size_t tail_start = (S / SIMD::width()) * SIMD::width();
         for(size_t j = tail_start; j < size_t(S); ++j)
             sum += row[j];
@@ -130,7 +130,7 @@ void DenseAdapter::apply(const cords::AttentionShape &shape, const cords::ViewR 
                  );
     }
 
-    // 3. Compute Output: O = S * V
+    // O = S * V
     cords::Matrix V(const_cast<float*>(v_ptr), S, D);
     cords::Matrix O(o_ptr, S, D);
 

@@ -45,4 +45,3 @@ private:
 };
 
 } // namespace job::threads
-// CHECKPOINT 1.0

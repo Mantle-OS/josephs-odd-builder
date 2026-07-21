@@ -51,28 +51,24 @@ inline void simd_for(job::threads::ThreadPool &pool,
 {
     if (start >= end)
         return;
-
     constexpr size_t kMinGrain = 1024;
     size_t count = end - start;
-
     size_t hw = pool.workerCount();
     if (hw == 0)
         hw = 1;
-
     if (count < kMinGrain || hw == 1) {
         simd_for(start, end, std::forward<VecFunc>(vFunc), std::forward<ScalarFunc>(sFunc));
         return;
     }
-
     size_t chunkSize = std::max(kMinGrain, (count + hw - 1) / hw);
     size_t numChunks = (count + chunkSize - 1) / chunkSize;
+
 
     job::threads::parallel_for(pool, size_t{0}, numChunks, [&](size_t chunkIdx) {
         size_t chunkStart = start + (chunkIdx * chunkSize);
         size_t chunkEnd   = std::min(chunkStart + chunkSize, end);
-
         simd_for(chunkStart, chunkEnd, vFunc, sFunc);
-    });
+    }, 0, 1);
 }
 
 // Convenience overload for 0 to N (Parallel)

@@ -160,6 +160,6 @@ TEST_CASE("FMM Adapter: 4 threads Scaling Benchmark (O(N) Proof)", "[ai][fmm][be
     BENCHMARK("FMM N=16384") { run_bench(16384); };
     // If it was O(N^2), 4096 would be 16x slower than 1024.
     // With O(N), it should be ~4x slower.
-    //Need to look at linear scaling.
+    // Need to look at linear scaling.
 }
 #endif

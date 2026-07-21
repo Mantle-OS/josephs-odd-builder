@@ -31,10 +31,11 @@ TEST_CASE("JobIoAsyncThread processes tasks, timers, and I/O events", "[threadin
     std::atomic<bool> timer_fired{false};
 
     // Living on the Edge .... Read and Edge-Triggered
-    ioLoop->registerFD(read_fd, EPOLLIN | EPOLLET,
-                       [&](uint32_t events) {
+    ioLoop->registerFD(read_fd,
+                       job::threads::IOEvent::Read | job::threads::IOEvent::EdgeTriggered,
+                       [&](job::threads::IOEvent events) {
                            INFO("I/O Event Fired!");
-                           REQUIRE((events & EPOLLIN));
+                           REQUIRE(hasEvent(events, job::threads::IOEvent::Read));
 
                            char buf[1];
                            ssize_t n = read(read_fd, buf, 1);

@@ -100,8 +100,8 @@ bool Field::from_yaml(const YAML::Node &n, Field &out) noexcept
             if (base.ends_with(".hpp"))
                 base = base.substr(0, base.size() - 4);
 
-            if (base.starts_with("mpkg_mp_"))
-                base = base.substr(8);
+            if (base.starts_with("aipkg_"))
+                base = base.substr(6);
 
             out.ref_sym = base;
         }
@@ -240,8 +240,8 @@ void Field::from_json(const nlohmann::json &j, Field &f)
         auto base = std::filesystem::path(*f.ref_include).filename().string();
         if (base.ends_with(".hpp"))
             base = base.substr(0, base.size() - 4);
-        if (base.starts_with("mpkg_"))
-            base = base.substr(5);
+        if (base.starts_with("aipkg_"))
+            base = base.substr(6);
         f.ref_sym = base;
     }
     // Auto-deduce size

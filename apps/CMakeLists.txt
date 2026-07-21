@@ -14,7 +14,6 @@ if(JOB_QT_AI)
     add_subdirectory(qzstd-example)
     add_subdirectory(qmlzstd-example)
 
-    # add_subdirectory(qmlsd-example)
     # add_subdirectory(qmlhf-example)
 
     add_subdirectory(qsodium-example)
@@ -22,4 +21,5 @@ if(JOB_QT_AI)
 
     # add_subdirectory(qllama-simple-example)
     # add_subdirectory(qllama-qml-client-server-example)
+    # add_subdirectory(qmlsd-example)
 endif()

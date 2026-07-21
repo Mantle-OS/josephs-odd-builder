@@ -26,11 +26,7 @@ job_msgpack_gen_lib(
         ${CMAKE_CURRENT_SOURCE_DIR}/input/ledger_devlink.yaml
         ${CMAKE_CURRENT_SOURCE_DIR}/input/ledger_devproof.yaml
         ${CMAKE_CURRENT_SOURCE_DIR}/input/ledger_devsig.yaml
-        ${CMAKE_CURRENT_SOURCE_DIR}/input/ledger_hash32.yaml
         ${CMAKE_CURRENT_SOURCE_DIR}/input/ledger_revoke.yaml
-        ${CMAKE_CURRENT_SOURCE_DIR}/input/ledger_reward.yaml
         ${CMAKE_CURRENT_SOURCE_DIR}/input/ledger_sth.yaml
         ${CMAKE_CURRENT_SOURCE_DIR}/input/ledger_tx.yaml
 )
-
-

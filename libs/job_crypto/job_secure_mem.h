@@ -3,10 +3,11 @@
 #include <cstddef>
 #include <string>
 #include <sodium/utils.h>
+#include "jobcrypto_export.h"
 
 namespace job::crypto {
 
-class JobSecureMem
+class JOBCRYPTO_EXPORT JobSecureMem
 {
 public:
     explicit JobSecureMem(size_t size = 0);
@@ -26,13 +27,9 @@ public:
     [[nodiscard]] size_t size() const noexcept;
     [[nodiscard]] bool empty() const noexcept { return m_size == 0 || !m_data; }
 
-    // All these should be removed.....
-    [[nodiscard]] std::string toString() const;
-    // Stop removal.
+    // Public keys only....
     [[nodiscard]] std::string toBase64(int variant = sodium_base64_VARIANT_ORIGINAL) const;
     bool fromBase64(const std::string &encoded, int variant = sodium_base64_VARIANT_ORIGINAL);
-    [[nodiscard]] std::string fromBase64toString(const std::string &encoded,
-                                                 int variant = sodium_base64_VARIANT_ORIGINAL) const;
 
     [[nodiscard]] bool operator==(const JobSecureMem &other) const noexcept;
     [[nodiscard]] bool operator!=(const JobSecureMem &other) const noexcept;

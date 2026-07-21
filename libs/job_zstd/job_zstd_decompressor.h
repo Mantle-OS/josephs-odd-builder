@@ -1,10 +1,11 @@
 #pragma once
 
 #include "job_zstd_options.h"
+#include "jobzstd_export.h"
 
 namespace job::zstd {
 
-class JobZstdDecompressor : public JobZstdOptions
+class JOBZSTD_EXPORT JobZstdDecompressor : public JobZstdOptions
 {
 
 public:

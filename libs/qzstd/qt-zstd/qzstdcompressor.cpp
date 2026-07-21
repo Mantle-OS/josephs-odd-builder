@@ -34,7 +34,7 @@ QZstdCompressor::~QZstdCompressor()
     m_opts = nullptr;
 }
 
-bool QZstdCompressor::compress() noexcept
+bool QZstdCompressor::compress()
 {
     const bool ok = execute();
 
@@ -60,7 +60,7 @@ void QZstdCompressor::setOptions(QZstdOptions *other)
         delete m_opts;
 
     m_opts = other;
-    m_ownsOpts = false; // HERE HERE HERE Not sure that this is needed here becasue the constructor sets it
+    m_ownsOpts = false;
 
     setupOptionConnections();
 

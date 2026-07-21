@@ -2,14 +2,13 @@
 
 #include <cstdint>
 #include <array>
-#include <sched.h>
 
 namespace job::threads {
 
 enum class SchedulingPolicy : uint8_t {
-    Other      = SCHED_OTHER,
-    FIFO       = SCHED_FIFO,
-    RoundRobin = SCHED_RR
+    Other      = 0,  //SCHED_OTHER,
+    FIFO       = 1,  //SCHED_FIFO,
+    RoundRobin = 2   //SCHED_RR
 };
 
 struct JobThreadOptions final {

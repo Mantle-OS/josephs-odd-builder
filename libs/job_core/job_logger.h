@@ -5,6 +5,7 @@
 #include <atomic>
 #include <format>
 
+#include "jobcore_export.h"
 namespace job::core {
 
 enum class LogLevel : uint8_t {
@@ -15,7 +16,7 @@ enum class LogLevel : uint8_t {
     Assert
 };
 
-class JobLogger final {
+class JOBCORE_EXPORT JobLogger final {
 public:
     static JobLogger &instance() noexcept;
 

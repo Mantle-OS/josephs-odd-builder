@@ -9,7 +9,7 @@ fields:
   - name: "dev_pub"
     type: "bin[32]"
     required: true
-  - name: "manifest_sha256"
+  - name: "sha"
     type: "bin[32]"
     required: true
   - name: "sig_by_dev"

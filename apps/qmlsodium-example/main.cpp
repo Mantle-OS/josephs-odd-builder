@@ -3,7 +3,6 @@
 #include <QQmlExtensionPlugin>
 #include <QtResource>
 
-
 Q_IMPORT_QML_PLUGIN(SodiumPlugin)
 
 int main(int argc, char *argv[])

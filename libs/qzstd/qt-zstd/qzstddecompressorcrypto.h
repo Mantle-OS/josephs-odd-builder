@@ -1,15 +1,20 @@
 #pragma once
+
+#include <QObject>
+#include <QString>
+
 #include <qsecuremem.h>
 
 #include <job_zstd_decompressor_crypto.h>
 
 #include "qzstdoptions.h"
+#include "qzstd_export.h"
 
-class QZstdDecompressorCrypto : public  job::zstd::JobZstdDecompressorCrypto
+class QZSTD_EXPORT QZstdDecompressorCrypto : public  job::zstd::JobZstdDecompressorCrypto
 {
 public:
     explicit QZstdDecompressorCrypto();
-    QZstdDecompressorCrypto(QZstdOptions *opts);
+    explicit QZstdDecompressorCrypto(QZstdOptions *opts);
     ~QZstdDecompressorCrypto();
     QZstdDecompressorCrypto(const QZstdDecompressorCrypto &) = delete;
     QZstdDecompressorCrypto(QZstdDecompressorCrypto &&) noexcept = delete;
@@ -22,7 +27,7 @@ public:
     [[nodiscard]] QZstdOptions *options() const;
     void setOptions(QZstdOptions *other);
 
-    [[nodiscard]] bool decryptAndDecompress() noexcept;
+    [[nodiscard]] bool decryptAndDecompress();
 
 private:
     void disconnectOptionConnections() noexcept;

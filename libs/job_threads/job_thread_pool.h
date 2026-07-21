@@ -13,13 +13,13 @@
 #include "job_semaphore.h"
 #include "sched/job_isched_policy.h"
 #include "descr/job_task_descriptor.h"
-
+#include "jobthreads_export.h"
 namespace job::threads {
 
 // EWMA decay
 constexpr double kLoadAlpha = 0.75;
 
-class ThreadPool {
+class JOBTHREADS_EXPORT ThreadPool {
 public:
     using WPtr = std::weak_ptr<ThreadPool>;
     using Ptr  = std::shared_ptr<ThreadPool>;

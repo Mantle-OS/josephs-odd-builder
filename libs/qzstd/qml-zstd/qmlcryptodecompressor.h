@@ -1,4 +1,3 @@
-// qmlcryptodecompressor.h
 #pragma once
 
 #include <QObject>
@@ -9,8 +8,8 @@
 #include <qsodiumpasswordutils.h>
 #include <qzstdoptions.h>
 #include <qzstddecompressorcrypto.h>
-
-class QmlCryptoDecompressor : public QZstdOptions
+#include "qmlzstd_export.h"
+class QMLZSTD_EXPORT QmlCryptoDecompressor : public QZstdOptions
 {
     Q_OBJECT
     Q_PROPERTY(QmlSecureMem *password READ get_password NOTIFY passwordChanged)

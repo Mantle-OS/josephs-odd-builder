@@ -4,7 +4,7 @@ QmlStringList::QmlStringList(QObject *parent) :
     QStringListModel(parent)
 {
 }
-
+// 1d only !!!!!!!!!!!!!
 void QmlStringList::setStringList(const QStringList &list)
 {
     beginResetModel();

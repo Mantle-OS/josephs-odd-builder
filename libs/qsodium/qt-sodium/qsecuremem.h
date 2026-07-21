@@ -7,7 +7,9 @@
 
 #include <job_secure_mem.h>
 
-class QSecureMem : public job::crypto::JobSecureMem
+#include "qsodium_export.h"
+
+class QSODIUM_EXPORT QSecureMem : public job::crypto::JobSecureMem
 {
 public:
 
@@ -23,9 +25,12 @@ public:
 
     // Explicit overrides only needed for specialized Qt data format conversions
     [[nodiscard]] size_t size() const noexcept;
-    [[nodiscard]] bool isEmpty() const noexcept { return empty(); }
+    [[nodiscard]] bool isEmpty() const noexcept
+    {
+        return empty();
+    }
 
-// You can use these for debugging not for production
+// You can use these for debugging not for production ,.... Fuck that dont use this at all.
 #if 0
     void appendTo(QByteArray *out) const;
     [[nodiscard]] QString toString() const;

@@ -40,36 +40,6 @@ TEST_CASE("JobSecureMem copyFrom and content integrity", "[job_crypto][secure_me
     REQUIRE(decoded.size() == std::strlen(text));
 }
 
-TEST_CASE("JobSecureMem Base64 round-trip", "[job_crypto][secure_mem][base64]")
-{
-    const char *input = "This is a test of JobSecureMem Base64!";
-    JobSecureMem original(std::strlen(input));
-    original.copyFrom(input, std::strlen(input));
-
-    std::string encoded = original.toBase64();
-    REQUIRE(!encoded.empty());
-
-    JobSecureMem decoded(32);
-    REQUIRE(decoded.fromBase64(encoded));
-    REQUIRE(decoded.size() == std::strlen(input));
-
-    std::string decodedString = decoded.fromBase64toString(encoded);
-    REQUIRE(decodedString == input);
-}
-
-TEST_CASE("JobSecureMem fromBase64toString returns expected data", "[job_crypto][secure_mem][decode]")
-{
-    JobSecureMem mem(64);
-    const char *msg = "hello world!";
-    mem.copyFrom(msg, std::strlen(msg));
-
-    std::string encoded = mem.toBase64();
-    REQUIRE(!encoded.empty());
-
-    std::string decoded = mem.fromBase64toString(encoded);
-    REQUIRE(decoded == "hello world!");
-}
-
 TEST_CASE("JobSecureMem handles zero-length and null input safely", "[job_crypto][secure_mem][edge]")
 {
     JobSecureMem zero(0);

@@ -15,18 +15,18 @@
 
 #include "property-macros.h"
 #include "qaiutils.h"
-
-class QDownloader : public QObject
+#include "qaiutils_export.h"
+class QAIUTILS_EXPORT QDownloader : public QObject
 {
     Q_OBJECT
 
-    QP_RO(int,      current,            0)
-    QP_RO(int,      total,              0)
-    QP_RW(int,      maxConcurrent,      10)
-    QP_RW(QString,  outDir,             QAiUtils::diffusionDir)
-    QP_RO(qint64,   progressCurrent,    0)
-    QP_RO(qint64,   progressMax,        0)
-    QP_RO(QString,  speed,              "")
+    QP_RO(int,      current,            0                       )
+    QP_RO(int,      total,              0                       )
+    QP_RW(int,      maxConcurrent,      10                      )
+    QP_RW(QString,  outDir,             QAiUtils::diffusionDir  )
+    QP_RO(qint64,   progressCurrent,    0                       )
+    QP_RO(qint64,   progressMax,        0                       )
+    QP_RO(QString,  speed,              ""                      )
 
 public:
     explicit QDownloader(QObject *parent = nullptr);

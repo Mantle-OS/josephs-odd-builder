@@ -2,11 +2,13 @@
 #include <job_zstd_decompressor.h>
 #include "qzstdoptions.h"
 
-class QZstdDecompressor : public job::zstd::JobZstdDecompressor
+#include "qzstd_export.h"
+
+class QZSTD_EXPORT QZstdDecompressor : public job::zstd::JobZstdDecompressor
 {
 public:
     explicit QZstdDecompressor();
-    QZstdDecompressor(QZstdOptions *opts);
+    explicit QZstdDecompressor(QZstdOptions *opts);
     ~QZstdDecompressor();
 
     QZstdDecompressor(const QZstdDecompressor &) = delete;
@@ -14,14 +16,13 @@ public:
     QZstdDecompressor &operator=(const QZstdDecompressor &) = delete;
     QZstdDecompressor &operator=(QZstdDecompressor &&) noexcept = delete;
 
-    [[nodiscard]] bool decompress() noexcept;
+    [[nodiscard]] bool decompress();
     [[nodiscard]] QZstdOptions *options() const;
     void setOptions(QZstdOptions *other);
 
 private:
     void setupOptionConnections() noexcept;
     void disconnectOptionConnections() noexcept;
-    QZstdOptions *m_opts = nullptr; // owned unless m_ownsOpts is true (somone called setOptions)
+    QZstdOptions *m_opts = nullptr;
     bool m_ownsOpts = true;
-
 };

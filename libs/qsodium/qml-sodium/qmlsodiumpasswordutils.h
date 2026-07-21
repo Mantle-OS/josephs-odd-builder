@@ -1,12 +1,13 @@
-#ifndef QMLSODIUMPASSWORDUTILS_H
-#define QMLSODIUMPASSWORDUTILS_H
+#pragma once
 
 #include <QObject>
 #include <QString>
 #include <qqmlregistration.h>
 
-#include <qmlsecuremem.h>
-class QmlSodiumPasswordUtils : public QObject
+#include "qmlsecuremem.h"
+#include "qmlsodium_export.h"
+
+class QMLSODIUM_EXPORT QmlSodiumPasswordUtils : public QObject
 {
     Q_OBJECT
     Q_PROPERTY(QmlSecureMem *password READ password NOTIFY passwordChanged FINAL)
@@ -30,5 +31,3 @@ Q_SIGNALS:
 private:
     QmlSecureMem *m_password = nullptr;
 };
-
-#endif // QMLSODIUMPASSWORDUTILS_H

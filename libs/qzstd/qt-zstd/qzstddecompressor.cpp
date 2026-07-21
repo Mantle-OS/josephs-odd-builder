@@ -32,7 +32,7 @@ QZstdDecompressor::QZstdDecompressor(QZstdOptions *opts):
     m_opts = nullptr;
 }
 
-bool  QZstdDecompressor::decompress() noexcept
+bool QZstdDecompressor::decompress()
 {
     const bool ok = execute();
 
@@ -59,7 +59,7 @@ void  QZstdDecompressor::setOptions(QZstdOptions *other)
 
     m_opts = other;
     m_ownsOpts = false;
-    // setup the new connections
+
     setupOptionConnections();
 
     setInput(m_opts->get_input().toStdString());

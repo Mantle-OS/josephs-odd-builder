@@ -94,6 +94,9 @@ bool QmlSodiumBox::copyPasswordMemoryFrom(QmlSecureMem *source) noexcept
         return false;
 
     dst->copyFrom(src->data(), src->size());
+
+    Q_EMIT passwordChanged(m_password);
+
     return true;
 }
 

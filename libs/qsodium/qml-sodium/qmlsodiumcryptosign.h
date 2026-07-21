@@ -1,8 +1,8 @@
-#ifndef QMLSODIUMCRYPTOSIGN_H
-#define QMLSODIUMCRYPTOSIGN_H
-
+#pragma once
 #include <QObject>
 #include <QString>
+#include <QUrl>
+
 #include <qqmlregistration.h>
 
 #include <property-macros.h>
@@ -11,8 +11,9 @@
 #include <qsodiumcryptosign.h>
 #include <qsodiumhash.h>
 
+#include "qmlsodium_export.h"
 
-class QmlSodiumCryptoSign : public QObject
+class QMLSODIUM_EXPORT QmlSodiumCryptoSign : public QObject
 {
     Q_OBJECT
     QP_RW(QString, filePath,        "") // the file to sign
@@ -21,101 +22,32 @@ class QmlSodiumCryptoSign : public QObject
     QP_RW(QString, signatureBase64, "") // The OUT signature Base 64
     QML_ELEMENT
 public:
-    explicit QmlSodiumCryptoSign(QObject *parent = nullptr) :
-        QObject{parent},
-        m_signer{new QSodiumCryptoSign{}}
-    {
-        connect(this, &QmlSodiumCryptoSign::publicKeyChanged, this, [&](const QString &key) {
-            QFileInfo pubFi(key);
-            QFileInfo priFi(get_privateKey());
-            if(pubFi.exists() && priFi.exists()){
-                if(m_signer->loadKeys(key, get_privateKey())){
-                    qDebug() << "Keys Loaded:";
-                    qDebug() << "PUB: " << key;
-                    qDebug() << "PRI: " << get_privateKey();
-                }
-            }
-        });
+    explicit QmlSodiumCryptoSign(QObject *parent = nullptr);
+    ~QmlSodiumCryptoSign() override;
+    enum Stage{
+        File = 0,
+        PublicKey = 1,
+        PrivateKey = 2,
+        Unknown = 99
+    };
+    Q_ENUMS(Stage)
 
-        connect(this, &QmlSodiumCryptoSign::privateKeyChanged, this, [&](const QString &key) {
-            QFileInfo pubFi(get_publicKey());
-            QFileInfo priFi(key);
-            if(pubFi.exists() && priFi.exists()){
-                if(m_signer->loadKeys(get_publicKey(), key)){
-                    qDebug() << "Keys Loaded";
-                    qDebug() << "PUB: " << get_publicKey();
-                    qDebug() << "PRI: " << key;
-                }
-            }
-        });
-    }
+    Q_INVOKABLE bool signFile() noexcept;
+    Q_INVOKABLE bool signAssociatedFile() noexcept;
+    Q_INVOKABLE bool verifyAssociatedFile() noexcept;
+    Q_INVOKABLE QString computeFileBlake2b() noexcept;
+    Q_INVOKABLE bool hasKeys() noexcept;
 
-    ~QmlSodiumCryptoSign() override
-    {
-        delete m_signer;
-        m_signer = nullptr;
-    }
+public Q_SLOTS:
+    [[nodiscard]] bool update_filePath (const QUrl &url) noexcept;
+    [[nodiscard]] bool update_publicKey (const QUrl &url) noexcept;
+    [[nodiscard]] bool update_privateKey(const QUrl &url) noexcept;
 
-    Q_INVOKABLE bool signFile() noexcept
-    {
-        if (!hasKeys() || get_filePath().isEmpty())
-            return false;
-
-        QString outSig;
-        // Extracts underlying properties natively, then syncs state back out to QML row properties
-        if (m_signer->signFile(get_filePath(), outSig)) {
-            set_signatureBase64(outSig);
-            return true;
-        }
-        return false;
-    }
-
-    Q_INVOKABLE bool signAssociatedFile() noexcept {
-        if (!hasKeys() || get_filePath().isEmpty())
-            return false;
-
-        QString outSig;
-        if (m_signer->signAssociatedFile(get_filePath(), outSig)) {
-            set_signatureBase64(outSig);
-            return true;
-        }
-        return false;
-    }
-
-    Q_INVOKABLE bool verifyAssociatedFile() noexcept
-    {
-        if (!hasKeys() || get_filePath().isEmpty())
-            return false;
-
-        return m_signer->verifyFile(get_filePath(), get_signatureBase64());
-    }
-
-    // dont need keys
-    Q_INVOKABLE QString computeFileBlake2b() noexcept {
-        if (get_filePath().isEmpty())
-            return {};
-
-        QByteArray const binaryHash = QSodiumHash::hashFile(get_filePath());
-        return QString::fromLatin1(binaryHash.toHex());
-    }
-
-
-    Q_INVOKABLE bool hasKeys() noexcept
-    {
-        if (!m_signer || !m_signer->isValid())
-            return false;
-        return true;
-    }
+protected:
+    QP_RO(QmlSodiumCryptoSign::Stage , lastStage , QmlSodiumCryptoSign::Unknown)
 
 private:
-    bool loadKeysFromDisk() noexcept
-    {
-        if (!m_signer)
-            return false;
-
-        return m_signer->loadKeys(get_publicKey(), get_privateKey());
-    }
+    [[nodiscard]] bool loadKeysFromDisk() noexcept;
+    [[nodiscard]] bool urlStr( const QUrl &url, QString &path ) const noexcept; // might move this over to shome helper lib...
     QSodiumCryptoSign *m_signer = nullptr;
 };
-
-#endif // QMLSODIUMCRYPTOSIGN_H

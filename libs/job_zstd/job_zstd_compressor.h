@@ -2,9 +2,11 @@
 
 #include "job_zstd_options.h"
 
+#include "jobzstd_export.h"
+
 namespace job::zstd {
 
-class JobZstdCompressor : public JobZstdOptions
+class JOBZSTD_EXPORT JobZstdCompressor : public JobZstdOptions
 {
 public:
     JobZstdCompressor() = default;

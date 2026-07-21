@@ -74,13 +74,8 @@ QFuture<bool> QDownloader::append(const QUrl &url)
     m_queue.enqueue(item);
     set_total(m_total + 1);
 
-    if (!m_shuttingDown) {
-        QMetaObject::invokeMethod(
-            this,
-            "processQueue",
-            Qt::QueuedConnection
-            );
-    }
+    if (!m_shuttingDown)
+        QMetaObject::invokeMethod(this, "processQueue", Qt::QueuedConnection);
 
     return future;
 }
@@ -118,49 +113,61 @@ QString QDownloader::saveFileName(const QUrl &url) const
 {
     QDir dir{m_outDir};
 
-    if (!dir.exists())
-        dir.mkpath(QStringLiteral("."));
+    if (!dir.exists() && !dir.mkpath(QStringLiteral(".")))
+        return {};
 
-    QString baseName = QFileInfo{url.path()}.fileName();
+    QString baseName = url.fileName();
 
     if (baseName.isEmpty())
         baseName = QStringLiteral("download");
 
+#if defined(JOB_WINDOWS)
+    static const QString invalidChars = QStringLiteral("<>:\"/\\|?*");
+
+    for (qsizetype i = 0; i < baseName.size(); ++i) {
+        if (invalidChars.contains(baseName.at(i)))
+            baseName[i] = QLatin1Char('_');
+    }
+
+    while (baseName.endsWith(QLatin1Char(' ')) || baseName.endsWith(QLatin1Char('.')))
+        baseName.chop(1);
+
+    if (baseName.isEmpty())
+        baseName = QStringLiteral("download");
+#endif
+
     QString candidate = dir.filePath(baseName);
 
-    if (!QFile::exists(candidate) && !QFile::exists(candidate + QStringLiteral(".part")))
+    if (!QFile::exists(candidate) &&
+        !QFile::exists(candidate + QStringLiteral(".part"))) {
         return candidate;
+    }
 
-    const QFileInfo info{baseName};
-    const QString stem = info.completeBaseName();
-    const QString suffix = info.suffix();
+    QFileInfo const info{baseName};
+    QString const stem = info.completeBaseName();
+    QString const suffix = info.suffix();
 
     for (int i = 1; ; ++i) {
         QString numbered;
 
-        if (suffix.isEmpty()) {
-            numbered = QStringLiteral("%1.%2")
-            .arg(stem)
-                .arg(i);
-        } else {
-            numbered = QStringLiteral("%1.%2.%3")
-            .arg(stem)
-                .arg(i)
-                .arg(suffix);
-        }
+        if (suffix.isEmpty())
+            numbered = QStringLiteral("%1.%2").arg(stem).arg(i);
+        else
+            numbered = QStringLiteral("%1.%2.%3") .arg(stem) .arg(i) .arg(suffix);
 
         candidate = dir.filePath(numbered);
 
-        if (!QFile::exists(candidate) && !QFile::exists(candidate + QStringLiteral(".part")))
+        if (!QFile::exists(candidate) &&
+            !QFile::exists(candidate + QStringLiteral(".part"))) {
             return candidate;
+        }
     }
 }
 
 void QDownloader::startItem(DownloadItem *item)
 {
-    if (!item) {
+    if (!item)
         return;
-    }
 
     if (!m_nam) {
         item->promise.addResult(false, 0);
@@ -224,7 +231,6 @@ void QDownloader::startItem(DownloadItem *item)
     Q_EMIT itemStarted(item->url, item->finalFileName);
 }
 
-
 void QDownloader::reqReadyRead()
 {
     auto *reply = qobject_cast<QNetworkReply *>(sender());
@@ -235,7 +241,20 @@ void QDownloader::reqReadyRead()
     if (!item || !item->file)
         return;
 
-    item->file->write(reply->readAll());
+    QByteArray const data = reply->readAll();
+    if (data.isEmpty())
+        return;
+
+    qint64 const written = item->file->write(data);
+
+    if (written != data.size()) {
+        QString const errorString =
+            item->file->errorString().isEmpty() ?
+                                        QStringLiteral("Incomplete file write.") :
+                                        item->file->errorString();
+
+        finishItem(reply, false, errorString);
+    }
 }
 
 void QDownloader::reqProgress(qint64 received, qint64 total)
@@ -292,31 +311,45 @@ void QDownloader::finishItem(QNetworkReply *reply, bool ok, const QString &error
         return;
     }
 
+    QString failureString = errorString;
+
     if (item->file) {
-        item->file->flush();
+        if (!item->file->flush()) {
+            ok = false;
+
+            if (failureString.isEmpty())
+                failureString = item->file->errorString();
+        }
+
         item->file->close();
+
+        if (item->file->error() != QFile::NoError) {
+            ok = false;
+
+            if (failureString.isEmpty())
+                failureString = item->file->errorString();
+        }
     }
 
     if (ok) {
         QFile::remove(item->finalFileName);
 
-        if (!QFile::rename(item->partFileName, item->finalFileName)) {
+        if (!QFile::rename( item->partFileName, item->finalFileName )) {
             ok = false;
+            failureString = QStringLiteral("Unable to move completed download into place.");
         }
     }
 
     if (ok) {
         item->promise.addResult(true, 0);
         item->promise.finish();
-
         Q_EMIT itemFinished(item->url, item->finalFileName);
     } else {
         QFile::remove(item->partFileName);
-
         item->promise.addResult(false, 0);
         item->promise.finish();
 
-        Q_EMIT itemFailed(item->url, errorString);
+        Q_EMIT itemFailed(item->url, failureString);
     }
 
     cleanupItem(item, !ok);
@@ -328,13 +361,8 @@ void QDownloader::finishItem(QNetworkReply *reply, bool ok, const QString &error
     set_current(m_current + 1);
     updateAggregateProgress();
 
-    if (!m_shuttingDown) {
-        QMetaObject::invokeMethod(
-            this,
-            "processQueue",
-            Qt::QueuedConnection
-            );
-    }
+    if (!m_shuttingDown)
+        QMetaObject::invokeMethod(this, "processQueue", Qt::QueuedConnection);
 }
 
 void QDownloader::cleanupItem(DownloadItem *item, bool removePartFile) noexcept

@@ -4,11 +4,11 @@
 #include <vector>
 
 #include "job_secure_mem.h"
+#include "jobcrypto_export.h"
 
 namespace job::crypto {
 
-class JobCrypto
-{
+class JOBCRYPTO_EXPORT JobCrypto {
 public:
     JobCrypto() noexcept;
     ~JobCrypto() = default;

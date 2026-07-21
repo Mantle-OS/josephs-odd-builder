@@ -112,8 +112,7 @@ struct Forces final {
         const size_t simdLimit = count & ~7; // Only go up to the last multiple of 8
 
         for (size_t i = 0; i < simdLimit; i += 8) {
-            // --- 1. GATHER ---
-            // (Getting the data out of the messy structs and into tight registers)
+            // Getting the data out of the messy structs and into tight registers
             float tx[8], ty[8], tz[8], tvx[8], tvy[8], tvz[8], tm[8], tr[8], tabs[8];
             for(int j=0; j<8; ++j) {
                 const auto &p = ps[i+j];
@@ -126,7 +125,7 @@ struct Forces final {
             f32 vx = SIMD::pull(tvx); f32 vy = SIMD::pull(tvy); f32 vz = SIMD::pull(tvz);
             f32 m = SIMD::pull(tm);  f32 r = SIMD::pull(tr);  f32 absorp = SIMD::pull(tabs);
 
-            // --- 2. RADIUS & LOG-SPACE ---
+            // RADIUS & LOG-SPACE ---
             f32 r_m2  = SIMD::mul_plus(x, x, SIMD::mul_plus(y, y, SIMD::mul(z, z)));
             f32 inv_r = SIMD::rsqrt(r_m2);
             f32 r_m   = SIMD::mul(r_m2, inv_r); // r^2 * 1/r = r
@@ -136,7 +135,7 @@ struct Forces final {
             f32 temp  = SIMD::mul(T0, SIMD::exp(SIMD::mul(tempExp, log_r)));
             f32 rho   = SIMD::mul(rho0, SIMD::exp(SIMD::mul(densExp, log_r)));
 
-            // --- 3. GAS DRAG ---
+            // GAS DRAG
             f32 area  = SIMD::mul(SIMD::set1(4.0f * core::piToTheFace), SIMD::mul(r, r));
             f32 cs    = SIMD::mul(soundBase, SIMD::sqrt(temp));
             f32 v_mag = SIMD::sqrt(SIMD::mul_plus(vx, vx, SIMD::mul_plus(vy, vy, SIMD::mul(vz, vz))));
@@ -147,7 +146,7 @@ struct Forces final {
                 );
             f32 drag_k = SIMD::mul(drag_mag, SIMD::div(SIMD::set1(1.0f), SIMD::max(v_mag, eps)));
 
-            // --- 4. PHOTOPHORETIC (The "Light Pusher") ---
+            // PHOTOPHORETIC (The "Light Pusher") ---
             // Kn = 0.01 / (rho * radius + eps)
             f32 kn = SIMD::div(knBase, SIMD::mul_plus(rho, r, eps));
             // a_ph = (absorp * T^2 * Kn) / (r * rho + 1e-12) * phBase
@@ -156,7 +155,7 @@ struct Forces final {
             f32 ph_mag = SIMD::mul(SIMD::div(ph_num, ph_den), phBase);
             f32 ph_k   = SIMD::mul(ph_mag, inv_r); // Direction is radial outward (pos * inv_r)
 
-            // --- 5. SCATTER & ACCUMULATE ---
+            // SCATTER & ACCUMULATE
             for(int j=0; j<8; ++j) {
                 auto &acc = ps[i+j].acceleration;
                 // Drag (anti-parallel to velocity)
@@ -219,7 +218,7 @@ struct Forces final {
         const size_t simdLimit = count & ~7;
 
         for (size_t i = 0; i < simdLimit; i += 8) {
-            // --- 1. GATHER (The Necessary Evil) ---
+            // GATHER (The Necessary Evil) ---
             float tx[8], ty[8], tz[8], tvx[8], tvy[8], tvz[8], tm[8], tr[8], tabs[8];
             for(int j=0; j<8; ++j) {
                 const auto &p = ps[i+j];
@@ -232,7 +231,7 @@ struct Forces final {
             const f32 vx = SIMD::pull(tvx); const f32 vy = SIMD::pull(tvy); const f32 vz = SIMD::pull(tvz);
             const f32 m = SIMD::pull(tm);  const f32 r = SIMD::pull(tr);  const f32 absorp = SIMD::pull(tabs);
 
-            // --- 2. DISTANCE MATH ---
+            // DISTANCE MATH
             // Calculate r once, use everywhere.
             const f32 r2    = SIMD::mul_plus(x, x, SIMD::mul_plus(y, y, SIMD::mul(z, z)));
             const f32 mask  = SIMD::gt_ps(r2, eps); // The "Don't fall into the star" shield
@@ -240,14 +239,13 @@ struct Forces final {
             const f32 r_m   = SIMD::mul(r2, inv_r);
             const f32 r_au  = SIMD::mul(r_m, invAU);
 
-            // --- 3. LOG-DOMAIN PHYSICS (Power Laws) ---
-            // Using your Estrin exp/log.
+            // LOG-DOMAIN PHYSICS (Power Laws) ---
             // std::pow(r, exp) -> exp(exp * log(r))
             const f32 log_r = SIMD::log(SIMD::max(r_au, eps));
             const f32 temp  = SIMD::mul(T0, SIMD::exp(SIMD::mul(tempExp, log_r)));
             const f32 rho   = SIMD::mul(rho0, SIMD::exp(SIMD::mul(densExp, log_r)));
 
-            // --- 4. GRAVITY & RADIATION (Radial Forces) ---
+            // GRAVITY & RADIATION (Radial Forces) ---
             // Gravity: a = -GM / r^2
             const f32 inv_r2 = SIMD::mul(inv_r, inv_r);
             const f32 grav_coeff = SIMD::mul(GM, SIMD::mul(inv_r2, inv_r)); // inward coefficient
@@ -265,14 +263,14 @@ struct Forces final {
             // Combine radial terms: (Radiation + Photophoretic - Gravity) * (Position / r)
             const f32 radial_k = SIMD::sub(SIMD::mul(SIMD::add(rad_coeff, ph_mag), inv_r), grav_coeff);
 
-            // --- 5. GAS DRAG (Velocity Force) ---
+            // GAS DRAG (Velocity Force) ---
             const f32 cs    = SIMD::mul(soundBase, SIMD::sqrt(temp));
             const f32 v_mag = SIMD::sqrt(SIMD::mul_plus(vx, vx, SIMD::mul_plus(vy, vy, SIMD::mul(vz, vz))));
             const f32 drag_coeff = SIMD::div(SIMD::mul(SIMD::set1(-1.0f), SIMD::mul(rho, SIMD::mul(cs, SIMD::mul(area, v_mag)))),
                                              SIMD::add(m, eps));
             const f32 drag_k = SIMD::mul(drag_coeff, SIMD::div(SIMD::set1(1.0f), SIMD::max(v_mag, eps)));
 
-            // --- 6. SCATTER AND FUSE ---
+
             for(int j=0; j<8; ++j) {
                 auto &acc = ps[i+j].acceleration;
                 // Apply masked radial forces
@@ -423,8 +421,6 @@ struct Forces final {
         return total_E;
     }
 
-
-
     void calculateStarForcesSimd(
         const float* posX, const float* posY, const float* posZ,
         const float* mass, const float* area, const float* absorptivity,
@@ -439,13 +435,13 @@ struct Forces final {
         const f32 eps    = SIMD::set1(1e-9f); // Don't divide by zero, the universe hates that.
 
         for (size_t i = 0; i < count; i += SIMD::width()) {
-            // 1. Pull 8 particles worth of data
+            // Pull 8 particles worth of data
             const f32 x = SIMD::pull(&posX[i]);
             const f32 y = SIMD::pull(&posY[i]);
             const f32 z = SIMD::pull(&posZ[i]);
             const f32 m = SIMD::pull(&mass[i]);
 
-            // 2. r^2 = x^2 + y^2 + z^2
+            // r^2 = x^2 + y^2 + z^2
             // Using FMA because we're high-class like that.
             const f32 r2 = SIMD::mul_plus(x, x, SIMD::mul_plus(y, y, SIMD::mul(z, z)));
 
@@ -453,16 +449,13 @@ struct Forces final {
             // We mask it out so we don't divide by zero and summon a black hole.
             const f32 mask = SIMD::gt_ps(r2, eps);
 
-            // 3. Reciprocal Square Root - The MVP of physics kernels.
             const f32 inv_r  = SIMD::rsqrt(r2);
             const f32 inv_r2 = SIMD::mul(inv_r, inv_r);
 
-            // 4. Gravity Calculation (Inward)
             // a_grav = -GM / r^2 * (pos/r)  => -GM * pos * (inv_r^3)
             const f32 inv_r3      = SIMD::mul(inv_r2, inv_r);
             const f32 grav_coeff  = SIMD::mul(GM, inv_r3);
 
-            // 5. Radiation Pressure (Outward)
             // a_rad = (L_star * area * absorptivity * rad_k) / (r^2 * mass)
             const f32 a   = SIMD::pull(&area[i]);
             const f32 abs = SIMD::pull(&absorptivity[i]);
@@ -472,7 +465,6 @@ struct Forces final {
             // Approximate 1/rad_den to keep the pipes moving.
             const f32 rad_coeff = SIMD::mul(rad_num, SIMD::mul(rad_k, SIMD::rsqrt(rad_den)));
 
-            // 6. Fused Sum
             // total_accel = pos * (rad_coeff * inv_r - grav_coeff)
             // We multiply rad_coeff by inv_r because rad_coeff is just the magnitude.
             const f32 total_coeff = SIMD::sub(SIMD::mul(rad_coeff, inv_r), grav_coeff);
@@ -484,13 +476,6 @@ struct Forces final {
             SIMD::mov(&accZ[i], SIMD::and_ps(mask, SIMD::mul(z, total_coeff)));
         }
     }
-
-
-
-
-
-
-
 };
 
 }

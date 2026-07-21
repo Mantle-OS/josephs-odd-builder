@@ -3,10 +3,10 @@
 #include <chrono>
 #include <cstdint>
 #include <functional>
-
+#include "jobcore_export.h"
 namespace job::core {
 
-class JobTimer {
+class JOBCORE_EXPORT JobTimer {
 public:
     using Clock = std::chrono::steady_clock;
     using TimePoint = Clock::time_point;

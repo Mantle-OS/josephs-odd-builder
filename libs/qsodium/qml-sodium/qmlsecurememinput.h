@@ -24,19 +24,20 @@
 
 #include <pointer-macros.h>
 
-#include <qmlsecuremem.h>
 #include <qsecuremem.h>
 
-class QmlSecureMemInput : public QQuickItem
-{
-    Q_OBJECT
-    Q_PROPERTY(int length READ length NOTIFY lengthChanged)
-    Q_PROPERTY(QColor borderColor READ borderColor WRITE setBorderColor NOTIFY borderColorChanged)
-    Q_PROPERTY(QColor maskColor READ maskColor WRITE setMaskColor NOTIFY maskColorChanged)
-    QP_PTR_RO(QmlSecureMem, memory)
-    QML_ELEMENT
-    static constexpr size_t kSecureInputCapacity = 64;
+#include "qmlsecuremem.h"
+#include "qmlsodium_export.h"
 
+class QMLSODIUM_EXPORT QmlSecureMemInput : public QQuickItem {
+    Q_OBJECT
+    Q_PROPERTY(int              length      READ length                                 NOTIFY lengthChanged)
+    Q_PROPERTY(QColor           borderColor READ borderColor    WRITE setBorderColor    NOTIFY borderColorChanged)
+    Q_PROPERTY(QColor           maskColor   READ maskColor      WRITE setMaskColor      NOTIFY maskColorChanged)
+    QP_PTR_RO(QmlSecureMem,     memory)
+    QML_ELEMENT
+
+    static constexpr std::size_t kSecureInputCapacity = 64;
 public:
     explicit QmlSecureMemInput(QQuickItem *parent = nullptr);
     ~QmlSecureMemInput() override;
@@ -62,14 +63,12 @@ protected:
     void focusOutEvent(QFocusEvent *event) override;
     void keyPressEvent(QKeyEvent *event) override;
     void mousePressEvent(QMouseEvent *event) override;
-
     QSGNode *updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *data) override;
 
 private:
-    int m_byteCount = 0;
-    int m_maskCount = 0;
-    std::vector<uint8_t> m_inputByteLengths;
-
-    QColor m_borderColor = QColor("#555555");
-    QColor m_maskColor = QColor("#00FF66");
+    int                     m_byteCount         = 0;
+    int                     m_maskCount         = 0;
+    std::vector<uint8_t>    m_inputByteLengths;
+    QColor                  m_borderColor       = QColor("#555555");
+    QColor                  m_maskColor         = QColor("#00FF66");
 };

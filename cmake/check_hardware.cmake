@@ -2,6 +2,30 @@ include(CheckCXXCompilerFlag)
 include(CheckSourceCompiles)
 include(CheckIPOSupported)
 
+
+set(JOB_WINDOWS OFF)
+set(JOB_LINUX OFF)
+set(JOB_APPLE OFF)
+set(JOB_BSD OFF)
+
+if(WIN32)
+    set(JOB_WINDOWS ON)
+    add_compile_definitions(JOB_WINDOWS)
+elseif(APPLE)
+    set(JOB_APPLE ON)
+    add_compile_definitions(JOB_APPLE)
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    set(JOB_LINUX ON)
+    add_compile_definitions(JOB_LINUX)
+elseif(CMAKE_SYSTEM_NAME MATCHES "^(FreeBSD|OpenBSD|NetBSD|DragonFly)$")
+    set(JOB_BSD ON)
+    add_compile_definitions(JOB_BSD)
+else()
+    message(FATAL_ERROR
+        "Unsupported target operating system: ${CMAKE_SYSTEM_NAME}"
+    )
+endif()
+
 add_compile_options(
     $<$<AND:$<CONFIG:Release>,$<COMPILE_LANGUAGE:CXX>>:-O3>
     $<$<AND:$<CONFIG:Release>,$<COMPILE_LANGUAGE:CXX>>:-funroll-loops>
@@ -50,8 +74,8 @@ if(CXX_SUPPORTS_FMATH_FLAG)
     add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-mfma>)
 endif()
 
-
-if(NOT MSVC AND CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64")    
+# ... MSVC gonna catch this IDK ?
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64")
     #############################################
     # 16-width kernels
     #############################################

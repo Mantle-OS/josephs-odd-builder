@@ -11,10 +11,11 @@
 #include <condition_variable>
 
 #include "job_thread_metrics.h"
+#include "jobthreads_export.h"
 
 namespace job::threads {
 
-class TaskQueue {
+class JOBTHREADS_EXPORT TaskQueue {
     friend class ThreadPool;
 
 public:

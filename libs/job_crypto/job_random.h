@@ -1,13 +1,16 @@
 #pragma once
 
+#include <atomic>
 #include <cstddef>
 #include <cstdint>
 #include <random>
 #include <vector>
 
+#include "jobcrypto_export.h"
+
 namespace job::crypto {
 
-class JobRandom {
+class JOBCRYPTO_EXPORT JobRandom {
 public:
     JobRandom() = delete;
     ~JobRandom() = delete;
@@ -30,6 +33,9 @@ public:
 private:
     static void initRandom();
     [[nodiscard]] static std::uint64_t initThreadSeed();
+
+    inline static std::atomic<bool>          m_useGlobalSeed{false};
+    inline static std::atomic<std::uint64_t> m_globalSeed{0};
 };
 
 } // namespace job::crypto

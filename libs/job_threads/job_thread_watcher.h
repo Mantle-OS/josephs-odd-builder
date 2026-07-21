@@ -9,11 +9,11 @@
 #include "job_isched_policy.h"
 #include "job_thread.h"
 #include "job_task_queue.h"
-
+#include "jobthreads_export.h"
 namespace job::threads {
 
 class ThreadPool;
-class ThreadWatcher {
+class JOBTHREADS_EXPORT ThreadWatcher {
 public:
 
     using Ptr  = std::shared_ptr<ThreadWatcher>;

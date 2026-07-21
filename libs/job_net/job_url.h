@@ -7,10 +7,10 @@
 #include <iostream>
 
 #include <job_secure_mem.h>
-
+#include "jobnet_export.h"
 namespace job::net {
 
-class JobUrl {
+class JOBNET_EXPORT JobUrl {
 public:
     using Ptr = std::shared_ptr<JobUrl>;
     enum class Scheme : uint8_t {
@@ -81,14 +81,35 @@ public:
     [[nodiscard]] const std::string &username() const noexcept;
     void setUsername(const std::string &u);
 
-    void setPassword(const std::string &p);
+    void setPassword(const std::string &p)
+    {
+        // p is now in memory it needs to be whiped like really free'd
+        setPassword(p.data(), p.size());
+    }
+    void setPassword(const char *data, size_t len)
+    {
+        if (len == 0) {
+            m_password.reset();
+            return;
+        }
+        m_password = std::make_unique<crypto::JobSecureMem>(len);
+        m_password->copyFrom(data, len);
+    }
 
-    // Rules
-    // 1) check preprocess defines use that if its insecure
-    // 2) if the user overrides m_base64EncodePwd = true.
-    //    2.a is m_passwdMode == Lenient ? decode the base64 to raw string : just show the base64 string
-    // 3) m_base64EncodePwd = false ret "*******" with log
-    [[nodiscard]] std::string password(bool include = false) const;
+    [[nodiscard]] const crypto::JobSecureMem *passwordSecure() const noexcept
+    {
+        return m_password.get();
+    }
+    std::string password(bool include) const
+    {
+        if (!include || !m_password)
+            return {};
+
+        if (m_base64EncodePwd)
+            return m_password->toBase64();
+
+        return "********";
+    }
 
     [[nodiscard]] std::string authority(bool includePassword = false) const;
 

@@ -102,7 +102,7 @@ public:
     [[nodiscard]] bool setRecording(bool enabled, const std::filesystem::path &filePath);
 
 private:
-    void onEvents(uint32_t events);
+    void onEvents(threads::IOEvent events);
 
     bool startRecording(const std::filesystem::path &filePath);
     void stopRecordingInternal();

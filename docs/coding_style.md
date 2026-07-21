@@ -1,6 +1,8 @@
-# Coding Style and Conventions
+# Job's Guidlines, Coding Style and Conventions
 
-This document describes the house style for the `job_*` libraries, tests and applications.
+The Number one rule on the job site is [Don’t panic!](https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#in0-dont-panic)
+
+This document describes the job of job's style for the JOB Framework.   
 
 The goals:
 
@@ -18,12 +20,28 @@ This is a living document. It captures how the codebase "already" looks and how 
 * Prefer clarity over cleverness.
 * Code should be mostly self-explanatory: names and structure should carry most of the meaning.
 * Comments explain **why**, not **what**, except in tricky algorithms.
-* Use the language features (const, noexcept, [[nodiscard]], chrono, atomics, etc.) when they make intent clearer.
+* Use the language features (const, noexcept, [[nodiscard]], [[unlikely]], [[likely]], chrono, atomics, etc.) when they make intent clearer.
 * Keep abstractions small and composable instead of building monolithic frameworks.
+* Please try to follow the core guidlines from the iso team in c++
 
 ---
 
 ## 2. Layout and Braces
+
+When reading code I visually look for immediate visual patterns (visual object orientation).  
+
+This help's (me) to navigate an implementation at a glance.
+
+Over the years, I have picked up a specific set of rules that maximize scannability,
+
+Whether I am tracing execution flow or scanning the layout and memory orientation of a struct/class etc . 
+
+By enforcing strict structure on block placement and minimizing brace noise, 
+intent becomes inheritly obvious without parsing the lines word for word. 
+
+I mean its objects orentiation anyways why not treat the visual look of the code with the same light ? 
+
+I am (very) open to suggestions to make this visual repersentation of the code better.
 
 ### 2.1 Function / method definitions
 
@@ -128,7 +146,9 @@ bool isRunning() const;
 
 ### 4.3 Members
 
-* Private data members use `m_` prefix:
+* Private data members Always use `m_` prefix: 
+Why use the old m_ prefix. One glance in a implenmtation files tell's you there are the public members
+
 
 ```cpp
 class JobThread {
@@ -314,8 +334,28 @@ Log messages should be:
 
 ---
 
-## 10. Tests
 
+## 10. Visibility, Linkage, and Namespace Boundaries
+
+This section governs how code bridges boundaries—both compiler boundaries (Translation Units) and linker boundaries (DLLs/Shared Libraries). 
+
+### 10.1 Linkage and Header Integrity
+
+Headers are blueprints meant for sharing identical definitions across translation units. 
+They must never pollute or fragment the global space, nor trigger duplicate storage states.
+
+*   **Banned: Anonymous Namespaces in Headers.** 
+Never place an anonymous (unnamed) namespace inside a header file (`Rule SF.22`). 
+It forces internal linkage, creating isolated duplicate copies of objects and functions in every translation unit that includes it, 
+leading to hidden ODR (One Definition Rule) violations and massive code bloat.
+*   **Banned: `static` Global Variables in Headers.** Similar to anonymous namespaces, marking a non-templated variable as `static` in a header creates a unique instance per translation unit. 
+*   **Preferred: Modern External Linkage.** For header-only utilities, constants, 
+and generated lookup tables, use `inline constexpr` (variables) or `inline static` (methods). 
+This explicitly instructs the linker to merge all instances into exactly one global allocation across the final binary.
+
+If you are confused you can [also see Cpp Core Guidelines](https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines)
+
+## 11. Tests
 
 We use Catch2 (version 3) for tests
 
@@ -336,6 +376,12 @@ We generally structure tests in **three conceptual blocks**. Some older tests do
 - **Block three: benchmarks / stress if needed (they are not all the time)**
   - There is a compile time option called ```JOB_TEST_BENCHMARKS``` wrap all benchmarks in this please **Example**
 ```cpp
+// at the top add the guard and pull in the upstream header
+#ifdef JOB_TEST_BENCHMARKS
+    #include <catch2/benchmark/catch_benchmark.hpp>
+#endif
+
+// Section 3 benchmarks
 #ifdef JOB_TEST_BENCHMARKS
 TEST_CASE("some benchmark", "[module][some_feature][some_scope][benchmark]")
 {
@@ -366,7 +412,7 @@ TEST_CASE("JobThreadGraph fan-in waits for all prerequisites", "[threading][grap
 
 ---
 
-## 11. Comments and Naming for Intent
+## 12. Comments and Naming for Intent
 
 * Names should carry meaning: prefer `count` / `index` / `deadlineMs` over `c` / `i` / `d`.
 * Shorthand like `cnt` is acceptable when idiomatic and obvious; single letters are best kept for local loop indices or math.
@@ -384,7 +430,7 @@ const int numTasks = 2;
 
 ---
 
-## 12. Documentation, Evolution, and Inline Comments
+## 13. Documentation, Evolution, and Inline Comments
 
 Documentation should describe the current architecture and intended usage,
 not every implementation detail.

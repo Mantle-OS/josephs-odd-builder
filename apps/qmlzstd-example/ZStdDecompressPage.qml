@@ -6,11 +6,7 @@ import QtQuick.Dialogs
 import QZstd
 
 Page {
-    id: decompressionPage
-
     QmlDecompressor { id: decompressor }
-
-
     Item {
         width: parent.width   * 0.80
         height: parent.height * 0.80
@@ -107,11 +103,10 @@ Page {
                 cleanPath = cleanPath.replace("file://", "")
 
             decompressor.input = cleanPath
-            if (cleanPath.endsWith(".zst")) {
+            if (cleanPath.endsWith(".zst"))
                 decompressor.output = cleanPath.substring(0, cleanPath.length - 4)
-            } else {
+            else
                 decompressor.output = cleanPath + ".extracted"
-            }
             decompressorPrivate.hasFile = true
         }
     }

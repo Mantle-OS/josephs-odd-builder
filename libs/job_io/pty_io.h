@@ -78,7 +78,7 @@ private:
     pid_t m_childPid = -1;
 
     std::shared_ptr<threads::JobIoAsyncThread> m_loop;
-    void onEvents(uint32_t events);
+    void onEvents(threads::IOEvent events);
 
     std::atomic<bool> m_localecho = false;
     std::atomic<bool> m_nonBlocking = false;

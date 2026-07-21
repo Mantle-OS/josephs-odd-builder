@@ -1,10 +1,12 @@
 #include "qmlsodiumpasswordutils.h"
-#include <qdebug.h>
+
+#include <QDebug>
+
 #include <qsodiumpasswordutils.h>
 
 QmlSodiumPasswordUtils::QmlSodiumPasswordUtils(QObject *parent) :
-    QObject(parent),
-    m_password(new QmlSecureMem(this))
+    QObject{parent},
+    m_password{new QmlSecureMem{this}}
 {
 }
 

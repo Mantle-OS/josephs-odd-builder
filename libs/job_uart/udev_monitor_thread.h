@@ -20,7 +20,7 @@ public:
     void stop();
 
 private:
-    void onEvents(uint32_t events);
+    void onEvents(threads::IOEvent events);
     Callback m_callback;
     std::weak_ptr<threads::JobIoAsyncThread> m_loop; // Store a weak_ptr
 

@@ -7,11 +7,13 @@
 #include <QObject>
 #include <QString>
 
-class QZstdCompressorCrypto : public job::zstd::JobZstdCompressorCrypto
+#include "qzstd_export.h"
+
+class QZSTD_EXPORT QZstdCompressorCrypto : public job::zstd::JobZstdCompressorCrypto
 {
 public:
     explicit QZstdCompressorCrypto();
-    QZstdCompressorCrypto(QZstdOptions *opts);
+    explicit QZstdCompressorCrypto(QZstdOptions *opts);
     ~QZstdCompressorCrypto();
     QZstdCompressorCrypto(const QZstdCompressorCrypto &) = delete;
     QZstdCompressorCrypto(QZstdCompressorCrypto &&) noexcept = delete;
@@ -24,7 +26,7 @@ public:
     [[nodiscard]] QZstdOptions *options() const;
     void setOptions(QZstdOptions *other);
 
-    [[nodiscard]] bool compressAndEncrypt() noexcept;
+    [[nodiscard]] bool compressAndEncrypt();
 
 private:
     // func

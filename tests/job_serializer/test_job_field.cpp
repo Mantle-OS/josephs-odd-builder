@@ -160,13 +160,13 @@ TEST_CASE("Field::from_yaml (single) populates Field struct from YAML", "[job_fi
 
     SECTION("Smart ref_sym from ref_include") {
         std::string yaml = R"(
-            name: "header"
-            type: "struct"
-            ref_include: "mpkg_mp_header.hpp"
-        )";
+        name: "header"
+        type: "struct"
+        ref_include: "aipkg_header.hpp"
+    )";
         YAML::Node node = YAML::Load(yaml);
         REQUIRE(Field::from_yaml(node, f));
-        REQUIRE(f.ref_include == "mpkg_mp_header.hpp");
+        REQUIRE(f.ref_include == "aipkg_header.hpp");
         REQUIRE(f.ref_sym == "header"); // Smart default
     }
 
@@ -333,14 +333,14 @@ TEST_CASE("Field JSON serialization (to/from_json)", "[job_field]") {
         nlohmann::json j_ref = {
             {"name", "header"},
             {"type", "struct"},
-            {"ref_include", "mpkg_msgpack_header.hpp"}
+            {"ref_include", "aipkg_header.hpp"}
         };
 
         Field f_ref{};
         Field::from_json(j_ref, f_ref);
 
-        REQUIRE(f_ref.ref_include == "mpkg_msgpack_header.hpp");
-        REQUIRE(f_ref.ref_sym == "msgpack_header");
+        REQUIRE(f_ref.ref_include == "aipkg_header.hpp");
+        REQUIRE(f_ref.ref_sym == "header");
     }
 }
 
@@ -370,5 +370,27 @@ TEST_CASE("Field::to_yaml emits correct YAML", "[job_field]") {
     // Check that optional-but-empty fields are not present
     REQUIRE(output.find("size:") == std::string::npos);
     REQUIRE(output.find("ctype:") == std::string::npos);
+}
+
+
+TEST_CASE("Field::isValid does not currently require ref_include alongside ref_sym", "[job_field][known_gap]")
+{
+    Field f{};
+    f.name = "header";
+    f.type = "struct";
+    f.kind = FieldKind::Struct;
+    f.ref_sym = "MyHeader";
+    // f.ref_include deliberately left unset
+
+    std::vector<Field> fields{f};
+
+    // NOTE: this currently passes, which is the known gap -- a struct field
+    // can declare ref_sym with no ref_include and still validate, generating
+    // a header that references an undeclared type with no include to
+    // resolve it. This test exists to make that behavior explicit and
+    // intentional-looking rather than an untested accident; if/when
+    // Field::isValid is tightened to require both together, this assertion
+    // should flip to REQUIRE_FALSE.
+    REQUIRE(Field::isValid(fields));
 }
 

@@ -41,11 +41,18 @@ std::string JobUtilMsgPack::getPackFunc(const Field &f)
         ss << "        for (const auto& item : " << f.name << ") {\n";
         ss << "            item.pack_msgpack(pk);\n";
         ss << "        }\n";
-    }
-    else if (f.kind == FieldKind::Struct) {
+    } else if (f.kind == FieldKind::Struct) {
         ss << "        " << f.name << ".pack_msgpack(pk);\n";
-    }
-    else {
+    } else if (f.kind == FieldKind::Bin) {
+        ss << "        pk.pack_bin(static_cast<uint32_t>(" << f.name << ".size()));\n";
+        ss << "        pk.pack_bin_body(reinterpret_cast<const char*>(" << f.name << ".data()), static_cast<uint32_t>(" << f.name << ".size()));\n";
+    } else if (f.kind == FieldKind::ListBin) {
+        ss << "        pk.pack_array(static_cast<uint32_t>(" << f.name << ".size()));\n";
+        ss << "        for (const auto& item : " << f.name << ") {\n";
+        ss << "            pk.pack_bin(static_cast<uint32_t>(item.size()));\n";
+        ss << "            pk.pack_bin_body(reinterpret_cast<const char*>(item.data()), static_cast<uint32_t>(item.size()));\n";
+        ss << "        }\n";
+    } else {
         ss << "        pk.pack(" << f.name << ");\n";
     }
 
@@ -68,14 +75,39 @@ std::string JobUtilMsgPack::getUnpackFunc(const Field &f)
         ss << "                    " << f.name << ".push_back(item);\n";
         ss << "                }\n";
         ss << "            }\n";
-    }
-    else if (f.kind == FieldKind::Struct) {
+    } else if (f.kind == FieldKind::Struct) {
         ss << "            " << f.name << ".unpack_msgpack(val_obj);\n";
-    }
-    else {
+    } else if (f.kind == FieldKind::Bin) {
+        ss << "            if (val_obj.type == msgpack::type::BIN) {\n";
+        if (f.size) {
+            ss << "                if (val_obj.via.bin.size != " << *f.size << ")\n";
+            ss << "                    throw std::runtime_error(\"size mismatch unpacking bin field '" << f.name << "', expected " << *f.size << " bytes, got \" + std::to_string(val_obj.via.bin.size));\n";
+            ss << "                std::memcpy(" << f.name << ".data(), val_obj.via.bin.ptr, " << *f.size << ");\n";
+        } else {
+            ss << "                " << f.name << ".assign(val_obj.via.bin.ptr, val_obj.via.bin.ptr + val_obj.via.bin.size);\n";
+        }
+        ss << "            }\n";
+    } else if (f.kind == FieldKind::ListBin) {
+        ss << "            if (val_obj.type == msgpack::type::ARRAY) {\n";
+        ss << "                " << f.name << ".clear();\n";
+        ss << "                " << f.name << ".reserve(val_obj.via.array.size);\n";
+        ss << "                for (uint32_t i = 0; i < val_obj.via.array.size; ++i) {\n";
+        ss << "                    const auto &elem = val_obj.via.array.ptr[i];\n";
+        ss << "                    if (elem.type != msgpack::type::BIN) continue;\n";
+        if (f.size) {
+            ss << "                    if (elem.via.bin.size != " << *f.size << ")\n";
+            ss << "                        throw std::runtime_error(\"size mismatch unpacking list<bin> element in '" << f.name << "', expected " << *f.size << " bytes, got \" + std::to_string(elem.via.bin.size));\n";
+            ss << "                    std::array<uint8_t, " << *f.size << "> item{};\n";
+            ss << "                    std::memcpy(item.data(), elem.via.bin.ptr, " << *f.size << ");\n";
+        } else {
+            ss << "                    std::vector<uint8_t> item(elem.via.bin.ptr, elem.via.bin.ptr + elem.via.bin.size);\n";
+        }
+        ss << "                    " << f.name << ".push_back(std::move(item));\n";
+        ss << "                }\n";
+        ss << "            }\n";
+    } else {
         ss << "            val_obj.convert(" << f.name << ");\n";
     }
-
     ss << "        }";
     return ss.str();
 }
@@ -123,6 +155,15 @@ bool JobUtilMsgPack::unpackFieldValue(const msgpack::object &obj, FieldValue &ou
         break;
     case msgpack::type::STR:
         out_fv.value = FieldValue::Scalar{obj.as<std::string>()};
+        break;
+    case msgpack::type::BOOLEAN:
+        out_fv.value = FieldValue::Scalar{obj.as<bool>()};
+        break;
+    case msgpack::type::FLOAT32:
+        out_fv.value = FieldValue::Scalar{obj.as<float>()};
+        break;
+    case msgpack::type::FLOAT64:
+        out_fv.value = FieldValue::Scalar{obj.as<double>()};
         break;
     case msgpack::type::BIN:
         out_fv.value = FieldValue::Binary(obj.via.bin.ptr, obj.via.bin.ptr + obj.via.bin.size);

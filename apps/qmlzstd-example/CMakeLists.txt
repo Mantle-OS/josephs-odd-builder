@@ -12,7 +12,6 @@ qt_add_executable(qml-zstd-example
 qt_add_qml_module(qml-zstd-example
     URI QZstdExample
     VERSION 1.0
-    SOURCES
     QML_FILES
         main.qml
         ZStdPage.qml
@@ -34,4 +33,6 @@ target_link_libraries(qml-zstd-example PRIVATE
 
 install(TARGETS qml-zstd-example
     BUNDLE DESTINATION .
-    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+)

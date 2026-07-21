@@ -50,7 +50,7 @@ bool QZstdSign::signFile(const QString &inPath, const QString &outPath, bool ove
     return job::zstd::JobZstdSign::signFile(in, out, overwrite);
 }
 
-bool QZstdSign::verifyFile(const QString &filePath, const QString &signatureBase64) noexcept
+bool QZstdSign::verifyFile(const QString &filePath, const QString &signatureBase64)
 {
     syncOptions();
     std::filesystem::path p(filePath.toStdString());

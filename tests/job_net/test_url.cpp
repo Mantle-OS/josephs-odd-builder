@@ -66,16 +66,26 @@ TEST_CASE("JobUrl supports base64-encoded password output", "[job_url][password]
     url.setPassword("s3cr3t");
 
     url.setbase64EncodePwd(true);
-    url.setPasswdMode(JobUrl::PasswdMode::Strict);
 
     std::string base64String = url.password(true);
     REQUIRE(!base64String.empty());
-    REQUIRE(base64String.find("s3cr3t") == std::string::npos); // must be encoded
+    REQUIRE(base64String.find("s3cr3t") == std::string::npos); // must be encoded, never raw
 
-    // Lenient mode returns decoded readable form
+    // password() no longer depends on PasswdMode at all -- same output either way
     url.setPasswdMode(JobUrl::PasswdMode::Lenient);
-    std::string readable = url.password(true);
-    REQUIRE(readable == "s3cr3t");
+    REQUIRE(url.password(true) == base64String);
+    url.setPasswdMode(JobUrl::PasswdMode::Strict);
+    REQUIRE(url.password(true) == base64String);
+
+    // Masked form when base64 output isn't requested
+    url.setbase64EncodePwd(false);
+    REQUIRE(url.password(true) == "********");
+
+    // The only way to reach the raw secret is via direct JobSecureMem access
+    const auto *secure = url.passwordSecure();
+    REQUIRE(secure != nullptr);
+    REQUIRE(secure->size() == std::string("s3cr3t").size());
+    REQUIRE(std::memcmp(secure->data(), "s3cr3t", secure->size()) == 0);
 }
 
 TEST_CASE("JobUrl handles missing components gracefully", "[job_url][minimal]") {

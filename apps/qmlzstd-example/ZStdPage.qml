@@ -177,11 +177,10 @@ Page {
                 enabled: asyncPrivate.hasSource
 
                 onClicked: {
-                    if (asyncPrivate.isCompressing) {
+                    if (asyncPrivate.isCompressing)
                         QmlZstd.compress(checkSignAction.checked, checkCryptoAction.checked)
-                    } else {
+                    else
                         QmlZstd.decompress(checkSignAction.checked, checkCryptoAction.checked)
-                    }
                 }
             }
         }
@@ -199,13 +198,12 @@ Page {
 
             QmlZstd.input = cleanPath
 
-            if (asyncPrivate.isCompressing) {
+            if (asyncPrivate.isCompressing)
                 QmlZstd.output = cleanPath + ".pkg"
-            } else if (cleanPath.endsWith(".pkg")) {
+            else if (cleanPath.endsWith(".pkg"))
                 QmlZstd.output = cleanPath.substring(0, cleanPath.length - 4) + ".extracted"
-            } else {
+            else
                 QmlZstd.output = cleanPath + ".extracted"
-            }
             asyncPrivate.hasSource = true
         }
     }

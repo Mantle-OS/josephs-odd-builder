@@ -3,19 +3,22 @@
 #include <streambuf>
 #include <istream>
 #include <string>
-#include <cstddef>
 
-#include "job_secure_mem.h"
-
+#include <job_secure_mem.h>
+#include "jobzstd_export.h"
 namespace job::zstd {
-class JobZstdDecryptingTransport : public std::streambuf
+class JOBZSTD_EXPORT JobZstdDecryptingTransport : public std::streambuf
 {
 public:
     JobZstdDecryptingTransport(std::streambuf *downstream, const job::crypto::JobSecureMem &key);
+    JobZstdDecryptingTransport( const JobZstdDecryptingTransport & ) = delete;
+    JobZstdDecryptingTransport &operator=( const JobZstdDecryptingTransport & ) = delete;
+    JobZstdDecryptingTransport( JobZstdDecryptingTransport && ) = delete;
+    JobZstdDecryptingTransport &operator=( JobZstdDecryptingTransport && ) = delete;
+
     [[nodiscard]] bool atEnd() const noexcept;
     [[nodiscard]] bool wasTruncated() const noexcept { return m_truncated; }
     [[nodiscard]] bool hadAuthenticationError() const noexcept { return m_authFailed; }
-
     [[nodiscard]] const std::string &errorString() const noexcept { return m_errorString; }
 
 protected:

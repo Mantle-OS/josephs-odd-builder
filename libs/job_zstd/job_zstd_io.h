@@ -7,13 +7,13 @@
 #include <cstddef>
 
 #include "job_zstd_options.h"
-
+#include "jobzstd_export.h"
 typedef struct ZSTD_CCtx_s ZSTD_CStream;
 typedef struct ZSTD_DCtx_s ZSTD_DStream;
 
 namespace job::zstd {
 
-class JobZstdIO : public std::streambuf
+class JOBZSTD_EXPORT JobZstdIO : public std::streambuf
 {
 public:
     enum class Mode { ReadOnly, WriteOnly };

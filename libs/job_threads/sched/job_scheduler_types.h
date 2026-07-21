@@ -8,4 +8,3 @@ enum class SchedulerType {
     Sporadic
 };
 } //namespace job::threads
-// CHECKPOINT v1.0

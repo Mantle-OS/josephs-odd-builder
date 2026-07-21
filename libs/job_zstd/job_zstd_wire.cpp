@@ -1,5 +1,5 @@
 #include "job_zstd_wire.h"
-
+#include <cstddef>
 namespace job::zstd::utils {
 
 void writeU8(std::ostream &out, std::uint8_t value)
@@ -72,4 +72,4 @@ bool readString(std::istream &in, std::string &value)
 
     return true;
 }
-} // namespace job::zstd::detail
+} // namespace job::zstd::utils

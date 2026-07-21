@@ -3,8 +3,8 @@
 #include <QStringListModel>
 #include <QQmlEngine>
 #include <QObject>
-
-class QmlStringList : public QStringListModel
+#include "qmlaiutils_export.h"
+class QMLAIUTILS_EXPORT QmlStringList : public QStringListModel
 {
     Q_OBJECT
     QML_ELEMENT

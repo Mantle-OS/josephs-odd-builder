@@ -1,9 +1,14 @@
 #pragma once
 #include <QObject>
 #include <QString>
+
 #include <property-macros.h>
+
 #include <job_zstd_options.h>
-class QZstdOptions : public QObject
+
+#include "qzstd_export.h"
+
+class QZSTD_EXPORT QZstdOptions : public QObject
 {
     Q_OBJECT
 
@@ -18,12 +23,12 @@ class QZstdOptions : public QObject
     QP_RO(QString,  errorString,                ""                                                      )
 
 public:
-    QZstdOptions(QObject *parent = nullptr) :
+    explicit QZstdOptions(QObject *parent = nullptr) :
         QObject{parent}
     {
 
     }
-    QZstdOptions(const job::zstd::JobZstdOptions &other, QObject *parent = nullptr) :
+    explicit QZstdOptions(const job::zstd::JobZstdOptions &other, QObject *parent = nullptr) :
         QObject{parent}
     {
         *this = other;
@@ -43,17 +48,26 @@ public:
             && get_recursiveDirectories()       == other.get_recursiveDirectories()
             && get_errorString()                == other.get_errorString();
     }
-    [[nodiscard]] bool operator==(const job::zstd::JobZstdOptions &other) const noexcept
+    [[nodiscard]] bool operator==( const job::zstd::JobZstdOptions &other ) const
     {
-        return get_input()                      == other.input()
-        && get_output()                         == other.output()
-            && get_current()                    == other.current()
-            && get_total()                      == other.total()
-            && get_compressionLevel()           == other.compressionLevel()
-            && get_preserveEmptyDirectories()   == other.preserveEmptyDirectories()
-            && get_preserveSymlinks()           == other.preserveSymlinks()
-            && get_recursiveDirectories()       == other.recursiveDirectories()
-            && get_errorString()                == other.errorString();
+        return get_input() ==
+                   QString::fromStdString(other.input())
+               && get_output() ==
+                      QString::fromStdString(other.output())
+               && get_current() ==
+                      other.current()
+               && get_total() ==
+                      other.total()
+               && get_compressionLevel() ==
+                      other.compressionLevel()
+               && get_preserveEmptyDirectories() ==
+                      other.preserveEmptyDirectories()
+               && get_preserveSymlinks() ==
+                      other.preserveSymlinks()
+               && get_recursiveDirectories() ==
+                      other.recursiveDirectories()
+               && get_errorString() ==
+                      QString::fromStdString(other.errorString());
     }
 
     [[nodiscard]] bool operator!=(const QZstdOptions &other) const noexcept

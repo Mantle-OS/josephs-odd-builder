@@ -1,7 +1,10 @@
 #include "qconcurrentprocess.h"
-#include <QtConcurrent/QtConcurrentRun>
+
 #include <QProcess>
+#include <QThread>
 #include <QDebug>
+
+#include <QtConcurrent/QtConcurrentRun>
 
 QConcurrentProcess::QConcurrentProcess(QObject *parent) :
     QObject{parent},

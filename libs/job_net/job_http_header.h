@@ -7,10 +7,10 @@
 #include <vector>
 
 #include "job_iana.h"
-
+#include "jobnet_export.h"
 namespace job::net {
 
-class JobHttpHeader {
+class JOBNET_EXPORT JobHttpHeader {
 public:
 
     JobHttpHeader();

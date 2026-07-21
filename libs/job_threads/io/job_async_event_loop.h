@@ -11,10 +11,10 @@
 
 #include "job_thread.h"
 #include "job_task_queue.h"
-
+#include "jobthreads_export.h"
 namespace job::threads {
 
-class AsyncEventLoop {
+class JOBTHREADS_EXPORT AsyncEventLoop {
 public:
     AsyncEventLoop();
     virtual ~AsyncEventLoop() noexcept;

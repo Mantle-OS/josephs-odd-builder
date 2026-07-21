@@ -16,8 +16,8 @@
 #include "qsodiumsecretbox.h"
 #include "qsodiumhash.h"
 
-
-class QSodium : public QObject
+#include "qsodium_export.h"
+class QSODIUM_EXPORT QSodium : public QObject
 {
     Q_OBJECT
     Q_PROPERTY(bool initialized READ isInitialized NOTIFY initializationChanged)
@@ -27,10 +27,6 @@ public:
     ~QSodium() override = default;
 
     bool isInitialized() const noexcept;
-
-    // bool verifyFileSignature(const QString &filePath,
-    //                          const QString &publicKeyBase64,
-    //                          const QString &signatureBase64) noexcept;
 
     QString computeFileBlake2b(const QString &filePath) noexcept;
 

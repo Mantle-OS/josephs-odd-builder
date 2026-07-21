@@ -289,6 +289,7 @@ set(JOBAI_CACHE_SOURCES)
 
 ################### END IMP,DECL ################################
 
+
 add_library(JosephsOddBuilder_Ai SHARED
     # modules
     ${JOBAI_ADAPTERS_HEADERS}   ${JOBAI_ADAPTERS_SOURCES}

@@ -102,6 +102,46 @@ bool JobCryptoSign::signAssociatedFile(const std::string &associatedPath, std::s
     return signFile(associatedPath, outSignatureBase64);
 }
 
+bool JobCryptoSign::verifyFile(const std::string &filePath, const std::string &signatureBase64) noexcept
+{
+    std::vector<unsigned char> sigBin;
+    if (!crypto::utils::base64ToBin(sigBin, signatureBase64))
+        return false;
+    return verifyFile(filePath, sigBin);
+}
+
+bool JobCryptoSign::verifyFile(const std::string &filePath, const std::vector<unsigned char> &signatureBytes) noexcept
+{
+    if (signatureBytes.empty() || signatureBytes.size() != crypto_sign_BYTES)
+        return false;
+
+    std::vector<unsigned char> pubKeyBin;
+    if (!crypto::utils::base64ToBin(pubKeyBin, publicKey()))
+        return false;
+
+    if (pubKeyBin.size() != crypto_sign_PUBLICKEYBYTES)
+        return false;
+
+    std::ifstream stream(filePath, std::ios::binary);
+    if (!stream.is_open())
+        return false;
+
+    crypto_sign_state state;
+    crypto_sign_init(&state);
+
+    std::vector<char> buffer(kChunkSize);
+    while (stream.read(buffer.data(), kChunkSize) || stream.gcount() > 0) {
+        crypto_sign_update(&state,
+                           reinterpret_cast<const unsigned char*>(buffer.data()),
+                           stream.gcount());
+    }
+
+    int const result = crypto_sign_final_verify(&state,
+                                                signatureBytes.data(),
+                                                pubKeyBin.data());
+    return (result == 0);
+}
+
 
 
 bool JobCryptoSign::verifyAssociatedFile(const std::string &signatureBase64) noexcept
@@ -127,6 +167,82 @@ bool JobCryptoSign::verifyAssociatedFile(const std::string &signatureBase64) noe
         m_file->close();
 
     return result;
+}
+
+bool JobCryptoSign::signBuffer(const std::vector<uint8_t> &buffer, std::string &outSignatureBase64) noexcept
+{
+    return signBuffer(buffer.data(), buffer.size(), outSignatureBase64);
+}
+
+bool JobCryptoSign::signBuffer(const uint8_t *data, std::size_t size, std::string &outSignatureBase64) noexcept
+{
+    if (!data && size > 0)
+        return false;
+
+    if (!isValid() || privateKey().size() != crypto_sign_SECRETKEYBYTES) {
+#ifndef NDEBUG
+        std::cerr << "[jobcrypto::JobCryptoSign] Invalid key state context for buffer signing.\n";
+#endif
+        return false;
+    }
+
+    crypto_sign_state state;
+    crypto_sign_init(&state);
+
+    // Who's the boss? The single-pass buffer layout
+    if (size > 0) {
+        crypto_sign_update(&state, reinterpret_cast<const unsigned char*>(data), size);
+    }
+
+    std::vector<unsigned char> sigBin(crypto_sign_BYTES);
+    unsigned long long sigLen = 0;
+
+    if (crypto_sign_final_create(&state, sigBin.data(), &sigLen, privateKey().data()) != 0)
+        return false;
+
+    std::string outB64(sodium_base64_encoded_len(sigBin.size(), sodium_base64_VARIANT_ORIGINAL), '\0');
+    sodium_bin2base64(outB64.data(), outB64.size(), sigBin.data(), sigBin.size(), sodium_base64_VARIANT_ORIGINAL);
+
+    if (!outB64.empty() && outB64.back() == '\0')
+        outB64.pop_back();
+
+    outSignatureBase64 = std::move(outB64);
+    return true;
+}
+
+bool JobCryptoSign::verifyBuffer(const std::vector<uint8_t> &buffer, const std::string &signatureBase64) noexcept
+{
+    std::vector<unsigned char> sigBin;
+    if (!crypto::utils::base64ToBin(sigBin, signatureBase64))
+        return false;
+
+    return verifyBuffer(buffer.data(), buffer.size(), sigBin);
+}
+
+bool JobCryptoSign::verifyBuffer(const uint8_t *data, std::size_t size, const std::vector<uint8_t> &signatureBytes) noexcept
+{
+    if (!data && size > 0)
+        return false;
+
+    if (signatureBytes.empty() || signatureBytes.size() != crypto_sign_BYTES)
+        return false;
+
+    std::vector<unsigned char> pubKeyBin;
+    if (!crypto::utils::base64ToBin(pubKeyBin, publicKey()))
+        return false;
+
+    if (pubKeyBin.size() != crypto_sign_PUBLICKEYBYTES)
+        return false;
+
+    crypto_sign_state state;
+    crypto_sign_init(&state);
+
+    if (size > 0) {
+        crypto_sign_update(&state, reinterpret_cast<const unsigned char*>(data), size);
+    }
+
+    int const result = crypto_sign_final_verify(&state, signatureBytes.data(), pubKeyBin.data());
+    return (result == 0);
 }
 
 } // namespace job::crypto

@@ -1,27 +1,30 @@
 #pragma once
 
 #include <QObject>
+#include <QString>
+#include <QMap>
 #include <QUrl>
 #include <QQueue>
 #include <QUrlQuery>
-#include <QJsonDocument>
 #include <QJsonObject>
 
 #include <QNetworkAccessManager>
 #include <QNetworkRequest>
 
-#include <QPromise>
 #include <QFuture>
+#include <QPromise>
 
 #include "property-macros.h"
 
-class QJsonApiClient : public QObject {
+#include "qaiutils_export.h"
+
+class QAIUTILS_EXPORT QJsonApiClient : public QObject {
     QP_RW(QString   , baseUrl           , ""        )
     QP_RW(bool      , testing           , false     )
     QP_RW(bool      , anonymous         , true      )
     QP_RW(bool      , busy              , false     )
     QP_RW(int       , maxRedirects      , -1        )
-    QP_RW(QString   , token             , ""        )
+    QP_RW(QString   , token             , ""        ) // Later this will be QSecureMem even though it is almost impopssible to not expose this to memory becasue networking is stupid on this end.
     Q_OBJECT
 public:
     explicit QJsonApiClient(QObject *parent = nullptr);
@@ -61,7 +64,8 @@ public:
 protected:
   QP_RW(AuthType, authtype, AuthType::None)
   QUrl setupUrl();
-  virtual void prepareSecureHeaders(QNetworkRequest &req, QJsonApiClient::AuthType authType) {
+  virtual void prepareSecureHeaders(QNetworkRequest &req, QJsonApiClient::AuthType authType)
+  {
       Q_UNUSED(req);
       Q_UNUSED(authType);
   }

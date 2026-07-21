@@ -1,6 +1,23 @@
 #include "qmlsodiumkeys.h"
 #include <QDebug>
 
+QmlSodiumKeys::QmlSodiumKeys(QObject *parent) :
+    QObject{parent},
+    m_keys{new QSodiumKeys{}}
+{
+    // Safe value capture of the 'this' object instance context pointer
+    connect(this, &QmlSodiumKeys::publicKeyBase64Changed, this, [this](const QString &key){
+        if (m_keys)
+            m_keys->setPublicKey(key);
+    });
+}
+
+QmlSodiumKeys::~QmlSodiumKeys()
+{
+    delete m_keys;
+    m_keys = nullptr;
+}
+
 QString QmlSodiumKeys::getFullPath(const QString &fileName) const noexcept
 {
     if (get_keyDir().isEmpty() || fileName.isEmpty())
@@ -11,6 +28,7 @@ QString QmlSodiumKeys::getFullPath(const QString &fileName) const noexcept
     }
     return get_keyDir() + "/" + fileName;
 }
+
 
 bool QmlSodiumKeys::create(QmlSodiumKeys::KeyType type) noexcept
 {
@@ -24,6 +42,11 @@ bool QmlSodiumKeys::create(QmlSodiumKeys::KeyType type) noexcept
 
     set_publicKeyBase64(m_keys->publicKey());
     return true;
+}
+
+bool QmlSodiumKeys::validSet() noexcept
+{
+    return m_keys && m_keys->isValid();
 }
 
 bool QmlSodiumKeys::saveKeysToDisk() noexcept
@@ -40,11 +63,7 @@ bool QmlSodiumKeys::saveKeysToDisk() noexcept
         qWarning() << "[QmlSodiumKeys] Target key file path variables have not been configured.";
         return false;
     }
-    return m_keys->saveKeys(
-        get_keyDir(),
-        pubPath,
-        priPath
-        );
+    return m_keys->saveKeys(get_keyDir(), pubPath, priPath);
 }
 
 bool QmlSodiumKeys::loadKeysFromDisk() noexcept
@@ -55,5 +74,21 @@ bool QmlSodiumKeys::loadKeysFromDisk() noexcept
     QString const pubPath = getFullPath(get_publicKeyFile());
     QString const priPath = getFullPath(get_privateKeyFile());
 
+    if (pubPath.isEmpty() || priPath.isEmpty()) {
+        qWarning() << "[QmlSodiumKeys] Source key file path variables have not been configured.";
+        return false;
+    }
+
     return m_keys->loadKeysFromDisk(pubPath, priPath);
 }
+
+// bool QmlSodiumKeys::loadKeysFromDisk() noexcept
+// {
+//     if (!m_keys)
+//         return false;
+
+//     QString const pubPath = getFullPath(get_publicKeyFile());
+//     QString const priPath = getFullPath(get_privateKeyFile());
+
+//     return m_keys->loadKeysFromDisk(pubPath, priPath);
+// }

@@ -52,13 +52,15 @@ void FmmAdapter::adapt(threads::ThreadPool &pool,
                                )
 {
     const size_t B = static_cast<size_t>(shape.batch);
-    for(size_t i = 0; i <= B; ++i)
+    for(size_t i = 0; i < B; ++i)
         apply(pool, shape, sources, output, i);
 }
 
 
 
-void FmmAdapter::apply(threads::ThreadPool &pool, const cords::AttentionShape &shape, const cords::ViewR &sources,
+void FmmAdapter::apply(threads::ThreadPool &pool,
+                       const cords::AttentionShape &shape,
+                       const cords::ViewR &sources,
                        /*const ViewR &targets,*/
                        cords::ViewR &output,  std::size_t size)
 {

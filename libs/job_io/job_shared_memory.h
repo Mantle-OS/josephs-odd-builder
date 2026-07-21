@@ -3,8 +3,8 @@
 #include <string>
 #include <sys/mman.h>
 
-#include <io_base.h>
-#include <job_permissions.h>
+#include <io_base.h>         // not corss platform
+#include <job_permissions.h> // not cross platform
 
 #include <job_semaphore.h>
 #include <job_shared_memory_header.h>

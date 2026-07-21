@@ -5,11 +5,8 @@ import QtQuick.Dialogs
 import Sodium
 
 Page {
-    id: rootKeyPage
-
     QmlSodiumKeys {
         id: keys
-        // Set up clean initial tracking filenames for the runtime tests
         publicKeyFile: "identity.pub"
         privateKeyFile: "identity.key"
     }
@@ -31,7 +28,7 @@ Page {
                     readOnly: true
                     Layout.fillWidth: true
                     text: keys.keyDir
-                    placeholderText: "No directory selected..."
+                    placeholderText: qsTr("No directory selected...")
                 }
                 Button {
                     text: qsTr("Browse...")
@@ -46,10 +43,7 @@ Page {
                     id: typeBox
                     Layout.fillWidth: true
                     model: ["Exchange", "Sign"]
-                    // Fixed: Use onActivated to trap genuine drop-down changes instantly
-                    onActivated: (index) => {
-                        createBtn.keyType = index
-                    }
+                    onActivated: (index) => { createBtn.keyType = index }
                 }
             }
 
@@ -74,11 +68,9 @@ Page {
                     text: qsTr("Generate Keypair")
                     onClicked: {
                         signDialog.title = qsTr("Key Generation Matrix")
-                        if (keys.create(keyType)) {
-                            signDialog.informativeText = qsTr("Keypair successfully minted in RAM.")
-                        } else {
-                            signDialog.informativeText = qsTr("Generation failed! Enforce init checks.")
-                        }
+                        signDialog.informativeText = keys.create(keyType) ?
+                            qsTr("Keypair successfully minted in RAM."):
+                            qsTr("Generation failed! Enforce init checks.")
                         signDialog.open()
                     }
                 }
@@ -87,11 +79,9 @@ Page {
                     text: qsTr("Save to Disk")
                     onClicked: {
                         signDialog.title = qsTr("Disk Sync Export")
-                        if (keys.saveKeysToDisk()) {
-                            signDialog.informativeText = qsTr("Keys exported securely onto storage track.")
-                        } else {
-                            signDialog.informativeText = qsTr("Failed to save keys. Verify dir permissions.")
-                        }
+                        signDialog.informativeText = keys.saveKeysToDisk() ?
+                            qsTr("Keys exported securely onto storage track.") :
+                            qsTr("Failed to save keys. Verify dir permissions.")
                         signDialog.open()
                     }
                 }
@@ -100,11 +90,9 @@ Page {
                     text: qsTr("Load From Disk")
                     onClicked: {
                         signDialog.title = qsTr("Disk Sync Import")
-                        if (keys.loadKeysFromDisk()) {
-                            signDialog.informativeText = qsTr("Keys loaded! Private memory array locked.")
-                        } else {
-                            signDialog.informativeText = qsTr("Import aborted. Files missing or malformed.")
-                        }
+                        signDialog.informativeText = keys.loadKeysFromDisk() ?
+                            qsTr("Keys loaded! Private memory array locked.") :
+                            qsTr("Import aborted. Files missing or malformed.")
                         signDialog.open()
                     }
                 }
@@ -113,11 +101,9 @@ Page {
                     text: qsTr("Validate State")
                     onClicked: {
                         signDialog.title = qsTr("Cryptographic Integrity Pass")
-                        if (keys.validSet()) {
-                            signDialog.informativeText = qsTr("VALID: Active memory blocks match correctly.")
-                        } else {
-                            signDialog.informativeText = qsTr("INVALID: Key descriptors are empty or disjointed.")
-                        }
+                        signDialog.informativeText = keys.validSet() ?
+                            qsTr("VALID: Active memory blocks match correctly.") :
+                            qsTr("INVALID: Key descriptors are empty or disjointed.")
                         signDialog.open()
                     }
                 }
@@ -129,11 +115,9 @@ Page {
     FolderDialog {
         id: dirPicker
         onAccepted: {
-            // Convert file URL schema to clean standard absolute system paths for C++ consumption
             let pathStr = selectedFolder.toString();
-            if (pathStr.startsWith("file://")) {
+            if (pathStr.startsWith("file://"))
                 pathStr = pathStr.replace("file://", "");
-            }
             keys.keyDir = pathStr;
         }
     }
@@ -143,16 +127,15 @@ Page {
         property string request: "public"
         onAccepted: {
             let pathStr = selectedFile.toString();
-            if (pathStr.startsWith("file://")) {
-                pathStr = pathStr.replace("file://", "");
-            }
 
-            // Fixed: Repaired duplicate conditional statement evaluation check logic
-            if (request === "private") {
+            if (pathStr.startsWith("file://"))
+                pathStr = pathStr.replace("file://", "");
+
+            if (request === "private")
                 keys.privateKeyFile = pathStr
-            } else if (request === "public") {
+            else if (request === "public")
                 keys.publicKeyFile = pathStr
-            }
+
         }
     }
 

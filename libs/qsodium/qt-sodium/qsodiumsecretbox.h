@@ -3,12 +3,12 @@
 #include <QByteArray>
 
 #include "qsecuremem.h"
-
-class QSodiumSecretBox {
+#include "qsodium_export.h"
+class QSODIUM_EXPORT QSodiumSecretBox {
 public:
     QSodiumSecretBox() = default;
     ~QSodiumSecretBox() = default;
-
+    // [[BACKLOG]] Fab 5 later if need be
     [[nodiscard]] static bool encrypt(const QByteArray &plainText,
                                       const QSecureMem &key,
                                       QByteArray &outCipherText,

@@ -11,19 +11,36 @@ set(JOBTHREADS_HEADERS
     job_thread_watcher.h
     job_semaphore.h
 )
+
 set(JOBTHREADS_SOURCES
-    job_thread.cpp
     job_thread_pool.cpp
     job_thread_watcher.cpp
 )
-
+if(JOB_WINDOWS)
+    set(OPAQUE_THREAD_PROVIDER
+        win32/job_thread_win32.cpp
+        win32/job_semaphore_win32.cpp
+        win32/job_io_async_thread_win32.cpp
+    )
+elseif(JOB_LINUX)
+    set(OPAQUE_THREAD_PROVIDER
+        posix/job_thread_posix.cpp
+        posix/job_semaphore_posix.cpp
+        posix/job_io_async_thread_posix.cpp
+    )
+else()
+    message(FATAL_ERROR "JobThreads can not be built with out a OPAQUE_THREAD_PROVIDER, Must be on Linux or Windows for now Apple and BSD are not yest supported")
+endif()
+list(APPEND JOBTHREADS_SOURCES ${OPAQUE_THREAD_PROVIDER})
 
 # UTILS
 set(JOBTHREADS_UTILS_HEADERS
     utils/job_thread_options.h
     utils/job_thread_args.h
     utils/job_thread_metrics.h
+
     utils/job_latch.h
+
     utils/job_parallel_for.h
     utils/job_parallel_reduce.h
 
@@ -88,12 +105,15 @@ set(JOBTHREADS_DESCR_SOURCES
 
 # ASYNC IO
 set(JOBTHREADS_IO_HEADERS
+    io/job_io_event.h
     io/job_async_event_loop.h
     io/job_io_async_thread.h
 )
 set(JOBTHREADS_IO_SOURCES
     io/job_async_event_loop.cpp
-    io/job_io_async_thread.cpp
+    # io/job_io_async_thread.cpp
+
+
 )
 
 
@@ -107,6 +127,8 @@ set(JOBTHREADS_CTX_HEADERS
 set(JOBTHREADS_CTX_SOURCES)
 
 
+set(JOBTHREADS_EXPORT ${CMAKE_CURRENT_BINARY_DIR}/jobthreads_export.h)
+
 add_library(JosephsOddBuilder_Threads SHARED
     ${JOBTHREADS_HEADERS}       ${JOBTHREADS_SOURCES}
     ${JOBTHREADS_UTILS_HEADERS} ${JOBTHREADS_UTILS_SOURCES}
@@ -117,17 +139,30 @@ add_library(JosephsOddBuilder_Threads SHARED
     ${JOBTHREADS_CTX_HEADERS}   ${JOBTHREADS_CTX_SOURCES}
 )
 
+generate_export_header(JosephsOddBuilder_Threads
+    BASE_NAME JOBTHREADS
+    EXPORT_FILE_NAME "${JOBTHREADS_EXPORT}"
+)
+
 set_target_properties(JosephsOddBuilder_Threads PROPERTIES
     VERSION ${PROJECT_VERSION}
     SOVERSION ${PROJECT_VERSION_MAJOR}
     OUTPUT_NAME "jobthreads"
+    CXX_VISIBILITY_PRESET hidden
+    VISIBILITY_INLINES_HIDDEN ON
 )
+
+if(JOB_LINUX)
+    target_link_libraries(JosephsOddBuilder_Threads PUBLIC atomic)
+elseif(JOB_WINDOWS)
+    target_link_libraries(JosephsOddBuilder_Threads PUBLIC ws2_32)
+endif()
 
 target_link_libraries(JosephsOddBuilder_Threads PUBLIC
     Threads::Threads
-    atomic
     JosephsOddBuilder_Core
 )
+
 target_include_directories(JosephsOddBuilder_Threads PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/utils>
@@ -136,6 +171,8 @@ target_include_directories(JosephsOddBuilder_Threads PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/descr>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/io>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/ctx>
+    ## export file
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
     ## install paths
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobthreads>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobthreads/utils>
@@ -154,6 +191,7 @@ install(TARGETS JosephsOddBuilder_Threads
     INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 )
 
+install(FILES ${JOBTHREADS_EXPORT}          DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobthreads )
 install(FILES ${JOBTHREADS_HEADERS}         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobthreads )
 install(FILES ${JOBTHREADS_UTILS_HEADERS}   DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobthreads/utils )
 install(FILES ${JOBTHREADS_QUEUE_HEADERS}   DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobthreads/queue )
@@ -161,7 +199,6 @@ install(FILES ${JOBTHREADS_SCHED_HEADERS}   DESTINATION ${CMAKE_INSTALL_INCLUDED
 install(FILES ${JOBTHREADS_DESCR_HEADERS}   DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobthreads/descr )
 install(FILES ${JOBTHREADS_IO_HEADERS}      DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobthreads/io )
 install(FILES ${JOBTHREADS_CTX_HEADERS}     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobthreads/ctx )
-
 
 set(PKGCONFIG_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/pkgconfig")
 set(PKGCONFIG_FILE "${CMAKE_CURRENT_BINARY_DIR}/jobthreads.pc")

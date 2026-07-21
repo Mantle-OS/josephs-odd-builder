@@ -2,13 +2,14 @@
 
 #include <algorithm>
 
+//  m_memory->mem()->() (64)
+// Pre-allocates QmlSecureMem ->  via QSecureMem{64} -> JobSecureMem
 QmlSecureMemInput::QmlSecureMemInput(QQuickItem *parent) :
     QQuickItem{parent},
      m_memory{new QmlSecureMem{this}}
 {
     setImplicitWidth(240);
     setImplicitHeight(32);
-    //  m_memory->mem()->() (64) // Pre-allocates QmlSecureMem -->  via QSecureMem{64} -> JobSecureMem
     setFlag(ItemHasContents, true);
     setFlag(ItemIsFocusScope, true);
     setAcceptedMouseButtons(Qt::LeftButton);
@@ -64,7 +65,7 @@ void QmlSecureMemInput::secureWipe() noexcept
     Q_EMIT secureWipeExecuted();
     update();
 
-    if (!rearmed) {
+    if (!rearmed){
         // LOG: QmlSecureMemInput failed to re-arm secure buffer after wipe.
     }
 }
@@ -98,7 +99,7 @@ void QmlSecureMemInput::keyPressEvent(QKeyEvent *event)
             --m_maskCount;
 
             // Zero out memory slice "safely"
-            std::memset(  m_memory->mem()->data() + m_byteCount, 0, bytesToRemove );
+            sodium_memzero(m_memory->mem()->data() + m_byteCount, bytesToRemove);
 
             Q_EMIT lengthChanged();
             update();
@@ -158,9 +159,11 @@ QColor QmlSecureMemInput::maskColor() const noexcept
 
 QSGNode *QmlSecureMemInput::updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *)
 {
-    // Add extra guards to return if impossible to draw
-    // if visible, (if width < 0 && if height < 0)
 
+    if (!isVisible() || width() <= 0.0 || height() <= 0.0) {
+        delete oldNode;
+        return nullptr;
+    }
 
     QSGNode *rootNode = oldNode;
 
@@ -231,7 +234,7 @@ QSGNode *QmlSecureMemInput::updatePaintNode(QSGNode *oldNode, UpdatePaintNodeDat
 
     float const dotSize = 10.0f;
     float const spacing = 16.0f;
-    float const startX = 15.0f;
+    float const startX  = 15.0f;
     float const centerY = h / 2.0f;
 
     int const visibleCount = std::max(0, std::min(m_maskCount, static_cast<int>((w - startX) / spacing)));

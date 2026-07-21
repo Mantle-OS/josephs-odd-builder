@@ -1,17 +1,15 @@
-// job_zstd_compressor_crypto.h
 #pragma once
 
 #include "job_zstd_compressor.h"
 #include "job_secure_mem.h"
-
+#include "jobzstd_export.h"
 namespace job::zstd {
 
-// Encrypted counterpart to JobZstdCompressor. The inner content is a
-// completely ordinary, unmodified job_zstd archive --
-// encryption is purely an outer envelope built on JobZstdEncryptingTransport. There is no
-// "this is encrypted" tag anywhere in the format: calling this class at
-// all is the caller's explicit declaration of intent.... Use the right tool for the JOB
-class JobZstdCompressorCrypto : public JobZstdCompressor
+// Encrypted counterpart to JobZstdCompressor. The inner content is a completely ordinary, unmodified job_zstd archive,
+// encryption is purely an outer envelope built on JobZstdEncryptingTransport.
+// There is no "this is encrypted" tag anywhere in the format: calling this class at all is the caller's explicit declaration of intent....
+// Use the right tool for the "JOB"
+class JOBZSTD_EXPORT JobZstdCompressorCrypto : public JobZstdCompressor
 {
 public:
     JobZstdCompressorCrypto() = default;

@@ -23,7 +23,8 @@ QString QSodium::computeFileBlake2b(const QString &filePath) noexcept
     if (!isInitialized())
         return {};
 
-    std::string const hexHash = m_cryptoBackend.computeFileBlake2bHex(filePath.toStdString());
+    std::filesystem::path const nativePath = QFileInfo(filePath).filesystemFilePath();
+    std::string const hexHash = m_cryptoBackend.computeFileBlake2bHex(nativePath.string());
     return QString::fromStdString(hexHash);
 }
 

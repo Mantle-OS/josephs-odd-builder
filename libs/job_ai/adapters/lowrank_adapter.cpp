@@ -5,7 +5,7 @@
 #include "ai_weights.h"
 #include "gemm.h"
 #include "matrix.h"
-
+// VERY VERY VERY ALPHA
 namespace job::ai::adapters {
 
 LowRankAdapter::LowRankAdapter(LowRankConfig cfg) :
@@ -50,8 +50,8 @@ void LowRankAdapter::adapt([[maybe_unused]]threads::ThreadPool &pool,
     const int S = shape.seq;
     const int D = shape.dim;
     size_t floatsPerBatch = static_cast<size_t>(D) * S + static_cast<size_t>(D) * D;
-    comp::AiWeights scratch(floatsPerBatch * B);
-    for(size_t i = 0; i <= size_t(B); i++)
+    cords::AiWeights scratch(floatsPerBatch * B);
+    for(size_t i = 0; i < size_t(B); i++)
         apply(S, D, sources, targets, values, output, scratch, floatsPerBatch, i);
 }
 
@@ -90,6 +90,5 @@ void LowRankAdapter::apply(int S, int D,
 
     comp::sgemmMatrix(Q, M, O, m_cfg.scale, 0.0f);
 }
-
 
 }

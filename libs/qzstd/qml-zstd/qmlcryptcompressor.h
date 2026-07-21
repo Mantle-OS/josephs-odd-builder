@@ -9,7 +9,8 @@
 #include "qzstdoptions.h"
 #include "qzstdcompressorcrypto.h"
 
-class QmlCyptoCompressor : public QZstdOptions
+#include "qmlzstd_export.h"
+class QMLZSTD_EXPORT QmlCyptoCompressor : public QZstdOptions
 {
     Q_OBJECT
     Q_PROPERTY(QmlSecureMem *password READ get_password NOTIFY passwordChanged)
@@ -24,13 +25,15 @@ public:
         m_comp = new QZstdCompressorCrypto{this};
     }
 
-    ~QmlCyptoCompressor()
+    ~QmlCyptoCompressor() override
     {
         if (m_password && m_password->mem())
             m_password->mem()->clear();
 
-        delete m_comp;
-        m_comp = nullptr;
+        if(m_comp) {
+            delete m_comp;
+            m_comp = nullptr;
+        }
     }
 
     Q_INVOKABLE bool compress(bool autoSalt = false)
@@ -49,7 +52,7 @@ public:
     }
 
     QmlSecureMem *get_password() noexcept { return m_password; }
-    Q_INVOKABLE bool setPassword(QmlSecureMem *source) noexcept
+    Q_INVOKABLE bool setPassword(QmlSecureMem *source)
     {
         return copyPasswordMemoryFrom(source);
     }
@@ -63,7 +66,7 @@ Q_SIGNALS:
     void passwordChanged();
 
 private:
-    bool deriveKey(QSecureMem &derivedKey) noexcept
+    bool deriveKey(QSecureMem &derivedKey)
     {
         if (!m_password || !m_password->internalBuffer() || m_password->internalBuffer()->empty())
             return false;
@@ -78,7 +81,7 @@ private:
         return QSodiumPasswordUtils::deriveKeyFromPassword(derivedKey, *m_password->internalBuffer(), saltBin);
     }
 
-    bool copyPasswordMemoryFrom(QmlSecureMem *source) noexcept
+    bool copyPasswordMemoryFrom(QmlSecureMem *source)
     {
         if (!source || !source->internalBuffer() || !m_password)
             return false;

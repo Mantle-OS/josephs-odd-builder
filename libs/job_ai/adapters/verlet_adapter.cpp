@@ -61,7 +61,7 @@ void VerletAdapter::adapt(
         return;
     std::shared_ptr<ThreadPool> poolPtr(&pool, [](void*){});
 
-    for(size_t i = 0; i <= size_t(B); ++i)
+    for(size_t i = 0; i < size_t(B); ++i)
         apply(S, D, poolPtr, sources, output, ctx, i);
 }
 

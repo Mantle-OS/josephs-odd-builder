@@ -6,11 +6,8 @@ import QZstd
 import Sodium
 
 Page {
-    id: cryptoPage
-
     QmlCyptoCompressor { id: encryptor }
     QmlCryptoDecompressor { id: decryptor }
-
 
     Item {
         width: parent.width * 0.85
@@ -84,9 +81,7 @@ Page {
                         Layout.alignment: Qt.AlignHCenter
                         text: qsTr("Compress and encrypt")
                         enabled: cryptoPrivate.encryptSource !== ""
-                        onClicked: {
-                            encryptPasswordPopup.open()
-                        }
+                        onClicked:  encryptPasswordPopup.open()
                     }
                 }
             }
@@ -147,9 +142,7 @@ Page {
                         Layout.alignment: Qt.AlignHCenter
                         text: qsTr("Decrypt and decompress")
                         enabled: cryptoPrivate.decryptSource !== "" && decryptor.salt !== ""
-                        onClicked: {
-                            decryptPasswordPopup.open()
-                        }
+                        onClicked:  decryptPasswordPopup.open()
                     }
                 }
             }
@@ -197,11 +190,10 @@ Page {
                 encryptPasswordInput.secureWipe()
                 encryptPasswordPopup.close()
 
-                if (encryptor.compress()) {
-                    resultDialog.text = qsTr("Compression and encryption complete.")
-                } else {
-                    resultDialog.text = qsTr("Failed: ") + encryptor.errorString
-                }
+                resultDialog.text = encryptor.compress() ?
+                            qsTr("Compression and encryption complete.") :
+                            qsTr("Failed: ") + encryptor.errorString
+
                 resultDialog.open()
             }
         }
@@ -246,12 +238,9 @@ Page {
             } else {
                 decryptPasswordInput.secureWipe()
                 decryptPasswordPopup.close()
-
-                if (decryptor.decompress()) {
-                    resultDialog.text = qsTr("Decryption and decompression complete.")
-                } else {
-                    resultDialog.text = qsTr("Failed: ") + decryptor.errorString
-                }
+                resultDialog.text = decryptor.decompress() ?
+                            qsTr("Decryption and decompression complete.") :
+                            qsTr("Failed: ") + decryptor.errorString
                 resultDialog.open()
             }
         }

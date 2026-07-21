@@ -85,9 +85,9 @@ bool PtyIO::openDevice()
         return false;
     }
 
-    // if (!m_loop->registerFD(m_masterFd, EPOLLIN, [this](uint32_t e) { onEvents(e); })) {
-    if (!m_loop->registerFD(m_masterFd, EPOLLIN | EPOLLERR | EPOLLHUP | EPOLLET, [this](uint32_t e) { onEvents(e); })) {
-
+    if (!m_loop->registerFD(m_masterFd,
+                            threads::IOEvent::Read | threads::IOEvent::Error | threads::IOEvent::HangUp | threads::IOEvent::EdgeTriggered,
+                            [this](threads::IOEvent e) { onEvents(e); })) {
         JOB_LOG_ERROR("[PtyIO] Failed to register FD with event loop!");
         setError(Error::LoopError);
         ::close(m_masterFd);
@@ -314,18 +314,19 @@ void PtyIO::setError(Error err)
 }
 
 
-void PtyIO::onEvents(uint32_t events)
+void PtyIO::onEvents(threads::IOEvent events)
 {
-    if (events & (POLLERR | POLLNVAL)) {
+    if (threads::hasEvent(events, threads::IOEvent::Error) ||
+        threads::hasEvent(events, threads::IOEvent::HangUp)) {
         setError(Error::ReadError);
         closeDevice(); // Fatal error, shut down
         return;
     }
-    if (events & POLLHUP) {
+    if (threads::hasEvent(events, threads::IOEvent::HangUp)) {
         closeDevice();
         return;
     }
-    if (events & POLLIN) {
+    if (threads::hasEvent(events, threads::IOEvent::Read)) {
         char buffer[4096];
         while(true) {
             ssize_t n = ::read(m_masterFd, buffer, sizeof(buffer));

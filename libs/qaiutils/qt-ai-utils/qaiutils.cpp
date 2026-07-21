@@ -5,6 +5,8 @@
 #include <QFile>
 #include <QDir>
 #include <QDebug>
+#include <QStringList>
+
 QAiUtils &QAiUtils::instance() {
     static QAiUtils instance;
     return instance;
@@ -37,41 +39,38 @@ void QAiUtils::debugPaths(){
     qDebug() << "Extra QML Dir:         " << QAiUtils::extraQmlDir;
 }
 
-bool QAiUtils::createDefaultDirs(){
-    int ret = 1;
-    QStringList dirs;
-    dirs.append(QAiUtils::baseDir);
-    dirs.append(QAiUtils::configsDir);
-    dirs.append(QAiUtils::jsonConfigsDir);
-    dirs.append(QAiUtils::yamlConfigsDir);
+bool QAiUtils::createDefaultDirs()
+{
+    QStringList const dirs{
+        baseDir,
+        configsDir,
+        jsonConfigsDir,
+        yamlConfigsDir,
+        appRuntimeDir,
+        logsDir,
+        outDir,
+        modelsDir,
+        checkpointsDir,
+        diffusionDir,
+        textEncoderDir,
+        lorasDir,
+        embeddingsDir,
+        controlNetDir,
+        upscaleModelDir,
+        vaeDir,
+        audioVaeDir,
+        packagesDir,
+        pluginsDir,
+        extraQmlDir,
+        userDir
+    };
 
-    dirs.append(QAiUtils::appRuntimeDir);
-    dirs.append(QAiUtils::logsDir);
-    dirs.append(QAiUtils::outDir);
+    for (const QString &dir : dirs) {
+        if (!createDir(dir))
+            return false;
+    }
 
-    dirs.append(QAiUtils::modelsDir);
-    dirs.append(QAiUtils::checkpointsDir);
-    dirs.append(QAiUtils::diffusionDir);
-    dirs.append(QAiUtils::textEncoderDir);
-    dirs.append(QAiUtils::lorasDir);
-    dirs.append(QAiUtils::embeddingsDir);
-    dirs.append(QAiUtils::controlNetDir);
-    dirs.append(QAiUtils::upscaleModelDir);
-    dirs.append(QAiUtils::vaeDir);
-    dirs.append(QAiUtils::audioVaeDir);
-
-    dirs.append(QAiUtils::packagesDir);
-
-    dirs.append(QAiUtils::pluginsDir);
-    dirs.append(QAiUtils::extraQmlDir);
-
-    dirs.append(QAiUtils::userDir);
-
-    for (const QString &dir : dirs)
-        if(createDir(dir))
-            ret = ret + 1;
-
-    return (ret == dirs.size());
+    return true;
 }
 
 bool QAiUtils::createDirFromFile(const QString &fileName){
@@ -157,20 +156,6 @@ bool QAiUtils::fileExists(const QString &filePath) {
 bool QAiUtils::dirExists(const QString &dirPath) {
     return QFile::exists(dirPath) && QFileInfo(dirPath).isDir();
 }
-
-// QString QAiUtils::hashFile(const QString &filePath, QCryptographicHash::Algorithm algo) {
-//     QFile file(filePath);
-//     if (!file.open(QIODevice::ReadOnly))
-//         return QString();
-
-//     QCryptographicHash hash(algo);
-//     if (!hash.addData(&file))
-//         return QString();
-
-//     file.close();
-//     QByteArray result = hash.result();
-//     return QString(result.toHex());
-// }
 
 QAiUtils::QAiUtils()
 {

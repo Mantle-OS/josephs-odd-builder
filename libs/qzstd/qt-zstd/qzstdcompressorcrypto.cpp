@@ -78,7 +78,7 @@ void QZstdCompressorCrypto::setOptions(QZstdOptions *other)
 }
 
 
-bool QZstdCompressorCrypto::compressAndEncrypt() noexcept
+bool QZstdCompressorCrypto::compressAndEncrypt()
 {
     if (!m_opts)
         return false; // no options object to report through at all
@@ -91,7 +91,7 @@ bool QZstdCompressorCrypto::compressAndEncrypt() noexcept
 
     bool const ok = execute();
     *m_opts = *this;
-    Q_EMIT m_opts->finished();
+    // Q_EMIT m_opts->finished();
     return ok;
 }
 void QZstdCompressorCrypto::disconnectOptionConnections() noexcept

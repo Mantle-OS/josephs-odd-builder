@@ -7,6 +7,8 @@
 
 #include <sodium.h>
 
+#include <job_logger.h>
+
 #include "job_crypto_init.h"
 
 namespace job::crypto {
@@ -16,7 +18,7 @@ JobSecureMem::JobSecureMem(size_t size)
     if (!JobCryptoInit::isInitialized()) {
         if (JobCryptoInit::initialize()) {
 #ifndef NDEBUG
-            std::clog << "[jobcrypto::JobSecureMem] Lazy initialized libsodium engine runtime natively.\n";
+            JOB_LOG_DEBUG("[jobcrypto::JobSecureMem] Lazy initialized libsodium engine runtime natively");
 #endif
         } else {
             std::cerr << "[jobcrypto::JobSecureMem] CRITICAL ERROR: Runtime initialization failure. Memory unavailable.\n";
@@ -29,10 +31,10 @@ JobSecureMem::JobSecureMem(size_t size)
     if (size > 0) {
         if (allocate(size)) {
 #ifndef NDEBUG
-            std::clog << "[jobcrypto::JobSecureMem] Secured " << size << " byte page allocation row.\n";
+            JOB_LOG_DEBUG("[jobcrypto::JobSecureMem] Secured {} byte page allocation row.", size);
 #endif
         } else {
-            std::cerr << "[jobcrypto::JobSecureMem] ERROR: Failed to lock down memory row for size: " << size << "\n";
+            JOB_LOG_ERROR("[jobcrypto::JobSecureMem] ERROR: Failed to lock down memory row for size: {}", size);
         }
     }
 }
@@ -149,16 +151,6 @@ void JobSecureMem::free() noexcept
     }
 }
 
-std::string JobSecureMem::toString() const
-{
-#if defined(JOB_SECUREMEM_ALLOW_STRING) && !defined(NDEBUG)
-    if (!m_data || m_size == 0)
-        return {};
-    return std::string(reinterpret_cast<const char*>(m_data), m_size);
-#else
-    throw std::runtime_error("JobSecureMem::toString() disabled in production builds");
-#endif
-}
 
 std::string JobSecureMem::toBase64(int variant) const
 {
@@ -182,7 +174,6 @@ std::string JobSecureMem::toBase64(int variant) const
     return out;
 }
 
-// job_secure_mem.cpp
 bool JobSecureMem::fromBase64(const std::string &encoded, int variant)
 {
     if (encoded.empty())
@@ -208,30 +199,6 @@ bool JobSecureMem::fromBase64(const std::string &encoded, int variant)
 
     sodium_memzero(temp.data(), temp.size());
     return true;
-}
-
-std::string JobSecureMem::fromBase64toString(const std::string &encoded, int variant) const
-{
-#if defined(JOB_SECUREMEM_ALLOW_STRING) && !defined(NDEBUG)
-    if (encoded.empty())
-        return {};
-
-    size_t const max_dec = (encoded.size() * 3) / 4 + 3;
-    JobSecureMem decodedBuffer(max_dec);
-
-    size_t outLen = 0;
-    if (sodium_base642bin(decodedBuffer.data(), decodedBuffer.size(),
-                          encoded.c_str(), encoded.size(),
-                          nullptr, &outLen, nullptr, variant) == 0)
-    {
-        return std::string(reinterpret_cast<char*>(decodedBuffer.data()), outLen);
-    }
-    return {};
-#else
-    static_cast<void>(encoded);
-    static_cast<void>(variant);
-    throw std::runtime_error("JobSecureMem::fromBase64toString() disabled in production builds");
-#endif
 }
 
 bool JobSecureMem::operator==(const JobSecureMem &other) const noexcept

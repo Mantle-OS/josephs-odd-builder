@@ -7,10 +7,10 @@
 #include "job_isched_policy.h"
 #include "descr/job_task_descriptor.h"
 #include "queue/job_mcmp_queue.h"
-
+#include "jobthreads_export.h"
 namespace job::threads {
 
-class JobWorkStealingScheduler : public ISchedPolicy {
+class JOBTHREADS_EXPORT JobWorkStealingScheduler : public ISchedPolicy {
 public:
     using Ptr = std::shared_ptr<JobWorkStealingScheduler>;
     using MPMCQueue = JobBoundedMPMCQueue<JobTaskDescriptor::Ptr>;
@@ -31,4 +31,4 @@ private:
 };
 
 } // namespace job::threads
-// CHECKPOINT v1.1
+

@@ -17,6 +17,8 @@
 #include <QVector>
 #include <qqmlintegration.h>
 
+#include "qmlaiutils_export.h"
+
 template<typename T> QList<T> qListFromVariant (const QVariantList & list) {
     QList<T> ret;
     ret.reserve (list.size ());
@@ -78,7 +80,7 @@ QVariantMap qMapToVariant(const QMap<Key, T> &map) {
 for (typename QList<_type_ *>::const_iterator it = _list_.constBegin (); it != _list_.constEnd (); ++it) \
         if (_type_ * _var_ = (* it))
 
-class ObjectListModelBase : public QAbstractListModel { // abstract Qt base class
+class QMLAIUTILS_EXPORT ObjectListModelBase : public QAbstractListModel { // abstract Qt base class
     Q_OBJECT
     Q_PROPERTY (int count READ count NOTIFY countChanged)
     QML_ELEMENT

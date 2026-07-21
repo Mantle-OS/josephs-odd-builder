@@ -1,9 +1,11 @@
 #include "job_zstd_compressor_crypto.h"
 
-#include <fstream>
-#include <vector>
-#include <limits>
 #include <algorithm>
+#include <cstdint>
+#include <filesystem>
+#include <fstream>
+#include <limits>
+#include <vector>
 
 #include <sodium/crypto_secretbox.h>
 

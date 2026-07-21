@@ -6,7 +6,6 @@
 #include <limits>
 #include <memory>
 
-
 namespace job::core {
 
 template <typename T_IDL, std::size_t Alignment = 64>

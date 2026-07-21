@@ -7,10 +7,10 @@
 
 #include "job_isched_policy.h"
 #include "descr/job_task_descriptor.h"
-
+#include "jobthreads_export.h"
 namespace job::threads {
 
-class JobRoundRobinScheduler : public ISchedPolicy {
+class JOBTHREADS_EXPORT JobRoundRobinScheduler : public ISchedPolicy {
 public:
     using Ptr = std::shared_ptr<JobRoundRobinScheduler>;
 

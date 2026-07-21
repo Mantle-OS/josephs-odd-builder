@@ -1,7 +1,7 @@
 #include "job_secret_box.h"
 
 #ifndef NDEBUG
-#include <iostream>
+#include <job_logger.h>
 #endif
 
 #include <sodium.h>
@@ -30,7 +30,7 @@ bool JobSecretBox::encrypt(const std::vector<unsigned char> &plainText,
 
     if (key.size() != crypto_secretbox_KEYBYTES) {
 #ifndef NDEBUG
-        std::cerr << "[JobSecretBox] Encryption aborted: Invalid key size envelope.\n";
+        JOB_LOG_ERROR("[JobSecretBox] Encryption aborted: Invalid key size envelope.");
 #endif
         return false;
     }
@@ -48,7 +48,7 @@ bool JobSecretBox::encrypt(const std::vector<unsigned char> &plainText,
 
     if (result != 0) {
 #ifndef NDEBUG
-        std::cerr << "[JobSecretBox] Symmetric encryption loop failed.\n";
+        JOB_LOG_ERROR("[JobSecretBox] Symmetric encryption loop failed.");
 #endif
         outCipherText.clear();
         outNonce.clear();
@@ -92,7 +92,7 @@ bool JobSecretBox::decrypt(const std::vector<unsigned char> &cipherText,
 
     if (result != 0) {
 #ifndef NDEBUG
-        std::cerr << "[JobSecretBox] Decryption failed! The payload was corrupted or modified on disk.\n";
+        JOB_LOG_ERROR("[JobSecretBox] Decryption failed! The payload was corrupted or modified on disk.");
 #endif
         // immediately,
         outPlainText.clear();

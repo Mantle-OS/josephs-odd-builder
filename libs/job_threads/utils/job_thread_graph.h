@@ -9,11 +9,11 @@
 
 #include "job_thread_pool.h"
 #include "job_thread_node.h"
-
+#include "jobthreads_export.h"
 // Kahn’s algorithm + thread pool
 namespace job::threads {
 
-class JobThreadGraph {
+class JOBTHREADS_EXPORT JobThreadGraph {
 public:
     explicit JobThreadGraph(ThreadPool::Ptr pool);
 

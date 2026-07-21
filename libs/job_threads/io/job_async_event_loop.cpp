@@ -4,7 +4,6 @@
 
 namespace job::threads {
 
-// I HATE THIS SO MUCH
 constexpr size_t kDefaultTimerReservation = 32;
 using namespace std::chrono_literals;
 AsyncEventLoop::AsyncEventLoop()

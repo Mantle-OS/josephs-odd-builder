@@ -17,12 +17,12 @@ bool JobZstdSign::setKeyPair(const std::filesystem::path &publicKeyFile,
     return m_signer.loadKeysFromDisk(publicKeyFile, privateKeyFile);
 }
 
-std::filesystem::path JobZstdSign::publicKeyFile() const noexcept
+std::filesystem::path JobZstdSign::publicKeyFile() const
 {
     return m_currentPubKeyFile;
 }
 
-bool JobZstdSign::setPublicKeyFile(const std::filesystem::path &publicKeyFile) noexcept
+bool JobZstdSign::setPublicKeyFile(const std::filesystem::path &publicKeyFile)
 {
     if (!m_signer.validPublicKey(publicKeyFile))
         return false;
@@ -36,11 +36,11 @@ bool JobZstdSign::setPublicKeyFile(const std::filesystem::path &publicKeyFile) n
     m_currentPubKeyFile = publicKeyFile;
     return true;
 }
-std::filesystem::path JobZstdSign::privateKeyFile() const noexcept
+std::filesystem::path JobZstdSign::privateKeyFile() const
 {
     return m_currentPriKeyFile;
 }
-bool JobZstdSign::setPrivateKeyFile(const std::filesystem::path &privateKeyFile) noexcept
+bool JobZstdSign::setPrivateKeyFile(const std::filesystem::path &privateKeyFile)
 {
     if (m_currentPubKeyFile.empty())
         return false;
@@ -117,7 +117,7 @@ bool JobZstdSign::signFile(const std::filesystem::path &inPath, const std::files
     return true;
 }
 
-bool JobZstdSign::verifyFile(const std::filesystem::path &filePath, const std::string &signatureBase64) noexcept
+bool JobZstdSign::verifyFile(const std::filesystem::path &filePath, const std::string &signatureBase64)
 {
     return m_signer.verifyFile(filePath.string(), signatureBase64);
 }

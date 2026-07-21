@@ -32,6 +32,21 @@ struct ScalarPackVisitor
     {
         pk.pack_uint64(val);
     }
+
+    void operator()(const bool &val) const
+    {
+        pk.pack(val);
+    }
+
+    void operator()(const float &val) const
+    {
+        pk.pack(val);
+    }
+    void operator()(const double &val) const
+    {
+        pk.pack(val);
+    }
+
     void operator()(const std::string &val) const
     {
         pk.pack_str(val.size());

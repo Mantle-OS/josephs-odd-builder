@@ -1,0 +1,10 @@
+prefix=@CMAKE_INSTALL_PREFIX@
+exec_prefix=${prefix}
+libdir=@CMAKE_INSTALL_FULL_LIBDIR@
+includedir=@CMAKE_INSTALL_FULL_INCLUDEDIR@/jobaipkg
+
+Name: jobaipkg
+Description: Tier 1 package managment for AI in JOB (Joseph's Odd Builder)
+Version: @PROJECT_VERSION@
+Libs: -L${libdir} -ljobcore -ljobsodium
+Cflags: -I${includedir}

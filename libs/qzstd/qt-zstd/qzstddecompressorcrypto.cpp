@@ -63,6 +63,8 @@ void QZstdDecompressorCrypto::setOptions(QZstdOptions *other)
         delete m_opts;
     m_opts = other;
 
+    m_ownsOpts = false;
+
     // setup the new connections
     setupOptionConnections();
 
@@ -76,13 +78,13 @@ void QZstdDecompressorCrypto::setOptions(QZstdOptions *other)
 
 
 
-bool QZstdDecompressorCrypto::decryptAndDecompress() noexcept
+bool QZstdDecompressorCrypto::decryptAndDecompress()
 {
     if(!m_opts)
         return false;
 
     if (!hasKeys()) {
-        setErrorString("Cryptographic pipeline missing a valid encryption key call setEncryptionKey() first.");
+        setErrorString("Cryptographic pipeline missing a valid decryption key call setDecryptionKey() first.");
         *m_opts = *this;
         return false;
     }

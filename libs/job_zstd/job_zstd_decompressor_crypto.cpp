@@ -1,36 +1,17 @@
-// job_zstd_decompressor_crypto.cpp
 #include "job_zstd_decompressor_crypto.h"
-#include "job_zstd_io.h"
-#include "job_zstd_entry.h"
-#include "job_zstd_wire.h"
-#include "job_zstd_decrypting_transport.h"
 
-#include <sodium/crypto_secretbox.h>
+#include <algorithm>
+#include <cstdint>
+#include <filesystem>
 #include <fstream>
 #include <limits>
-#include <algorithm>
+#include <string>
 
+#include <sodium/crypto_secretbox.h>
+
+#include "job_zstd_wire.h"
+#include "job_zstd_entry.h"
 namespace job::zstd {
-
-namespace {
-
-// Centralizes the "which error actually explains this" precedence used at every failure exit in this file: the decrypting transport's own diagnosis (auth failure vs. its own notion of truncation) is more specific than
-// whatever JobZstdIO concluded, since JobZstdIO can only see "the transport ran dry early" and has no vocabulary for WHY.
-[[nodiscard]] std::string bestErrorMessage(const JobZstdIO &zstd, const JobZstdDecryptingTransport &decTransport, const std::string &fallback)
-{
-    if (decTransport.hadAuthenticationError())
-        return decTransport.errorString();
-
-    if (decTransport.wasTruncated())
-        return decTransport.errorString();
-
-    if (!zstd.errorString().empty())
-        return zstd.errorString();
-
-    return fallback;
-}
-
-} // namespace
 
 const job::crypto::JobSecureMem &JobZstdDecompressorCrypto::decryptionKey() const noexcept
 {
@@ -91,7 +72,7 @@ bool JobZstdDecompressorCrypto::execute()
         static_cast<void>(zstdProbe.close());
 
         if (!gotMagic) {
-            setErrorString(bestErrorMessage(zstdProbe, decTransport, "Archive is empty or missing its header tag."));
+            setErrorString(JobZstdDecompressorCrypto::bestErrorMessage(zstdProbe, decTransport, "Archive is empty or missing its header tag."));
             return false;
         }
     }
@@ -117,6 +98,7 @@ bool JobZstdDecompressorCrypto::execute()
     return false;
 }
 
+// Well this was even more fun lol .....
 bool JobZstdDecompressorCrypto::decompressFolder()
 {
     if (!hasKeys()) {
@@ -142,14 +124,14 @@ bool JobZstdDecompressorCrypto::decompressFolder()
 
     std::string tag;
     if (!job::zstd::utils::readString(zstdIn, tag) || tag != JobZstdOptions::magicDirString()) {
-        setErrorString(bestErrorMessage(zstd, decTransport, "Archive header did not match the expected directory format tag."));
+        setErrorString(JobZstdDecompressorCrypto::bestErrorMessage(zstd, decTransport, "Archive header did not match the expected directory format tag."));
         static_cast<void>(zstd.close());
         return false;
     }
 
     std::uint64_t totalEntries = 0;
     if (!job::zstd::utils::readU64(zstdIn, totalEntries)) {
-        setErrorString(bestErrorMessage(zstd, decTransport, "Archive header is truncated -- missing entry count."));
+        setErrorString(JobZstdDecompressorCrypto::bestErrorMessage(zstd, decTransport, "Archive header is truncated -- missing entry count."));
         static_cast<void>(zstd.close());
         return false;
     }
@@ -178,7 +160,7 @@ bool JobZstdDecompressorCrypto::decompressFolder()
         std::string relPathStr;
 
         if (!job::zstd::utils::readString(zstdIn, entryTag) || !job::zstd::utils::readString(zstdIn, relPathStr)) {
-            setErrorString(bestErrorMessage(zstd, decTransport, "Archive entry stream ended unexpectedly while reading entry header."));
+            setErrorString(JobZstdDecompressorCrypto::bestErrorMessage(zstd, decTransport, "Archive entry stream ended unexpectedly while reading entry header."));
             static_cast<void>(zstd.close());
             return false;
         }
@@ -224,7 +206,7 @@ bool JobZstdDecompressorCrypto::decompressFolder()
         case JobZstdEntryKind::Symlink: {
             std::string targetStr;
             if (!job::zstd::utils::readString(zstdIn, targetStr)) {
-                setErrorString(bestErrorMessage(zstd, decTransport, "Archive entry stream ended unexpectedly while reading symlink target."));
+                setErrorString(JobZstdDecompressorCrypto::bestErrorMessage(zstd, decTransport, "Archive entry stream ended unexpectedly while reading symlink target."));
                 static_cast<void>(zstd.close());
                 return false;
             }
@@ -264,7 +246,7 @@ bool JobZstdDecompressorCrypto::decompressFolder()
         case JobZstdEntryKind::File: {
             std::uint64_t fileLength = 0;
             if (!job::zstd::utils::readU64(zstdIn, fileLength)) {
-                setErrorString(bestErrorMessage(zstd, decTransport, "Archive entry stream ended unexpectedly while reading file length."));
+                setErrorString(JobZstdDecompressorCrypto::bestErrorMessage(zstd, decTransport, "Archive entry stream ended unexpectedly while reading file length."));
                 static_cast<void>(zstd.close());
                 return false;
             }
@@ -300,7 +282,7 @@ bool JobZstdDecompressorCrypto::decompressFolder()
                 std::streamsize const got = zstdIn.gcount();
 
                 if (got <= 0) {
-                    setErrorString(bestErrorMessage(zstd, decTransport, "Archive format payload stream broken or unexpected EOF reached: " + relPathStr));
+                    setErrorString(JobZstdDecompressorCrypto::bestErrorMessage(zstd, decTransport, "Archive format payload stream broken or unexpected EOF reached: " + relPathStr));
                     static_cast<void>(zstd.close());
                     return false;
                 }
@@ -322,7 +304,7 @@ bool JobZstdDecompressorCrypto::decompressFolder()
     }
 
     if (!zstd.close()) {
-        setErrorString(bestErrorMessage(zstd, decTransport, zstd.errorString()));
+        setErrorString(JobZstdDecompressorCrypto::bestErrorMessage(zstd, decTransport, zstd.errorString()));
         return false;
     }
 
@@ -355,7 +337,7 @@ bool JobZstdDecompressorCrypto::decompressFile()
 
     std::string tag;
     if (!job::zstd::utils::readString(zstdIn, tag) || tag != JobZstdOptions::magicFileString()) {
-        setErrorString(bestErrorMessage(zstd, decTransport, "Archive header did not match the expected flat-file format tag."));
+        setErrorString(JobZstdDecompressorCrypto::bestErrorMessage(zstd, decTransport, "Archive header did not match the expected flat-file format tag."));
         static_cast<void>(zstd.close());
         return false;
     }
@@ -392,13 +374,13 @@ bool JobZstdDecompressorCrypto::decompressFile()
     }
 
     if (zstd.wasTruncated() || zstd.hadDecodeError() || decTransport.wasTruncated() || decTransport.hadAuthenticationError()) {
-        setErrorString(bestErrorMessage(zstd, decTransport, zstd.errorString()));
+        setErrorString(JobZstdDecompressorCrypto::bestErrorMessage(zstd, decTransport, zstd.errorString()));
         static_cast<void>(zstd.close());
         return false;
     }
 
     if (!zstd.close()) {
-        setErrorString(bestErrorMessage(zstd, decTransport, zstd.errorString()));
+        setErrorString(JobZstdDecompressorCrypto::bestErrorMessage(zstd, decTransport, zstd.errorString()));
         return false;
     }
 
@@ -433,13 +415,13 @@ bool JobZstdDecompressorCrypto::decompressSymlinkArchive()
     std::string targetStr;
 
     if (!job::zstd::utils::readString(zstdIn, tag) || tag != JobZstdOptions::magicLinkString() || !job::zstd::utils::readString(zstdIn, targetStr)) {
-        setErrorString(bestErrorMessage(zstd, decTransport, "Archive header did not match the expected symlink format tag."));
+        setErrorString(JobZstdDecompressorCrypto::bestErrorMessage(zstd, decTransport, "Archive header did not match the expected symlink format tag."));
         static_cast<void>(zstd.close());
         return false;
     }
 
     if (!preserveSymlinks()) {
-        setErrorString("Archive is a symlink and preserveSymlinks() is false -- refusing extraction.");
+        setErrorString("Archive is a symlink and preserveSymlinks() is false: refusing extraction.");
         static_cast<void>(zstd.close());
         return false;
     }
@@ -478,6 +460,20 @@ bool JobZstdDecompressorCrypto::decompressSymlinkArchive()
     static_cast<void>(zstd.close());
     notifyFinished();
     return true;
+}
+
+std::string JobZstdDecompressorCrypto::bestErrorMessage(const JobZstdIO &zstd, const JobZstdDecryptingTransport &decTransport, const std::string &fallback)
+{
+    if (decTransport.hadAuthenticationError())
+        return decTransport.errorString();
+
+    if (decTransport.wasTruncated())
+        return decTransport.errorString();
+
+    if (!zstd.errorString().empty())
+        return zstd.errorString();
+
+    return fallback;
 }
 
 } // namespace job::zstd

@@ -11,10 +11,10 @@ set(SODIUM_EXAMPLE_QML
     CryptoSigner.qml # showing how QmlSodiumCryptoSign works
     HashView.qml     # showing how QmlSodiumHash singleton works
     KeyManager.qml   # showing how QmlSodiumKeys Element works
-    PasswodUtils.qml # showing how QmlSodiumPasswordUtils Element
+    PasswordUtils.qml # showing how QmlSodiumPasswordUtils Element
 )
 
-qt_add_executable(qml-sodium-example main.cpp )
+qt_add_executable(qml-sodium-example main.cpp)
 
 qt_add_qml_module(qml-sodium-example
     URI QmlSodiumExample
@@ -29,11 +29,20 @@ target_link_libraries(qml-sodium-example PRIVATE
     Qt6::Gui
     Qt6::Quick
     Qt6::Qml
-    ${LibSodium_LIBRARIES} JosephsOddBuilder_Crypto qt-sodium qml-sodium qml-sodiumplugin
-    qt-ai-utils qml-ai-utils qml-ai-utilsplugin
+
+    ${LibSodium_LIBRARIES}
+    JosephsOddBuilder_Crypto
+    qt-sodium
+    qml-sodium
+    qml-sodiumplugin
+
+    qt-ai-utils
+    qml-ai-utils
+    qml-ai-utilsplugin
 )
 
-include(GNUInstallDirs)
 install(TARGETS qml-sodium-example
     BUNDLE DESTINATION .
-    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+)

@@ -13,7 +13,7 @@ fields:
     type: "bin[32]"
     required: true
   - name: "ts_ms"
-    type: "u64"
+    type: "i64"
     required: true
   - name: "first"
     type: "u64"

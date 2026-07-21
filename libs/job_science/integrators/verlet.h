@@ -1,7 +1,7 @@
 #pragma once
 #include <optional>
-#include <memory.h>
-
+#include <memory>
+#include <cstring>
 #include <job_thread_pool.h>
 
 #include "data/particle.h"

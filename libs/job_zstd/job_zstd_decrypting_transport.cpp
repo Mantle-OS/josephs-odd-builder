@@ -1,7 +1,9 @@
 #include "job_zstd_decrypting_transport.h"
 
 #include <cstring>
+#include <cstddef>
 #include <algorithm>
+#include <vector>
 
 #include <sodium/crypto_secretbox.h>
 
@@ -75,7 +77,7 @@ JobZstdDecryptingTransport::int_type JobZstdDecryptingTransport::underflow()
         return traits_type::eof();
 
     if (m_finished)
-        return traits_type::eof(); // Already known, from a previous call -- no need to ask again.
+        return traits_type::eof(); // Already known, from a previous call... no need to ask again.
 
     if (!decodeNextChunk())
         return traits_type::eof();

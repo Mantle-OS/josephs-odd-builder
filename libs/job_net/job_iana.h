@@ -5,9 +5,11 @@
 #include <unordered_map>
 #include <format>
 
+#include "jobnet_export.h"
+
 namespace job::net {
 
-class JobIana final{
+class JOBNET_EXPORT JobIana final {
 public:
     JobIana() = delete;
     ~JobIana() = delete;
@@ -211,6 +213,7 @@ public:
         return false;
     }
 };
+
 inline const std::unordered_map<JobIana::IanaHeaders, std::string> JobIana::kIanaHeaderNames = {
     { IanaHeaders::AIM                                     ,"AIM"                                       },
     { IanaHeaders::Accept                                  ,"Accept"                                    },

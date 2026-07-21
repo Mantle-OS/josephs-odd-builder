@@ -64,7 +64,6 @@ QFuture<QJsonObject> QJsonApiClient::request(const QString &path,
 QMap<QString, QString> QJsonApiClient::headers() const
 {
     return m_headers;
-
 }
 
 void QJsonApiClient::setHeaders(const QMap<QString, QString> &newHeaders)

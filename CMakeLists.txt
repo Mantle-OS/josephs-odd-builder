@@ -22,8 +22,6 @@ if(JOB_SER_MSGPACK_BINDINGS)
     include(cmake/job_msgpack_gen_lib.cmake)
 endif()
 
-
-
 if(JOB_QT_AI)
     include(cmake/cmake_ggml_build_flags.cmake)
     include(cmake/cmake_llama_cpp_build_flags.cmake)

@@ -70,7 +70,7 @@ struct AVX_F {
     // Logic
     static inline f32 max(f32 reg_a, f32 reg_b) { return _mm256_max_ps(reg_a, reg_b); }
     static inline f32 min(f32 reg_a, f32 reg_b) { return _mm256_min_ps(reg_a, reg_b); }
-    static inline f32 eq(f32 reg_a, f32 reg_b)     { return _mm256_and_ps(reg_a, reg_b); }
+    static inline f32 eq(f32 reg_a, f32 reg_b)     { return _mm256_cmp_ps(reg_a, reg_b, _CMP_EQ_OQ); }
     static inline f32 and_ps(f32 reg_a, f32 reg_b) { return _mm256_and_ps(reg_a, reg_b); }
     static inline f32 or_ps(f32 reg_a, f32 reg_b) { return _mm256_or_ps(reg_a, reg_b); }
     static inline f32 xor_ps(f32 reg_a, f32 reg_b) { return _mm256_xor_ps(reg_a, reg_b); }
@@ -107,8 +107,5 @@ struct AVX_F {
     static f32 exp(f32 x);
     static f32 log(f32 x);
     static f32 exp_fast(f32 x);
-
-
-
 };
 }

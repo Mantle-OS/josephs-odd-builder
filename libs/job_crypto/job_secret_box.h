@@ -3,10 +3,10 @@
 #include <vector>
 
 #include "job_secure_mem.h"
-
+#include "jobcrypto_export.h"
 namespace job::crypto {
 
-class JobSecretBox {
+class JOBCRYPTO_EXPORT JobSecretBox {
 public:
     JobSecretBox() = delete;
     ~JobSecretBox() = delete;

@@ -63,9 +63,6 @@ struct JobPendingEntry
     return std::nullopt;
 }
 
-
-
-
 // Walks every component of fullPath, from the filesystem root down to (and
 // including) the leaf itself, refusing the moment anything already on disk
 // turns out to be a symlink. Applied uniformly to every extraction target --
@@ -106,7 +103,7 @@ struct JobPendingEntry
         std::filesystem::file_status const status = std::filesystem::symlink_status(current, statusEc);
 
         if (statusEc)
-            continue; // Doesn't exist yet -- nothing to be tricked by, it'll be created fresh.
+            continue; // Doesn't exist yet... nothing to be tricked by, it'll be created fresh.
 
         if (status.type() == std::filesystem::file_type::symlink) {
             errorOut = "Refusing to extract through a pre-existing symlink at: " + current.string();
@@ -212,7 +209,7 @@ struct JobPendingEntry
                     return false;
                 continue;
             }
-            // Falls through: dereferenced regular file, handled by the File case below.
+            // Falls through: dereferenced regular file
         }
 
         if (std::filesystem::is_directory(childPath)) {

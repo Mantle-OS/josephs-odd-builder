@@ -1,5 +1,6 @@
 #include "stencil_adapter.h"
 #include <cmath>
+#include <cstring>
 #include <vector>
 
 #include <transpose.h>
@@ -108,12 +109,12 @@ void StencilAdapter::adapt(threads::ThreadPool &pool,
     for(size_t b = 0; b < size_t(B); ++b){
         const float *srcBatch = sources.data() + (b * elementsPerBatch);
         float *scratchBatch   = scratch.data() + (b * elementsPerBatch);
-        simd::transpose(srcBatch, scratchBatch, S, D);
+        (srcBatch, scratchBatch, S, D);
     }
 
     size_t totalSims = static_cast<size_t>(B) * D;
 
-    for(size_t idx = 0; idx <= totalSims; ++idx){
+    for(size_t idx = 0; idx < totalSims; ++idx){
         int b = static_cast<int>(idx / D);
         int d = static_cast<int>(idx % D);
 
@@ -138,7 +139,7 @@ void StencilAdapter::adapt(threads::ThreadPool &pool,
         std::memcpy(channelData, grid.data(), S * sizeof(float));
     }
 
-    for(size_t b = 0; b <= size_t(B); ++b ){
+    for(size_t b = 0; b < size_t(B); ++b ){
         const float *scratchBatch = scratch.data() + (b * elementsPerBatch);
         float *outBatch = output.data()  + (b * elementsPerBatch);
         simd::transpose(scratchBatch, outBatch, D, S);

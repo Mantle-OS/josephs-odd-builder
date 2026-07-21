@@ -25,12 +25,31 @@ else()
     message(FATAL_ERROR "AVX mismatch you have to set it up. see cmake/build_options")
 endif()
 
+add_library(JosephsOddBuilder_Simd SHARED
+    ${JOBSIMD_HEADERS}
+    ${JOBSIMD_SOURCES}
+)
+## nothing really needs this .... Yet but I am here right now so.
+set(JOB_SIMD_EXPORT_FILE
+    ${CMAKE_CURRENT_BINARY_DIR}/jobsimd_export.h
+)
 
-add_library(JosephsOddBuilder_Simd SHARED ${JOBSIMD_HEADERS} ${JOBSIMD_SOURCES})
+generate_export_header(JosephsOddBuilder_Simd
+    EXPORT_FILE_NAME "${JOB_SIMD_EXPORT_FILE}"
+)
+
+if(JOB_LINUX)
+    target_link_libraries(JosephsOddBuilder_Simd PUBLIC
+        Threads::Threads
+        atomic
+    )
+elseif(JOB_WINDOWS)
+    target_link_libraries(JosephsOddBuilder_Simd PUBLIC
+        ws2_32
+    )
+endif()
 
 target_link_libraries(JosephsOddBuilder_Simd PUBLIC
-    Threads::Threads
-    atomic
     JosephsOddBuilder_Core
     JosephsOddBuilder_Threads
 )
@@ -39,11 +58,15 @@ set_target_properties(JosephsOddBuilder_Simd PROPERTIES
     VERSION ${PROJECT_VERSION}
     SOVERSION ${PROJECT_VERSION_MAJOR}
     OUTPUT_NAME "jobsimd"
+    CXX_VISIBILITY_PRESET hidden
+    VISIBILITY_INLINES_HIDDEN ON
 )
 
 target_include_directories(JosephsOddBuilder_Simd PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobsimd/>
+    ## export file
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
 )
 
 install(TARGETS JosephsOddBuilder_Simd
@@ -54,23 +77,25 @@ install(TARGETS JosephsOddBuilder_Simd
     INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 )
 
-install(FILES ${JOBSIMD_HEADERS}
-    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobsimd
-)
+install(FILES ${JOBSIMD_HEADERS}        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobsimd )
+install(FILES ${JOB_SIMD_EXPORT_FILE}   DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobsimd )
 
-set(PKGCONFIG_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/pkgconfig")
-set(PKGCONFIG_FILE "${CMAKE_CURRENT_BINARY_DIR}/jobsimd.pc")
 
-configure_file(
-    "${CMAKE_CURRENT_SOURCE_DIR}/jobsimd.pc.in"
-    "${PKGCONFIG_FILE}"
-    @ONLY
-)
+if(JOB_LINUX)
+    set(PKGCONFIG_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/pkgconfig")
+    set(PKGCONFIG_FILE "${CMAKE_CURRENT_BINARY_DIR}/jobsimd.pc")
 
-install(FILES "${PKGCONFIG_FILE}" DESTINATION "${PKGCONFIG_INSTALL_DIR}")
+    configure_file(
+        "${CMAKE_CURRENT_SOURCE_DIR}/jobsimd.pc.in"
+        "${PKGCONFIG_FILE}"
+        @ONLY
+    )
+
+    install(FILES "${PKGCONFIG_FILE}" DESTINATION "${PKGCONFIG_INSTALL_DIR}")
+endif()
+
 install(EXPORT JosephsOddBuilderSimdTargets
     FILE JosephsOddBuilderSimdTargets.cmake
     NAMESPACE JOB::
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/JosephsOddBuilderSimd
 )
-

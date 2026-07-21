@@ -5,7 +5,6 @@ project(JosephOddBuild_Core
 )
 
 set(JOBCORE_SOURCES
-    crc32.cpp
     job_logger.cpp
     job_timer.cpp
 )
@@ -25,15 +24,25 @@ add_library(JosephsOddBuilder_Core SHARED
     ${JOBCORE_SOURCES}
 )
 
+set(JOBTHREADS_EXPORT ${CMAKE_CURRENT_BINARY_DIR}/jobcore_export.h)
+generate_export_header(JosephsOddBuilder_Core
+    BASE_NAME JOBCORE
+    EXPORT_FILE_NAME "${JOBCORE_EXPORT}"
+)
+
 set_target_properties(JosephsOddBuilder_Core PROPERTIES
     VERSION ${PROJECT_VERSION}
     SOVERSION ${PROJECT_VERSION_MAJOR}
     OUTPUT_NAME "jobcore"
+    CXX_VISIBILITY_PRESET hidden
+    VISIBILITY_INLINES_HIDDEN ON
 )
 
 target_include_directories(JosephsOddBuilder_Core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobcore/>
+    ## export file
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
 )
 
 install(TARGETS JosephsOddBuilder_Core
@@ -44,23 +53,24 @@ install(TARGETS JosephsOddBuilder_Core
     INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 )
 
-install(FILES ${JOBCORE_HEADERS}
-    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobcore
-)
+install(FILES ${JOBCORE_HEADERS} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobcore )
+install(FILES ${JOBCORE_EXPORT} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobcore )
 
-set(PKGCONFIG_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/pkgconfig")
-set(PKGCONFIG_FILE "${CMAKE_CURRENT_BINARY_DIR}/jobcore.pc")
+if(JOB_LINUX)
+    set(PKGCONFIG_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/pkgconfig")
+    set(PKGCONFIG_FILE "${CMAKE_CURRENT_BINARY_DIR}/jobcore.pc")
 
-configure_file(
-    "${CMAKE_CURRENT_SOURCE_DIR}/jobcore.pc.in"
-    "${PKGCONFIG_FILE}"
-    @ONLY
-)
+    configure_file(
+        "${CMAKE_CURRENT_SOURCE_DIR}/jobcore.pc.in"
+        "${PKGCONFIG_FILE}"
+        @ONLY
+    )
 
-install(FILES "${PKGCONFIG_FILE}" DESTINATION "${PKGCONFIG_INSTALL_DIR}")
+    install(FILES "${PKGCONFIG_FILE}" DESTINATION "${PKGCONFIG_INSTALL_DIR}")
+endif()
+
 install(EXPORT JosephsOddBuilderCoreTargets
     FILE JosephsOddBuilderCoreTargets.cmake
     NAMESPACE JOB::
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/JosephsOddBuilderCore
 )
-

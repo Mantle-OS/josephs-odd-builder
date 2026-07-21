@@ -5,6 +5,7 @@
 #include <limits>
 #include <type_traits>
 
+#include "jobcore_export.h"
 namespace job::core {
 
 // DONT USE THIS FOR CRYPTOGRAPHY !!!!
@@ -14,7 +15,7 @@ namespace job::core {
 // SplitMix64 walks into a bar... The bartender says "Why the long face?"
 // "I'm 64 bits, but everyone still treats me like I'm just a stepping stone to something better."
 
-struct SplitMix64 {
+struct JOBCORE_EXPORT SplitMix64 {
     uint64_t m_state;
 
     constexpr explicit SplitMix64(uint64_t seedIndex) :

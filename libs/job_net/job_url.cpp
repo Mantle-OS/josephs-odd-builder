@@ -3,7 +3,10 @@
 #include <sstream>
 #include <iomanip>
 #include <stdexcept>
-#include <sodium.h>
+#include <algorithm>
+#include <cctype>
+
+#include <job_secure_mem.h>
 
 namespace job::net {
 namespace {
@@ -69,8 +72,12 @@ bool JobUrl::parse(const std::string &urlString)
         m_scheme = schemeFromString(match[1]);
         if (match[2].matched)
             m_username = match[2];
-        if (match[3].matched)
-            setPassword(match[3]);
+
+        //FIXME this shuold be put in secure memory right away
+        if (match[3].matched) {
+            const auto len = static_cast<size_t>(match[3].length());
+            setPassword(len > 0 ? &*match[3].first : "", len);
+        }
         if (match[4].matched)
             m_host = match[4];
         if (match[5].matched)
@@ -221,7 +228,9 @@ JobUrl::Scheme JobUrl::schemeFromString(const std::string &str) noexcept
 {
     std::string lower;
     lower.resize(str.size());
-    std::transform(str.begin(), str.end(), lower.begin(), ::tolower);
+    std::transform(str.begin(), str.end(), lower.begin(), [](unsigned char c) {
+        return static_cast<char>(std::tolower(c));
+    });
 
     if (lower == "file")
         return Scheme::File;
@@ -302,44 +311,6 @@ void JobUrl::setUsername(const std::string &u)
 {
     m_username = u;
 }
-
-void JobUrl::setPassword(const std::string &p)
-{
-    if (p.empty()) {
-        m_password.reset();
-        return;
-    }
-    m_password = std::make_unique<JobSecureMem>(p.size());
-    m_password->copyFrom(p.data(), p.size());
-}
-
-std::string JobUrl::password(bool include) const
-{
-    if (!include || !m_password)
-        return {};
-
-#if defined(JOB_SECUREMEM_ALLOW_STRING)
-    // Direct access mode (for debug or local builds)
-    return m_password->toString();
-#else
-    // Secure mode (default)
-    if (m_base64EncodePwd) {
-        std::string encoded = m_password->toBase64();
-
-        if (m_passwdMode == PasswdMode::Lenient) {
-            // Decode immediately into readable string for lenient inspection
-            return m_password->fromBase64toString(encoded);
-        }
-
-        // Otherwise return base64 string (safe for export/logging)
-        return encoded;
-    }
-
-    // Masked fallback
-    return "********";
-#endif
-}
-
 
 std::string JobUrl::authority(bool includePassword) const
 {

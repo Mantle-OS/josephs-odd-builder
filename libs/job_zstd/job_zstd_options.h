@@ -1,10 +1,10 @@
 #pragma once
-
 #include <string>
 #include <functional>
 
+#include "jobzstd_export.h"
 namespace job::zstd {
-class JobZstdOptions
+class JOBZSTD_EXPORT JobZstdOptions
 {
 public:
     static constexpr int kDefaultCompressionLevel = 3;
@@ -20,8 +20,6 @@ public:
 
     [[nodiscard]] static int minCompressionLevel() noexcept;
     [[nodiscard]] static int maxCompressionLevel() noexcept;
-
-    // static constexpr int qtDataStreamVersion() noexcept { return 21; }
 
     [[nodiscard]] const std::string &input() const noexcept;
     bool setInput(const std::string &newInput);

@@ -70,7 +70,7 @@ enum class SerializeLicenseType : uint8_t {
 
 
 struct FieldValue final {
-    using Scalar    = std::variant<int32_t, uint32_t, int64_t, uint64_t, std::string>;
+    using Scalar    = std::variant<int32_t, uint32_t, int64_t, uint64_t, float, double, bool, std::string>;
     using Binary    = std::vector<uint8_t>;
     using List      = std::vector<FieldValue>;
     using Struct    = std::unordered_map<std::string, FieldValue>;

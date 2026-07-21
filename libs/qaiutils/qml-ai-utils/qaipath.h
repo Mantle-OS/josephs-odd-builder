@@ -1,5 +1,4 @@
-#ifndef QAIPATH_H
-#define QAIPATH_H
+#pragma once
 
 #include <QObject>
 #include <QQmlEngine>
@@ -7,20 +6,17 @@
 #include "property-macros.h"
 #include "pointer-macros.h"
 #include "qmlstringlist.h"
+#include "qmlaiutils_export.h"
 
-class QAiPath : public QObject
+// VERY ALPHA SUBJECT TO CHANGE !!!!!!!!!
+class QMLAIUTILS_EXPORT QAiPath : public QObject
 {
     Q_OBJECT
-    QP_RW(QString,              currentModel,           "" )
-    QP_PTR_RO(QmlStringList,    modelDirs)
-    QP_PTR_RO(QmlStringList,    availableModels)
+    QP_RW(QString,              currentModel,           ""          )
+    QP_PTR_RO(QmlStringList,    modelDirs                           ) // NON owned for now. will come back later. [[Depends on session manager]]
+    QP_PTR_RO(QmlStringList,    availableModels                     ) // NON owned for now. will come back later. [[Depends on session manager]]
     QML_ELEMENT
 public:
-    explicit QAiPath(QObject *parent = nullptr) :
-        QObject{parent}
-    {
-
-    }
+    explicit QAiPath(QObject *parent = nullptr);
 };
 
-#endif // QAIPATH_H

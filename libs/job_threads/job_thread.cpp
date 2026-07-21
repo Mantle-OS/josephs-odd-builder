@@ -29,6 +29,45 @@ void JobThread::setRunFunction(RunFunction fn)
     m_runFunc = std::move(fn);
 }
 
+// JobThread::StartResult JobThread::start()
+// {
+//     if (m_running.load(std::memory_order_acquire) || m_starting.test_and_set(std::memory_order_acq_rel))
+//         return StartResult::AlreadyRunning;
+
+//     auto promise = std::make_shared<std::promise<StartResult>>();
+//     auto future  = promise->get_future();
+//     auto *args = new (std::nothrow)JobThreadArgs{
+//         this,
+//         promise,
+//         m_stopSource.get_token()
+//     };
+
+//     if (!args){
+//         m_starting.clear(std::memory_order_release);
+//         return StartResult::ThreadError;
+//     }
+
+//     int create_result = pthread_create(&m_pthread,
+//                                        nullptr,
+//                                        &JobThread::threadEntry,
+//                                        args);
+
+
+
+//     if (create_result != 0) {
+//         delete args;
+//         m_joinable = false;
+//         promise->set_value(StartResult::ThreadError);
+//         m_starting.clear(std::memory_order_release);
+//     } else {
+//         m_joinable = true;
+//     }
+
+//     return future.get();
+// }
+
+
+
 JobThread::StartResult JobThread::start()
 {
     if (m_running.load(std::memory_order_acquire) || m_starting.test_and_set(std::memory_order_acq_rel))
@@ -52,8 +91,6 @@ JobThread::StartResult JobThread::start()
                                        &JobThread::threadEntry,
                                        args);
 
-
-
     if (create_result != 0) {
         delete args;
         m_joinable = false;
@@ -63,8 +100,21 @@ JobThread::StartResult JobThread::start()
         m_joinable = true;
     }
 
-    return future.get();
+    StartResult result = future.get();
+
+    // If the thread was created but failed its real-work preconditions
+    // (scheduling/affinity), the OS thread has already run threadEntry to
+    // completion and exited. Reap it now so join() correctly reports there's
+    // nothing left to join, rather than leaving that to the caller.
+    if (result != StartResult::Started && m_joinable) {
+        pthread_join(m_pthread, nullptr);
+        m_joinable = false;
+    }
+
+    return result;
 }
+
+
 
 void *JobThread::threadEntry(void *arg)
 {

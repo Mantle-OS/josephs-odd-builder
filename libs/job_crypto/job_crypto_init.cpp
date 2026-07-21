@@ -1,7 +1,9 @@
 #include "job_crypto_init.h"
 
+#include <sodium.h>
+
 #ifndef NDEBUG
-#include <iostream>
+#include <job_logger.h>
 #endif
 
 namespace job::crypto {
@@ -14,14 +16,14 @@ bool JobCryptoInit::initialize() noexcept
     if (sodium_init() < 0) {
 
 #ifndef NDEBUG
-        std::cerr << "[JobCryptoInit] libsodium initialization failed!\n";
+        JOB_LOG_ERROR("[JobCryptoInit] libsodium initialization failed!");
 #endif
         return false;
     }
 
     s_initialized = true;
 #ifndef NDEBUG
-    std::cout << "[JobCryptoInit] libsodium initialized.\n";
+    JOB_LOG_DEBUG("[JobCryptoInit] libsodium initialized.");
 #endif
     return true;
 }

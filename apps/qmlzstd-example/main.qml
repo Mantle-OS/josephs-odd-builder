@@ -13,34 +13,22 @@ ApplicationWindow {
     title: qsTr("Qt Zstd example")
 
     header: TabBar{
-        id: bar
+        id: tb
         width: parent.width
-
-        TabButton{
-            text: qsTr("Async")
-        }
-        TabButton{
-            text: qsTr("Blocking Compress")
-        }
-        TabButton{
-            text: qsTr("Blocking Decompress")
-        }
-        TabButton{
-            text: qsTr("Blocking ZstdCrypto")
-        }
-        TabButton{
-            text: qsTr("About")
-        }
+        TabButton{ text: qsTr("Async") }
+        TabButton{ text: qsTr("Blocking Compress") }
+        TabButton{ text: qsTr("Blocking Decompress") }
+        TabButton{ text: qsTr("Blocking ZstdCrypto") }
+        TabButton{ text: qsTr("About") }
     }
 
     StackLayout{
-        id: stackView
-        currentIndex: bar.currentIndex
+        currentIndex: tb.currentIndex
         anchors.fill: parent
-        ZStdPage{} //Async
-        ZStdCompressPage{} // Vlocking
-        ZStdDecompressPage{} // blocking
-        ZstdCrypto{}
+        ZStdPage{}              // Async
+        ZStdCompressPage{}      // Blocking
+        ZStdDecompressPage{}    // Blocking
+        ZstdCrypto{}            // Guess JK Blocking
         About{}
     }
 }

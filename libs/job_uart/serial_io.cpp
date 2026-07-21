@@ -77,7 +77,9 @@ bool SerialIO::openDevice()
         return false;
     }
 
-    if (!m_loop->registerFD(m_fd, EPOLLIN | EPOLLERR | EPOLLHUP | EPOLLET, [this](uint32_t e) { onEvents(e); })) {
+    if (!m_loop->registerFD(m_fd,
+                            threads::IOEvent::Read | threads::IOEvent::Error | threads::IOEvent::HangUp | threads::IOEvent::EdgeTriggered ,
+                            [this](threads::IOEvent e) { onEvents(e); })) {
         JOB_LOG_ERROR("[SerialIO] Failed to register FD with event loop!");
         updateError(Error::LoopError);
         m_loop->stop();
@@ -209,41 +211,34 @@ bool SerialIO::writeRawFile(const std::filesystem::path &filePath)
     return totalSent == totalSize;
 }
 
-void SerialIO::onEvents(uint32_t events)
+void SerialIO::onEvents(threads::IOEvent events)
 {
-    if (events & (POLLERR | POLLNVAL)) {
+    if (threads::hasEvent(events, threads::IOEvent::Error) ||
+        threads::hasEvent(events, threads::IOEvent::HangUp)) {
         updateError(Error::ReadError);
         closeDevice(); // Fatal error
         return;
     }
 
-    if (events & POLLHUP) {
-        closeDevice();
-        return;
-    }
-
-    if (events & POLLIN) {
+    if (threads::hasEvent(events, threads::IOEvent::Read)) {
         char buf[1024];
         while (true) {
             ssize_t n = ::read(m_fd, buf, sizeof(buf));
-
             if (n > 0) {
                 std::lock_guard<std::mutex> lock(m_cbMutex);
-
                 if (m_isRecording && m_logStream.is_open())
                     m_logStream.write(buf, n);
-
                 if (m_readCallback)
                     m_readCallback(buf, n);
             } else if (n == 0) {
                 closeDevice();
-                break; // Exit loop
+                break;
             } else if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                break; // Exit loop
+                break;
             } else if (errno != EINTR) {
                 updateError(Error::ReadError);
                 closeDevice();
-                break; // Exit loop
+                break;
             }
         }
     }

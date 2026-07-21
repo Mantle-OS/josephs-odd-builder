@@ -47,7 +47,7 @@ void BhAdapter::adapt(threads::ThreadPool &pool,
                       [[maybe_unused]]const AdapterCtx &ctx)
 {
     const size_t B = static_cast<size_t>(shape.batch);
-    for(size_t i = 0 ; i <= B; ++i)
+    for(size_t i = 0 ; i < B; ++i)
         apply(pool, shape, sources, output, i);
 }
 
@@ -73,7 +73,7 @@ void BhAdapter::apply(threads::ThreadPool &pool, const cords::AttentionShape &sh
         p.mass = 1.0f;
         p.acceleration = {0,0,0};
         if (D >= 7)
-            p.mass = std::abs(in_ptr[idx + m_cfg.dim_mapping[6]]);
+            p.mass = std::abs(in_ptr[idx + m_cfg.dim_mapping[6]]); // [[COME_BACK]] OOB dim_mappings
         else
             p.mass = 1.0f;
 
@@ -81,7 +81,7 @@ void BhAdapter::apply(threads::ThreadPool &pool, const cords::AttentionShape &sh
 
     float theta = (S < 128) ? 0.0f : m_cfg.theta;
     float g_const = m_cfg.gravity * 0.001f;
-float softening = 0.5f;
+    float softening = 0.5f;
     auto get_pos = [](const BhTraits::Body &body) -> const BhTraits::Vec3& {
         return body.position;
     };

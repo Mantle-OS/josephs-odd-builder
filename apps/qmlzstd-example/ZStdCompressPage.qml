@@ -5,11 +5,7 @@ import QtQuick.Dialogs
 import QZstd
 
 Page {
-    id: compressionPage
-
-    QmlCompressor {
-        id: compressor
-    }
+    QmlCompressor { id: compressor }
 
     Item {
         width: parent.width   * 0.80
@@ -41,16 +37,18 @@ Page {
                     to: compressor.total > 0 ? compressor.total : 100
                 }
                 Label {
-                    text: compressor.total > 0 ? Math.round((compressor.current / compressor.total) * 100) + "%" : "0%"
+                    text: compressor.total > 0 ?
+                              Math.round((compressor.current / compressor.total) * 100) + "%" :
+                              "0%"
                 }
             }
 
             RowLayout {
                 Layout.fillWidth: true
                 Label {
-                    text: compressorPrivate.hasFolder
-                        ? qsTr("Target path: ") + compressor.input
-                        : qsTr("No target folder selected.")
+                    text: compressorPrivate.hasFolder ?
+                              qsTr("Target path: ") + compressor.input :
+                              qsTr("No target folder selected.")
                     Layout.fillWidth: true
                     elide: Text.ElideMiddle
                     wrapMode: Text.WordWrap

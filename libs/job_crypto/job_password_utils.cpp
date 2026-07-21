@@ -1,8 +1,7 @@
 #include "job_password_utils.h"
 
-// #include <cstring>
 #ifndef NDEBUG
-#include <iostream>
+#include <job_logger.h>
 #endif
 
 #include <sodium.h>
@@ -67,8 +66,7 @@ bool JobPasswordUtils::deriveKeyFromPassword(JobSecureMem &outDerivedKey,
 
     if (salt.size() != crypto_pwhash_SALTBYTES) {
 #ifndef NDEBUG
-        std::cerr << "[JobPasswordUtils] Derivation aborted: Salt size must equal exactly "
-                  << crypto_pwhash_SALTBYTES << " bytes.\n";
+        JOB_LOG_ERROR("[JobPasswordUtils] Derivation aborted: Salt size must equal exactly {} bytes", crypto_pwhash_SALTBYTES);
 #endif
         return false;
     }
@@ -91,7 +89,7 @@ bool JobPasswordUtils::deriveKeyFromPassword(JobSecureMem &outDerivedKey,
 
     if (result != 0) {
 #ifndef NDEBUG
-        std::cerr << "[JobPasswordUtils] Deterministic sub-key derivation pass failed.\n";
+        JOB_LOG_ERROR("[JobPasswordUtils] Deterministic sub-key derivation pass failed.");
 #endif
         outDerivedKey.clear(); // Zero out memory state immediately
         return false;

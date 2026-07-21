@@ -9,6 +9,9 @@ TEST_CASE("deduceFieldKind correctly identifies all FieldKinds", "[serializer_ut
 
     SECTION("Scalar types") {
         REQUIRE(deduceFieldKind("str") == FieldKind::Scalar);
+        REQUIRE(deduceFieldKind("bool") == FieldKind::Scalar);
+        REQUIRE(deduceFieldKind("float") == FieldKind::Scalar);
+        REQUIRE(deduceFieldKind("double") == FieldKind::Scalar);
         REQUIRE(deduceFieldKind("i32") == FieldKind::Scalar);
         REQUIRE(deduceFieldKind("u32") == FieldKind::Scalar);
         REQUIRE(deduceFieldKind("i64") == FieldKind::Scalar);
@@ -32,11 +35,14 @@ TEST_CASE("deduceFieldKind correctly identifies all FieldKinds", "[serializer_ut
         REQUIRE(deduceFieldKind("list<struct>") == FieldKind::ListStruct);
     }
 
-    SECTION("Unknown types default to Scalar") {
-        // IMPORANT This should return the default (Scalar) and log a warning
-        // as per your implementation.
+    SECTION("Unknown types default to Scalar (via the fallback branch, not explicit recognition)") {
+        // IMPORTANT: these are genuinely unrecognized strings, distinct from
+        // "double"/"float"/"bool" above, which are explicitly matched cases,
+        // not fallback ones. Mixing the two here would mask a regression if
+        // one of the explicit types were ever accidentally removed from the
+        // recognized list both branches return Scalar, so only testing
+        // recognized types under the "unknown" heading proves nothing.
         REQUIRE(deduceFieldKind("f32") == FieldKind::Scalar);
-        REQUIRE(deduceFieldKind("double") == FieldKind::Scalar);
         REQUIRE(deduceFieldKind("") == FieldKind::Scalar);
         REQUIRE(deduceFieldKind("list<f32>") == FieldKind::Scalar);
     }
@@ -77,5 +83,26 @@ TEST_CASE("jsonToScalar converts FieldValue::Scalar to nlohmann::json", "[serial
         nlohmann::json j = jsonToScalar(scalar);
         REQUIRE(j.is_string());
         REQUIRE(j.get<std::string>() == "Hello, JOB!");
+    }
+
+    SECTION("bool") {
+        FieldValue::Scalar scalar = true;
+        nlohmann::json j = jsonToScalar(scalar);
+        REQUIRE(j.is_boolean());
+        REQUIRE(j.get<bool>() == true);
+    }
+
+    SECTION("float") {
+        FieldValue::Scalar scalar = 3.5f;
+        nlohmann::json j = jsonToScalar(scalar);
+        REQUIRE(j.is_number_float());
+        REQUIRE(j.get<float>() == Catch::Approx(3.5f));
+    }
+
+    SECTION("double") {
+        FieldValue::Scalar scalar = 2.71828;
+        nlohmann::json j = jsonToScalar(scalar);
+        REQUIRE(j.is_number_float());
+        REQUIRE(j.get<double>() == Catch::Approx(2.71828));
     }
 }

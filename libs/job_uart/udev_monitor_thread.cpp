@@ -48,7 +48,7 @@ bool UdevMonitorThread::start(std::shared_ptr<threads::JobIoAsyncThread> loop, c
     m_loop = loop; // Store weak_ptr
     m_callback = onDeviceChange;
 
-    if (!loop->registerFD(m_udevFd, EPOLLIN, [this](uint32_t e) { onEvents(e); })) {
+    if (!loop->registerFD(m_udevFd, threads::IOEvent::Read, [this](threads::IOEvent e) { onEvents(e); })) {
         JOB_LOG_ERROR("[UdevMonitor] Failed to register FD with event loop!");
         m_udevFd = -1;
         return false;
@@ -68,9 +68,9 @@ void UdevMonitorThread::stop()
     m_callback = nullptr;
 }
 
-void UdevMonitorThread::onEvents(uint32_t events)
+void UdevMonitorThread::onEvents(threads::IOEvent events)
 {
-    if (events & POLLIN) {
+    if (threads::hasEvent(events, threads::IOEvent::Read)) {
         if (struct udev_device *dev = udev_monitor_receive_device(m_monitor)) {
             const char *action = udev_device_get_action(dev);
 
@@ -82,7 +82,8 @@ void UdevMonitorThread::onEvents(uint32_t events)
         }
     }
 
-    if (events & (POLLERR | POLLHUP)) {
+    if (threads::hasEvent(events, threads::IOEvent::Error) ||
+        threads::hasEvent(events, threads::IOEvent::HangUp)) {
         JOB_LOG_ERROR("[UdevMonitor] Error on udev FD, attempting to stop and restart listener.");
         stop();
     }

@@ -1,11 +1,9 @@
 #pragma once
-namespace job::simd  {
-
-
 #if defined(__AVX512F__) || defined(__AVX2__)
-
 #include <immintrin.h>
-
+#endif
+namespace job::simd  {
+#if defined(__AVX512F__) || defined(__AVX2__)
 enum class RoundingMode : int {
     Nearest  = _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC, // 0x08
     Down     = _MM_FROUND_TO_NEG_INF     | _MM_FROUND_NO_EXC, // 0x09

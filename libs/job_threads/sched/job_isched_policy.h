@@ -5,9 +5,9 @@
 #include <atomic>
 
 #include "descr/job_idescriptor.h"
-
+#include "jobthreads_export.h"
 namespace job::threads {
-class ISchedPolicy {
+class JOBTHREADS_EXPORT ISchedPolicy {
 public:
     using Ptr  = std::shared_ptr<ISchedPolicy>;
     using WPtr = std::weak_ptr<ISchedPolicy>;

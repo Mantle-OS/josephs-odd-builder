@@ -5,7 +5,6 @@ import QtQuick.Dialogs
 import Sodium
 
 Page {
-    id: rootHashPage
 
     Item {
         width: parent.width * 0.80
@@ -23,7 +22,7 @@ Page {
                     id: bufferInputField
                     Layout.fillWidth: true
                     Layout.preferredHeight: 60
-                    placeholderText: "Type any string or token payload here to compute an instant BLAKE2b hash..."
+                    placeholderText: qsTr("Type any string or token payload here to compute an instant BLAKE2b hash...")
                 }
             }
 
@@ -34,9 +33,8 @@ Page {
                     id: filePathView
                     readOnly: true
                     Layout.fillWidth: true
-                    // Bind directly to the singleton property context
                     text: QmlSodiumHash.filePath
-                    placeholderText: "Browse for a local file to calculate a hardware checksum..."
+                    placeholderText: qsTr("Browse for a local file to calculate a hardware checksum...")
                 }
                 Button {
                     text: qsTr("Browse...")
@@ -51,15 +49,8 @@ Page {
                     id: lastHashDisplay
                     Layout.fillWidth: true
                     readOnly: true
-                    // Automatically redraws if ANY component updates the singleton's state
                     text: QmlSodiumHash.lastHash
-                    placeholderText: "No hash calculations executed in this session yet."
-
-                    background: Rectangle {
-                        color: "#1a1a1a"
-                        border.color: "#333333"
-                        radius: 4
-                    }
+                    placeholderText: qsTr("No hash calculations executed in this session yet.")
                 }
             }
 
@@ -71,15 +62,10 @@ Page {
                     text: qsTr("Hash Text Buffer")
                     onClicked: {
                         hashDialog.title = qsTr("Buffer Processing Wave")
-
-                        // Execute directly on the singleton namespace
                         let result = QmlSodiumHash.hashBuffer(bufferInputField.text);
-
-                        if (result.length > 0) {
-                            hashDialog.informativeText = qsTr("Success! Hex-encoded BLAKE2b Hash:\n\n") + result;
-                        } else {
-                            hashDialog.informativeText = qsTr("Aborted: Input text data buffer is empty.");
-                        }
+                        hashDialog.informativeText  (result.length > 0) ?
+                            qsTr("Success! Hex-encoded BLAKE2b Hash:\n\n") + result :
+                            qsTr("Aborted: Input text data buffer is empty.");
                         hashDialog.open();
                     }
                 }
@@ -88,16 +74,13 @@ Page {
                     text: qsTr("Hash Selected File")
                     onClicked: {
                         hashDialog.title = qsTr("File Stream Processing Wave")
-
                         if (QmlSodiumHash.filePath.length === 0) {
                             hashDialog.informativeText = qsTr("Error: Please pick a valid target file path first.");
                         } else {
                             let result = QmlSodiumHash.hashFile();
-                            if (result.length > 0) {
-                                hashDialog.informativeText = qsTr("Success! File Hex-encoded BLAKE2b Hash:\n\n") + result;
-                            } else {
-                                hashDialog.informativeText = qsTr("Failed: Check target file visibility or access bounds.");
-                            }
+                            hashDialog.informativeText = (result.length > 0) ?
+                                qsTr("Success! File Hex-encoded BLAKE2b Hash:\n\n") + result :
+                                qsTr("Failed: Check target file visibility or access bounds.")
                         }
                         hashDialog.open();
                     }
@@ -110,10 +93,8 @@ Page {
         id: hashFilePicker
         onAccepted: {
             let pathStr = selectedFile.toString();
-            if (pathStr.startsWith("file://")) {
-                pathStr = pathStr.replace("file://", "");
-            }
-            // Update the singleton's global property string instantly
+            if (pathStr.startsWith("file://"))
+                pathStr = Qt.platform.os === "linux" ? pathStr.replace("file://", "") : pathStr.replace("file:///", "")
             QmlSodiumHash.filePath = pathStr;
         }
     }

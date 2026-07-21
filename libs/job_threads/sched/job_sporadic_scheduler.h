@@ -8,10 +8,11 @@
 
 #include "job_isched_policy.h"
 #include "descr/job_sporadic_descriptor.h"
+#include "jobthreads_export.h"
 
 namespace job::threads {
 
-class JobSporadicScheduler : public ISchedPolicy {
+class JOBTHREADS_EXPORT JobSporadicScheduler : public ISchedPolicy {
 public:
     using Ptr = std::shared_ptr<JobSporadicScheduler>;
 
@@ -61,4 +62,4 @@ private:
 };
 
 } // namespace job::threads
-// CHECKPOINT v1.1
+

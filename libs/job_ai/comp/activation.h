@@ -392,72 +392,72 @@ inline void activateDenseParallel(
 }
 
 
-template<bool T_ESTRIN>
-inline void activateDense(float* __restrict__ data,
-                          size_t size,
-                          ActivationType type,
-                          float alpha = 1.0f) // We can get rid of smooth then go through these calls fixing the
-{
-    switch (type) {
-    case ActivationType::Identity:
-        fusedDenseKernel<FunctorIdentity<T_ESTRIN>, false>(data, size, alpha);
-        break;
-    case ActivationType::Sigmoid:
-        fusedDenseKernel<FunctorSigmoid<T_ESTRIN>, false>(data, size, alpha);
-        break;
-    case ActivationType::Tanh:
-        fusedDenseKernel<FunctorTann<T_ESTRIN>, false>(data, size, alpha);
-        break;
-    case ActivationType::HardTanh:
-        fusedDenseKernel<FunctorHardTanh<T_ESTRIN>, false>(data, size, alpha);
-        break;
-    case ActivationType::ReLU:
-        fusedDenseKernel<FunctorReLU<T_ESTRIN>, false>(data, size, alpha);
-        break;
-    case ActivationType::LeakyReLU:
-        fusedDenseKernel<FunctorLeakyReLU<T_ESTRIN>, true>(data, size, alpha);
-        break;
-    case ActivationType::PReLU:
-        fusedDenseKernel<FunctorPReLU<T_ESTRIN>, true>(data, size, alpha);
-        break;
-    case ActivationType::RReLU:
-        fusedDenseKernel<FunctorRReLU<T_ESTRIN>, true>(data, size, alpha);
-        break;
-    case ActivationType::ELU:
-        fusedDenseKernel<FunctorELU<T_ESTRIN>, true>(data, size, alpha);
-        break;
-    case ActivationType::SELU:
-        fusedDenseKernel<FunctorSELU<T_ESTRIN>, true>(data, size, alpha);
-        break;
-    case ActivationType::GELU:
-        fusedDenseKernel<FunctorGELU<T_ESTRIN>, true>(data, size, alpha);
-        break;
-    case ActivationType::AproxGELU:
-        fusedDenseKernel<FunctorAproxGELU<T_ESTRIN>, true>(data, size, alpha);
-        break;
-    case ActivationType::Swish:
-        fusedDenseKernel<FunctorSwish<T_ESTRIN>, true>(data, size, alpha);
-        break;
-    case ActivationType::HSwish:
-        fusedDenseKernel<FunctorHardSwish<T_ESTRIN>, true>(data, size, alpha);
-        break;
-    case ActivationType::Mish:
-        fusedDenseKernel<FunctorMish<T_ESTRIN>, true>(data, size, alpha);
-        break;
-    case ActivationType::HMish:
-        fusedDenseKernel<FunctorHardMish<T_ESTRIN>, true>(data, size, alpha);
-        break;
-    case ActivationType::Softplus:
-        fusedDenseKernel<FunctorSoftplus<T_ESTRIN>, true>(data, size, alpha);
-        break;
-    case ActivationType::Maxout:
-        JOB_LOG_ERROR("[ActivationMath]: Please use job::ai::comp::maxout(range) on its own");
-        break;
-    case ActivationType::GDN:
-        JOB_LOG_ERROR("[ActivationMath]: Please use job::ai::comp::rrelu(x, config)"); // I guess we could call this as well now
-        break;
-    }
-}
+// template<bool T_ESTRIN>
+// inline void activateDense(float* __restrict__ data,
+//                           size_t size,
+//                           ActivationType type,
+//                           float alpha = 1.0f) // We can get rid of smooth then go through these calls fixing the
+// {
+//     switch (type) {
+//     case ActivationType::Identity:
+//         fusedDenseKernel<FunctorIdentity<T_ESTRIN>, false>(data, size, alpha);
+//         break;
+//     case ActivationType::Sigmoid:
+//         fusedDenseKernel<FunctorSigmoid<T_ESTRIN>, false>(data, size, alpha);
+//         break;
+//     case ActivationType::Tanh:
+//         fusedDenseKernel<FunctorTann<T_ESTRIN>, false>(data, size, alpha);
+//         break;
+//     case ActivationType::HardTanh:
+//         fusedDenseKernel<FunctorHardTanh<T_ESTRIN>, false>(data, size, alpha);
+//         break;
+//     case ActivationType::ReLU:
+//         fusedDenseKernel<FunctorReLU<T_ESTRIN>, false>(data, size, alpha);
+//         break;
+//     case ActivationType::LeakyReLU:
+//         fusedDenseKernel<FunctorLeakyReLU<T_ESTRIN>, true>(data, size, alpha);
+//         break;
+//     case ActivationType::PReLU:
+//         fusedDenseKernel<FunctorPReLU<T_ESTRIN>, true>(data, size, alpha);
+//         break;
+//     case ActivationType::RReLU:
+//         fusedDenseKernel<FunctorRReLU<T_ESTRIN>, true>(data, size, alpha);
+//         break;
+//     case ActivationType::ELU:
+//         fusedDenseKernel<FunctorELU<T_ESTRIN>, true>(data, size, alpha);
+//         break;
+//     case ActivationType::SELU:
+//         fusedDenseKernel<FunctorSELU<T_ESTRIN>, true>(data, size, alpha);
+//         break;
+//     case ActivationType::GELU:
+//         fusedDenseKernel<FunctorGELU<T_ESTRIN>, true>(data, size, alpha);
+//         break;
+//     case ActivationType::AproxGELU:
+//         fusedDenseKernel<FunctorAproxGELU<T_ESTRIN>, true>(data, size, alpha);
+//         break;
+//     case ActivationType::Swish:
+//         fusedDenseKernel<FunctorSwish<T_ESTRIN>, true>(data, size, alpha);
+//         break;
+//     case ActivationType::HSwish:
+//         fusedDenseKernel<FunctorHardSwish<T_ESTRIN>, true>(data, size, alpha);
+//         break;
+//     case ActivationType::Mish:
+//         fusedDenseKernel<FunctorMish<T_ESTRIN>, true>(data, size, alpha);
+//         break;
+//     case ActivationType::HMish:
+//         fusedDenseKernel<FunctorHardMish<T_ESTRIN>, true>(data, size, alpha);
+//         break;
+//     case ActivationType::Softplus:
+//         fusedDenseKernel<FunctorSoftplus<T_ESTRIN>, true>(data, size, alpha);
+//         break;
+//     case ActivationType::Maxout:
+//         JOB_LOG_ERROR("[ActivationMath]: Please use job::ai::comp::maxout(range) on its own");
+//         break;
+//     case ActivationType::GDN:
+//         JOB_LOG_ERROR("[ActivationMath]: Please use job::ai::comp::rrelu(x, config)"); // I guess we could call this as well now
+//         break;
+//     }
+// }
 
 
 template<typename T_FUNCTOR>

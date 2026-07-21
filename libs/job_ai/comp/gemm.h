@@ -103,10 +103,6 @@ inline void computeTile(int M, int N, int K, float alpha,
                 int m_limit = std::min(kMicroM, M_curr - mi); // How many rows are valid?
                 int n_limit = std::min(kMicroN, N_curr - ni); // How many cols are valid?
 
-                [[maybe_unused]]f32 c[8];
-                for(int i = 0; i < 8; ++i)
-                    c[i] = SIMD::zero();
-
                 // Registers
                 f32 acc[8];
                 for(int i=0; i<8; ++i)

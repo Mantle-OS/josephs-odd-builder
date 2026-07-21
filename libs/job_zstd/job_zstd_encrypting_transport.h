@@ -1,4 +1,3 @@
-// job_zstd_encrypting_transport.h
 #pragma once
 
 #include <streambuf>
@@ -9,8 +8,10 @@
 
 #include <job_secure_mem.h>
 
+#include "jobzstd_export.h"
+
 namespace job::zstd {
-class JobZstdEncryptingTransport : public std::streambuf
+class JOBZSTD_EXPORT JobZstdEncryptingTransport : public std::streambuf
 {
 public:
     static constexpr std::size_t kDefaultChunkSize = 65536;
@@ -20,7 +21,7 @@ public:
 
     // Encrypts and writes whatever partial chunk remains buffered. Must be
     // called exactly once, after the upstream JobZstdIO has already been
-    // close()'d -- this is where the final (possibly short) chunk actually
+    // close()'d, his is where the final (possibly short) chunk actually
     // gets encrypted and flushed.
     [[nodiscard]] bool finish();
 

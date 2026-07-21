@@ -2,7 +2,7 @@ include(CheckCXXCompilerFlag)
 ##############################
 # Compiler flags
 ##############################
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 20) # thanks nvidia .....
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -49,10 +49,6 @@ elseif(JOB_L3_MB STREQUAL "8")
 else()
     message(FATAL_ERROR "JOB_L3_MB must be 8, 16, or 32!")
 endif()
-
-
-
-
 
 
 option(JOB_CUDA "Add nvidia cuda support " ON)

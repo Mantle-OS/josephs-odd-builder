@@ -16,7 +16,11 @@ fields:
     type: "u64"
     required: false
     comment: "after install"
+  - name: "upstream_sha"
+    type: "str"
+    required: true
+    comment: "Upstream Sha of the file, one can get this from the web ui or using git. There are issues way out of my control for using api's or libgit2 for auto generation"
   - name: "sha"
-    type: "u32"
+    type: "bin[32]"
     required: false
-    comment: "after install the blake9 no really needed here"
+    comment: "The file that is going to get installed hash"

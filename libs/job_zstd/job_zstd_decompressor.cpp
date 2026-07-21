@@ -90,7 +90,6 @@ bool JobZstdDecompressor::decompressFolder()
         return false;
     }
 
-
     std::istream zstdIn(&zstd);
 
     std::string tag;
@@ -184,7 +183,7 @@ bool JobZstdDecompressor::decompressFolder()
             }
 
             if (!preserveSymlinks()) {
-                setErrorString("Archive contains a symlink entry and preserveSymlinks() is false -- refusing extraction: " + relPathStr);
+                setErrorString("Archive contains a symlink entry and preserveSymlinks() is false: refusing extraction: " + relPathStr);
                 static_cast<void>(zstd.close());
                 return false;
             }
@@ -418,7 +417,7 @@ bool JobZstdDecompressor::decompressSymlinkArchive()
     }
 
     if (!preserveSymlinks()) {
-        setErrorString("Archive is a symlink and preserveSymlinks() is false -- refusing extraction.");
+        setErrorString("Archive is a symlink and preserveSymlinks() is false: refusing extraction.");
         static_cast<void>(zstd.close());
         return false;
     }

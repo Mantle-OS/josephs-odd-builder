@@ -2,11 +2,14 @@
 
 #include <job_secure_mem.h>
 
+#include "job_zstd_io.h"
 #include "job_zstd_decompressor.h"
+#include "job_zstd_decrypting_transport.h"
 
+#include "jobzstd_export.h"
 namespace job::zstd {
 
-class JobZstdDecompressorCrypto : public JobZstdDecompressor
+class JOBZSTD_EXPORT JobZstdDecompressorCrypto : public JobZstdDecompressor
 {
 public:
     JobZstdDecompressorCrypto() = default;
@@ -21,6 +24,7 @@ public:
     [[nodiscard]] bool decompressSymlinkArchive() override;
 private:
     job::crypto::JobSecureMem m_decryptionKey;
+    [[nodiscard]] static std::string bestErrorMessage(const JobZstdIO &zstd, const JobZstdDecryptingTransport &decTransport, const std::string &fallback);
 };
 
 } // namespace job::zstd

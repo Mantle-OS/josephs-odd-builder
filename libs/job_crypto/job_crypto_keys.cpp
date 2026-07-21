@@ -42,6 +42,102 @@ bool JobCryptoKeys::setPublicKey(const std::vector<unsigned char> &publicKeyByte
     return true;
 }
 
+std::string JobCryptoKeys::publicKeyData(const std::filesystem::path &pub) noexcept
+{
+    std::error_code existsEc;
+    if (pub.empty() || !std::filesystem::exists(pub, existsEc))
+        return {};
+
+    std::ifstream file(pub, std::ios::binary);
+    if (!file)
+        return {};
+
+    std::ostringstream content;
+    content << file.rdbuf();
+
+    std::vector<unsigned char> pubKeyBin;
+    if (!crypto::utils::base64ToBin(pubKeyBin, content.str()))
+        return {};
+
+    return crypto::utils::toBase64(pubKeyBin);
+}
+
+bool JobCryptoKeys::validPublicKey(const std::filesystem::path &publicKeyFile) noexcept
+{
+    std::error_code existsEc;
+    if (publicKeyFile.empty() || !std::filesystem::exists(publicKeyFile, existsEc))
+        return false;
+
+    std::ifstream file(publicKeyFile, std::ios::binary);
+    if (!file)
+        return false;
+
+    std::ostringstream content;
+    content << file.rdbuf();
+
+    std::vector<unsigned char> pubKeyBin;
+    if (!crypto::utils::base64ToBin(pubKeyBin, content.str()))
+        return false;
+
+    return pubKeyBin.size() == crypto_sign_PUBLICKEYBYTES;
+}
+
+bool JobCryptoKeys::privateKeyMatchesPublicKey(KeyType type) const noexcept
+{
+    std::vector<unsigned char> pubKeyBin;
+    if (!crypto::utils::base64ToBin(pubKeyBin, publicKey()))
+        return false;
+
+    switch (type) {
+    case KeyType::Exchange: {
+        if (privateKey().size() != crypto_kx_SECRETKEYBYTES ||
+            pubKeyBin.size() != crypto_kx_PUBLICKEYBYTES)
+            return false;
+
+        unsigned char derivedPub[crypto_kx_PUBLICKEYBYTES];
+
+        if (crypto_scalarmult_base(derivedPub, privateKey().data()) != 0)
+            return false;
+
+        bool const matches = sodium_memcmp(
+                                 derivedPub,
+                                 pubKeyBin.data(),
+                                 crypto_kx_PUBLICKEYBYTES
+                                 ) == 0;
+
+        sodium_memzero(derivedPub, sizeof(derivedPub));
+        return matches;
+    }
+
+    case KeyType::Sign: {
+        if (privateKey().size() != crypto_sign_SECRETKEYBYTES ||
+            pubKeyBin.size() != crypto_sign_PUBLICKEYBYTES)
+            return false;
+
+        unsigned char derivedPub[crypto_sign_PUBLICKEYBYTES];
+        unsigned char derivedSk[crypto_sign_SECRETKEYBYTES];
+
+        if (crypto_sign_seed_keypair(derivedPub, derivedSk, privateKey().data()) != 0) {
+            sodium_memzero(derivedSk, sizeof(derivedSk));
+            sodium_memzero(derivedPub, sizeof(derivedPub));
+            return false;
+        }
+
+        bool const matches = sodium_memcmp(
+                                 derivedPub,
+                                 pubKeyBin.data(),
+                                 crypto_sign_PUBLICKEYBYTES
+                                 ) == 0;
+
+        sodium_memzero(derivedSk, sizeof(derivedSk));
+        sodium_memzero(derivedPub, sizeof(derivedPub));
+        return matches;
+    }
+    }
+
+    return false;
+}
+
 void JobCryptoKeys::setPrivateKey(const JobSecureMem &privKey)
 {
     m_privateKey.free();
@@ -168,6 +264,61 @@ bool JobCryptoKeys::createServerSessionKeys(JobSecureMem &rx, JobSecureMem &tx, 
         );
 
     return (result == 0);
+}
+
+bool JobCryptoKeys::createAndSaveKeys(const std::filesystem::path &dirPath, KeyType type,
+                                      const std::string &pubName, const std::string &priName) noexcept
+{
+    if (!createKeys(type))
+        return false;
+
+    return saveKeys(dirPath, pubName, priName);
+}
+
+bool JobCryptoKeys::saveKeys(const std::filesystem::path &dirPath, const std::string &pubName, const std::string &priName) noexcept
+{
+    if (!isValid())
+        return false;
+
+    std::error_code ec;
+    if (!std::filesystem::exists(dirPath)) {
+        std::filesystem::create_directories(dirPath, ec);
+        if (ec)
+            return false;
+    }
+
+    std::filesystem::path const pubPath = dirPath / pubName;
+    std::filesystem::path const priPath = dirPath / priName;
+
+    std::ofstream pubFile(pubPath, std::ios::out | std::ios::binary);
+    if (!pubFile.is_open()) return false;
+
+    std::string const pubData = publicKey();
+    pubFile.write(pubData.data(), static_cast<std::streamsize>(pubData.size()));
+    pubFile.close();
+    if (pubFile.fail())
+        return false;
+
+    if (m_privateKey.empty())
+        return false;
+
+    std::ofstream priFile(priPath, std::ios::out | std::ios::binary);
+    if (!priFile.is_open())
+        return false;
+
+    priFile.write(reinterpret_cast<const char*>(m_privateKey.data()),
+                  static_cast<std::streamsize>(m_privateKey.size()));
+
+    priFile.flush();
+    priFile.close();
+    if (priFile.fail())
+        return false;
+
+#ifndef NDEBUG
+    // JOB_LOG_DEBUG("[DEBUG SAVE] Private Key Size in memory: %" << m_privateKey.size())";
+#endif
+
+    return true;
 }
 
 } // namespace job::crypto

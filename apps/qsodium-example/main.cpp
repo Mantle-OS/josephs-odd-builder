@@ -1,5 +1,6 @@
 #include <QCoreApplication>
 #include <QFile>
+#include <QFileInfo>
 #include <QDir>
 #include <QStandardPaths>
 #include <QDebug>

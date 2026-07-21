@@ -7,11 +7,10 @@
 #include <sodium/crypto_pwhash.h>
 
 #include "job_secure_mem.h"
-
+#include "jobcrypto_export.h"
 namespace job::crypto {
 
-class JobPasswordUtils
-{
+class JOBCRYPTO_EXPORT JobPasswordUtils {
 public:
     JobPasswordUtils() = delete;
     ~JobPasswordUtils() = delete;

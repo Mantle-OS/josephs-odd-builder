@@ -6,10 +6,11 @@
 
 #include "job_isched_policy.h"
 #include "job_task_descriptor.h"
+#include "jobthreads_export.h"
 
 namespace job::threads {
 
-class FifoScheduler : public ISchedPolicy {
+class JOBTHREADS_EXPORT FifoScheduler : public ISchedPolicy {
 public:
     using Ptr = std::shared_ptr<FifoScheduler>;
 

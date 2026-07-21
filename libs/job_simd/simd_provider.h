@@ -26,7 +26,9 @@ using SIMD = NEON_F;
 #endif
 
 
+// after we have gathered the namespcae
 #include "simd_math.h"
+
 namespace job::simd {
 inline f32 SIMD::exp(f32 x)      { return exp_estrin(x); }
 inline f32 SIMD::log(f32 x)      { return avx_log(x); }

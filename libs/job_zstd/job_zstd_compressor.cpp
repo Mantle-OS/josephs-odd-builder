@@ -1,4 +1,3 @@
-// job_zstd_compressor.cpp
 #include "job_zstd_compressor.h"
 
 #include <filesystem>
@@ -76,7 +75,7 @@ bool JobZstdCompressor::compressFolder()
 
     job::zstd::JobZstdIO zstd(dst.rdbuf());
     if (!zstd.setCompressionLevel(compressionLevel())) {
-        setErrorString("Compression level rejected -- was the stream already open?");
+        setErrorString("Compression level rejected: Was the stream already open?");
         return false;
     }
 

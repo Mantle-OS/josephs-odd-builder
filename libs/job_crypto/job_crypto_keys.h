@@ -17,9 +17,11 @@
 #include "job_crypto_utils.h"
 #include "job_secure_mem.h"
 
+#include "jobcrypto_export.h"
+
 namespace job::crypto {
 
-class JobCryptoKeys
+class JOBCRYPTO_EXPORT JobCryptoKeys
 {
 public:
     enum class KeyType {
@@ -38,100 +40,9 @@ public:
     [[nodiscard]] std::string publicKey() const noexcept { return m_publicKey; }
     void setPublicKey(const std::string &pubKey) { m_publicKey = pubKey; }
     [[nodiscard]] bool setPublicKey(const std::vector<unsigned char> &publicKeyBytes) noexcept;
-    [[nodiscard]] std::string publicKeyData(const std::filesystem::path &pub) noexcept
-    {
-        std::error_code existsEc;
-        if (pub.empty() || !std::filesystem::exists(pub, existsEc))
-            return {};
-
-        std::ifstream file(pub, std::ios::binary);
-        if (!file)
-            return {};
-
-        std::ostringstream content;
-        content << file.rdbuf();
-
-        std::vector<unsigned char> pubKeyBin;
-        if (!crypto::utils::base64ToBin(pubKeyBin, content.str()))
-            return {};
-
-        return crypto::utils::toBase64(pubKeyBin);
-    }
-    [[nodiscard]] bool validPublicKey(const std::filesystem::path &publicKeyFile) noexcept
-    {
-        std::error_code existsEc;
-        if (publicKeyFile.empty() || !std::filesystem::exists(publicKeyFile, existsEc))
-            return false;
-
-        std::ifstream file(publicKeyFile, std::ios::binary);
-        if (!file)
-            return false;
-
-        std::ostringstream content;
-        content << file.rdbuf();
-
-        std::vector<unsigned char> pubKeyBin;
-        if (!crypto::utils::base64ToBin(pubKeyBin, content.str()))
-            return false;
-
-        return pubKeyBin.size() == crypto_sign_PUBLICKEYBYTES;
-    }
-
-    [[nodiscard]] bool privateKeyMatchesPublicKey(KeyType type) const noexcept
-    {
-        std::vector<unsigned char> pubKeyBin;
-        if (!crypto::utils::base64ToBin(pubKeyBin, publicKey()))
-            return false;
-
-        switch (type) {
-        case KeyType::Exchange: {
-            if (privateKey().size() != crypto_kx_SECRETKEYBYTES ||
-                pubKeyBin.size() != crypto_kx_PUBLICKEYBYTES)
-                return false;
-
-            unsigned char derivedPub[crypto_kx_PUBLICKEYBYTES];
-
-            if (crypto_scalarmult_base(derivedPub, privateKey().data()) != 0)
-                return false;
-
-            bool const matches = sodium_memcmp(
-                                     derivedPub,
-                                     pubKeyBin.data(),
-                                     crypto_kx_PUBLICKEYBYTES
-                                     ) == 0;
-
-            sodium_memzero(derivedPub, sizeof(derivedPub));
-            return matches;
-        }
-
-        case KeyType::Sign: {
-            if (privateKey().size() != crypto_sign_SECRETKEYBYTES ||
-                pubKeyBin.size() != crypto_sign_PUBLICKEYBYTES)
-                return false;
-
-            unsigned char derivedPub[crypto_sign_PUBLICKEYBYTES];
-            unsigned char derivedSk[crypto_sign_SECRETKEYBYTES];
-
-            if (crypto_sign_seed_keypair(derivedPub, derivedSk, privateKey().data()) != 0) {
-                sodium_memzero(derivedSk, sizeof(derivedSk));
-                sodium_memzero(derivedPub, sizeof(derivedPub));
-                return false;
-            }
-
-            bool const matches = sodium_memcmp(
-                                     derivedPub,
-                                     pubKeyBin.data(),
-                                     crypto_sign_PUBLICKEYBYTES
-                                     ) == 0;
-
-            sodium_memzero(derivedSk, sizeof(derivedSk));
-            sodium_memzero(derivedPub, sizeof(derivedPub));
-            return matches;
-        }
-        }
-
-        return false;
-    }
+    [[nodiscard]] std::string publicKeyData(const std::filesystem::path &pub) noexcept;
+    [[nodiscard]] bool validPublicKey(const std::filesystem::path &publicKeyFile) noexcept;
+    [[nodiscard]] bool privateKeyMatchesPublicKey(KeyType type) const noexcept;
 
 
     [[nodiscard]] JobSecureMem privateKey() const noexcept { return m_privateKey; }
@@ -144,67 +55,15 @@ public:
 
     [[nodiscard]] bool createClientSessionKeys(JobSecureMem &rx, JobSecureMem &tx, const std::string &serverPublicKey) noexcept;
     [[nodiscard]] bool createServerSessionKeys(JobSecureMem &rx, JobSecureMem &tx, const std::string &clientPublicKey) noexcept;
-
-
     [[nodiscard]] bool createAndSaveKeys(const std::filesystem::path &dirPath,
                                          KeyType type,
                                          const std::string &pubName = "public.key",
-                                         const std::string &priName = "private.key") noexcept
-    {
-        if (!createKeys(type))
-            return false;
-
-        return saveKeys(dirPath, pubName, priName);
-    }
+                                         const std::string &priName = "private.key") noexcept;
 
 
     [[nodiscard]] bool saveKeys(const std::filesystem::path &dirPath,
-                                         const std::string &pubName = "public.key",
-                                         const std::string &priName = "private.key") noexcept
-    {
-        if (!isValid())
-            return false;
-
-        std::error_code ec;
-        if (!std::filesystem::exists(dirPath)) {
-            std::filesystem::create_directories(dirPath, ec);
-            if (ec)
-                return false;
-        }
-
-        std::filesystem::path const pubPath = dirPath / pubName;
-        std::filesystem::path const priPath = dirPath / priName;
-
-        std::ofstream pubFile(pubPath, std::ios::out | std::ios::binary);
-        if (!pubFile.is_open()) return false;
-
-        std::string const pubData = publicKey();
-        pubFile.write(pubData.data(), static_cast<std::streamsize>(pubData.size()));
-        pubFile.close();
-        if (pubFile.fail())
-            return false;
-
-        if (m_privateKey.empty())
-            return false;
-
-        std::ofstream priFile(priPath, std::ios::out | std::ios::binary);
-        if (!priFile.is_open())
-            return false;
-
-        priFile.write(reinterpret_cast<const char*>(m_privateKey.data()),
-                      static_cast<std::streamsize>(m_privateKey.size()));
-
-        priFile.flush();
-        priFile.close();
-        if (priFile.fail())
-            return false;
-
-#ifndef NDEBUG
-        // std::cout << "[DEBUG SAVE] Private Key Size in memory: " << m_privateKey.size() << "\n";
-#endif
-
-        return true;
-    }
+                                const std::string &pubName = "public.key",
+                                const std::string &priName = "private.key") noexcept;
     [[nodiscard]] bool loadKeysFromDisk(const std::filesystem::path &pubPath,
                                         const std::filesystem::path &priPath) noexcept
     {

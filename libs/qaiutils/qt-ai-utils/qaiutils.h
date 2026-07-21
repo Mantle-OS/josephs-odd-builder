@@ -3,10 +3,10 @@
 
 #include <QObject>
 #include <QHash>
-#include <QDebug>
+#include <QString>
 
-class QAiUtils
-{
+#include "qaiutils_export.h"
+class QAIUTILS_EXPORT QAiUtils {
 public:
     static QAiUtils &instance();
 

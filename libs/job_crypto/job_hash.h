@@ -5,11 +5,10 @@
 #include <vector>
 
 #include <sodium/crypto_generichash.h>
-
+#include "jobcrypto_export.h"
 namespace job::crypto {
 
-class JobHash
-{
+class JOBCRYPTO_EXPORT JobHash {
 public:
     JobHash() = default;
     ~JobHash() = default;

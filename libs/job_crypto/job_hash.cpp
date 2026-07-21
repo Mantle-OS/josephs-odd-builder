@@ -7,6 +7,8 @@
 
 #include "job_crypto_init.h"
 
+#include <job_logger.h>
+
 namespace job::crypto {
 
 std::vector<unsigned char> JobHash::hashBuffer(const std::vector<unsigned char> &data,
@@ -14,12 +16,16 @@ std::vector<unsigned char> JobHash::hashBuffer(const std::vector<unsigned char> 
                                                const unsigned char *key,
                                                std::size_t keylen) noexcept
 {
-    if (!JobCryptoInit::isInitialized() && !JobCryptoInit::initialize())
+    if (!JobCryptoInit::isInitialized() && !JobCryptoInit::initialize()){
+        JOB_LOG_DEBUG(
+            "[JobHash] Buffer hashing stopped because the crypto runtime is unavailable."
+            );
         return {};
+    }
 
     if (hashSize < crypto_generichash_BYTES_MIN || hashSize > crypto_generichash_BYTES_MAX) {
 #ifndef NDEBUG
-        std::cerr << "[JobHash] Invalid requested hash byte dimensions: " << hashSize << "\n";
+        JOB_LOG_ERROR("[JobHash] Invalid requested hash byte dimensions: {}", hashSize);
 #endif
         return {};
     }
@@ -28,8 +34,11 @@ std::vector<unsigned char> JobHash::hashBuffer(const std::vector<unsigned char> 
     if (key != nullptr) {
         if (keylen < crypto_generichash_KEYBYTES_MIN || keylen > crypto_generichash_KEYBYTES_MAX) {
 #ifndef NDEBUG
-            std::cerr << "[JobHash] Keyed MAC error: Provided key length (" << keylen
-                      << ") falls outside permitted boundaries.\n";
+            JOB_LOG_ERROR(
+                "[JobHash] Keyed MAC error: Provided key length ({}) "
+                "falls outside permitted boundaries.",
+                keylen
+                );
 #endif
             return {};
         }
@@ -47,7 +56,7 @@ std::vector<unsigned char> JobHash::hashBuffer(const std::vector<unsigned char> 
 
     if (result != 0) {
 #ifndef NDEBUG
-        std::cerr << "[JobHash] Failed to compute buffer hash pass.\n";
+        JOB_LOG_ERROR("[JobHash] Failed to compute buffer hash pass.");
 #endif
         return {};
     }
@@ -60,12 +69,17 @@ std::vector<unsigned char> JobHash::hashFile(const std::string &filePath,
                                              const unsigned char *key,
                                              std::size_t keylen) noexcept
 {
-    if (!JobCryptoInit::isInitialized() && !JobCryptoInit::initialize())
+    if (!JobCryptoInit::isInitialized() && !JobCryptoInit::initialize()){
+        JOB_LOG_DEBUG(
+            "[JobHash] File hashing stopped because the crypto runtime is unavailable: {}",
+            filePath
+            );
         return {};
+    }
 
     if (hashSize < crypto_generichash_BYTES_MIN || hashSize > crypto_generichash_BYTES_MAX) {
 #ifndef NDEBUG
-        std::cerr << "[JobHash] Invalid requested hash byte dimensions: " << hashSize << "\n";
+        JOB_LOG_ERROR("[JobHash] Invalid requested hash byte dimensions: {}", hashSize );
 #endif
         return {};
     }
@@ -74,8 +88,11 @@ std::vector<unsigned char> JobHash::hashFile(const std::string &filePath,
     if (key != nullptr) {
         if (keylen < crypto_generichash_KEYBYTES_MIN || keylen > crypto_generichash_KEYBYTES_MAX) {
 #ifndef NDEBUG
-            std::cerr << "[JobHash] Keyed MAC error: Provided key length (" << keylen
-                      << ") falls outside permitted boundaries.\n";
+            JOB_LOG_ERROR(
+                "[JobHash] Keyed MAC error: Provided key length ({}) "
+                "falls outside permitted boundaries.",
+                keylen
+                );
 #endif
             return {};
         }
@@ -86,16 +103,26 @@ std::vector<unsigned char> JobHash::hashFile(const std::string &filePath,
     std::ifstream file(filePath, std::ios::binary);
     if (!file.is_open()) {
 #ifndef NDEBUG
-        std::cerr << "[JobHash] Cannot open file source for hashing loops: " << filePath << "\n";
+        JOB_LOG_ERROR(
+            "[JobHash] Cannot open file source for hashing loops: {}",
+            filePath
+            );
 #endif
         return {};
     }
 
     crypto_generichash_state state;
-    crypto_generichash_init(&state, key, keylen, hashSize);
+
+    if (crypto_generichash_init( &state, key, keylen, hashSize ) != 0) {
+#ifndef NDEBUG
+        JOB_LOG_ERROR(
+            "[JobHash] Failed to initialize file hashing state."
+            );
+#endif
+        return {};
+    }
 
     std::vector<char> buffer(kChunkSize);
-
     while (file.good()) {
         file.read(buffer.data(), kChunkSize);
         std::streamsize const bytesRead = file.gcount();
@@ -106,7 +133,10 @@ std::vector<unsigned char> JobHash::hashFile(const std::string &filePath,
 
     if (file.bad()) {
 #ifndef NDEBUG
-        std::cerr << "[JobHash] Disk read error while calculating signature hash for: " << filePath << "\n";
+        JOB_LOG_ERROR(
+            "[JobHash] Disk read error while calculating signature hash for: {}",
+            filePath
+            );
 #endif
         return {};
     }

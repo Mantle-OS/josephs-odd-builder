@@ -1,21 +1,18 @@
-#ifndef QAIPATHING_H
-#define QAIPATHING_H
+#pragma once
 
 #include <QObject>
-#include <QDir>
-#include <QDirIterator>
-#include <QFileInfo>
+#include <QString>
+#include <QStringList>
 
 #include <QQmlEngine>
 
 #include "qmlstringlist.h"
 #include "qaiutils.h"
-
 #include "property-macros.h"
 #include "pointer-macros.h"
+#include "qmlaiutils_export.h"
 
-
-class QAiPathing : public QObject
+class QMLAIUTILS_EXPORT QAiPathing : public QObject
 {
     Q_OBJECT
     QP_RW(QString,              baseDir,                QAiUtils::modelsDir         )
@@ -64,8 +61,6 @@ public:
     ~QAiPathing();
     Q_INVOKABLE void scanAll();
 
-
-
 Q_SIGNALS:
     void scanCheckpointsDone();
     void scanDiffusionDone();
@@ -89,8 +84,7 @@ private:
     void scanVaeModel();
     void scanAudioVaeModel();
     void scan(QmlStringList *dirs, QmlStringList *files,
-              const QStringList &allowedSuffix = {"safetensor, gguf"});
+              const QStringList &allowedSuffix = {"safetensors, gguf"});
 
 };
 
-#endif // QAIPATHING_H

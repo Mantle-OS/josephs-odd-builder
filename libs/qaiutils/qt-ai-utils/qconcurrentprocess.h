@@ -2,11 +2,16 @@
 #define QCONCURRENTPROCESS_H
 
 #include <QObject>
+#include <QString>
+#include <QStringList>
+#include <QList>
 #include <QQueue>
 #include <QSemaphore>
 #include <QFutureWatcher>
 
-class QConcurrentProcess : public QObject {
+#include "qaiutils_export.h"
+
+class QAIUTILS_EXPORT QConcurrentProcess : public QObject {
     Q_OBJECT
 public:
     explicit QConcurrentProcess(QObject *parent = nullptr);

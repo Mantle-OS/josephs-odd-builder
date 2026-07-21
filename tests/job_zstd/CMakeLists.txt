@@ -20,10 +20,12 @@ add_executable(test_job_zstd
     test_job_zstd_sign.cpp
     test_job_zstd.cpp
 )
+if(JOB_LINUX)
+    target_link_libraries(test_job_zstd PRIVATE atomic)
+endif()
 
 target_link_libraries(test_job_zstd PRIVATE
     Threads::Threads
-    atomic
     JosephsOddBuilder_Core
     ${LibSodium_LIBRARIES} JosephsOddBuilder_Crypto
     ${LibZstd_LIBRARIES} JosephsOddBuilder_Zstd

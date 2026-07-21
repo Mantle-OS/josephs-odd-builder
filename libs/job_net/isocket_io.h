@@ -3,19 +3,23 @@
 #include <string>
 #include <cstdint>
 #include <memory>
+#include <functional>
 
-#include <sys/epoll.h>
-
-#include <job_logger.h>
-
+// threads
 #include <job_io_async_thread.h>
 
+
 #include "job_url.h"
-#include "job_ipaddr.h"
-#include "socket_error.h"
+
+#include "resolve/job_ipaddr.h"
+#include "sockets/job_socket_error.h"
+
+#include "jobnet_export.h"
 
 namespace job::net {
-class ISocketIO  {
+
+class JOBNET_EXPORT ISocketIO  {
+
 public:
     using Ptr = std::shared_ptr<ISocketIO>;
     enum class SocketType : uint8_t {
@@ -56,8 +60,8 @@ public:
     virtual ISocketIO::Ptr accept() = 0;
     virtual void disconnect() = 0;
 
-    virtual ssize_t read(void *buffer, size_t size) = 0;
-    virtual ssize_t write(const void *buffer, size_t size) = 0;
+    virtual int64_t read(void *buffer, size_t size) = 0;
+    virtual int64_t write(const void *buffer, size_t size) = 0;
 
     virtual SocketState state() const noexcept = 0;
     virtual SocketErrors::SocketErrNo lastError() const noexcept = 0;
@@ -72,22 +76,21 @@ public:
 
     virtual void dumpState() const = 0;
 
-    int fd() const noexcept;
+    int fd() const noexcept; // thinking about this as it should jsut be the int from the windows registery as well
 
     void setLoop(const threads::JobIoAsyncThread::Ptr &loop);
 
     std::function<void()> onConnect;
     std::function<void(const char*, size_t)> onRead;
-    std::function<void(const char*, size_t)> onWrite; // For later
+    std::function<void(const char*, size_t)> onWrite;
     std::function<void()> onReady; // For UDP
     std::function<void()> onDisconnect;
     std::function<void(int)> onError;
     std::function<void(std::shared_ptr<ISocketIO>)> onAccept;
 
-
 protected:
-    virtual void onEvents(uint32_t events) = 0;
-    virtual void registerEvents(uint32_t events);
+    virtual void onEvents(threads::IOEvent events) = 0;
+    virtual void registerEvents(threads::IOEvent events);
     std::weak_ptr<threads::JobIoAsyncThread> m_loop;
     int m_fd{-1};
 };

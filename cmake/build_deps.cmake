@@ -1,5 +1,5 @@
 ##############################
-# DEPS
+# DEPS (build_deps.cmake)
 ##############################
 # TODO add the Qt Qml deps for the protoplanarty viewer
 
@@ -20,9 +20,12 @@
 # * REDHAT / FEDORA / CENTOS based (not tested)
 # sudo dnf install openssl-devel libzstd-devel pkgconf-pkg-config zlib-devel libsodium-devel flatbuffers-devel flatbuffers-compiler json-devel yaml-cpp-devel msgpack-devel catch2-devel
 
+include(GenerateExportHeader)
 include(GNUInstallDirs)
 find_package(Threads REQUIRED)
 find_package(PkgConfig REQUIRED)
+
+## FIXME much latyer add a section for JOB_WINDOWS
 
 ## CRYPTO
 pkg_check_modules(LibOpenSSL REQUIRED libssl)
@@ -51,6 +54,7 @@ if(JOB_CUDA)
 
 endif()
 
+## we build this now
 # pkg_check_modules(LibGgml REQUIRED ggml)
 # find_library(LibGgmlBase NAMES libggml-base ggml-base)
 # if(LibGgmlBase)
@@ -74,4 +78,6 @@ if(JOB_QT_AI)
         QuickControls2
       REQUIRED
     )
+
+    set(QML_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/qt6/qml" )
 endif()

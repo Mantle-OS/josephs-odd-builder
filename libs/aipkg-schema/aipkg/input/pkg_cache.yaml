@@ -23,7 +23,7 @@ fields:
     type: "str"
     required: false
   - name: "sha"
-    type: "str"
+    type: "bin[32]"
     required: false
     comment: "After packaged up blake.."
   - name: "sections"

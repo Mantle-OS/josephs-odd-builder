@@ -1,22 +1,23 @@
-#ifndef QMLSODIUMKEYS_H
-#define QMLSODIUMKEYS_H
-
+#pragma once
 #include <QObject>
 #include <QStandardPaths>
+
 #include <QQmlEngine>
 
 #include <property-macros.h>
-#include <qsodiumkeys.h>
 #include <qaiutils.h>
 
-class QmlSodiumKeys : public QObject
+#include <qsodiumkeys.h>
+
+#include "qmlsodium_export.h"
+class QMLSODIUM_EXPORT QmlSodiumKeys : public QObject
 {
     Q_OBJECT
 
-    QP_RW(QString, keyDir, QStandardPaths::writableLocation(QStandardPaths::TempLocation))
-    QP_RW(QString, publicKeyFile, "")
-    QP_RW(QString, privateKeyFile, "")
-    QP_RW(QString, publicKeyBase64, "")
+    QP_RW(QString, keyDir,          QStandardPaths::writableLocation(QStandardPaths::TempLocation)  )
+    QP_RW(QString, publicKeyFile,   ""                                                              )
+    QP_RW(QString, privateKeyFile,  ""                                                              )
+    QP_RW(QString, publicKeyBase64, ""                                                              )
 
     QML_ELEMENT
 public:
@@ -26,31 +27,18 @@ public:
     };
     Q_ENUM(KeyType)
 
-    explicit QmlSodiumKeys(QObject *parent = nullptr) :
-        QObject{parent},
-        m_keys{new QSodiumKeys{}}
-    {
-        // Safe value capture of the 'this' object instance context pointer
-        connect(this, &QmlSodiumKeys::publicKeyBase64Changed, this, [this](const QString &key){
-            if (m_keys)
-                m_keys->setPublicKey(key);
-        });
-    }
+    explicit QmlSodiumKeys(QObject *parent = nullptr);
 
-    ~QmlSodiumKeys() override {
-        delete m_keys;
-        m_keys = nullptr;
-    }
+    ~QmlSodiumKeys() override;
 
     Q_INVOKABLE bool create(QmlSodiumKeys::KeyType type) noexcept;
-    Q_INVOKABLE bool validSet() noexcept { return m_keys && m_keys->isValid(); }
+    Q_INVOKABLE bool validSet() noexcept;
 
     Q_INVOKABLE bool loadKeysFromDisk() noexcept;
     Q_INVOKABLE bool saveKeysToDisk() noexcept;
 
 private:
-    QSodiumKeys *m_keys = nullptr;
+    QSodiumKeys *m_keys = nullptr; // owned
+
     QString getFullPath(const QString &fileName) const noexcept;
 };
-
-#endif // QMLSODIUMKEYS_H
