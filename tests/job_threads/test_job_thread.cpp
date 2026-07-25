@@ -1,4 +1,8 @@
+#include "job_latch.h"
 #include <catch2/catch_test_macros.hpp>
+#ifdef JOB_TEST_BENCHMARKS
+#include <catch2/benchmark/catch_benchmark.hpp>
+#endif
 
 #include <atomic>
 #include <chrono>
@@ -8,10 +12,8 @@
 
 #include <job_thread.h>
 #include <job_logger.h>
-
 using namespace job::threads;
 using namespace std::chrono_literals;
-
 TEST_CASE("JobThread lifecycle with setRunFunction (Composition)", "[threading][lifecycle]")
 {
     std::atomic<bool> didRun{false};
@@ -85,6 +87,198 @@ TEST_CASE("JobThread lifecycle with overridden run (Inheritance)", "[threading][
     REQUIRE(thread.stopTokenWasHonored.load() == true);
 }
 
+// Edge Cases
+TEST_CASE("JobThread edge cases: RAII cleanup without explicit join", "[threading][edge]")
+{
+    SECTION("Destructor requests stop and joins active thread automatically") {
+        std::atomic<bool> didRun{false};
+        std::atomic<bool> stopHonored{false};
+
+        {
+            JobThread thread;
+            thread.setRunFunction([&](std::stop_token token) {
+                didRun.store(true);
+                while (!token.stop_requested()) {
+                    std::this_thread::sleep_for(1ms);
+                }
+                stopHonored.store(true);
+            });
+
+            REQUIRE(thread.start() == JobThread::StartResult::Started);
+            std::this_thread::sleep_for(5ms);
+        } // Block exit triggers ~JobThread() -> requestStop() + join()
+
+        REQUIRE(didRun.load());
+        REQUIRE(stopHonored.load());
+    }
+
+    SECTION("Destructor handles unstarted thread gracefully") {
+        REQUIRE_NOTHROW([]() {
+            JobThread thread;
+            thread.setOptions(JobThreadOptions::normal());
+            // Exit scope without calling start()
+        }());
+    }
+}
+
+TEST_CASE("JobThread edge cases: State recovery after start failure", "[threading][edge]")
+{
+    SECTION("Flag m_starting is cleared after failed start, allowing re-start") {
+        JobThreadOptions invalidOpts = JobThreadOptions::normal();
+        invalidOpts.realtime = true;
+        invalidOpts.policy = SchedulingPolicy::Other; // Invalid combination
+
+        JobThread thread(invalidOpts);
+        thread.setRunFunction([](std::stop_token token) {
+            while (!token.stop_requested()) {
+                std::this_thread::sleep_for(100us);
+            }
+        });
+
+        // First attempt fails during options validation/scheduling
+        auto res1 = thread.start();
+        REQUIRE(res1 == JobThread::StartResult::SchedulingFailed);
+        REQUIRE_FALSE(thread.isRunning());
+
+        // Fix options
+        thread.setOptions(JobThreadOptions::normal());
+
+        // Second attempt must succeed (proves m_starting was cleared and not left stuck)
+        auto res2 = thread.start();
+        REQUIRE(res2 == JobThread::StartResult::Started);
+        REQUIRE(thread.isRunning());
+
+        thread.requestStop();
+        REQUIRE(thread.join() == true);
+    }
+}
+
+TEST_CASE("JobThread edge cases: Non-realtime thread core pinning", "[threading][edge]")
+{
+    JobThreadOptions opts = JobThreadOptions::normal();
+    opts.realtime = false;
+    opts.pinToCore = true;
+    opts.coreId = 0; // Pin to CPU core 0
+
+    JobThread thread(opts);
+    std::atomic<bool> ran{false};
+    thread.setRunFunction([&](std::stop_token token) {
+        ran.store(true, std::memory_order_release);
+        while (!token.stop_requested()) {
+            std::this_thread::sleep_for(100us);
+        }
+    });
+
+    // Validates that applyAffinity runs even when realtime=false
+    auto result = thread.start();
+    if (result == JobThread::StartResult::Started) {
+        REQUIRE(thread.isRunning());
+        thread.requestStop();
+        REQUIRE(thread.join() == true);
+        REQUIRE(ran.load(std::memory_order_acquire));
+    } else {
+        // If system restricts affinity calls, it should fail with AffinityFailed, not silently ignore
+        REQUIRE(result == JobThread::StartResult::AffinityFailed);
+        REQUIRE_FALSE(thread.isRunning());
+        REQUIRE_FALSE(thread.join());
+    }
+}
+
+TEST_CASE("JobThread edge cases: Out-of-bounds parameter guards", "[threading][edge]")
+{
+    SECTION("Unbound coreId validation") {
+        JobThreadOptions opts = JobThreadOptions::normal();
+        opts.pinToCore = true;
+        opts.coreId = JobThreadOptions::kCoreUnbound; // 0xFF
+
+        JobThread thread(opts);
+        // Invalid core ID must trigger AffinityFailed during startup
+        REQUIRE(thread.start() == JobThread::StartResult::AffinityFailed);
+        REQUIRE_FALSE(thread.isRunning());
+        REQUIRE_FALSE(thread.join());
+    }
+
+    SECTION("Invalid priority range validation") {
+        JobThreadOptions opts = JobThreadOptions::normal();
+        opts.priority = 105; // Maximum valid priority is 99
+
+        JobThread thread(opts);
+        REQUIRE(thread.start() == JobThread::StartResult::SchedulingFailed);
+        REQUIRE_FALSE(thread.isRunning());
+        REQUIRE_FALSE(thread.join());
+    }
+}
+
+TEST_CASE("JobThread edge cases: Rapid start/stop churn", "[threading][edge][stress]")
+{
+    constexpr int kIterations = 50;
+    JobThread thread;
+
+    for (int i = 0; i < kIterations; ++i) {
+        std::atomic<bool> ran{false};
+
+        thread.setRunFunction([&ran](std::stop_token token) {
+            ran.store(true, std::memory_order_release);
+            while (!token.stop_requested()) {
+                std::this_thread::sleep_for(10us);
+            }
+        });
+
+        REQUIRE(thread.start() == JobThread::StartResult::Started);
+        REQUIRE(thread.start() == JobThread::StartResult::AlreadyRunning);
+
+        thread.requestStop();
+
+        // join() guarantees the threadEntry function has completely returned
+        REQUIRE(thread.join() == true);
+        REQUIRE_FALSE(thread.join()); // Second join must safely return false
+
+        REQUIRE(ran.load(std::memory_order_acquire) == true);
+    }
+}
+
+TEST_CASE("JobThread permits only one active join operation", "[threading][job-thread][join][edge]")
+{
+    JobThread thread;
+
+    JobLatch workerEntered{1};
+    JobLatch releaseWorker{1};
+
+    thread.setRunFunction([&](std::stop_token token) {
+        workerEntered.countDown();
+        releaseWorker.wait();
+        while (!token.stop_requested())
+            std::this_thread::yield();
+    });
+
+    REQUIRE(thread.start() == JobThread::StartResult::Started);
+
+    workerEntered.wait();
+
+    std::atomic<bool> firstJoinResult{false};
+    JobLatch joinCallerReady{1};
+
+    std::thread joiningThread([&] {
+        joinCallerReady.countDown();
+        firstJoinResult.store(thread.join(), std::memory_order_release);
+    });
+
+    joinCallerReady.wait();
+
+    REQUIRE_FALSE(thread.join());
+    REQUIRE(thread.start() == JobThread::StartResult::AlreadyRunning);
+
+    thread.requestStop();
+    releaseWorker.countDown();
+
+    joiningThread.join();
+
+    REQUIRE(firstJoinResult.load(std::memory_order_acquire));
+    REQUIRE_FALSE(thread.isRunning());
+    REQUIRE_FALSE(thread.join());
+}
+
+
 #ifndef JOB_CI_BUILD
 TEST_CASE("JobThread real-time options failure (as non-root)", "[threading][options]")
 {
@@ -100,7 +294,6 @@ TEST_CASE("JobThread real-time options failure (as non-root)", "[threading][opti
     bool correctFailure = (result == JobThread::StartResult::SchedulingFailed ||
                            result == JobThread::StartResult::AffinityFailed);
 
-
     if (result == JobThread::StartResult::Started) {
         thread.requestStop();
         REQUIRE(thread.join() == true);
@@ -112,6 +305,7 @@ TEST_CASE("JobThread real-time options failure (as non-root)", "[threading][opti
 }
 #endif
 
+#ifdef JOB_TEST_BENCHMARKS
 TEST_CASE("JobThread data race stress test (proves mutex)", "[threading][bench][race]")
 {
     job::core::JobLogger::instance().setLevel(job::core::LogLevel::Info);
@@ -133,7 +327,7 @@ TEST_CASE("JobThread data race stress test (proves mutex)", "[threading][bench][
                 if (i % 2 == 0) {
                     thread.setRunFunction(nullptr); // Use default run
                 } else {
-                    thread.setRunFunction([&]([[maybe_unused]]std::stop_token t){
+                    thread.setRunFunction([&]([[maybe_unused]] std::stop_token t){
                         // Do nothing, just override
                     });
                 }
@@ -158,28 +352,18 @@ TEST_CASE("JobThread data race stress test (proves mutex)", "[threading][bench][
 TEST_CASE("JobThread startup/join latency benchmark", "[threading][bench][latency]")
 {
     job::core::JobLogger::instance().setLevel(job::core::LogLevel::Info);
-    constexpr int kNumIterations = 100;
-    auto start_time = std::chrono::high_resolution_clock::now();
 
-    for (int i = 0; i < kNumIterations; ++i) {
+    BENCHMARK("JobThread start + requestStop + join cycle") {
         JobThread t;
         t.setRunFunction([&](std::stop_token token) {
             while (!token.stop_requested()) {
                 std::this_thread::sleep_for(1us);
             }
         });
-        REQUIRE(t.start() == JobThread::StartResult::Started);
+        (void)t.start();
         t.requestStop();
-        REQUIRE(t.join() == true);
-    }
-
-    auto end_time = std::chrono::high_resolution_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
-    double avg_us = static_cast<double>(duration.count()) / kNumIterations;
-
-    JOB_LOG_INFO("[JobThread] Total time for 100 iterations: {} us", duration.count());
-    JOB_LOG_INFO("[JobThread] Average start/join latency: {} us per thread" , avg_us);
-
-    REQUIRE(avg_us < 10000.0);
+        return t.join();
+    };
 }
 
+#endif

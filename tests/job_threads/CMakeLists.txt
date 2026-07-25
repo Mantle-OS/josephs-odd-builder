@@ -19,6 +19,7 @@ add_executable(test_job_threads
     test_bfs.cpp
     test_dijkstra.cpp
     test_branch_and_bound.cpp
+
 )
 
 target_link_libraries(test_job_threads PRIVATE

@@ -150,11 +150,13 @@ void *JobThread::threadEntry(void *arg)
                 ::pthread_setname_np(::pthread_self(), self->m_options.name.data());
             }
         }
+
         RunFunction func_to_run;
         {
             std::lock_guard<std::mutex> lock(self->m_mutex);
             func_to_run = self->m_runFunc;
         }
+
         if (func_to_run)
             func_to_run(token);
         else

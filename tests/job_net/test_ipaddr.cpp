@@ -1,7 +1,50 @@
 #include <catch2/catch_test_macros.hpp>
 #include <job_ipaddr.h>
 
+#include <unistd.h>
+#include <cstdio>
+#include <string>
+
+#if defined(JOB_WINDOWS)
+#include <windows.h>
+#else
+#include <sys/socket.h>
+#include <sys/un.h>
+#endif
+
 using namespace job::net;
+TEST_CASE("JobIpAddr UNIX socket parsing", "[job_ipaddr][unix]") {
+    std::string path = "/tmp/test_ipaddr_" + std::to_string(::getpid()) + ".sock";
+
+#if defined(JOB_WINDOWS)
+    HANDLE h = ::CreateFileA(path.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+    REQUIRE(h != INVALID_HANDLE_VALUE);
+    ::CloseHandle(h);
+#else
+    ::unlink(path.c_str());
+    int fd = ::socket(AF_UNIX, SOCK_STREAM, 0);
+    REQUIRE(fd >= 0);
+    sockaddr_un un{};
+    un.sun_family = AF_UNIX;
+    std::snprintf(un.sun_path, sizeof(un.sun_path), "%s", path.c_str());
+    REQUIRE(::bind(fd, reinterpret_cast<sockaddr *>(&un), sizeof(un)) == 0);
+#endif
+
+    JobIpAddr addr(path);
+    REQUIRE(addr.isValid());
+    REQUIRE(addr.family() == JobIpAddr::Family::Unix);
+    REQUIRE(addr.toString(false) == path);
+    REQUIRE(addr.isLocal());
+    REQUIRE(addr.isUnixPermitted());
+
+#if defined(JOB_WINDOWS)
+    ::DeleteFileA(path.c_str());
+#else
+    ::close(fd);
+    ::unlink(path.c_str());
+#endif
+}
+
 
 TEST_CASE("JobIpAddr IPv4 parsing and string conversion", "[job_ipaddr][ipv4]") {
     JobIpAddr addr("192.168.1.10", 8080);
@@ -34,16 +77,6 @@ TEST_CASE("JobIpAddr IPv6 parsing and conversion", "[job_ipaddr][ipv6]") {
     REQUIRE_FALSE(addr.isLoopback());
     REQUIRE_FALSE(addr.isMulticast());
     REQUIRE_FALSE(addr.isNull());
-}
-
-TEST_CASE("JobIpAddr UNIX socket parsing", "[job_ipaddr][unix]") {
-    JobIpAddr addr("/tmp/test.sock");
-
-    REQUIRE(addr.isValid());
-    REQUIRE(addr.family() == JobIpAddr::Family::Unix);
-    REQUIRE(addr.toString(false) == "/tmp/test.sock");
-    REQUIRE(addr.isLocal());
-    REQUIRE(addr.isUnixPermitted());
 }
 
 TEST_CASE("JobIpAddr loopback and local detection", "[job_ipaddr][loopback][local]") {

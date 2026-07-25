@@ -1,41 +1,47 @@
 #pragma once
+
+#include <cstddef>
+#include <cstdint>
 #include <latch>
 
 namespace job::threads {
 
-// Single-use latch backed by std::latch (C++20+).
-struct JobLatch {
-    explicit JobLatch(std::uint32_t n) :
-        lat(static_cast<std::ptrdiff_t>(n))
+// Single-use countdown synchronization primitive backed by std::latch.
+class JobLatch final {
+public:
+    explicit JobLatch(std::uint32_t count) noexcept :
+        m_latch(static_cast<std::ptrdiff_t>(count))
     {
     }
 
-    JobLatch(const JobLatch&)            = delete;
-    JobLatch& operator=(const JobLatch&) = delete;
+    JobLatch(const JobLatch &) = delete;
+    JobLatch &operator=(const JobLatch &) = delete;
 
-    inline void countDown() noexcept
+    void countDown() noexcept
     {
-        lat.count_down();
+        m_latch.count_down();
     }
 
     // Block until the counter reaches zero.
-    inline void wait()
+    void wait() const noexcept
     {
-        lat.wait();
+        m_latch.wait();
     }
 
-    // Non-blocking: true if already at zero.
-    inline bool tryWait() const noexcept
+    // Non-blocking: true when the counter has reached zero.
+    [[nodiscard]] bool tryWait() const noexcept
     {
-        return lat.try_wait();
+        return m_latch.try_wait();
     }
-    inline void arriveAndWait()
+
+    // Decrement the counter and block until it reaches zero.
+    void arriveAndWait() noexcept
     {
-        lat.arrive_and_wait();
+        m_latch.arrive_and_wait();
     }
 
 private:
-    std::latch lat;
+    std::latch m_latch;
 };
 
 } // namespace job::threads

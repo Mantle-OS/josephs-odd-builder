@@ -1,12 +1,16 @@
 #include "job_io_async_thread.h"
 
+#include <cstring>
+#include <algorithm>
+#include <unordered_map>
+
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <windows.h>
-#include <cstring>
-#include <algorithm>
 
 #include <job_logger.h>
+
+#include "win_fd_reg.h"
 
 namespace job::threads {
 
@@ -36,10 +40,7 @@ static IOEvent fromPollRevents(SHORT revents) noexcept
     return out;
 }
 
-// WSAPoll only polls SOCKETs, so the eventfd-style "wake the loop" trick
-// needs a real connected loopback TCP socket pair -- Windows has no
-// socketpair(). Standard technique: listen on 127.0.0.1:ephemeral,
-// connect to it, accept the connection, discard the listener.
+// WSAPoll only polls SOCKETs, so the eventfd-style "wake the loop" trick needs a real connected loopback TCP socket pair
 static bool createLoopbackPair(SOCKET &outRead, SOCKET &outWrite)
 {
     SOCKET listener = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
@@ -49,7 +50,7 @@ static bool createLoopbackPair(SOCKET &outRead, SOCKET &outWrite)
     sockaddr_in addr{};
     addr.sin_family = AF_INET;
     addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-    addr.sin_port = 0; // ephemeral
+    addr.sin_port = 0; // ephemeral port
 
     if (bind(listener, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) == SOCKET_ERROR) {
         closesocket(listener);
@@ -97,30 +98,30 @@ static bool createLoopbackPair(SOCKET &outRead, SOCKET &outWrite)
 }
 
 struct JobIoAsyncThread::Backend {
-    bool                    wsaInitialized{false};
-    SOCKET                  wakeReadSock{INVALID_SOCKET};
-    SOCKET                  wakeWriteSock{INVALID_SOCKET};
-    std::vector<WSAPOLLFD>  pollFds;        // live registration set; only registerFD/unregisterFD touch this
-    std::vector<WSAPOLLFD>  lastPollResult; // snapshot handed to WSAPoll; only the loop thread touches this
+    bool                            wsaInitialized{false};
+    SOCKET                          wakeReadSock{INVALID_SOCKET};
+    SOCKET                          wakeWriteSock{INVALID_SOCKET};
+    std::vector<WSAPOLLFD>          pollFds;
+    std::vector<WSAPOLLFD>          lastPollResult;
+    std::unordered_map<SOCKET, int> socketToFd;
 };
 
 JobIoAsyncThread::JobIoAsyncThread() :
     m_backend(std::make_unique<Backend>())
 {
-    // Winsock is internally reference-counted -- each WSAStartup() call
-    // needs a matching WSACleanup(), and it's explicitly documented as
-    // safe to call from multiple instances/threads without a separate
-    // global once-only registry.
     WSADATA wsaData{};
-    int wsaResult = WSAStartup(MAKEWORD(2, 2), &wsaData);
+
+    int const wsaResult = WSAStartup(MAKEWORD(2, 2), &wsaData);
     if (wsaResult != 0) {
         JOB_LOG_ERROR("[JobIoAsyncThread] WSAStartup failed: {}", wsaResult);
         return;
     }
+
     m_backend->wsaInitialized = true;
 
     if (!createLoopbackPair(m_backend->wakeReadSock, m_backend->wakeWriteSock)) {
         JOB_LOG_ERROR("[JobIoAsyncThread] Failed to create wake socket pair: {}", WSAGetLastError());
+
         WSACleanup();
         m_backend->wsaInitialized = false;
         return;
@@ -129,6 +130,8 @@ JobIoAsyncThread::JobIoAsyncThread() :
     WSAPOLLFD wakeEntry{};
     wakeEntry.fd = m_backend->wakeReadSock;
     wakeEntry.events = POLLRDNORM;
+    wakeEntry.revents = 0;
+
     m_backend->pollFds.push_back(wakeEntry);
 }
 
@@ -160,15 +163,18 @@ void JobIoAsyncThread::stop()
     {
         std::scoped_lock lock(m_ioMutex);
         m_fdCallbacks.clear();
+        m_backend->socketToFd.clear();
     }
 
     m_queue.stop();
+
     if (m_backend->wakeWriteSock != INVALID_SOCKET) {
-        char val = 1;
-        int s = send(m_backend->wakeWriteSock, &val, 1, 0);
-        if (s == SOCKET_ERROR && WSAGetLastError() != WSAEWOULDBLOCK)
+        char const val = 1;
+        int const result = send(m_backend->wakeWriteSock, &val, 1, 0);
+        if (result == SOCKET_ERROR && WSAGetLastError() != WSAEWOULDBLOCK)
             JOB_LOG_ERROR("[JobIoAsyncThread] stop() failed to write to wake socket: {}", WSAGetLastError());
     }
+
     if (m_thread) {
         (void)m_thread->join();
         m_thread.reset();
@@ -188,98 +194,204 @@ void JobIoAsyncThread::post(std::function<void()> task, int priority)
 
 bool JobIoAsyncThread::registerFD(int fd, IOEvent events, IOEventCallback callback)
 {
-    if (fd < 0 || !m_backend->wsaInitialized)
+    if (fd < 0 || !m_backend->wsaInitialized) [[unlikely]]
         return false;
+
+    SOCKET const socket = WinFdReg::instance().lookup(fd);
+    if (socket == INVALID_SOCKET) [[unlikely]] {
+        JOB_LOG_ERROR("[JobIoAsyncThread] registerFD received invalid Win32 fd {}", fd);
+        return false;
+    }
 
     {
         std::scoped_lock lock(m_ioMutex);
-        auto it = std::find_if(m_backend->pollFds.begin(), m_backend->pollFds.end(),
-                               [fd](const WSAPOLLFD &e) { return e.fd == static_cast<SOCKET>(fd); });
-        if (it != m_backend->pollFds.end()) {
-            it->events = toPollEvents(events);
+
+        auto const existingSocket = m_backend->socketToFd.find(socket);
+
+        if (existingSocket != m_backend->socketToFd.end() && existingSocket->second != fd) [[unlikely]] {
+            JOB_LOG_ERROR("[JobIoAsyncThread] native socket is already registered under fd {} instead of fd {}", existingSocket->second, fd);
+            return false;
+        }
+
+        auto const pollEntry = std::find_if(m_backend->pollFds.begin(), m_backend->pollFds.end(),
+                                            [socket](WSAPOLLFD const &entry) {
+                                                return entry.fd == socket;
+                                            });
+
+        if (pollEntry != m_backend->pollFds.end()) {
+            pollEntry->events = toPollEvents(events);
+            pollEntry->revents = 0;
         } else {
             WSAPOLLFD entry{};
-            entry.fd = static_cast<SOCKET>(fd);
+            entry.fd = socket;
             entry.events = toPollEvents(events);
-            m_backend->pollFds.push_back(entry);
+            entry.revents = 0;
+
+            try {
+                m_backend->pollFds.push_back(entry);
+                m_backend->socketToFd.emplace(socket, fd);
+            } catch (...) {
+                auto const insertedEntry = std::find_if(m_backend->pollFds.begin(), m_backend->pollFds.end(),
+                                                        [socket](WSAPOLLFD const &candidate) {
+                                                            return candidate.fd == socket;
+                                                        });
+
+                if (insertedEntry != m_backend->pollFds.end())
+                    m_backend->pollFds.erase(insertedEntry);
+
+                JOB_LOG_ERROR("[JobIoAsyncThread] failed to store Win32 fd {}", fd);
+                return false;
+            }
         }
+
         m_fdCallbacks[fd] = std::move(callback);
     }
-    post([]{});
+
+    post([] {});
+    return true;
+}
+
+bool JobIoAsyncThread::modifyFD(int fd, IOEvent events)
+{
+    if (fd < 0 || !m_backend->wsaInitialized)
+        return false;
+
+    SOCKET socket = WinFdReg::instance().lookup(fd);
+    if (socket == INVALID_SOCKET) {
+        JOB_LOG_WARN("[JobIoAsyncThread] modifyFD received invalid Win32 fd {}", fd);
+        return false;
+    }
+
+    {
+        std::scoped_lock lock(m_ioMutex);
+        auto const socketEntry =
+            m_backend->socketToFd.find(socket);
+
+        if (socketEntry == m_backend->socketToFd.end() ||
+            socketEntry->second != fd) {
+            JOB_LOG_WARN( "[JobIoAsyncThread] modifyFD called for unregistered fd {}", fd);
+            return false;
+        }
+
+        auto const pollEntry = std::find_if( m_backend->pollFds.begin(), m_backend->pollFds.end(),
+                                            [socket](WSAPOLLFD const &entry) {
+                                                return entry.fd == socket;
+                                            });
+
+        if (pollEntry == m_backend->pollFds.end()) {
+            JOB_LOG_WARN("[JobIoAsyncThread] no poll entry for fd {}", fd );
+            return false;
+        }
+
+        pollEntry->events = toPollEvents(events);
+        pollEntry->revents = 0;
+    }
+
+    post([] {});
     return true;
 }
 
 bool JobIoAsyncThread::unregisterFD(int fd)
 {
-    if (fd < 0)
+    if (fd < 0) [[unlikely]]
         return false;
+
+    SOCKET socket = WinFdReg::instance().lookup(fd);
+    bool removed = false;
 
     {
         std::scoped_lock lock(m_ioMutex);
-        auto it = std::find_if(m_backend->pollFds.begin(), m_backend->pollFds.end(),
-                               [fd](const WSAPOLLFD &e) { return e.fd == static_cast<SOCKET>(fd); });
-        if (it != m_backend->pollFds.end())
-            m_backend->pollFds.erase(it);
+
+        // Fallback: search socketToFd if WinFdReg lookup returned INVALID_SOCKET
+        // if (socket == INVALID_SOCKET) {
+        //     for (auto const &[sock, tokenFd] : m_backend->socketToFd) {
+        //         if (tokenFd == fd) {
+        //             socket = sock;
+        //             break;
+        //         }
+        //     }
+        // }
+        // Fallback: search socketToFd if WinFdReg lookup returned INVALID_SOCKET
+        if (socket == INVALID_SOCKET) {
+            for (auto const &[sock, tokenFd] : m_backend->socketToFd) {
+                if (tokenFd == fd) {
+                    socket = sock;
+                    break;
+                }
+            }
+        }
+
+        if (socket != INVALID_SOCKET) {
+            auto const pollEntry = std::find_if(m_backend->pollFds.begin(), m_backend->pollFds.end(),
+                                                [socket](WSAPOLLFD const &entry) {
+                                                    return entry.fd == socket;
+                                                });
+
+            if (pollEntry != m_backend->pollFds.end()) {
+                m_backend->pollFds.erase(pollEntry);
+                removed = true;
+            }
+
+            m_backend->socketToFd.erase(socket);
+        }
+
         m_fdCallbacks.erase(fd);
     }
-    post([]{});
-    return true;
+
+    if (removed) {
+        post([] {});
+    }
+
+    return removed;
 }
 
 void JobIoAsyncThread::processIOEvents(int event_count)
 {
-    // lastPollResult is only ever touched by this (the loop) thread safe to read without m_ioMutex.
-    // Only the m_fdCallbacks lookups need it.
-    std::vector<std::pair<IOEventCallback, IOEvent>> callbacksToRun;
-    callbacksToRun.reserve(event_count);
+    Event_Callback callbacksToRun;
+    callbacksToRun.reserve(static_cast<std::size_t>(event_count));
 
-    for (auto &entry : m_backend->lastPollResult) {
+    for (auto const &entry : m_backend->lastPollResult) {
         if (entry.revents == 0)
             continue;
 
         if (entry.fd == m_backend->wakeReadSock) {
-            char buf[64];
-            // Limit the maximum number of drain cycles per event loop iteration
-            // to prevent loop starvation during severe thread wake-up races.
-            for (int iterations = 0; iterations < 4; ++iterations) {
-                int s = recv(m_backend->wakeReadSock, buf, sizeof(buf), 0);
-
-                if (s == SOCKET_ERROR) {
-                    int err = WSAGetLastError();
-                    if (err != WSAEWOULDBLOCK) {
-                        JOB_LOG_WARN("[JobIoAsyncThread] error draining wake socket: {}", err);
-                    }
-                    break; // Buffer is dry or faulted
-                }
-
-                if (s == 0) {
-                    break; // Socket closed gracefully
-                }
-
-                // If we read less than the full buffer size, the socket is guaranteed
-                // to be empty right now. Break early to eliminate a costly WSAEWOULDBLOCK syscall.
-                if (s < static_cast<int>(sizeof(buf))) {
+            char buffer[64];
+            for (int iteration = 0; iteration < 4; ++iteration) {
+                int const result = recv(m_backend->wakeReadSock, buffer, static_cast<int>(sizeof(buffer)), 0);
+                if (result == SOCKET_ERROR) {
+                    int const error = WSAGetLastError();
+                    if (error != WSAEWOULDBLOCK)
+                        JOB_LOG_WARN("[JobIoAsyncThread] error draining wake socket: {}", error);
                     break;
                 }
+
+                if (result == 0 || result < static_cast<int>(sizeof(buffer)))
+                    break;
             }
+
             continue;
         }
 
-        int fd = static_cast<int>(entry.fd);
-        IOEvent translated = fromPollRevents(entry.revents);
+        IOEvent const translated = fromPollRevents(entry.revents);
 
         std::scoped_lock lock(m_ioMutex);
-        auto it = m_fdCallbacks.find(fd);
-        if (it != m_fdCallbacks.end()) {
-            callbacksToRun.push_back({it->second, translated});
-        } else if (hasEvent(translated, IOEvent::Error) || hasEvent(translated, IOEvent::HangUp)) {
-            JOB_LOG_WARN("[JobIoAsyncThread] ERR/HUP on unknown/unregistered fd {}", fd);
+        auto const fdEntry = m_backend->socketToFd.find(entry.fd);
+        if (fdEntry == m_backend->socketToFd.end()) {
+            if (hasEvent(translated, IOEvent::Error) || hasEvent(translated, IOEvent::HangUp))
+                JOB_LOG_WARN("[JobIoAsyncThread] ERR/HUP on unknown native socket");
+            continue;
         }
+
+        int const fd = fdEntry->second;
+        auto const callbackEntry = m_fdCallbacks.find(fd);
+        if (callbackEntry != m_fdCallbacks.end())
+            callbacksToRun.emplace_back(callbackEntry->second, translated);
+        else if (hasEvent(translated, IOEvent::Error) || hasEvent(translated, IOEvent::HangUp))
+            JOB_LOG_WARN("[JobIoAsyncThread] ERR/HUP on unregistered fd {}", fd);
     }
 
-    // events is already IOEvent -- no re-conversion, same fix as the posix side.
     for (auto &[callback, events] : callbacksToRun)
-        post([=]() { callback(events); });
+        post([callback = std::move(callback), events]() mutable { callback(events); });
 }
 
 void JobIoAsyncThread::loop(std::stop_token token, [[maybe_unused]] std::chrono::milliseconds idle_heartbeat)
@@ -303,9 +415,7 @@ void JobIoAsyncThread::loop(std::stop_token token, [[maybe_unused]] std::chrono:
             timeout_ms = static_cast<int>(std::max(static_cast<rep>(0), next_wakeup.count()));
         }
 
-        // Snapshot under the lock, then release before the blocking call --
-        // registerFD/unregisterFD only ever touch pollFds, never this
-        // snapshot, so they're never stuck waiting behind WSAPoll.
+        // Snapshot under lock, then release before blocking WSAPoll call
         {
             std::scoped_lock lock(m_ioMutex);
             m_backend->lastPollResult = m_backend->pollFds;

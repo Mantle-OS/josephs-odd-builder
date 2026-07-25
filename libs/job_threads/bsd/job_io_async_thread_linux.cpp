@@ -150,17 +150,40 @@ bool JobIoAsyncThread::registerFD(int fd, IOEvent events, IOEventCallback callba
     post([]{});
     return true;
 }
+bool JobIoAsyncThread::modifyFD(int fd, IOEvent events)
+{
+    if (fd < 0 || m_backend->epollFd == -1)
+        return false;
 
+    {
+        std::scoped_lock lock(m_ioMutex);
+        if (!m_fdCallbacks.contains(fd)) {
+            JOB_LOG_WARN("[JobIoAsyncThread] modifyFD called for unregistered fd {}", fd);
+            return false;
+        }
+    }
+
+    epoll_event ev{};
+    ev.events = toEpollBits(events);
+    ev.data.fd = fd;
+
+    if (::epoll_ctl( m_backend->epollFd, EPOLL_CTL_MOD, fd, &ev ) == -1) {
+        JOB_LOG_ERROR( "[JobIoAsyncThread] epoll_ctl MOD failed for fd {}: {}", fd, std::strerror(errno));
+        return false;
+    }
+
+    post([] {});
+    return true;
+}
 bool JobIoAsyncThread::unregisterFD(int fd)
 {
     if (fd < 0 || m_backend->epollFd == -1)
         return false;
 
     epoll_event ev{};
-    if (epoll_ctl(m_backend->epollFd, EPOLL_CTL_DEL, fd, &ev) == -1) {
+    if (epoll_ctl(m_backend->epollFd, EPOLL_CTL_DEL, fd, &ev) == -1)
         if (errno != ENOENT)
             JOB_LOG_WARN("[JobIoAsyncThread] epoll_ctl DEL failed for fd {}: {}", fd, strerror(errno));
-    }
 
     {
         std::scoped_lock lock(m_ioMutex);

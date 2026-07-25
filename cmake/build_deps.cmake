@@ -67,7 +67,7 @@ endif()
 pkg_check_modules(CatchTwo REQUIRED catch2-with-main)
 
 
-if(JOB_QT_AI)
+if(JOB_QT)
     find_package(Qt6 6.2 COMPONENTS
         Core
         Gui
@@ -78,6 +78,19 @@ if(JOB_QT_AI)
         QuickControls2
       REQUIRED
     )
-
     set(QML_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/qt6/qml" )
 endif()
+
+
+
+
+
+
+
+
+
+
+
+
+
+

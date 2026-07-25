@@ -1,4 +1,4 @@
-if(JOB_SER_MSGPACK_BINDINGS)
+if(JOB_BUILD_SERIALIZER_MSGPACK)
     add_subdirectory(job_msg_gen)
     add_subdirectory(job_msg_gen_example)
 endif()
@@ -6,11 +6,9 @@ endif()
 add_subdirectory(job_ansi_examples)
 add_subdirectory(job_ai_terminal_dashboard_example)
 
-if(JOB_QT_APPS)
+if(JOB_QT)
     add_subdirectory(qt_protoplanetary_view)
-endif()
 
-if(JOB_QT_AI)
     add_subdirectory(qzstd-example)
     add_subdirectory(qmlzstd-example)
 

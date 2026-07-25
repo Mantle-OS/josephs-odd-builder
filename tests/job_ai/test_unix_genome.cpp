@@ -8,7 +8,7 @@
 #include <filesystem>
 #include <vector>
 
-// Your Architecture Headers
+// Architecture Headers
 #include <servers/unix_socket_server.h>
 #include <clients/unix_socket_client.h>
 #include <genome.h>
@@ -216,7 +216,12 @@ TEST_CASE("Unix Socket: AI Genome Transfer", "[unix][ai][genome]")
         auto accumulator = std::make_shared<std::vector<char>>();
         accumulator->reserve(totalSize);
 
-        client->onMessage = [client, accumulator, totalSize, &packetReceived](const char* data, size_t len) {
+        std::weak_ptr<UnixClient> weakClient = client;
+        client->onMessage = [weakClient, accumulator, totalSize, &packetReceived](const char* data, size_t len) {
+            auto client = weakClient.lock();
+            if (!client)
+                return;
+
             accumulator->insert(accumulator->end(), data, data + len);
 
             if (accumulator->size() >= totalSize) {
@@ -233,7 +238,7 @@ TEST_CASE("Unix Socket: AI Genome Transfer", "[unix][ai][genome]")
 
     REQUIRE(server->start(path, 0));
 
-    auto client = std::make_shared<UnixClient>(loop.loop);
+    auto client = UnixClient::create(loop.loop);
     std::atomic<bool> clientConnected{false};
     std::atomic<bool> clientDisconnected{false};
 

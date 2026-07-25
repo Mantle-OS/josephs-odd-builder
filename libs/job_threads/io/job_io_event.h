@@ -3,6 +3,7 @@
 
 namespace job::threads {
 
+using JobFd = std::uintptr_t;
 
 // EPOLLIN     Read
 // EPOLLOUT    Write

@@ -17,7 +17,7 @@
 // UTILS
 #include <job_ipaddr.h>
 #include <job_url.h>
-#include <socket_error.h>
+#include <job_socket_error.h>
 // Sockets
 #include <isocket_io.h>
 #include <tcp_socket.h>

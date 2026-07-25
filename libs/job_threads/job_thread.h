@@ -1,4 +1,5 @@
 #pragma once
+
 #include <atomic>
 #include <functional>
 #include <stop_token>
@@ -8,6 +9,14 @@
 
 #include "job_thread_options.h"
 #include "jobthreads_export.h"
+
+// NOTE ALL IMPL FILES MUST DECL THE FOLLOWING
+// [[nodiscard]] StartResult start();
+// [[nodiscard]] bool join() noexcept;
+// [[nodiscard]] int applyScheduling() noexcept;
+// [[nodiscard]] int applyAffinity() noexcept;
+// static TYPE &provider(unsigned char *storage) noexcept { return *reinterpret_cast<TYPE*>(storage);}
+// where stype is p_thread for an example. so you can call provider(m_handleStorage)
 
 namespace job::threads {
 
@@ -25,19 +34,66 @@ public:
     };
 
     JobThread() noexcept = default;
-    explicit JobThread(const JobThreadOptions &options) noexcept;
-    virtual ~JobThread() noexcept;
 
-    void setOptions(const JobThreadOptions &options) noexcept;
-    void setRunFunction(RunFunction fn);
+    explicit JobThread(const JobThreadOptions &options) noexcept :
+        m_options(options)
+    {
 
+    }
+
+    virtual ~JobThread() noexcept
+    {
+        requestStop();
+        (void)join();
+
+    }
+
+    void setOptions(const JobThreadOptions &options) noexcept
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        m_options = options;
+    }
+
+    void setRunFunction(RunFunction fn)
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        m_runFunc = std::move(fn);
+    }
+
+    void requestStop() noexcept
+    {
+        m_stopSource.request_stop();
+    }
+
+    [[nodiscard]] bool isRunning() const noexcept
+    {
+        return m_running.load(std::memory_order_relaxed);
+    }
+
+
+    // IN IMPL FILE
     [[nodiscard]] StartResult start();
-    void requestStop() noexcept;
     [[nodiscard]] bool join() noexcept;
-    [[nodiscard]] bool isRunning() const noexcept;
 
 protected:
-    virtual void run(std::stop_token token) noexcept;
+    virtual void run(std::stop_token token) noexcept
+    {
+        uint16_t heartbeat;
+        {
+            std::lock_guard<std::mutex> lock(m_mutex);
+            heartbeat = m_options.heartbeat;
+        }
+        while (!token.stop_requested()) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(heartbeat));
+            {
+                std::lock_guard<std::mutex> lock(m_mutex);
+                heartbeat = m_options.heartbeat;
+            }
+        }
+    }
+
+
+    // IN IMPL FILE (in job_thread_<os>.cpp)
     [[nodiscard]] int applyScheduling() noexcept;
     [[nodiscard]] int applyAffinity() noexcept;
 
@@ -48,20 +104,20 @@ private:
     static void *threadEntry(void *arg);
 #endif
 
-    // Opaque storage for the platform's native thread handle
-    // (pthread_t on posix, HANDLE on Windows). Sized/aligned generously
-    // for either; the real type is only ever named inside the platform
-    // backend .cpp that implements these member functions.
     static constexpr std::size_t kHandleStorageSize = 16;
 
-    mutable std::mutex  m_mutex;
-    JobThreadOptions    m_options;
-    std::atomic<bool>   m_running{false};
-    RunFunction         m_runFunc;
-    alignas(alignof(std::max_align_t)) unsigned char m_handleStorage[kHandleStorageSize]{};
-    std::stop_source    m_stopSource;
-    bool                m_joinable{false};
-    std::atomic_flag    m_starting{false};
+    mutable std::mutex                                  m_mutex;
+    JobThreadOptions                                    m_options;
+    std::atomic<bool>                                   m_running{false};
+    RunFunction                                         m_runFunc;
+    alignas(alignof(std::max_align_t)) unsigned char    m_handleStorage[kHandleStorageSize]{};
+    std::stop_source                                    m_stopSource;
+
+    bool                                                m_joinable{false};
+    std::atomic_flag                                    m_joining{false};
+    std::atomic<int>                                    m_lastJoinError{0};
+
+    std::atomic_flag                                    m_starting{false};
 };
 
 } // namespace job::threads

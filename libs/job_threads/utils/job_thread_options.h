@@ -12,6 +12,11 @@ enum class SchedulingPolicy : uint8_t {
 };
 
 struct JobThreadOptions final {
+    static constexpr uint8_t  kDefaultPriority      = 20;
+    static constexpr uint8_t  kDefaultRtPriority    = 50;
+    static constexpr uint8_t  kCoreUnbound          = 0xFF; // 255
+    static constexpr uint16_t kDefaultHeartbeatMs   = 50;
+
     bool realtime{false};
     bool lockMemory{false};
     bool pinToCore{false};
@@ -29,10 +34,18 @@ struct JobThreadOptions final {
 
     std::array<char, 32> name{'\0'};
 
-    static constexpr uint8_t  kDefaultPriority      = 20;
-    static constexpr uint8_t  kDefaultRtPriority    = 50;
-    static constexpr uint8_t  kCoreUnbound          = 0xFF; // 255
-    static constexpr uint16_t kDefaultHeartbeatMs   = 50;
+
+    [[nodiscard]] constexpr bool valid() const noexcept
+    {
+        bool ret = true;
+        if (realtime && policy == SchedulingPolicy::Other)
+            ret = false;
+
+        if (priority > 99)
+            ret = false;
+
+        return ret;
+    }
 
     // Preset's
     [[nodiscard]] static constexpr JobThreadOptions normal() noexcept
@@ -51,18 +64,6 @@ struct JobThreadOptions final {
         opts.priority   = kDefaultRtPriority;
         opts.heartbeat  = 50;
         return opts;
-    }
-
-    [[nodiscard]] constexpr bool valid() const noexcept
-    {
-        bool ret = true;
-        if (realtime && policy == SchedulingPolicy::Other)
-            ret = false;
-
-        if (priority > 99)
-            ret = false;
-
-        return ret;
     }
 };
 

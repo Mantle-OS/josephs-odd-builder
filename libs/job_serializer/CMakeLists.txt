@@ -36,11 +36,11 @@ set(JOBSER_HEADERS
     # emitters/qt_emitter.h
 )
 
-if(JOB_SER_MSGPACK_BINDINGS)
+if(JOB_BUILD_SERIALIZER_MSGPACK)
     add_subdirectory(job_msgpack)
 endif()
 
-if(JOB_SER_FLATBUFFERS_BINDINGS)
+if(JOB_BUILD_SERIALIZER_FLATBUFFERS)
     add_subdirectory(job_flatbuffers)
 endif()
 

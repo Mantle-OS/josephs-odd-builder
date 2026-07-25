@@ -4,7 +4,7 @@ add_custom_target(JOB_Documentation SOURCES
     job/job.md
     job/ansi_overview.md
     job/core_overview.md
-    job/crypto_overview.md # Been refactored and is now cross platform
+    job/crypto_overview.md
     job/io_overview.md
     job/net_overview.md
     job/science_overview.md

@@ -35,6 +35,19 @@ void ISocketIO::registerEvents(threads::IOEvent events)
     }
 }
 
+void ISocketIO::modifyEvents(threads::IOEvent events)
+{
+    if (m_fd < 0) {
+        JOB_LOG_ERROR("[ISocketIO] modifyEvents called on invalid fd");
+        return;
+    }
+    if (auto loop = m_loop.lock()) {
+        if (!loop->modifyFD(m_fd, events))
+            JOB_LOG_ERROR("[ISocketIO] Failed to modify FD {}", m_fd);
+    } else {
+        JOB_LOG_ERROR("[ISocketIO] Failed to modify FD {}: Event loop is null", m_fd);
+    }
+}
 
 } // namespace job::net
 

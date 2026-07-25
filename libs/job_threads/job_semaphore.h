@@ -1,8 +1,9 @@
 #pragma once
-#include <cstdint>
-#include <cstddef>
-#include <string>
+#include <atomic>
 #include <chrono>
+#include <cstddef>
+#include <cstdint>
+#include <string>
 
 #include <job_logger.h>
 

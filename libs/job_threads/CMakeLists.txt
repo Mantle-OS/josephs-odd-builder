@@ -20,16 +20,14 @@ if(JOB_WINDOWS)
     set(OPAQUE_THREAD_PROVIDER
         win32/job_thread_win32.cpp
         win32/job_semaphore_win32.cpp
-        win32/job_io_async_thread_win32.cpp
     )
 elseif(JOB_LINUX)
     set(OPAQUE_THREAD_PROVIDER
-        posix/job_thread_posix.cpp
-        posix/job_semaphore_posix.cpp
-        posix/job_io_async_thread_posix.cpp
+        linux/job_thread_linux.cpp
+        linux/job_semaphore_linux.cpp
     )
 else()
-    message(FATAL_ERROR "JobThreads can not be built with out a OPAQUE_THREAD_PROVIDER, Must be on Linux or Windows for now Apple and BSD are not yest supported")
+    message(FATAL_ERROR "JobThreads can not be built with out a OPAQUE_THREAD_PROVIDER, Must be on Linux or Windows for now Apple and BSD are not yet supported")
 endif()
 list(APPEND JOBTHREADS_SOURCES ${OPAQUE_THREAD_PROVIDER})
 
@@ -64,7 +62,6 @@ set(JOBTHREADS_UTILS_SOURCES
     utils/job_thread_graph.cpp
 )
 
-
 # QUEUE's
 set(JOBTHREADS_QUEUE_HEADERS
     queue/job_task_queue.h
@@ -73,7 +70,6 @@ set(JOBTHREADS_QUEUE_HEADERS
 set(JOBTHREADS_QUEUE_SOURCES
     queue/job_task_queue.cpp
 )
-
 
 # Scheduler's
 set(JOBTHREADS_SCHED_HEADERS
@@ -91,7 +87,6 @@ set(JOBTHREADS_SCHED_SOURCES
     sched/job_sporadic_scheduler.cpp
 )
 
-
 # Descriptor's
 set(JOBTHREADS_DESCR_HEADERS
     descr/job_idescriptor.h
@@ -102,7 +97,6 @@ set(JOBTHREADS_DESCR_SOURCES
     descr/job_idescriptor.cpp
 )
 
-
 # ASYNC IO
 set(JOBTHREADS_IO_HEADERS
     io/job_io_event.h
@@ -111,13 +105,25 @@ set(JOBTHREADS_IO_HEADERS
 )
 set(JOBTHREADS_IO_SOURCES
     io/job_async_event_loop.cpp
-    # io/job_io_async_thread.cpp
-
-
+    # io/job_io_async_thread.cpp TODO remove this file as it is not needed any more and is handled with below.
 )
 
+# ASYNC WINDOWS
+if(JOB_WINDOWS)
+    list(APPEND JOBTHREADS_IO_HEADERS
+        win32/win_fd_reg.h
+    )
+    list(APPEND JOBTHREADS_IO_SOURCES
+        win32/win_fd_reg.cpp
+        win32/job_io_async_thread_win32.cpp
+    )
+elseif(JOB_LINUX)
+    list(APPEND JOBTHREADS_IO_SOURCES
+        linux/job_io_async_thread_linux.cpp
+    )
+endif()
 
-# Ctx Api
+# Api The Simple I just want to use threads.
 set(JOBTHREADS_CTX_HEADERS
     ctx/job_fifo_ctx.h
     ctx/job_rr_ctx.h
@@ -126,19 +132,30 @@ set(JOBTHREADS_CTX_HEADERS
 )
 set(JOBTHREADS_CTX_SOURCES)
 
+if(BUILD_SHARED_LIBS)
+    add_library(JosephsOddBuilder_Threads SHARED
+        ${JOBTHREADS_HEADERS}       ${JOBTHREADS_SOURCES}
+        ${JOBTHREADS_UTILS_HEADERS} ${JOBTHREADS_UTILS_SOURCES}
+        ${JOBTHREADS_QUEUE_HEADERS} ${JOBTHREADS_QUEUE_SOURCES}
+        ${JOBTHREADS_SCHED_HEADERS} ${JOBTHREADS_SCHED_SOURCES}
+        ${JOBTHREADS_DESCR_HEADERS} ${JOBTHREADS_DESCR_SOURCES}
+        ${JOBTHREADS_IO_HEADERS}    ${JOBTHREADS_IO_SOURCES}
+        ${JOBTHREADS_CTX_HEADERS}   ${JOBTHREADS_CTX_SOURCES}
+    )
+else()
+    add_library(JosephsOddBuilder_Threads STATIC
+        ${JOBTHREADS_HEADERS}       ${JOBTHREADS_SOURCES}
+        ${JOBTHREADS_UTILS_HEADERS} ${JOBTHREADS_UTILS_SOURCES}
+        ${JOBTHREADS_QUEUE_HEADERS} ${JOBTHREADS_QUEUE_SOURCES}
+        ${JOBTHREADS_SCHED_HEADERS} ${JOBTHREADS_SCHED_SOURCES}
+        ${JOBTHREADS_DESCR_HEADERS} ${JOBTHREADS_DESCR_SOURCES}
+        ${JOBTHREADS_IO_HEADERS}    ${JOBTHREADS_IO_SOURCES}
+        ${JOBTHREADS_CTX_HEADERS}   ${JOBTHREADS_CTX_SOURCES}
+    )
+    add_compile_definitions(JOBTHREADS_STATIC_DEFINE)
+endif()
 
 set(JOBTHREADS_EXPORT ${CMAKE_CURRENT_BINARY_DIR}/jobthreads_export.h)
-
-add_library(JosephsOddBuilder_Threads SHARED
-    ${JOBTHREADS_HEADERS}       ${JOBTHREADS_SOURCES}
-    ${JOBTHREADS_UTILS_HEADERS} ${JOBTHREADS_UTILS_SOURCES}
-    ${JOBTHREADS_QUEUE_HEADERS} ${JOBTHREADS_QUEUE_SOURCES}
-    ${JOBTHREADS_SCHED_HEADERS} ${JOBTHREADS_SCHED_SOURCES}
-    ${JOBTHREADS_DESCR_HEADERS} ${JOBTHREADS_DESCR_SOURCES}
-    ${JOBTHREADS_IO_HEADERS}    ${JOBTHREADS_IO_SOURCES}
-    ${JOBTHREADS_CTX_HEADERS}   ${JOBTHREADS_CTX_SOURCES}
-)
-
 generate_export_header(JosephsOddBuilder_Threads
     BASE_NAME JOBTHREADS
     EXPORT_FILE_NAME "${JOBTHREADS_EXPORT}"
@@ -150,12 +167,13 @@ set_target_properties(JosephsOddBuilder_Threads PROPERTIES
     OUTPUT_NAME "jobthreads"
     CXX_VISIBILITY_PRESET hidden
     VISIBILITY_INLINES_HIDDEN ON
+    POSITION_INDEPENDENT_CODE ON
 )
 
-if(JOB_LINUX)
-    target_link_libraries(JosephsOddBuilder_Threads PUBLIC atomic)
-elseif(JOB_WINDOWS)
+if(JOB_WINDOWS)
     target_link_libraries(JosephsOddBuilder_Threads PUBLIC ws2_32)
+elseif(JOB_LINUX)
+    target_link_libraries(JosephsOddBuilder_Threads PUBLIC atomic)
 endif()
 
 target_link_libraries(JosephsOddBuilder_Threads PUBLIC
@@ -183,6 +201,13 @@ target_include_directories(JosephsOddBuilder_Threads PUBLIC
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobthreads/ctx>
 )
 
+if(JOB_WINDOWS)
+    target_include_directories(JosephsOddBuilder_Threads PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/win32>
+    )
+# linux does not have extra headers
+endif()
+
 install(TARGETS JosephsOddBuilder_Threads
     EXPORT JosephsOddBuilderThreadsTargets
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
@@ -200,19 +225,19 @@ install(FILES ${JOBTHREADS_DESCR_HEADERS}   DESTINATION ${CMAKE_INSTALL_INCLUDED
 install(FILES ${JOBTHREADS_IO_HEADERS}      DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobthreads/io )
 install(FILES ${JOBTHREADS_CTX_HEADERS}     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobthreads/ctx )
 
-set(PKGCONFIG_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/pkgconfig")
-set(PKGCONFIG_FILE "${CMAKE_CURRENT_BINARY_DIR}/jobthreads.pc")
+if(JOB_LINUX)
+    set(PKGCONFIG_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/pkgconfig")
+    set(PKGCONFIG_FILE "${CMAKE_CURRENT_BINARY_DIR}/jobthreads.pc")
+    configure_file(
+        "${CMAKE_CURRENT_SOURCE_DIR}/jobthreads.pc.in"
+        "${PKGCONFIG_FILE}"
+        @ONLY
+    )
+    install(FILES "${PKGCONFIG_FILE}" DESTINATION "${PKGCONFIG_INSTALL_DIR}")
+endif()
 
-configure_file(
-    "${CMAKE_CURRENT_SOURCE_DIR}/jobthreads.pc.in"
-    "${PKGCONFIG_FILE}"
-    @ONLY
-)
-
-install(FILES "${PKGCONFIG_FILE}" DESTINATION "${PKGCONFIG_INSTALL_DIR}")
 install(EXPORT JosephsOddBuilderThreadsTargets
     FILE JosephsOddBuilderThreadsTargets.cmake
     NAMESPACE JOB::
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/JosephsOddBuilderThreads
 )
-

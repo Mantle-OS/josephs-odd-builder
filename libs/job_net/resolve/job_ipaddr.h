@@ -2,6 +2,10 @@
 
 #include <regex>
 #include <string>
+#include <memory>
+#include <cstdint>
+#include <cstring>
+#include <string_view>
 
 #if defined(JOB_WINDOWS)
     #include <winsock2.h>
@@ -16,9 +20,17 @@
     #include <unistd.h>
 #endif
 
+#include "jobnet_export.h"
+
 namespace job::net {
 
-class JobIpAddr {
+#if defined(JOB_WINDOWS)
+    using JobSockLen = int;
+#else
+    using JobSockLen = socklen_t;
+#endif
+
+class JOBNET_EXPORT JobIpAddr {
 public:
     using Ptr = std::shared_ptr<JobIpAddr>;
     enum class Family : uint8_t {
@@ -27,43 +39,53 @@ public:
         IPv6,
         Unix
     };
-
+#if defined(JOB_LINUX)
     constexpr JobIpAddr() noexcept = default;
-    JobIpAddr(const std::string &addr, uint16_t port = 0);
-    JobIpAddr(const JobIpAddr &other);
-    JobIpAddr &operator=(const JobIpAddr &other);
+#else
+    JobIpAddr() noexcept = default;
+#endif
 
-    bool setAddress(const std::string &addr, uint16_t port = 0);
-    void clear() noexcept;
-
-    [[nodiscard]] bool isValid() const noexcept;
-    [[nodiscard]] Family family() const noexcept;
-    [[nodiscard]] std::string toString(bool includePort = true) const;
-    [[nodiscard]] uint16_t port() const noexcept;
-
-    [[nodiscard]] const sockaddr *sockAddr() const noexcept;
-    [[nodiscard]] socklen_t sockAddrLen() const noexcept;
-
-    [[nodiscard]] bool isLocal() const noexcept;
-    [[nodiscard]] bool isLoopback() const noexcept;
-    [[nodiscard]] bool isMulticast() const noexcept;
-    [[nodiscard]] bool isNull() const noexcept;
-    [[nodiscard]] bool isGlobal() const noexcept;
-    [[nodiscard]] bool isBroadcast() const noexcept;
-    [[nodiscard]] bool isUnixPermitted() const noexcept;
-
-    [[nodiscard]] static bool isIPv4(const std::string &ip) noexcept
+    explicit JobIpAddr(const std::string &addr, uint16_t port = 0)
     {
-        in_addr addr4;
-        return inet_pton(AF_INET, ip.c_str(), &addr4) == 1;
+        (void)setAddress(addr, port);
+    }
+    JobIpAddr(const JobIpAddr &other) = default;
+    JobIpAddr &operator=(const JobIpAddr &other) = default;
+
+    void clear() noexcept
+    {
+        std::memset(&m_storage, 0, sizeof(m_storage));
+        m_len = 0;
+        m_port = 0;
+        m_valid = false;
+        m_family = Family::Unknown;
     }
 
-    [[nodiscard]] static bool isIPv6(const std::string &ip) noexcept
+    [[nodiscard]] bool isValid() const noexcept
     {
-        in6_addr addr6;
-        return inet_pton(AF_INET6, ip.c_str(), &addr6) == 1;
+        return m_valid;
     }
-    [[nodiscard]] static bool isUnixPath(const std::string &path);
+
+    [[nodiscard]] Family family() const noexcept
+    {
+        return m_family;
+    }
+
+    [[nodiscard]] uint16_t port() const noexcept
+    {
+        return m_port;
+    }
+
+    [[nodiscard]] const sockaddr *sockAddr() const noexcept
+    {
+        return reinterpret_cast<const sockaddr*>(&m_storage);
+    }
+
+    [[nodiscard]] JobSockLen sockAddrLen() const noexcept
+    {
+        return m_len;
+    }
+
     [[nodiscard]] static constexpr bool isValidPort(int32_t port) noexcept
     {
         return port >= 0 && port <= 65535;
@@ -78,20 +100,52 @@ public:
         }
     }
 
-    [[nodiscard]] bool fromSockAddr(const sockaddr *sa, socklen_t len);
-    [[nodiscard]] const std::regex &ipv4Pattern() noexcept;
-    [[nodiscard]] const std::regex &ipv6Pattern() noexcept;
+    [[nodiscard]] static const std::regex &ipv4Pattern()
+    {
+        static const std::regex re(R"(^(\d{1,3}\.){3}\d{1,3}$)");
+        return re;
+    }
 
+    [[nodiscard]] static const std::regex &ipv6Pattern()
+    {
+        static const std::regex re(R"(^([0-9A-Fa-f]{0,4}:){1,7}[0-9A-Fa-f]{0,4}$)");
+        return re;
+    }
 
-    [[nodiscard]] bool operator==(const JobIpAddr &o) const noexcept;
-    [[nodiscard]] bool operator!=(const JobIpAddr &o) const noexcept;
+    [[nodiscard]] bool operator==(const JobIpAddr &o) const noexcept
+    {
+        return m_family == o.m_family &&
+               m_port == o.m_port &&
+               std::memcmp(&m_storage, &o.m_storage, sizeof(sockaddr_storage)) == 0;
+    }
 
+    [[nodiscard]] bool operator!=(const JobIpAddr &o) const noexcept
+    {
+        return !(*this == o);
+    }
+
+    // HANDED PER OS IMPL
+    bool setAddress(const std::string &addr, uint16_t port = 0);
+    [[nodiscard]] std::string toString(bool includePort = true) const;
+    [[nodiscard]] bool isLocal() const noexcept;
+    [[nodiscard]] bool isLoopback() const noexcept;
+    [[nodiscard]] bool isMulticast() const noexcept;
+    [[nodiscard]] bool isNull() const noexcept;
+    [[nodiscard]] bool isGlobal() const noexcept;
+    [[nodiscard]] bool isBroadcast() const noexcept;
+
+    [[nodiscard]] static bool isIPv4(const std::string &ip) noexcept;
+    [[nodiscard]] static bool isIPv6(const std::string &ip) noexcept;
+    [[nodiscard]] static bool isUnixPath(const std::string &path);
+    [[nodiscard]] bool isUnixPermitted() const noexcept;
+
+    [[nodiscard]] bool fromSockAddr(const sockaddr *sa, JobSockLen len);
 private:
-    Family m_family{Family::Unknown};
-    uint16_t m_port{0};
-    sockaddr_storage m_storage{};
-    socklen_t m_len{0};
-    bool m_valid{false};
+    Family              m_family{Family::Unknown};
+    uint16_t            m_port{0};
+    sockaddr_storage    m_storage{};
+    JobSockLen          m_len{0};
+    bool                m_valid{false};
 };
 
 } // namespace job::net

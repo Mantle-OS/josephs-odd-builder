@@ -20,6 +20,7 @@ set(JOBNET_RESOLVE_HEADERS
     resolve/job_ipaddr.h
     resolve/job_resolver.h
     resolve/job_ssl_context.h
+    resolve/job_ssl_error.h
     resolve/job_proxy_config.h
 )
 
@@ -27,14 +28,16 @@ if(JOB_WINDOWS)
     set(JOBNET_RESOLVE_SOURCES
         resolve/win32/job_ipaddr_win32.cpp
         resolve/win32/job_resolver_win32.cpp
-        resolve/win32/job_ssl_context_schannel.cpp
+        resolve/win32/job_ssl_error_win32.cpp       # schannel mappings back to our errors
+        resolve/win32/job_ssl_context_win32.cpp     # schannel context
     )
-
 elseif(JOB_LINUX)
     set(JOBNET_RESOLVE_SOURCES
         resolve/linux/job_ipaddr_linux.cpp
         resolve/linux/job_resolver_linux.cpp
-        resolve/linux/job_ssl_context_openssl.cpp
+
+        resolve/linux/job_ssl_error_linux.cpp       # openssl mappings back to our errors
+        resolve/linux/job_ssl_context_linux.cpp     # openssl context
     )
 else()
     message(FATAL_ERROR "Unsuppored OS for networking. only linux and windows is currently supported")
@@ -47,58 +50,66 @@ set(JOBNET_SOCKETS_HEADERS
     sockets/unix_socket.h
 )
 
-set(JOBNET_SOCKETS_SOURCES
-)
+set(JOBNET_SOCKETS_SOURCES)
 
 if(JOB_WINDOWS)
-    list(APPEND JOBNET_SOCKETS_HEADERS sockets/win32/win32_socket_registry.h)
-    set(JOBNET_OPAQUE_SOCKET_PROVIDER
+    list(APPEND JOBNET_SOCKETS_SOURCES
+        sockets/win32/job_socket_error_win32.cpp
         sockets/win32/tcp_socket_win32.cpp
         sockets/win32/udp_socket_win32.cpp
         sockets/win32/unix_socket_win32.cpp
     )
 
 elseif(JOB_LINUX)
-    set(JOBNET_OPAQUE_SOCKET_PROVIDER
+    list(APPEND JOBNET_SOCKETS_SOURCES
+        sockets/linux/job_socket_error_linux.cpp
         sockets/linux/tcp_socket_linux.cpp
         sockets/linux/udp_socket_linux.cpp
         sockets/linux/unix_socket_linux.cpp
     )
 endif()
-list(APPEND JOBNET_SOCKETS_SOURCES ${JOBNET_OPAQUE_SOCKET_PROVIDER})
 
 set(JOBNET_SERVERS_HEADERS
-    # servers/tcp_server.h
-    # servers/udp_server.h
-    # servers/unix_socket_server.h
+    servers/tcp_server.h
+    servers/udp_server.h
+    servers/unix_socket_server.h
 )
 
 set(JOBNET_SERVERS_SOURCES
-    # servers/tcp_server.cpp
-    # servers/udp_server.cpp
-    # servers/unix_socket_server.cpp
+    servers/tcp_server.cpp
+    servers/udp_server.cpp
+    servers/unix_socket_server.cpp
 )
 
 set(JOBNET_CLIENTS_HEADERS
-    # clients/tcp_client.h
-    # clients/udp_client.h
-    # clients/unix_socket_client.h
+    clients/tcp_client.h
+    clients/udp_client.h
+    clients/unix_socket_client.h
 )
 
 set(JOBNET_CLIENTS_SOURCES
-    # clients/tcp_client.cpp
-    # clients/udp_client.cpp
-    # clients/unix_socket_client.cpp
+    clients/tcp_client.cpp
+    clients/udp_client.cpp
+    clients/unix_socket_client.cpp
 )
 
-add_library(JosephsOddBuilder_Net SHARED
-    ${JOBNET_HEADERS}           ${JOBNET_SOURCES}
-    ${JOBNET_RESOLVE_HEADERS}   ${JOBNET_RESOLVE_SOURCES}
-    ${JOBNET_SOCKETS_HEADERS}   ${JOBNET_SOCKETS_SOURCES}
-    ${JOBNET_SERVERS_HEADERS}   ${JOBNET_SERVERS_SOURCES}
-    ${JOBNET_CLIENTS_HEADERS}   ${JOBNET_CLIENTS_SOURCES}
-)
-
+if(BUILD_SHARED_LIBS)
+    add_library(JosephsOddBuilder_Net SHARED
+        ${JOBNET_HEADERS}           ${JOBNET_SOURCES}
+        ${JOBNET_RESOLVE_HEADERS}   ${JOBNET_RESOLVE_SOURCES}
+        ${JOBNET_SOCKETS_HEADERS}   ${JOBNET_SOCKETS_SOURCES}
+        ${JOBNET_SERVERS_HEADERS}   ${JOBNET_SERVERS_SOURCES}
+        ${JOBNET_CLIENTS_HEADERS}   ${JOBNET_CLIENTS_SOURCES}
+    )
+else()
+    add_library(JosephsOddBuilder_Net STATIC
+        ${JOBNET_HEADERS}           ${JOBNET_SOURCES}
+        ${JOBNET_RESOLVE_HEADERS}   ${JOBNET_RESOLVE_SOURCES}
+        ${JOBNET_SOCKETS_HEADERS}   ${JOBNET_SOCKETS_SOURCES}
+        ${JOBNET_SERVERS_HEADERS}   ${JOBNET_SERVERS_SOURCES}
+        ${JOBNET_CLIENTS_HEADERS}   ${JOBNET_CLIENTS_SOURCES}
+    )
+endif()
 set(JOBNET_EXPORT ${CMAKE_CURRENT_BINARY_DIR}/jobnet_export.h)
 generate_export_header(JosephsOddBuilder_Net
     BASE_NAME JOBNET
@@ -111,6 +122,7 @@ set_target_properties(JosephsOddBuilder_Net PROPERTIES
     OUTPUT_NAME "jobnet"
     CXX_VISIBILITY_PRESET hidden
     VISIBILITY_INLINES_HIDDEN ON
+    # Might need fPIC
 )
 
 target_include_directories(JosephsOddBuilder_Net PUBLIC
@@ -133,6 +145,7 @@ target_include_directories(JosephsOddBuilder_Net PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
 )
 
+## FIXME one day soon I need to go through these and fix the whole public vs private deal for the export
 if(JOB_WINDOWS)
     target_link_libraries(JosephsOddBuilder_Net PRIVATE
         ws2_32
@@ -147,14 +160,13 @@ if(JOB_WINDOWS)
 elseif(JOB_LINUX)
     target_link_libraries(JosephsOddBuilder_Net PRIVATE
         ${LibOpenSSL_LIBRARIES}
-        Threads::Threads
+        ${LibCrypto_LIBRARIES}
         atomic
     )
-
 endif()
 
 target_link_libraries(JosephsOddBuilder_Net PRIVATE
-    ${LibCrypto_LIBRARIES}
+    Threads::Threads
     JosephsOddBuilder_Core
     JosephsOddBuilder_Threads
     JosephsOddBuilder_Crypto
@@ -179,7 +191,6 @@ install(FILES ${JOBNET_SERVERS_HEADERS}     DESTINATION ${CMAKE_INSTALL_INCLUDED
 if(JOB_LINUX)
     set(PKGCONFIG_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/pkgconfig")
     set(PKGCONFIG_FILE "${CMAKE_CURRENT_BINARY_DIR}/jobnet.pc")
-
     configure_file(
         "${CMAKE_CURRENT_SOURCE_DIR}/jobnet.pc.in"
         "${PKGCONFIG_FILE}"

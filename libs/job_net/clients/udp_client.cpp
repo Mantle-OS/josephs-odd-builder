@@ -1,13 +1,15 @@
 #include "clients/udp_client.h"
 #include <job_logger.h>
-
 namespace job::net {
 
-UdpClient::UdpClient(threads::JobIoAsyncThread::Ptr loop, uint16_t buffer_size) :
+UdpClient::UdpClient(threads::JobIoAsyncThread::Ptr loop, JobResolver::Ptr resolver, uint16_t buffer_size) :
     m_loop(std::move(loop)),
+    m_resolver(std::move(resolver)),
     m_readBuffer(buffer_size)
 {
-    m_socket = std::make_shared<UdpSocket>(m_loop);
+    m_socket = UdpSocket::create(m_loop);
+    m_socket->setResolver(m_resolver);
+    setupSocketCallbacks();
 }
 
 UdpClient::~UdpClient()
@@ -15,36 +17,46 @@ UdpClient::~UdpClient()
     disconnect();
 }
 
-bool UdpClient::connectToHost(const std::string &host, uint16_t port)
+bool UdpClient::connectToHost(const JobIpAddr &ipaddr)
 {
-    JobUrl url;
-    url.setScheme("udp");
-    url.setHost(host);
-    url.setPort(port);
+    if (!m_socket) {
+        m_socket = UdpSocket::create(m_loop);
+        m_socket->setResolver(m_resolver);
+        setupSocketCallbacks();
+    }
 
-    return connectToHost(url);
+    if (!m_socket->connectToHost(ipaddr)) {
+        if (onError)
+            onError(static_cast<int>(m_socket->lastError()));
+        return false;
+    }
+    return true;
 }
 
 bool UdpClient::connectToHost(const JobUrl &url)
 {
-    if (!m_socket)
-        m_socket = std::make_shared<UdpSocket>(m_loop);
+    if (!m_socket) {
+        m_socket = UdpSocket::create(m_loop);
+        m_socket->setResolver(m_resolver);
+        setupSocketCallbacks();
+    }
 
-    setupSocketCallbacks();
-
-    if (!m_socket->connectToHost(url)) {
+    if (!m_resolver) {
+        JOB_LOG_ERROR("[UdpClient] connectToHost(url) requires a resolver — call setResolver() first");
         if (onError)
-            onError(static_cast<int>(m_socket->lastError()));
-
+            onError(static_cast<int>(SocketErrors::SocketErrNo::Invalid));
         return false;
     }
 
-    // Why I buy bunn coffee makers I want my coffee NOW !
-    // just like UDP
-    m_connected.store(true);
-    if (onConnect)
-        onConnect();
-
+    // ISocketIO::connectToHost(JobUrl) handles resolve-then-connect; m_connected/onConnect
+    // fire from m_socket->onConnect below once the underlying UdpSocket::connectToHost
+    // (JobIpAddr) actually succeeds — not synchronously here, since resolution may not
+    // have completed by the time this call returns.
+    if (!m_socket->connectToHost(url)) {
+        if (onError)
+            onError(static_cast<int>(m_socket->lastError()));
+        return false;
+    }
     return true;
 }
 
@@ -95,11 +107,22 @@ std::string UdpClient::lastErrorString() const noexcept
     return m_socket->lastErrorString();
 }
 
+void UdpClient::setResolver(JobResolver::Ptr resolver)
+{
+    m_resolver = std::move(resolver);
+    if (m_socket)
+        m_socket->setResolver(m_resolver);
+}
+
 void UdpClient::setupSocketCallbacks()
 {
     if (!m_socket)
         return;
-
+    m_socket->onConnect = [this]() {
+        m_connected.store(true, std::memory_order_relaxed);
+        if (onConnect)
+            onConnect();
+    };
     m_socket->onRead = [this]([[maybe_unused]] const char *data, [[maybe_unused]] size_t len) {
         // DOWN the "drain"
         while(true) {
@@ -114,13 +137,11 @@ void UdpClient::setupSocketCallbacks()
             }
         }
     };
-
     m_socket->onDisconnect = [this]() {
         m_connected.store(false, std::memory_order_relaxed);
         if (onDisconnect)
             onDisconnect();
     };
-
     m_socket->onError = [this](int err) {
         if (onError)
             onError(err);
@@ -128,4 +149,3 @@ void UdpClient::setupSocketCallbacks()
 }
 
 } // namespace job::net
-

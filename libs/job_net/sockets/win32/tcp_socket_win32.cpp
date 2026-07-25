@@ -1,31 +1,48 @@
-#include "sockets/tcp_socket.h"
-#include "win32/win32_socket_registry.h"
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
 
 #include <winsock2.h>
 #include <ws2tcpip.h>
-#include <cstring>
+#include <windows.h>
+
+#include "sockets/tcp_socket.h"
+
 #include <algorithm>
+#include <cstring>
+#include <limits>
+#include <mutex>
+#include <string>
+#include <utility>
 
 #include <job_logger.h>
-#include <job_io_async_thread.h>
+#include <io/job_io_async_thread.h>
+
+#include "win_fd_reg.h"
 
 namespace job::net {
 
-// Fetch the centralized subsystem registry instance
-extern win32::Win32SocketRegistry& getSocketRegistry();
-
-TcpSocket::TcpSocket(threads::JobIoAsyncThread::Ptr loop) :
+TcpSocket::TcpSocket(PrivateTag, threads::JobIoAsyncThread::Ptr loop) :
     ISocketIO(std::move(loop))
 {
     m_state.store(SocketState::Unconnected);
 }
 
-TcpSocket::TcpSocket(threads::JobIoAsyncThread::Ptr loop, int existing_token, const JobIpAddr &peerAddr) :
+TcpSocket::TcpSocket(
+    PrivateTag,
+    threads::JobIoAsyncThread::Ptr loop,
+    int existing_fd,
+    const JobIpAddr &peerAddr) :
     ISocketIO(std::move(loop)),
     m_peerAddr(peerAddr)
 {
-    m_fd = existing_token;
+    m_fd = existing_fd;
     m_state.store(SocketState::Connected);
+
     setOption(SocketOption::NonBlocking, true);
     updateLocalInfo();
 }
@@ -38,42 +55,44 @@ TcpSocket::~TcpSocket()
 void TcpSocket::closeSocket()
 {
     m_state.store(SocketState::Closed);
+
     if (m_fd < 0)
         return;
 
     if (auto loop = m_loop.lock())
         loop->unregisterFD(m_fd);
 
-    SOCKET nativeSocket = getSocketRegistry().lookup(m_fd);
-    if (nativeSocket != INVALID_SOCKET)
-        ::closesocket(nativeSocket);
+    const SOCKET nativeSock =
+        threads::WinFdReg::instance().lookup(m_fd);
 
-    getSocketRegistry().release(m_fd);
+    if (nativeSock != INVALID_SOCKET)
+        ::closesocket(nativeSock);
+
+    threads::WinFdReg::instance().release(m_fd);
     m_fd = -1;
 }
 
 void TcpSocket::disconnect()
 {
     auto expected = SocketState::Connected;
-    if (m_state.compare_exchange_strong(expected, SocketState::Closing) ||
+
+    if (m_state.compare_exchange_strong(
+            expected,
+            SocketState::Closing) ||
         m_state.load() == SocketState::Listening) {
+
         closeSocket();
+
         if (onDisconnect)
             onDisconnect();
-    } else {
-        closeSocket();
+
+        return;
     }
+
+    closeSocket();
 }
 
-bool TcpSocket::connectToHost(const JobUrl &url)
-{
-    // High-level connection factory or JobResolver maps endpoints into JobIpAddr before execution.
-    // If a raw URL fallback is forced, resolve via static infrastructure.
-    JOB_LOG_WARN("[TcpSocket] Direct connectToHost called. Sockets should receive mapped JobIpAddr targets.");
-    return false;
-}
-
-bool TcpSocket::connect(const JobIpAddr &addr)
+bool TcpSocket::connectToHost(const JobIpAddr &ipaddr)
 {
     if (m_fd >= 0)
         closeSocket();
@@ -82,54 +101,101 @@ bool TcpSocket::connect(const JobIpAddr &addr)
         if (m_state.load() == SocketState::Closed) {
             m_state.store(SocketState::Unconnected);
         } else {
-            JOB_LOG_WARN("[TcpSocket] connect called in invalid state: {}", (int)m_state.load());
+            JOB_LOG_WARN(
+                "[TcpSocket] connectToHost called in invalid state: {}",
+                static_cast<int>(m_state.load())
+                );
             return false;
         }
     }
 
-    SOCKET s = ::socket(addr.family() == JobIpAddr::Family::IPv6 ? AF_INET6 : AF_INET, SOCK_STREAM, 0);
-    if (s == INVALID_SOCKET) {
+    if (!ipaddr.isValid()) {
+        JOB_LOG_WARN("[TcpSocket] connectToHost called with invalid JobIpAddr");
+        m_errors.setError(WSAEINVAL);
+        return false;
+    }
+
+    int addressFamily = AF_UNSPEC;
+
+    switch (ipaddr.family()) {
+    case JobIpAddr::Family::IPv4:
+        addressFamily = AF_INET;
+        break;
+    case JobIpAddr::Family::IPv6:
+        addressFamily = AF_INET6;
+        break;
+    default:
+        // TcpSocket only speaks IPv4/IPv6 — Unix-domain targets belong to UnixSocket.
+        JOB_LOG_WARN("[TcpSocket] connectToHost: unsupported address family");
+        m_errors.setError(WSAEAFNOSUPPORT);
+        return false;
+    }
+
+    const SOCKET nativeSock = ::socket(addressFamily, SOCK_STREAM, IPPROTO_TCP);
+
+    if (nativeSock == INVALID_SOCKET) {
         m_errors.setError(::WSAGetLastError());
         return false;
     }
 
-    // Allocate safe 32-bit registry token to prevent 64-bit pointer truncation
-    m_fd = getSocketRegistry().allocate(s);
-    if (m_fd < 0){
-        ::closesocket(s);
+    u_long nonBlocking = 1;
+
+    if (::ioctlsocket(nativeSock, FIONBIO, &nonBlocking) == SOCKET_ERROR) {
+        m_errors.setError(::WSAGetLastError());
+        ::closesocket(nativeSock);
         return false;
     }
 
-    u_long nonBlocking = 1;
-    ::ioctlsocket(s, FIONBIO, &nonBlocking);
+    m_fd = threads::WinFdReg::instance().allocate(nativeSock);
 
-    m_peerAddr = addr;
+    if (m_fd < 0) {
+        ::closesocket(nativeSock);
+        m_errors.setError(WSAEMFILE);
+        return false;
+    }
 
-    if (::connect(s, addr.sockAddr(), static_cast<int>(addr.sockAddrLen())) == 0) {
+    m_peerAddr = ipaddr;
+    m_state.store(SocketState::Connecting);
+
+    const int connectResult = ::connect(
+        nativeSock,
+        ipaddr.sockAddr(),
+        static_cast<int>(ipaddr.sockAddrLen())
+        );
+
+    if (connectResult == 0) {
         m_state.store(SocketState::Connected);
+        updateLocalInfo();
+
         registerEvents(
             threads::IOEvent::Read |
             threads::IOEvent::Error |
             threads::IOEvent::HangUp |
-            threads::IOEvent::EdgeTriggered);
-        updateLocalInfo();
+            threads::IOEvent::EdgeTriggered
+            );
+
+        if (onConnect)
+            onConnect();
+
         return true;
     }
 
-    int lastError = ::WSAGetLastError();
-    if (lastError == WSAEWOULDBLOCK) {
-        m_state.store(SocketState::Connecting);
+    const int lastError = ::WSAGetLastError();
+
+    if (lastError == WSAEWOULDBLOCK || lastError == WSAEINPROGRESS) {
         registerEvents(
             threads::IOEvent::Write |
             threads::IOEvent::Read |
             threads::IOEvent::Error |
             threads::IOEvent::HangUp |
-            threads::IOEvent::EdgeTriggered);
+            threads::IOEvent::EdgeTriggered
+            );
         return true;
     }
 
-    closeSocket();
     m_errors.setError(lastError);
+    closeSocket();
+    m_state.store(SocketState::Unconnected);
     return false;
 }
 
@@ -138,58 +204,130 @@ bool TcpSocket::bind(const JobIpAddr &addr)
     if (m_fd >= 0)
         closeSocket();
 
-    SOCKET s = ::socket(addr.family() == JobIpAddr::Family::IPv6 ? AF_INET6 : AF_INET, SOCK_STREAM, 0);
-    if (s == INVALID_SOCKET) {
+    if (!addr.isValid()) {
+        m_errors.setError(WSAEINVAL);
+        return false;
+    }
+
+    int addressFamily = AF_UNSPEC;
+
+    switch (addr.family()) {
+    case JobIpAddr::Family::IPv4:
+        addressFamily = AF_INET;
+        break;
+
+    case JobIpAddr::Family::IPv6:
+        addressFamily = AF_INET6;
+        break;
+
+    default:
+        // TcpSocket only speaks IPv4/IPv6 — Unix-domain targets belong to UnixSocket.
+        m_errors.setError(WSAEAFNOSUPPORT);
+        return false;
+    }
+
+    const SOCKET nativeSock = ::socket(addressFamily, SOCK_STREAM, IPPROTO_TCP);
+
+    if (nativeSock == INVALID_SOCKET) {
         m_errors.setError(::WSAGetLastError());
         return false;
     }
 
-    m_fd = getSocketRegistry().allocate(s);
-    if (m_fd < 0) {
-        ::closesocket(s);
+    u_long nonBlocking = 1;
+
+    if (::ioctlsocket(
+            nativeSock,
+            FIONBIO,
+            &nonBlocking) == SOCKET_ERROR) {
+
+        m_errors.setError(::WSAGetLastError());
+        ::closesocket(nativeSock);
         return false;
     }
 
-    u_long nonBlocking = 1;
-    ::ioctlsocket(s, FIONBIO, &nonBlocking);
+    m_fd = threads::WinFdReg::instance().allocate(nativeSock);
+
+    if (m_fd < 0) {
+        ::closesocket(nativeSock);
+        m_errors.setError(WSAEMFILE);
+        return false;
+    }
 
     setOption(SocketOption::ReuseAddress, true);
 
-    if (::bind(s, addr.sockAddr(), static_cast<int>(addr.sockAddrLen())) != 0) {
+    if (::bind(
+            nativeSock,
+            addr.sockAddr(),
+            static_cast<int>(addr.sockAddrLen())) == SOCKET_ERROR) {
+
         m_errors.setError(::WSAGetLastError());
         closeSocket();
         return false;
     }
 
+    /*
+     * Query the kernel instead of merely copying the requested address.
+     * This captures an automatically selected ephemeral port when port
+     * zero was supplied.
+     */
     updateLocalInfo();
+
     return true;
 }
 
-bool TcpSocket::bind(const std::string &address, uint16_t port)
+bool TcpSocket::bind(const JobUrl &url)
 {
-    JobIpAddr addr(address, port);
+    // TCP binds to a local interface, never a remote peer — a hostname needing DNS
+    // resolution has no sensible meaning here, so this deliberately never touches the
+    // resolver. Only accepts an already-numeric IPv4/IPv6 literal.
+    const std::string &host = url.host();
+
+    if (!JobIpAddr::isIPv4(host) && !JobIpAddr::isIPv6(host)) {
+        JOB_LOG_ERROR("[TcpSocket] bind(url) requires a numeric IPv4/IPv6 host, got '{}' — "
+                      "hostname resolution is not performed for bind()", host);
+        m_errors.setError(WSAEINVAL);
+        return false;
+    }
+
+    const JobIpAddr addr(host, url.port());
+
+    if (!addr.isValid()) {
+        JOB_LOG_ERROR("[TcpSocket] bind(url): failed to construct address from '{}'", host);
+        m_errors.setError(WSAEINVAL);
+        return false;
+    }
+
     return bind(addr);
 }
 
 bool TcpSocket::listen(int backlog)
 {
     if (m_fd < 0) {
-        m_errors.setError(WSAEBADF);
+        m_errors.setError(WSAENOTSOCK);
         return false;
     }
 
-    SOCKET s = getSocketRegistry().lookup(m_fd);
-    if (s == INVALID_SOCKET || ::listen(s, backlog) != 0) {
+    const SOCKET nativeSock =
+        threads::WinFdReg::instance().lookup(m_fd);
+
+    if (nativeSock == INVALID_SOCKET) {
+        m_errors.setError(WSAENOTSOCK);
+        return false;
+    }
+
+    if (::listen(nativeSock, backlog) == SOCKET_ERROR) {
         m_errors.setError(::WSAGetLastError());
         return false;
     }
 
     m_state.store(SocketState::Listening);
+
     registerEvents(
         threads::IOEvent::Read |
         threads::IOEvent::Error |
         threads::IOEvent::HangUp |
-        threads::IOEvent::EdgeTriggered);
+        threads::IOEvent::EdgeTriggered
+        );
 
     updateLocalInfo();
     return true;
@@ -197,99 +335,175 @@ bool TcpSocket::listen(int backlog)
 
 ISocketIO::Ptr TcpSocket::accept()
 {
-    if (m_fd < 0 || m_state.load() != SocketState::Listening)
+    if (m_fd < 0 ||
+        m_state.load() != SocketState::Listening) {
+        return nullptr;
+    }
+
+    const SOCKET nativeSock =
+        threads::WinFdReg::instance().lookup(m_fd);
+
+    if (nativeSock == INVALID_SOCKET)
         return nullptr;
 
-    SOCKET s = getSocketRegistry().lookup(m_fd);
-    if (s == INVALID_SOCKET)
-        return nullptr;
+    sockaddr_storage clientAddress{};
+    int addressLength = sizeof(clientAddress);
 
-    sockaddr_storage client_addr{};
-    int len = sizeof(client_addr);
+    const SOCKET clientSock = ::accept(
+        nativeSock,
+        reinterpret_cast<sockaddr *>(&clientAddress),
+        &addressLength
+        );
 
-    SOCKET clientSock = ::accept(s, reinterpret_cast<sockaddr *>(&client_addr), &len);
     if (clientSock == INVALID_SOCKET) {
-        int err = ::WSAGetLastError();
-        if (err != WSAEWOULDBLOCK)
-            m_errors.setError(err);
+        const int error = ::WSAGetLastError();
+
+        if (error != WSAEWOULDBLOCK)
+            m_errors.setError(error);
 
         return nullptr;
     }
 
     u_long nonBlocking = 1;
-    ::ioctlsocket(clientSock, FIONBIO, &nonBlocking);
+
+    if (::ioctlsocket(
+            clientSock,
+            FIONBIO,
+            &nonBlocking) == SOCKET_ERROR) {
+
+        m_errors.setError(::WSAGetLastError());
+        ::closesocket(clientSock);
+        return nullptr;
+    }
+
+    const int clientFd =
+        threads::WinFdReg::instance().allocate(clientSock);
+
+    if (clientFd < 0) {
+        ::closesocket(clientSock);
+        m_errors.setError(WSAEMFILE);
+        return nullptr;
+    }
 
     JobIpAddr peerAddr;
-    if (!peerAddr.fromSockAddr(reinterpret_cast<sockaddr *>(&client_addr), len))
-        JOB_LOG_WARN("[TcpSocket] accept: Failed to parse peer address.");
+
+    if (!peerAddr.fromSockAddr(
+            reinterpret_cast<sockaddr *>(&clientAddress),
+            static_cast<JobSockLen>(addressLength))) {
+        JOB_LOG_WARN(
+            "[TcpSocket] accept: Failed to parse peer address."
+            );
+    }
 
     auto loop = m_loop.lock();
+
     if (!loop) {
+        threads::WinFdReg::instance().release(clientFd);
         ::closesocket(clientSock);
         return nullptr;
     }
 
-    int clientToken = getSocketRegistry().allocate(clientSock);
-    if (clientToken < 0) {
-        ::closesocket(clientSock);
-        return nullptr;
-    }
+    auto socket = TcpSocket::create(loop, clientFd, peerAddr);
 
-    auto sock = std::make_shared<TcpSocket>(loop, clientToken, peerAddr);
-    sock->registerEvents(
+    socket->registerEvents(
         threads::IOEvent::Read |
         threads::IOEvent::Error |
         threads::IOEvent::HangUp |
-        threads::IOEvent::EdgeTriggered);
+        threads::IOEvent::EdgeTriggered
+        );
 
-    return sock;
+    return socket;
 }
 
-ssize_t TcpSocket::read(void *buffer, size_t size)
+ssize_t TcpSocket::read(
+    void *buffer,
+    size_t size)
 {
     if (m_fd < 0)
         return -1;
 
-    SOCKET s = getSocketRegistry().lookup(m_fd);
-    if (s == INVALID_SOCKET)
-        return -1;
-
-    int n = ::recv(s, static_cast<char*>(buffer), static_cast<int>(size), 0);
-    if (n < 0) {
-        int err = ::WSAGetLastError();
-        if (err == WSAEWOULDBLOCK)
-            return 0;
-
-        m_errors.setError(err);
+    if (!buffer && size != 0) {
+        m_errors.setError(WSAEFAULT);
         return -1;
     }
-    if (n == 0) {
+
+    const SOCKET nativeSock =
+        threads::WinFdReg::instance().lookup(m_fd);
+
+    if (nativeSock == INVALID_SOCKET)
+        return -1;
+
+    const size_t boundedSize = std::min(
+        size,
+        static_cast<size_t>(std::numeric_limits<int>::max())
+        );
+
+    const int received = ::recv(
+        nativeSock,
+        static_cast<char *>(buffer),
+        static_cast<int>(boundedSize),
+        0
+        );
+
+    if (received == SOCKET_ERROR) {
+        const int error = ::WSAGetLastError();
+
+        if (error == WSAEWOULDBLOCK)
+            return 0;
+
+        m_errors.setError(error);
+        return -1;
+    }
+
+    if (received == 0) {
         disconnect();
         return 0;
     }
-    return static_cast<ssize_t>(n);
+
+    return static_cast<ssize_t>(received);
 }
 
-ssize_t TcpSocket::write(const void *buffer, size_t size)
+ssize_t TcpSocket::write( const void *buffer, size_t size)
 {
     if (m_fd < 0)
         return -1;
 
-    SOCKET s = getSocketRegistry().lookup(m_fd);
-    if (s == INVALID_SOCKET)
-        return -1;
-
-    std::lock_guard<std::mutex> lock(m_writeMutex);
-    int n = ::send(s, static_cast<const char*>(buffer), static_cast<int>(size), 0);
-    if (n < 0) {
-        int err = ::WSAGetLastError();
-        if (err == WSAEWOULDBLOCK) {
-            return 0;
-        }
-        m_errors.setError(err);
+    if (!buffer && size != 0) {
+        m_errors.setError(WSAEFAULT);
         return -1;
     }
-    return static_cast<ssize_t>(n);
+
+    const SOCKET nativeSock =
+        threads::WinFdReg::instance().lookup(m_fd);
+
+    if (nativeSock == INVALID_SOCKET)
+        return -1;
+
+    const size_t boundedSize = std::min(
+        size,
+        static_cast<size_t>(std::numeric_limits<int>::max())
+        );
+
+    std::lock_guard<std::mutex> lock(m_writeMutex);
+
+    const int sent = ::send(
+        nativeSock,
+        static_cast<const char *>(buffer),
+        static_cast<int>(boundedSize),
+        0
+        );
+
+    if (sent == SOCKET_ERROR) {
+        const int error = ::WSAGetLastError();
+
+        if (error == WSAEWOULDBLOCK)
+            return 0;
+
+        m_errors.setError(error);
+        return -1;
+    }
+
+    return static_cast<ssize_t>(sent);
 }
 
 ISocketIO::SocketState TcpSocket::state() const noexcept
@@ -312,40 +526,70 @@ ISocketIO::SocketType TcpSocket::type() const noexcept
     return SocketType::Tcp;
 }
 
-void TcpSocket::setOption(SocketOption option, bool enable)
+void TcpSocket::setOption(
+    SocketOption option,
+    bool enable)
 {
     if (m_fd < 0)
         return;
 
-    SOCKET s = getSocketRegistry().lookup(m_fd);
-    if (s == INVALID_SOCKET)
+    const SOCKET nativeSock =
+        threads::WinFdReg::instance().lookup(m_fd);
+
+    if (nativeSock == INVALID_SOCKET)
         return;
 
-    int ret = -1;
-    int val = enable ? 1 : 0;
+    int result = SOCKET_ERROR;
+    const BOOL value = enable ? TRUE : FALSE;
 
     switch (option) {
     case SocketOption::ReuseAddress:
-        ret = ::setsockopt(s, SOL_SOCKET, SO_REUSEADDR, reinterpret_cast<const char*>(&val), sizeof(val));
+        result = ::setsockopt(
+            nativeSock,
+            SOL_SOCKET,
+            SO_REUSEADDR,
+            reinterpret_cast<const char *>(&value),
+            sizeof(value)
+            );
         break;
+
     case SocketOption::KeepAlive:
-        ret = ::setsockopt(s, SOL_SOCKET, SO_KEEPALIVE, reinterpret_cast<const char*>(&val), sizeof(val));
+        result = ::setsockopt(
+            nativeSock,
+            SOL_SOCKET,
+            SO_KEEPALIVE,
+            reinterpret_cast<const char *>(&value),
+            sizeof(value)
+            );
         break;
+
     case SocketOption::TcpNoDelay:
-        ret = ::setsockopt(s, IPPROTO_TCP, TCP_NODELAY, reinterpret_cast<const char*>(&val), sizeof(val));
+        result = ::setsockopt(
+            nativeSock,
+            IPPROTO_TCP,
+            TCP_NODELAY,
+            reinterpret_cast<const char *>(&value),
+            sizeof(value)
+            );
         break;
+
     case SocketOption::NonBlocking: {
-        u_long mode = enable ? 1 : 0;
-        ret = ::ioctlsocket(s, FIONBIO, &mode);
+        u_long mode = enable ? 1UL : 0UL;
+
+        result = ::ioctlsocket(
+            nativeSock,
+            FIONBIO,
+            &mode
+            );
         break;
     }
+
     default:
-        break;
+        return;
     }
-    if (ret != 0)
-    {
+
+    if (result == SOCKET_ERROR)
         m_errors.setError(::WSAGetLastError());
-    }
 }
 
 bool TcpSocket::option(SocketOption option) const
@@ -353,142 +597,259 @@ bool TcpSocket::option(SocketOption option) const
     if (m_fd < 0)
         return false;
 
-    SOCKET s = getSocketRegistry().lookup(m_fd);
-    if (s == INVALID_SOCKET)
+    const SOCKET nativeSock =
+        threads::WinFdReg::instance().lookup(m_fd);
+
+    if (nativeSock == INVALID_SOCKET)
         return false;
 
-    int val = 0;
-    int len = sizeof(val);
+    BOOL value = FALSE;
+    int valueLength = sizeof(value);
+    int result = SOCKET_ERROR;
 
     switch (option) {
     case SocketOption::ReuseAddress:
-        ::getsockopt(s, SOL_SOCKET, SO_REUSEADDR, reinterpret_cast<char*>(&val), &len);
+        result = ::getsockopt(
+            nativeSock,
+            SOL_SOCKET,
+            SO_REUSEADDR,
+            reinterpret_cast<char *>(&value),
+            &valueLength
+            );
         break;
+
     case SocketOption::KeepAlive:
-        ::getsockopt(s, SOL_SOCKET, SO_KEEPALIVE, reinterpret_cast<char*>(&val), &len);
+        result = ::getsockopt(
+            nativeSock,
+            SOL_SOCKET,
+            SO_KEEPALIVE,
+            reinterpret_cast<char *>(&value),
+            &valueLength
+            );
         break;
+
     case SocketOption::TcpNoDelay:
-        ::getsockopt(s, IPPROTO_TCP, TCP_NODELAY, reinterpret_cast<char*>(&val), &len);
+        result = ::getsockopt(
+            nativeSock,
+            IPPROTO_TCP,
+            TCP_NODELAY,
+            reinterpret_cast<char *>(&value),
+            &valueLength
+            );
         break;
+
+
+    // FIONBIO cannot be queried through getsockopt().
     case SocketOption::NonBlocking:
-        JOB_LOG_WARN("[TcpSocket] Querying NonBlocking socket option is un-supported on Win32.");
         return false;
+
     default:
         return false;
     }
-    return (val != 0);
+
+    if (result == SOCKET_ERROR)
+        return false;
+
+    return value != FALSE;
 }
 
-std::string TcpSocket::peerAddress() const { return m_peerAddr.toString(false); }
-uint16_t TcpSocket::peerPort() const { return m_peerAddr.port(); }
-std::string TcpSocket::localAddress() const { return m_localAddr.toString(false); }
-
-uint16_t TcpSocket::localPort()
+std::string TcpSocket::peerAddress() const
 {
-    if (m_localAddr.port() == 0 && m_fd != -1)
-        updateLocalInfo();
+    return m_peerAddr.toString(false);
+}
+
+uint16_t TcpSocket::peerPort() const
+{
+    return m_peerAddr.port();
+}
+
+std::string TcpSocket::localAddress() const
+{
+    return m_localAddr.toString(false);
+}
+
+uint16_t TcpSocket::localPort() const
+{
+    if (m_localAddr.port() == 0 && m_fd >= 0)
+        const_cast<TcpSocket *>(this)->updateLocalInfo();
 
     return m_localAddr.port();
 }
 
 void TcpSocket::dumpState() const
 {
-    JOB_LOG_DEBUG("[TcpSocket] token={} state={} peer={}:{} local={}:{}",
-                  m_fd, (int)m_state.load(),
-                  peerAddress(), peerPort(),
-                  localAddress(), m_localAddr.port()
-                  );
+    JOB_LOG_DEBUG(
+        "[TcpSocket] fd={} state={} peer={}:{} local={}:{}",
+        m_fd,
+        static_cast<int>(m_state.load()),
+        peerAddress(),
+        peerPort(),
+        localAddress(),
+        localPort()
+        );
 }
 
 bool TcpSocket::isOpen() const noexcept
 {
-    const auto current_state = m_state.load();
-    return (current_state == ISocketIO::SocketState::Connected ||
-            current_state == ISocketIO::SocketState::Listening);
+    const auto currentState = m_state.load();
+
+    return currentState == SocketState::Connected ||
+           currentState == SocketState::Listening;
 }
 
 void TcpSocket::updateLocalInfo()
 {
-    if (m_fd == -1)
+    if (m_fd < 0)
         return;
 
-    SOCKET s = getSocketRegistry().lookup(m_fd);
-    sockaddr_storage sa{};
-    int len = sizeof(sa);
-    if (s != INVALID_SOCKET && ::getsockname(s, reinterpret_cast<sockaddr*>(&sa), &len) == 0){
-        if (!m_localAddr.fromSockAddr(reinterpret_cast<sockaddr*>(&sa), len))
-            JOB_LOG_WARN("[TcpSocket] updateLocalInfo: Failed to parse local address.");
+    const SOCKET nativeSock =
+        threads::WinFdReg::instance().lookup(m_fd);
+
+    if (nativeSock == INVALID_SOCKET)
+        return;
+
+    sockaddr_storage address{};
+    int addressLength = sizeof(address);
+
+    if (::getsockname(
+            nativeSock,
+            reinterpret_cast<sockaddr *>(&address),
+            &addressLength) == SOCKET_ERROR) {
+        return;
+    }
+
+    if (!m_localAddr.fromSockAddr(
+            reinterpret_cast<sockaddr *>(&address),
+            static_cast<JobSockLen>(addressLength))) {
+        JOB_LOG_WARN(
+            "[TcpSocket] updateLocalInfo: "
+            "Failed to parse local address."
+            );
     }
 }
 
 void TcpSocket::updatePeerInfo()
 {
-    if (m_fd == -1)
+    if (m_fd < 0)
         return;
 
-    SOCKET s = getSocketRegistry().lookup(m_fd);
-    sockaddr_storage sa{};
-    int len = sizeof(sa);
-    if (s != INVALID_SOCKET && ::getpeername(s, reinterpret_cast<sockaddr*>(&sa), &len) == 0) {
-        if (!m_peerAddr.fromSockAddr(reinterpret_cast<sockaddr*>(&sa), len)) {
-            JOB_LOG_WARN("[TcpSocket] updatePeerInfo: Failed to parse peer address.");
-        }
+    const SOCKET nativeSock =
+        threads::WinFdReg::instance().lookup(m_fd);
+
+    if (nativeSock == INVALID_SOCKET)
+        return;
+
+    sockaddr_storage address{};
+    int addressLength = sizeof(address);
+
+    if (::getpeername(
+            nativeSock,
+            reinterpret_cast<sockaddr *>(&address),
+            &addressLength) == SOCKET_ERROR) {
+        return;
+    }
+
+    if (!m_peerAddr.fromSockAddr(
+            reinterpret_cast<sockaddr *>(&address),
+            static_cast<JobSockLen>(addressLength))) {
+        JOB_LOG_WARN(
+            "[TcpSocket] updatePeerInfo: "
+            "Failed to parse peer address."
+            );
     }
 }
 
 void TcpSocket::onEvents(threads::IOEvent events)
 {
-    if (m_fd < 0)
-        return;
+    if (threads::hasEvent(events, threads::IOEvent::Error) ||
+        threads::hasEvent(events, threads::IOEvent::HangUp)) {
 
-    SOCKET s = getSocketRegistry().lookup(m_fd);
-    if (s == INVALID_SOCKET)
-        return;
+        const SOCKET nativeSock =
+            threads::WinFdReg::instance().lookup(m_fd);
 
-    if (threads::hasEvent(events, threads::IOEvent::Error) || threads::hasEvent(events, threads::IOEvent::HangUp)) {
-        int error = 0;
-        int len = sizeof(error);
-        ::getsockopt(s, SOL_SOCKET, SO_ERROR, reinterpret_cast<char*>(&error), &len);
-        m_errors.setError(error ? error : WSAEIO);
-        if (onError)
-            onError(error ? error : WSAEIO);
+        int socketError = 0;
+        int errorLength = sizeof(socketError);
+
+        if (nativeSock != INVALID_SOCKET) {
+            ::getsockopt(
+                nativeSock,
+                SOL_SOCKET,
+                SO_ERROR,
+                reinterpret_cast<char *>(&socketError),
+                &errorLength
+                );
+        }
+
+        if (socketError != 0) {
+            m_errors.setError(socketError);
+            if (onError)
+                onError(socketError);
+        }
+        // else: HangUp with no real SO_ERROR just means the peer closed normally —
+        // not an error, don't report one. disconnect() below still fires onDisconnect.
 
         disconnect();
         return;
     }
 
-    if (threads::hasEvent(events, threads::IOEvent::Write) && m_state.load() == SocketState::Connecting) {
-        int error = 0;
-        int len = sizeof(error);
-        if (::getsockopt(s, SOL_SOCKET, SO_ERROR, reinterpret_cast<char*>(&error), &len) == 0 && error == 0) {
+    if (threads::hasEvent(events, threads::IOEvent::Write) &&
+        m_state.load() == SocketState::Connecting) {
+
+        const SOCKET nativeSock =
+            threads::WinFdReg::instance().lookup(m_fd);
+
+        int socketError = 0;
+        int errorLength = sizeof(socketError);
+
+        const bool connected =
+            nativeSock != INVALID_SOCKET &&
+            ::getsockopt(
+                nativeSock,
+                SOL_SOCKET,
+                SO_ERROR,
+                reinterpret_cast<char *>(&socketError),
+                &errorLength) == 0 &&
+            socketError == 0;
+
+        if (connected) {
             m_state.store(SocketState::Connected);
+
             updateLocalInfo();
             updatePeerInfo();
+
+            registerEvents(
+                threads::IOEvent::Read |
+                threads::IOEvent::Error |
+                threads::IOEvent::HangUp |
+                threads::IOEvent::EdgeTriggered
+                );
+
             if (onConnect)
                 onConnect();
+
         } else {
-            m_errors.setError(error ? error : WSAEIO);
+            const int reportedError =
+                socketError != 0 ? socketError : WSAECONNABORTED;
+
+            m_errors.setError(reportedError);
+
             if (onError)
-                onError(error ? error : WSAEIO);
+                onError(reportedError);
 
             disconnect();
         }
+
         return;
     }
 
     if (threads::hasEvent(events, threads::IOEvent::Read)) {
-        const auto current_state = m_state.load();
-        if (current_state == SocketState::Connected){
-
+        if (m_state.load() == SocketState::Connected) {
             if (onRead)
                 onRead(nullptr, 0);
 
-        } else if (current_state == SocketState::Listening) {
-            if (onAccept){
-                // Core multiplexer loop handles factory instantiations inside servers land via shared_ptr
-                if (auto acceptedSocket = accept())
-                    onAccept(acceptedSocket);
-            }
+        } else if (m_state.load() == SocketState::Listening) {
+            if (onConnect)
+                onConnect();
         }
     }
 }

@@ -8,11 +8,11 @@ add_executable(test_job_net
     test_ipaddr.cpp
     test_http_header.cpp
     # sockets
-    test_tcp_socket.cpp ## up 1st
+    test_tcp_socket.cpp
     test_udp_socket.cpp
     test_unix_socket.cpp
     # Clients / server testing
-    test_tcp_client_server.cpp # up next
+    test_tcp_client_server.cpp
     test_udp_client_server.cpp
     test_unix_client_server.cpp
 )

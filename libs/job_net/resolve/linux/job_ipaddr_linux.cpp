@@ -1,45 +1,40 @@
 #include "job_ipaddr.h"
 
 #include <sstream>
-#include <cstring>
-#include <regex>
 #include <array>
-
-//
-// #include <arpa/inet.h>
-// #include <sys/un.h>
-// #include <netdb.h>
-// #include <unistd.h>
+#include <cstddef>
+#include <sys/stat.h>
+#include <unistd.h>
 
 namespace job::net {
-
-
-JobIpAddr::JobIpAddr(const std::string &addr, uint16_t port) { setAddress(addr, port); }
-JobIpAddr::JobIpAddr(const JobIpAddr &other) = default;
-JobIpAddr &JobIpAddr::operator=(const JobIpAddr &other) = default;
-
-void JobIpAddr::clear() noexcept {
-    std::memset(&m_storage, 0, sizeof(m_storage));
-    m_len = 0;
-    m_port = 0;
-    m_valid = false;
-    m_family = Family::Unknown;
-}
-
 
 bool JobIpAddr::setAddress(const std::string &addr, uint16_t port) {
     clear();
 
     // --- UNIX socket ---
     if (isUnixPath(addr)) {
-        if (addr.size() >= sizeof(reinterpret_cast<sockaddr_un*>(&m_storage)->sun_path))
-            return false;
+        auto *un = reinterpret_cast<sockaddr_un*>(&m_storage);
+        const size_t maxPathLen = sizeof(un->sun_path);
+
+        if (addr.size() >= maxPathLen)
+            return false; // Path exceeds sockaddr_un buffer limits
 
         m_family = Family::Unix;
-        sockaddr_un *un = reinterpret_cast<sockaddr_un*>(&m_storage);
         un->sun_family = AF_UNIX;
-        std::snprintf(un->sun_path, sizeof(un->sun_path), "%s", addr.c_str());
-        m_len = sizeof(sockaddr_un);
+
+        // Use memcpy to safely support Linux abstract namespace sockets (starting with '\0')
+        std::memcpy(un->sun_path, addr.data(), addr.size());
+
+        // Null-terminate non-abstract sockets
+        if (!addr.empty() && addr[0] != '\0' && addr.size() < maxPathLen)
+            un->sun_path[addr.size()] = '\0';
+
+        // Calculate exact structure length for kernel functions (bind/connect)
+        if (!addr.empty() && addr[0] == '\0')
+            m_len = static_cast<JobSockLen>(offsetof(sockaddr_un, sun_path) + addr.size());
+        else
+            m_len = static_cast<JobSockLen>(offsetof(sockaddr_un, sun_path) + addr.size() + 1);
+
         m_valid = true;
         return true;
     }
@@ -47,7 +42,6 @@ bool JobIpAddr::setAddress(const std::string &addr, uint16_t port) {
     // --- IPv4 ---
     if (isIPv4(addr)) {
         sockaddr_in ipv4_addr{};
-
         ipv4_addr.sin_family = AF_INET;
         ipv4_addr.sin_port = htons(port);
         if (inet_pton(AF_INET, addr.c_str(), &ipv4_addr.sin_addr) == 1) {
@@ -80,21 +74,6 @@ bool JobIpAddr::setAddress(const std::string &addr, uint16_t port) {
     return false;
 }
 
-
-bool JobIpAddr::isValid() const noexcept
-{
-    return m_valid;
-}
-
-JobIpAddr::Family JobIpAddr::family() const noexcept
-{
-    return m_family;
-}
-uint16_t JobIpAddr::port() const noexcept
-{
-    return m_port;
-}
-
 std::string JobIpAddr::toString(bool includePort) const
 {
     std::array<char, INET6_ADDRSTRLEN> buf{};
@@ -120,7 +99,12 @@ std::string JobIpAddr::toString(bool includePort) const
     }
     case Family::Unix: {
         const auto *un = reinterpret_cast<const sockaddr_un*>(&m_storage);
-        oss << un->sun_path;
+
+        // Print abstract sockets safely
+        if (un->sun_path[0] == '\0')
+            oss << "@" << (un->sun_path + 1);
+        else
+            oss << un->sun_path;
         break;
     }
     default:
@@ -131,22 +115,22 @@ std::string JobIpAddr::toString(bool includePort) const
     return oss.str();
 }
 
-
-const sockaddr *JobIpAddr::sockAddr() const noexcept
+bool JobIpAddr::isUnixPath(const std::string &path)
 {
-    return reinterpret_cast<const sockaddr*>(&m_storage);
+    if (path.empty())
+        return false;
+
+    if (path[0] == '\0')
+        return true;
+
+    if (path.length() >= 5 && path.compare(path.length() - 5, 5, ".sock") == 0)
+        return true;
+
+    if (path[0] == '/' || path.rfind("./", 0) == 0 || path.rfind("../", 0) == 0)
+        return true;
+
+    return false;
 }
-
-socklen_t JobIpAddr::sockAddrLen() const noexcept
-{
-    return m_len;
-}
-
-
-bool JobIpAddr::isUnixPath(const std::string &path) {
-    return !path.empty() && path[0] == '/';
-}
-
 
 bool JobIpAddr::isLocal() const noexcept
 {
@@ -155,8 +139,7 @@ bool JobIpAddr::isLocal() const noexcept
 
     if (m_family == Family::IPv4) {
         auto addr = ntohl(reinterpret_cast<const sockaddr_in*>(&m_storage)->sin_addr.s_addr);
-        // 127.x.x.x
-        return (addr >> 24) == 127;
+        return (addr >> 24) == 127; // 127.x.x.x
     }
 
     if (m_family == Family::IPv6) {
@@ -169,50 +152,41 @@ bool JobIpAddr::isLocal() const noexcept
 
 bool JobIpAddr::isLoopback() const noexcept
 {
-    bool ret = false;
-
     if (m_family == Family::IPv4)
-        ret = ntohl(reinterpret_cast<const sockaddr_in*>(&m_storage)->sin_addr.s_addr) == 0x7F000001;
+        return ntohl(reinterpret_cast<const sockaddr_in*>(&m_storage)->sin_addr.s_addr) == 0x7F000001;
 
     if (m_family == Family::IPv6)
-        ret = IN6_IS_ADDR_LOOPBACK(&reinterpret_cast<const sockaddr_in6*>(&m_storage)->sin6_addr);
+        return IN6_IS_ADDR_LOOPBACK(&reinterpret_cast<const sockaddr_in6*>(&m_storage)->sin6_addr);
 
-    return ret;
+    return false;
 }
 
 bool JobIpAddr::isMulticast() const noexcept
 {
-    bool ret = false;
-
     if (m_family == Family::IPv4) {
         auto addr = ntohl(reinterpret_cast<const sockaddr_in*>(&m_storage)->sin_addr.s_addr);
-        // 224.0.0.0–239.255.255.255
-        ret = (addr & 0xF0000000) == 0xE0000000;
+        return (addr & 0xF0000000) == 0xE0000000;
     }
 
     if (m_family == Family::IPv6)
-        ret = IN6_IS_ADDR_MULTICAST(&reinterpret_cast<const sockaddr_in6*>(&m_storage)->sin6_addr);
+        return IN6_IS_ADDR_MULTICAST(&reinterpret_cast<const sockaddr_in6*>(&m_storage)->sin6_addr);
 
-    return ret;
+    return false;
 }
 
 bool JobIpAddr::isNull() const noexcept
 {
-    bool ret = false;
-
     if (m_family == Family::IPv4)
-        ret = reinterpret_cast<const sockaddr_in*>(&m_storage)->sin_addr.s_addr == 0;
+        return reinterpret_cast<const sockaddr_in*>(&m_storage)->sin_addr.s_addr == INADDR_ANY;
 
     if (m_family == Family::IPv6)
         return IN6_IS_ADDR_UNSPECIFIED(&reinterpret_cast<const sockaddr_in6*>(&m_storage)->sin6_addr);
 
-    return ret;
+    return false;
 }
 
 bool JobIpAddr::isGlobal() const noexcept
 {
-    bool ret = false;
-
     if (m_family == Family::IPv4) {
         auto *saddr = reinterpret_cast<const sockaddr_in*>(&m_storage);
         if (!saddr)
@@ -220,53 +194,38 @@ bool JobIpAddr::isGlobal() const noexcept
 
         uint32_t addr = ntohl(saddr->sin_addr.s_addr);
 
-        // unspec address
         if (addr == 0)
             return false;
 
         uint8_t first  = (addr >> 24) & 0xFF;
         uint8_t second = (addr >> 16) & 0xFF;
 
-        // Private / reserved IPv4 ranges (RFC1918, loopback, link-local, etc.)
-
-        // 10.0.0.0/8
         if (first == 10)
-            return false;
-
-        // 127.0.0.0/8
+            return false; // 10.0.0.0/8
         if (first == 127)
-            return false;
-
-        // 172.16.0.0/12
+            return false; // 127.0.0.0/8
         if (first == 172 && (second >= 16 && second <= 31))
-            return false;
-
-        // 192.168.0.0/16
+            return false; // 172.16.0.0/12
         if (first == 192 && second == 168)
-            return false;
-
-        // 169.254.0.0/16
+            return false; // 192.168.0.0/16
         if (first == 169 && second == 254)
-            return false;
-
-        // Multicast || reserved
+            return false; // 169.254.0.0/16
         if (first >= 224)
-            return false;
+            return false; // Multicast / Reserved
 
-        ret = true;
+        return true;
     }
     else if (m_family == Family::IPv6) {
         const auto *a6 = &reinterpret_cast<const sockaddr_in6*>(&m_storage)->sin6_addr;
-        if (IN6_IS_ADDR_UNSPECIFIED(a6) ||
-            IN6_IS_ADDR_LOOPBACK(a6)    ||
-            IN6_IS_ADDR_LINKLOCAL(a6)   ||
-            IN6_IS_ADDR_MULTICAST(a6))
-            return false;
-        ret = true;
+        return !(IN6_IS_ADDR_UNSPECIFIED(a6) ||
+                 IN6_IS_ADDR_LOOPBACK(a6)    ||
+                 IN6_IS_ADDR_LINKLOCAL(a6)   ||
+                 IN6_IS_ADDR_MULTICAST(a6));
     }
 
-    return ret;
+    return false;
 }
+
 bool JobIpAddr::isBroadcast() const noexcept
 {
     if (m_family != Family::IPv4)
@@ -276,19 +235,70 @@ bool JobIpAddr::isBroadcast() const noexcept
 
 bool JobIpAddr::isUnixPermitted() const noexcept
 {
-    // FIXME
-    // Placeholder for future permission checks (e.g. stat() or ACL logic)
+    if (m_family != Family::Unix || !m_valid)
+        return false;
+
+    const auto *un = reinterpret_cast<const sockaddr_un*>(&m_storage);
+    const char *path = un->sun_path;
+
+    // Abstract namespace sockets don't exist on the filesystem
+    if (path[0] == '\0')
+        return true;
+
+    struct stat st{};
+    if (::stat(path, &st) != 0)
+        return false;
+
+    if (!S_ISSOCK(st.st_mode))
+        return false;
+
+    if (::access(path, R_OK | W_OK) != 0)
+        return false;
+
     return true;
 }
 
-bool JobIpAddr::fromSockAddr(const sockaddr *sa, socklen_t len)
+bool JobIpAddr::isIPv4(const std::string &ip) noexcept
 {
-    if (!sa || len == 0)
+    in_addr addr4;
+    return inet_pton(AF_INET, ip.c_str(), &addr4) == 1;
+}
+
+bool JobIpAddr::isIPv6(const std::string &ip) noexcept
+{
+    in6_addr addr6;
+    return inet_pton(AF_INET6, ip.c_str(), &addr6) == 1;
+}
+
+bool JobIpAddr::fromSockAddr(const sockaddr *sa, job::net::JobSockLen len)
+{
+    if (!sa || len <= 0)
         return false;
+
+    if (static_cast<std::size_t>(len) > sizeof(m_storage))
+        return false;
+
+    // Minimum size validation per family
+    switch (sa->sa_family) {
+    case AF_INET:
+        if (len < static_cast<JobSockLen>(sizeof(sockaddr_in)))
+            return false;
+        break;
+    case AF_INET6:
+        if (len < static_cast<JobSockLen>(sizeof(sockaddr_in6)))
+            return false;
+        break;
+    case AF_UNIX:
+        if (len < static_cast<JobSockLen>(offsetof(sockaddr_un, sun_path)))
+            return false;
+        break;
+    default:
+        return false;
+    }
 
     clear();
 
-    std::memcpy(&m_storage, sa, len);
+    std::memcpy(&m_storage, sa, static_cast<std::size_t>(len));
     m_len = len;
     m_valid = true;
 
@@ -306,38 +316,11 @@ bool JobIpAddr::fromSockAddr(const sockaddr *sa, socklen_t len)
         m_port = 0;
         break;
     default:
-        m_family = Family::Unknown;
-        m_valid = false;
+        clear();
         return false;
     }
 
     return true;
 }
 
-const std::regex &JobIpAddr::ipv4Pattern() noexcept
-{
-    static const std::regex re(R"(^(\d{1,3}\.){3}\d{1,3}$)");
-    return re;
-}
-
-const std::regex &JobIpAddr::ipv6Pattern() noexcept
-{
-    static const std::regex re(R"(^([0-9A-Fa-f]{0,4}:){1,7}[0-9A-Fa-f]{0,4}$)");
-    return re;
-}
-
-bool JobIpAddr::operator==(const JobIpAddr &o) const noexcept
-{
-    return m_family == o.m_family &&
-           m_port == o.m_port &&
-           std::memcmp(&m_storage, &o.m_storage, sizeof(sockaddr_storage)) == 0;
-}
-
-bool JobIpAddr::operator!=(const JobIpAddr &o) const noexcept
-{
-    return !(*this == o);
-}
-
-
 } // namespace job::net
-

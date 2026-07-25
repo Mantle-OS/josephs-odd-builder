@@ -21,35 +21,11 @@ static int toNativePolicy(SchedulingPolicy policy) noexcept
     case SchedulingPolicy::FIFO:       return SCHED_FIFO;
     case SchedulingPolicy::RoundRobin: return SCHED_RR;
     case SchedulingPolicy::Other:
-    default:                          return SCHED_OTHER;
+    default:                           return SCHED_OTHER;
     }
 }
 
-
 using JobThreadArgs = ThreadArgs<JobThread, JobThread::StartResult>;
-
-JobThread::JobThread(const JobThreadOptions &options) noexcept :
-    m_options{options}
-{
-}
-
-JobThread::~JobThread() noexcept
-{
-    requestStop();
-    (void)join();
-}
-
-void JobThread::setOptions(const JobThreadOptions &options) noexcept
-{
-    std::lock_guard<std::mutex> lock(m_mutex);
-    m_options = options;
-}
-
-void JobThread::setRunFunction(RunFunction fn)
-{
-    std::lock_guard<std::mutex> lock(m_mutex);
-    m_runFunc = std::move(fn);
-}
 
 JobThread::StartResult JobThread::start()
 {
@@ -58,13 +34,13 @@ JobThread::StartResult JobThread::start()
 
     auto promise = std::make_shared<std::promise<StartResult>>();
     auto future  = promise->get_future();
-    auto *args = new (std::nothrow)JobThreadArgs{
+    auto *args = new (std::nothrow) JobThreadArgs{
         this,
         promise,
         m_stopSource.get_token()
     };
 
-    if (!args){
+    if (!args) {
         m_starting.clear(std::memory_order_release);
         return StartResult::ThreadError;
     }
@@ -102,82 +78,54 @@ void *JobThread::threadEntry(void *arg)
 
     StartResult ret = StartResult::Started;
     {
-        if(self->m_options.realtime){
-            std::lock_guard<std::mutex> lock(self->m_mutex);
-            int ok_sched = self->applyScheduling();
-            int ok_aff   = self->applyAffinity();
-            if (ok_sched != 0)
+        std::lock_guard<std::mutex> lock(self->m_mutex);
+        if (self->m_options.realtime) {
+            if (self->applyScheduling() != 0) {
                 ret = StartResult::SchedulingFailed;
-            else if (ok_aff != 0)
+            }
+        }
+        if (ret == StartResult::Started && self->m_options.pinToCore) {
+            if (self->applyAffinity() != 0) {
                 ret = StartResult::AffinityFailed;
+            }
         }
     }
 
     promise->set_value(ret);
 
-    if (ret == StartResult::Started) {
-        self->m_running.store(true);
+    if (ret != StartResult::Started) {
         self->m_starting.clear(std::memory_order_release);
-
-        {
-            std::lock_guard<std::mutex> lock(self->m_mutex);
-            if (self->m_options.name[0] != '\0') {
-                self->m_options.name[self->m_options.name.size() - 1] = '\0';
-                ::pthread_setname_np(::pthread_self(), self->m_options.name.data());
-            }
-        }
-        RunFunction func_to_run;
-        {
-            std::lock_guard<std::mutex> lock(self->m_mutex);
-            func_to_run = self->m_runFunc;
-        }
-        if (func_to_run)
-            func_to_run(token);
-        else
-            self->run(token);
-
-        self->m_running.store(false);
+        return nullptr;
     }
+
+    self->m_running.store(true, std::memory_order_release);
+    self->m_starting.clear(std::memory_order_release);
+
+    {
+        std::lock_guard<std::mutex> lock(self->m_mutex);
+        if (self->m_options.name[0] != '\0') {
+            char nameBuf[16]{};
+            std::strncpy(nameBuf, self->m_options.name.data(), sizeof(nameBuf) - 1);
+            ::pthread_setname_np(::pthread_self(), nameBuf);
+        }
+    }
+
+    RunFunction func_to_run;
+    {
+        std::lock_guard<std::mutex> lock(self->m_mutex);
+        func_to_run = self->m_runFunc;
+    }
+
+    if (func_to_run) {
+        func_to_run(token);
+    } else {
+        self->run(token);
+    }
+
+    self->m_running.store(false, std::memory_order_release);
     return nullptr;
 }
 
-void JobThread::requestStop() noexcept
-{
-    m_stopSource.request_stop();
-}
-
-bool JobThread::join() noexcept
-{
-    if (m_joinable) {
-        pthread_join(nativeHandle(m_handleStorage), nullptr);
-        m_joinable = false;
-        return true;
-    }
-    return false;
-}
-
-bool JobThread::isRunning() const noexcept
-{
-    return m_running.load();
-}
-
-void JobThread::run(std::stop_token token) noexcept
-{
-    uint16_t heartbeat;
-    {
-        std::lock_guard<std::mutex> lock(m_mutex);
-        heartbeat = m_options.heartbeat;
-    }
-    while (!token.stop_requested()) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(heartbeat));
-        {
-            std::lock_guard<std::mutex> lock(m_mutex);
-            heartbeat = m_options.heartbeat;
-        }
-    }
-}
-
-// NOTE: m_mutex MUST be locked
 int JobThread::applyScheduling() noexcept
 {
     if (m_options.realtime) {
@@ -186,7 +134,6 @@ int JobThread::applyScheduling() noexcept
 
         if (m_options.lockMemory) {
             if (mlockall(MCL_CURRENT | MCL_FUTURE) == -1) {
-                perror("mlockall failed");
                 return errno;
             }
         }
@@ -194,7 +141,6 @@ int JobThread::applyScheduling() noexcept
         if (pthread_setschedparam(pthread_self(),
                                   toNativePolicy(m_options.policy),
                                   &sched) != 0) {
-            perror("pthread_setschedparam failed");
             return errno;
         }
     }
@@ -202,7 +148,6 @@ int JobThread::applyScheduling() noexcept
     return 0;
 }
 
-// NOTE: m_mutex MUST be locked
 int JobThread::applyAffinity() noexcept
 {
     if (m_options.pinToCore) {
@@ -211,7 +156,6 @@ int JobThread::applyAffinity() noexcept
         CPU_SET(m_options.coreId, &cpuset);
 
         if (sched_setaffinity(0, sizeof(cpu_set_t), &cpuset) != 0) {
-            perror("sched_setaffinity failed");
             return errno;
         }
     }
