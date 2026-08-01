@@ -1,5 +1,4 @@
-#ifndef QLLAMAADAPTERLORA_H
-#define QLLAMAADAPTERLORA_H
+#pragma once
 
 #include <QObject>
 #include <QQmlEngine>
@@ -16,7 +15,7 @@ class QLlamaAdapterLora : public QLlamaBase
 
     QP_RW(QString, loraPath, "")
     QP_RW(double,  scale,    1.0) // 1.0 = Full application intensity scaling
-    QP_RO(bool,    isLoaded, false)
+    QP_RO(bool,    isLoaded, false)  // not in API but really nuseful
 
 public:
     Q_INVOKABLE explicit QLlamaAdapterLora(QObject *parent = nullptr);
@@ -28,5 +27,3 @@ public:
 private:
     struct llama_adapter_lora *m_adapter = nullptr;
 };
-
-#endif // QLLAMAADAPTERLORA_H

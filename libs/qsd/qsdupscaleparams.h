@@ -5,7 +5,7 @@
 #include <QQmlEngine>
 
 #include <stable-diffusion.h>
-
+// Not even started after video
 class QSdUpscaleParams : public QObject
 {
     Q_OBJECT

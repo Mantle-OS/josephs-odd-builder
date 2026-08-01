@@ -15,10 +15,10 @@ fields:
     required: true
     comment: "IDENTITY=0, PACKAGE_SIGNING=1, LEDGER_SIGNING=2"
   - name: "public_key"
-    type: "bin"
+    type: "bin[32]"
     required: true
   - name: "secret_key"
-    type: "bin"
+    type: "bin[64]"
     required: true
     comment: "Loaded into QSecureMem after vault unlock."
   - name: "created_at"

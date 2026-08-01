@@ -10,16 +10,14 @@ Pane{
         Layout.alignment: Qt.AlignCenter
         Label{text:qsTr("Prompt")}
         MenuSeparator{Layout.fillWidth: true}
-
         ScrollView{
             Layout.fillWidth: true
             Layout.fillHeight: true
             TextArea{
                 id: prompt
-                text: "a lovely cat holding a sign says \"Qt Stable diffusion ZImage Turbo\""
+                text: "a lovely cat holding a sign says \"QDS ZImage Turbo\""
             }
         }
-
         RowLayout{
             Switch{
                 id: autoSaveSwitch
@@ -37,20 +35,24 @@ Pane{
                     QSD.ContextParams.weightsOnCpu                          = true
 
                     // GenerationParams
-                    QSD.ImageGenerationParams.width                          = 1024
-                    QSD.ImageGenerationParams.height                         = 1024
+                    QSD.ImageGenerationParams.imgWidth                       = 1024
+                    QSD.ImageGenerationParams.imgHeight                      = 1024
                     QSD.ImageGenerationParams.seed                           = 42
                     QSD.ImageGenerationParams.prompt                         = prompt.text
 
                     QSD.ImageGenerationParams.sampleParams.sampleSteps       = 8
                     QSD.ImageGenerationParams.sampleParams.guidance.txtCfg   = parseFloat(1.0)
 
+                    // QSD.ImageGenerationParams.sampleParams.eta = 0.0
+                    QSD.ImageGenerationParams.sampleParams.flowShift = 1.0
+                    // QSD.ImageGenerationParams.sampleParams.guidance.imgCfg = 1.0
+
                     QSD.generateImage(outputImage, autoSaveSwitch.checked)
 
                 }
             }
         }
-        /// where we are going to add our cusom time deal
+
         QSdImage{
             id: outputImage
             Layout.fillWidth: true

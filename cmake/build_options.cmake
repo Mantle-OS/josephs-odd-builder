@@ -17,7 +17,7 @@ endif()
 # AVX Settings
 ##############################
 option(JOB_AVX_FLAG           "build with avx" OFF)
-option(JOB_AVX_2_FLAG         "build with avx two" OFF)
+option(JOB_AVX_TWO_FLAG         "build with avx two" OFF)
 option(JOB_AVX_VNNI_FLAG      "build with avx vnni" ON)
 option(JOB_AVX_512_FLAG       "build with avx 512f" OFF)
 option(JOB_AVX_512_VNNI_FLAG  "build with avx 512vnni" OFF)

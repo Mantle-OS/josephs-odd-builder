@@ -1,5 +1,4 @@
-#ifndef QSDSLGPARAMS_H
-#define QSDSLGPARAMS_H
+#pragma once
 
 #include <QObject>
 #include <QQmlEngine>
@@ -28,5 +27,3 @@ private:
     int                 *m_layers = nullptr;
 // QP_RW(int *layers READ layers WRITE setLayers NOTIFY layersChanged FINAL)
 };
-
-#endif // QSDSLGPARAMS_H

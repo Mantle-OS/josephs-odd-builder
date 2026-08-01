@@ -1,6 +1,4 @@
-#ifndef QSDSAMPLEPARAMS_H
-#define QSDSAMPLEPARAMS_H
-
+#pragma once
 #include <memory.h>
 
 #include <QObject>
@@ -20,9 +18,9 @@ class QSdSampleParams : public QSdBaseParam
     QP_RW(QSdEnums::QSdSchedulerTypes,  scheduler,          QSdEnums::QSdSchedulerCount       )
     QP_RW(QSdEnums::QSdSampleTypes,     sampleMethod,       QSdEnums::QSdSampleCount          )
     QP_RW(int,                          sampleSteps,        20                                )
-    QP_RW(float,                        eta,                INFINITY                          )
+    QP_RW(float,                        eta,                1.0f                              )
     QP_RW(int,                          shiftedTimestep,    0                                 )
-    QP_RW(float,                        flowShift,          INFINITY                          )
+    QP_RW(float,                        flowShift,          1.0f                              )
     QP_RW(QString,                      extraSampleArgs,    ""                                )
 
     QP_PTR_RO(QSdGuidanceParams, guidance)
@@ -52,5 +50,3 @@ private:
     QList<float> m_customSigmas;
     std::vector<float> m_proxySigmas;
 };
-
-#endif // QSDSAMPLEPARAMS_H

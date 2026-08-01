@@ -85,7 +85,7 @@ target_link_libraries(qt-stable-diffusion PRIVATE
     ggml
     stable-diffusion
     qt-ai-utils qml-ai-utils
-    qt-huggingface
+    # qt-huggingface
     Qt6::Core
     Qt6::Gui
     Qt6::Network

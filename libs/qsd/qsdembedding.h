@@ -1,5 +1,4 @@
-#ifndef QSDEMBEDDING_H
-#define QSDEMBEDDING_H
+#pragma once
 
 #include <QObject>
 #include <QQmlEngine>
@@ -30,4 +29,3 @@ private:
     QByteArray  tmp_embeddingPath;
 };
 
-#endif // QSDEMBEDDING_H

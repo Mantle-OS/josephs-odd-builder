@@ -1,6 +1,4 @@
-#ifndef QSDPMPARAMS_H
-#define QSDPMPARAMS_H
-
+#pragma once
 #include <QObject>
 #include <QQmlEngine>
 
@@ -39,7 +37,7 @@ public:
     sd_pm_params_t pmParams()
     {
         sd_pm_params_t ret{};
-
+        // errr....
         // ret.id_images = m_idImages->img();
         // if(m_idImages->img())
         // else
@@ -75,5 +73,3 @@ private:
     QByteArray tmp_idEmbedPath;
     sd_pm_params_t m_pmParams = { nullptr, 0,  nullptr, 20.f };
 };
-
-#endif // QSDPMPARAMS_H

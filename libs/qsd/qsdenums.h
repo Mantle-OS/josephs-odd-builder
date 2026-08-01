@@ -1,5 +1,4 @@
-#ifndef QSDENUMS_H
-#define QSDENUMS_H
+#pragma once
 
 #include "core/ggml_extend_backend.h"
 #include <QObject>
@@ -369,6 +368,3 @@ private:
     void fillHiResUpscalerTypes();
 };
 
-
-
-#endif // QSDENUMS_H

@@ -1,6 +1,4 @@
-#ifndef QSDCACHEPARAMS_H
-#define QSDCACHEPARAMS_H
-
+#pragma once
 #include <QObject>
 #include <QQmlEngine>
 #include <stable-diffusion.h>
@@ -50,4 +48,3 @@ private:
     QByteArray tmp_scmMask;
 };
 
-#endif // QSDCACHEPARAMS_H

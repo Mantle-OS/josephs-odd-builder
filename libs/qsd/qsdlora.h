@@ -1,6 +1,4 @@
-#ifndef QSDLORA_H
-#define QSDLORA_H
-
+#pragma once
 #include <QObject>
 #include <QQmlEngine>
 
@@ -14,7 +12,7 @@ class QSdLora : public QSdBaseParam
     QP_RW(bool,     isHighNoise,    false   )
     QP_RW(float,    multiplier,     0.f     )
     QP_RW(QString,  path,           ""      )
-    QP_RW(bool,     isEnabled,      false   )
+    QP_RW(bool,     isEnabled,      false   ) // local api not upstream
     QML_ELEMENT
 
 public:
@@ -31,5 +29,3 @@ private:
 
 
 };
-
-#endif // QSDLORA_H

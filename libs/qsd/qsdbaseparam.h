@@ -1,5 +1,4 @@
-#ifndef QSDBASEPARAM_H
-#define QSDBASEPARAM_H
+#pragma once
 
 #include <QObject>
 #include <QMetaObject>
@@ -33,5 +32,3 @@ public:
     virtual YAML::Node toYaml() const;
     virtual void fromYaml(const YAML::Node &yamlNode);
 };
-
-#endif // QSDBASEPARAM_H

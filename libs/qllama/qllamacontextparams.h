@@ -1,13 +1,14 @@
-#ifndef QLLAMACONTEXTPARAMS_H
-#define QLLAMACONTEXTPARAMS_H
+#pragma once
 
-#include "qllamabase.h"
-#include "qllamaenums.h"
 #include <QObject>
 #include <QQmlEngine>
+
 #include <llama.h>
 
 #include <property-macros.h>
+
+#include "qllamabase.h"
+#include "qllamaenums.h"
 
 class QLlamaContextParams : public QLlamaBase
 {
@@ -84,4 +85,3 @@ private:
     llama_context_params m_contextParams;
 };
 
-#endif // QLLAMACONTEXTPARAMS_H

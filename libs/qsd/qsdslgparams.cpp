@@ -10,8 +10,7 @@ QSdSlgParams::~QSdSlgParams()
 {
     resetSlgParams();
 
-    // I am not sure about ownershitp here some back later to this
-    // FIXME
+    // [[RECHECK LATER WRITE INTO UNIT TEST]]I am not sure about ownershitp here some back later to this
     if(m_layers)
         m_layers = nullptr;
 }
@@ -23,6 +22,7 @@ sd_slg_params_t QSdSlgParams::slgParams() const
     slgParams.layer_count = m_layerCount;
     slgParams.layer_start = m_layerStart;
     slgParams.layer_end = m_layerEnd;
+    slgParams.scale = m_scale;
     return slgParams;
 }
 

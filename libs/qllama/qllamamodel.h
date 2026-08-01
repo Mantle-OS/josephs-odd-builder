@@ -1,5 +1,4 @@
-#ifndef QLLAMAMODEL_H
-#define QLLAMAMODEL_H
+#pragma once
 
 #include <QObject>
 #include <QString>
@@ -39,5 +38,3 @@ private:
     struct llama_model *m_model = nullptr;
     const struct llama_vocab *m_vocab = nullptr; // llama_model owns this lifecycle pointer internally
 };
-
-#endif // QLLAMAMODEL_H

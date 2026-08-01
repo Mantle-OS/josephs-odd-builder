@@ -1,5 +1,4 @@
-#ifndef QSDIMAGE_H
-#define QSDIMAGE_H
+#pragma once
 
 #include <QObject>
 #include <QImage>
@@ -23,7 +22,6 @@
 class QSdImage : public QQuickItem
 {
     Q_OBJECT
-    // width and height come from the QQuickItem
     QP_RW(quint32, channel, 0)
     QP_RW(QString, sourcePath, "")
     QP_RO(QString, lastErrorString, "")
@@ -50,9 +48,8 @@ public:
 
     sd_image_t img()
     {
-        if (m_nativeImage.isNull()) {
+        if (m_nativeImage.isNull())
             return {0, 0, 0, nullptr};
-        }
 
         m_img.width = static_cast<uint32_t>(m_nativeImage.width());
         m_img.height = static_cast<uint32_t>(m_nativeImage.height());
@@ -77,19 +74,18 @@ public:
         }
 
         QImage::Format fmt = formatFromChannel(static_cast<QSdEnums::QSdImageChannel>(other.channel));
-        if (fmt == QImage::Format_Invalid) {
-            fmt = QImage::Format_RGB888; // Fail-safe fallback
-        }
+        if (fmt == QImage::Format_Invalid)
+            fmt = QImage::Format_RGB888; //  fallback
 
         QImage wrapper(other.data, other.width, other.height, other.width * other.channel, fmt);
-        m_nativeImage = wrapper.copy(); // Deep copy isolation
+        m_nativeImage = wrapper.copy(); // Deep copy :(  whatever its still fast
 
         m_img = other;
         m_img.data = const_cast<uint8_t*>(m_nativeImage.bits());
         m_imageChanged = true;
 
         Q_EMIT dataChanged();
-        update(); // Request Scene Graph content refresh pass
+        update();
     }
 
     void resetImg()
@@ -128,6 +124,7 @@ public:
         if (!loaded.load(filePath))
             return false;
 
+        // I will need to add the others later
         m_nativeImage = loaded.convertToFormat(loaded.hasAlphaChannel() ?
                                                    QImage::Format_RGBA8888 : QImage::Format_RGB888);
 
@@ -152,27 +149,22 @@ public:
 
         QFileInfo fileInfo(filePath);
         QDir dir = fileInfo.dir();
-        QString baseName = fileInfo.baseName(); // Filename without extension or path
-        QString extension = fileInfo.suffix(); // e.g., "png" or "jpg"
-
-        // Default fallback if suffix extension is entirely omitted
+        QString baseName = fileInfo.baseName();
+        QString extension = fileInfo.suffix();
         if (extension.isEmpty()) {
             extension = "png";
         }
 
         QString finalFilePath = filePath;
 
-        // Check if the exact requested filename already exists
         if (QFile::exists(filePath)) {
             int highestIndex = 0;
 
-            // Match files with the pattern: baseName_XXX.extension
-            // Using a wildcard filter to scan the directory
             QString filter = QString("%1_*.%2").arg(baseName, extension);
             QStringList existingFiles = dir.entryList(QStringList(filter), QDir::Files);
 
-            // Regular expression to parse out the suffix digits
-            // e.g., matches "_003" capturing "003"
+
+            // regex for example "_003" capturing "003"
             static const QRegularExpression regex(QString("^%1_(\\d+)\\.%2$").arg(QRegularExpression::escape(baseName), QRegularExpression::escape(extension)));
 
             for (const QString &filename : existingFiles) {
@@ -185,16 +177,14 @@ public:
                 }
             }
 
-            // Increment to get the next sequential number in the series
             int nextIndex = highestIndex + 1;
 
-            // Pad with leading zeros out to 3 digits (e.g., _001, _012, _104)
+            // (e.g., _001, _012, _104)
             QString suffix = QString("_%1").arg(nextIndex, 3, 10, QChar('0'));
             finalFilePath = dir.absoluteFilePath(QString("%1%2.%3").arg(baseName, suffix, extension));
         }
 
-        // Perform the actual hardware write operation via QImage
-        // Qt automatically determines the compression algorithm from the file extension
+        // Perform the actual hardware write operation via QImage -> Qt automatically determines the compression algorithm from the file extension
         bool success = m_nativeImage.save(finalFilePath);
 
         if (!success) {
@@ -263,7 +253,6 @@ protected:
     {
         Q_UNUSED(data)
 
-        // If the geometry width/height is zero in QML, skip rendering completely
         if (width() <= 0 || height() <= 0 || m_nativeImage.isNull()) {
             delete oldNode;
             return nullptr;
@@ -282,7 +271,6 @@ protected:
             m_imageChanged = false;
         }
 
-        // Map the texture dimensions to your bounding box area inside your QML layout
         node->setRect(0, 0, width(), height());
         node->setFiltering(QSGTexture::Linear); // Clean anti-aliasing interpolation scaling
 
@@ -301,5 +289,3 @@ private:
     QImage      m_nativeImage;
     bool        m_imageChanged = false;
 };
-
-#endif  // QSDIMAGE_H

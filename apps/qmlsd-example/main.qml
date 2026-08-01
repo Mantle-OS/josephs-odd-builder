@@ -9,47 +9,19 @@ ApplicationWindow {
     width: Screen.width / 2
     height: Screen.height / 2
     visible: true
-    title: qsTr("ZImage Turbo test")
+    title: qsTr("Qsd playground")
 
-    menuBar: MenuBar {
-        Menu {
-            title: qsTr("&File")
-            Action { text: qsTr("&New...") }
-            Action { text: qsTr("&Open...") }
-            Action { text: qsTr("&Save") }
-            Action { text: qsTr("Save &As...") }
-            MenuSeparator { }
-            Action { text: qsTr("&Quit") }
-        }
-        Menu {
-            title: qsTr("&Edit")
-            Action { text: qsTr("Cu&t") }
-            Action { text: qsTr("&Copy") }
-            Action { text: qsTr("&Paste") }
-        }
-    }
     header: TabBar{
         id: bar
         width: parent.width
 
-        TabButton{
-            text: qsTr("Context")
-        }
-        TabButton{
-            text: qsTr("Image Generation")
-        }
-        TabButton{
-            text: qsTr("Devices")
-        }
-        TabButton{
-            text: qsTr("ZImage Turbo")
-        }
-        TabButton{
-            text: qsTr("SD3 Large")
-        }
-        TabButton{
-            text: qsTr("SD3 Medium")
-        }
+        TabButton{ text: qsTr("Context") }
+        TabButton{ text: qsTr("Image Generation") }
+        TabButton{ text: qsTr("Devices") }
+        // presets
+        TabButton{ text: qsTr("ZImage Turbo") }
+        TabButton{ text: qsTr("SD3 Large") }
+        TabButton{ text: qsTr("SD3 Medium") }
     }
 
     StackLayout{

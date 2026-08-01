@@ -1,6 +1,4 @@
-#ifndef QLLAMAMODELKVOVERRIDE_H
-#define QLLAMAMODELKVOVERRIDE_H
-
+#pragma once
 #include <QObject>
 #include <QString>
 #include <QQmlEngine>
@@ -14,7 +12,6 @@
 class QLlamaModelKvOverride : public QLlamaBase
 {
     Q_OBJECT
-    QML_ELEMENT
 
     QP_RW(QLlamaEnums::QLlamaKvOverrideType,    tag,        QLlamaEnums::QLlamaKvOverrideTypeInt    )
     QP_RW(QString,                              key,        ""                                      )
@@ -22,6 +19,8 @@ class QLlamaModelKvOverride : public QLlamaBase
     QP_RW(double,                               valF64,     0.0                                     )
     QP_RW(bool,                                 valBool,    false                                   )
     QP_RW(QString,                              valStr,     ""                                      )
+
+    QML_ELEMENT
 
 public:
     explicit QLlamaModelKvOverride(QObject *parent = nullptr) :
@@ -51,5 +50,3 @@ public:
 private:
     llama_model_kv_override m_modelKvOverride;
 };
-
-#endif // QLLAMAMODELKVOVERRIDE_H

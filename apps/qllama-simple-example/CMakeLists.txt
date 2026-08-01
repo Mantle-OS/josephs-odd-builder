@@ -20,8 +20,6 @@ target_link_libraries(qllama-simple-example PRIVATE
     qt-ai-utils qml-ai-utils qml-ai-utilsplugin
     ggml
     llama llama-common llama-common-base
-    # ${LLGUIDANCE_STATIC_ARCHIVE}
-    # job_llguidance
     qt-llama
 )
 

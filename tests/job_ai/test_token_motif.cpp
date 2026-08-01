@@ -1,4 +1,3 @@
-#include "job_fifo_ctx.h"
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/catch_approx.hpp>
 #ifdef JOB_TEST_BENCHMARKS
@@ -10,6 +9,7 @@
 #include <string_view>
 #include <sstream>
 
+#include <job_fifo_ctx.h>
 #include <job_stealing_ctx.h>
 
 #include "token/byte_lattice.h"

@@ -3,6 +3,7 @@
 #include <QQmlExtensionPlugin>
 #include <QtResource>
 
+// TODO gonna need a whole JOB_STATIC or something to hgandle these later not tonight
 // Q_IMPORT_QML_PLUGIN(QLlama)
 
 int main(int argc, char *argv[])

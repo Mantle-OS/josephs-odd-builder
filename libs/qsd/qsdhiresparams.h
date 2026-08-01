@@ -1,5 +1,4 @@
-#ifndef QSDHIRESPARAMS_H
-#define QSDHIRESPARAMS_H
+#pragma once
 
 #include <vector>
 
@@ -14,6 +13,8 @@
 
 #include "qsdbaseparam.h"
 #include "qsdenums.h"
+
+// note not fully tested
 class QSdHiResParams : public QSdBaseParam
 {
     Q_OBJECT
@@ -151,4 +152,3 @@ private:
     QByteArray tmp_modelPath;
 };
 
-#endif // QSDHIRESPARAMS_H

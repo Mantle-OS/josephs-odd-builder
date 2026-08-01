@@ -1,5 +1,4 @@
-#ifndef QSDCTX_H
-#define QSDCTX_H
+#pragma once
 
 #include <QObject>
 #include <QQmlEngine>
@@ -18,6 +17,8 @@
 #include "qsdimage.h"
 #include "qsdimggenparams.h"
 #include "qsdvidgenparams.h"
+
+// Alpha code not fully implementeed yet ..
 
 struct SdGenerationResult {
     sd_image_t* resultImages = nullptr;
@@ -232,7 +233,7 @@ private:
                                                 QSdImage* target,
                                                 bool autoSave);
 
-    // BROKEN just gonna use qggml
+    // BROKEN just gonna use qggml maybe.. IDK might fix this.
     void fillBackend(){
         if(m_ctx){
             // Now we can fill the backend manager
@@ -253,5 +254,4 @@ private:
 
 };
 
-#endif // QSDCTX_H
 //sd_get_num_physical_cores()

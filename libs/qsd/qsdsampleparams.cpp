@@ -83,11 +83,11 @@ void QSdSampleParams::resetSampleParams()
     m_sampleParams.scheduler                   = SCHEDULER_COUNT;
     m_sampleParams.sample_method               = SAMPLE_METHOD_COUNT;
     m_sampleParams.sample_steps                = 20;
-    m_sampleParams.eta                         = INFINITY;
+    m_sampleParams.eta                         = 1.0f;
     m_sampleParams.shifted_timestep            = 0;
     m_sampleParams.custom_sigmas               = nullptr;
     m_sampleParams.custom_sigmas_count         = 0;
-    m_sampleParams.flow_shift                  = INFINITY;
+    m_sampleParams.flow_shift                  = 1.0f;
     m_sampleParams.extra_sample_args           = nullptr;
 
     setSampleParams(m_sampleParams);

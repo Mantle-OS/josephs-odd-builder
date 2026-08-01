@@ -1,8 +1,8 @@
 #include "qllamavocab.h"
 #include <QDebug>
 
-QLlamaVocab::QLlamaVocab(QObject *parent)
-    : QLlamaBase(parent)
+QLlamaVocab::QLlamaVocab(QObject *parent) :
+    QLlamaBase{parent}
 {
 }
 

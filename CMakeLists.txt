@@ -36,3 +36,5 @@ add_subdirectory(tests)
 add_subdirectory(docs)
 
 add_custom_target(github_ci SOURCES .github/workflows/test.yml )
+
+include(cmake/cmake_print_status.cmake)

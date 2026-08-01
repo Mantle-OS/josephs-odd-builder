@@ -1,6 +1,4 @@
-#ifndef QLLAMABASE_H
-#define QLLAMABASE_H
-
+#pragma once
 #include <QObject>
 #include <QJsonObject>
 #include <QJsonArray>
@@ -34,4 +32,4 @@ public:
     virtual YAML::Node toYaml() const;
     virtual void fromYaml(const YAML::Node &yamlNode);
 };
-#endif // QLLAMABASE_H
+

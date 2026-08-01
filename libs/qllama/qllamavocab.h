@@ -1,5 +1,4 @@
-#ifndef QLLAMAVOCAB_H
-#define QLLAMAVOCAB_H
+#pragma once
 
 #include <QObject>
 #include <QQmlEngine>
@@ -52,6 +51,3 @@ public:
 private:
     const struct llama_vocab *m_nativeVocab = nullptr;
 };
-
-
-#endif // QLLAMAVOCAB_H

@@ -1,5 +1,4 @@
-#ifndef QSDCTXPARAMS_H
-#define QSDCTXPARAMS_H
+#pragma once
 
 #include <QObject>
 #include <QQmlEngine>
@@ -116,5 +115,3 @@ private:
 
 
 };
-
-#endif // QSDCTXPARAMS_H

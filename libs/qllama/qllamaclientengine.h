@@ -1,7 +1,5 @@
-#ifndef QLLAMACLIENTENGINE_H
-#define QLLAMACLIENTENGINE_H
+#pragma once
 
-#include "qllamaengine.h"
 #include <QtNetwork/QNetworkAccessManager>
 #include <QtNetwork/QNetworkReply>
 #include <QtNetwork/QNetworkRequest>
@@ -12,6 +10,7 @@
 
 #include <property-macros.h>
 
+#include "qllamaengine.h"
 class QLlamaClientEngine : public QLlamaEngine
 {
     Q_OBJECT
@@ -51,6 +50,3 @@ private:
 
     QByteArray m_networkBuffer;
 };
-
-
-#endif // QLLAMACLIENTENGINE_H

@@ -1,5 +1,4 @@
-#ifndef QSDAUDIO_H
-#define QSDAUDIO_H
+#pragma once
 
 #include <QObject>
 #include <QQmlEngine>
@@ -33,5 +32,3 @@ private:
     sd_audio_t m_audio{0, 0, 0, nullptr};
     float *m_data = nullptr;
 };
-
-#endif // QSDAUDIO_H

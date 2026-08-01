@@ -1,5 +1,4 @@
-#ifndef QLLAMAMODELPARAMS_H
-#define QLLAMAMODELPARAMS_H
+#pragma once
 
 #include <QObject>
 #include <QQmlEngine>
@@ -59,7 +58,6 @@ public:
 
     ~QLlamaModelParams() override = default;
 
-    // MOC bitches here Q_OPAQUE_POINTER needed ? for ggml_backend_buffer_type maybe hold off till qggml is done.
     // Q_INVOKABLE
     void appendtoBufferType(const QString &tensorPattern, ggml_backend_buffer_type_t buft)
     {
@@ -117,4 +115,3 @@ private:
     QMap<QString, ggml_backend_buffer_type_t>       m_buftMap;
     ggml_backend_dev_t                             *m_devices = nullptr;
 };
-#endif // QLLAMAMODELPARAMS_H

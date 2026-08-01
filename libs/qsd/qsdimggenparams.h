@@ -1,6 +1,4 @@
-#ifndef QSDIMGGENPARAMS_H
-#define QSDIMGGENPARAMS_H
-
+#pragma once
 #include <QObject>
 #include <QQmlEngine>
 
@@ -211,5 +209,3 @@ private:
     QByteArray tmp_prompt;
     QByteArray tmp_negativePrompt;
 };
-
-#endif // QSDIMGGENPARAMS_H

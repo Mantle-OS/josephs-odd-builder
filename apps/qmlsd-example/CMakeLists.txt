@@ -35,7 +35,7 @@ target_link_libraries(qt-stable-diffusion-example PRIVATE
     Qt6::Quick
     Qt6::Qml
     qt-ai-utils qml-ai-utils qml-ai-utilsplugin
-    qt-huggingfaceplugin
+    # qt-huggingfaceplugin
     qt-stable-diffusionplugin
 )
 

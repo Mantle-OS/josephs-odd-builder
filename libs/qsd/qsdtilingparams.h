@@ -1,5 +1,4 @@
-#ifndef QSDTILINGPARAMS_H
-#define QSDTILINGPARAMS_H
+#pragma once
 
 #include <QObject>
 #include <QQmlEngine>
@@ -36,5 +35,3 @@ private:
     sd_tiling_params_t  m_tilingParams{false, false, 0, 0, 0.5f, 0.0f, 0.0f, nullptr};
     QByteArray tmp_extraTilingArgs;
 };
-
-#endif // QSDTILINGPARAMS_H

@@ -13,7 +13,7 @@
 
 // If K is large, A is accessed with stride lda for every single FMA. That is a lot of jumping.
 // High-performance libraries (like BLAS) often pack A into a temporary buffer
-// so that A[0..7][p] are contiguous in memory.
+// so that A[0..7][p] are contiguous in memory. whatever this seems to work "good"
 
 
 namespace job::ai::comp {

@@ -183,12 +183,14 @@ QSdEnums::QSdSchedulerTypes QSD::getDefaultScheduler(QSdEnums::QSdSampleTypes ty
 void QSD::generateImage(QSdImage *outImage, bool autoSave)
 {
 
+
+
+
     if (outImage)
         m_que.append(outImage);
 
 
-
-    // 1. Guard check: Safety protection against thread pool collisions
+    // thread pool collisions
     if (m_imageWatcher.isRunning()) {
         qWarning() << "Image generation engine is currently busy processing a frame!";
         return;
@@ -208,12 +210,29 @@ void QSD::generateImage(QSdImage *outImage, bool autoSave)
     if (!m_ctx || !m_ImageGenerationParams)
         return;
 
-    sd_img_gen_params_t stableParamsSnapshot = m_ImageGenerationParams->imgGenParms();
+    sd_img_gen_params_t params =
+        m_ImageGenerationParams->imgGenParms();
+
+    qDebug() << "sample_method =" << params.sample_params.sample_method
+             << "scheduler =" << params.sample_params.scheduler
+             << "steps =" << params.sample_params.sample_steps
+             << "eta =" << params.sample_params.eta
+             << "flow_shift =" << params.sample_params.flow_shift
+             << "txt_cfg =" << params.sample_params.guidance.txt_cfg
+             << "img_cfg =" << params.sample_params.guidance.img_cfg
+             << "distilled =" << params.sample_params.guidance.distilled_guidance
+             << "strength =" << params.strength
+             << "width =" << params.width
+             << "height =" << params.height
+             << "seed =" << params.seed
+             << "batch_count =" << params.batch_count;
+
+    // sd_img_gen_params_t stableParamsSnapshot = m_ImageGenerationParams->imgGenParms();
     QFuture<SdGenerationResult> future = QtConcurrent::run(
         &QSD::runImageGenerationWorker,
         this,
         m_ctx,
-        stableParamsSnapshot,
+        params,
         outImage,
         autoSave
         );
@@ -230,7 +249,7 @@ SdGenerationResult QSD::runImageGenerationWorker(sd_ctx_t* ctx,
     outcomePacket.targetImageElement = target;
     outcomePacket.triggerAutoSave = autoSave;
 
-    // Invoke the heavy low-level inference processing boundary
+    // Invoke the heavy "low-level" inference processing boundary
     outcomePacket.resultImages = generate_image(ctx, &params);
 
     return outcomePacket;
@@ -245,19 +264,56 @@ void QSD::onGenerationFinished()
 
     if (rawImagesArray && rawImagesArray->data != nullptr && targetCanvas != nullptr) {
         qInfo() << "Inference worker complete. Updating canvas texture data...";
+        const sd_image_t &raw = rawImagesArray[0];
 
-        // 1. Map raw uncompressed C-pixels onto target canvas object
+        // qDebug() << "Native result:"
+        //          << "width =" << raw.width
+        //          << "height =" << raw.height
+        //          << "channel =" << raw.channel
+        //          << "data =" << static_cast<void *>(raw.data);
+
+        if (raw.data && raw.width && raw.height && raw.channel) {
+            const qsizetype byteCount =
+                static_cast<qsizetype>(raw.width) *
+                static_cast<qsizetype>(raw.height) *
+                static_cast<qsizetype>(raw.channel);
+
+            quint8 minimum = 255;
+            quint8 maximum = 0;
+            quint64 sum = 0;
+
+            for (qsizetype i = 0; i < byteCount; ++i) {
+                const quint8 value = raw.data[i];
+                minimum = qMin(minimum, value);
+                maximum = qMax(maximum, value);
+                sum += value;
+            }
+
+            // qDebug() << "Native pixels:"
+            //          << "bytes =" << byteCount
+            //          << "min =" << minimum
+            //          << "max =" << maximum
+            //          << "average ="
+            //          << static_cast<double>(sum) /
+            //                 static_cast<double>(byteCount);
+        }
+        // -pixels onto target canvas object
         targetCanvas->setImg(rawImagesArray[0]);
 
-        // Clean up the temporary C memory allocation array returned by stable-diffusion.cpp
+
+        // qDebug() << "Copied target:"
+        //          << "width =" << targetCanvas->img().width
+        //          << "height =" << targetCanvas->img().height
+        //          << "channel =" << targetCanvas->img().channel
+        //          << "data =" << static_cast<void *>(targetCanvas->data());
+        // Clean up
         free_sd_images(rawImagesArray, 1);
 
-        // 2. Automated File-System Save Processing Pass
-        // Note: checking !targetCanvas->data() or checking dimensions verifies it isn't empty
+        // Save Processing Pass
         if (targetCanvas->data() != nullptr && snapshotResult.triggerAutoSave) {
             QString destinationDirectory = QString("%1/tmp").arg(QAiUtils::outDir);
 
-            // Your custom saveToFile logic safely handles suffix collisions automatically now!
+            // save the file
             targetCanvas->saveToFile(destinationDirectory);
         }
     } else {
@@ -265,6 +321,7 @@ void QSD::onGenerationFinished()
     }
 
     // Teardown context loop to cleanly free weights out of VRAM if running single-pass passes
+    // SHOULD have a flag on this later on.
     if (m_ctx) {
         free_sd_ctx(m_ctx);
         m_ctx = nullptr;

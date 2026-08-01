@@ -1,5 +1,4 @@
-#ifndef QLLAMALOCALENGINE_H
-#define QLLAMALOCALENGINE_H
+#pragma once
 
 #include "qllamaengine.h"
 #include "qllamamodel.h"
@@ -65,6 +64,3 @@ private:
     QThread            *m_workerThread = nullptr;
     QLlamaLocalWorker  *m_worker       = nullptr;
 };
-
-
-#endif // QLLAMALOCALENGINE_H

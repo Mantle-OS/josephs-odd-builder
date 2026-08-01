@@ -1,5 +1,4 @@
-#ifndef QLLAMAENGINE_H
-#define QLLAMAENGINE_H
+#pragma once
 
 #include <QObject>
 #include <QString>
@@ -37,5 +36,3 @@ Q_SIGNALS:
     void generationFinished(const QString &fullCompletedText);
     void executionError(const QString &errorString);
 };
-
-#endif // QLLAMAENGINE_H

@@ -1,6 +1,4 @@
-#ifndef QSDGUIDANCEPARAMS_H
-#define QSDGUIDANCEPARAMS_H
-
+#pragma once
 #include <QObject>
 #include <QQmlEngine>
 
@@ -16,7 +14,7 @@ class QSdGuidanceParams : public QSdBaseParam
 {
     Q_OBJECT
     QP_RW(float, txtCfg,            8.0f        )
-    QP_RW(float, imgCfg,            INFINITY    )
+    QP_RW(float, imgCfg,            INFINITY    ) // should really use somthing else as the default macro in macro is never ....
     QP_RW(float, distilledGuidance, 3.5f        )
     QP_PTR_RO(QSdSlgParams, slg)
 
@@ -33,6 +31,4 @@ public:
 private:
     sd_guidance_params_t m_guidanceParams{};
 };
-
-#endif // QSDGUIDANCEPARAMS_H
 

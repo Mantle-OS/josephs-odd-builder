@@ -29,6 +29,7 @@ target_link_libraries(qml-sodium-example PRIVATE
     Qt6::Gui
     Qt6::Quick
     Qt6::Qml
+    # Qt6::qmlfolderlistmodelplugin
 
     ${LibSodium_LIBRARIES}
     JosephsOddBuilder_Crypto

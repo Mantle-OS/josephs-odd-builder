@@ -1,5 +1,4 @@
-#ifndef QLLAMACONTEXT_H
-#define QLLAMACONTEXT_H
+#pragma once
 
 #include <QObject>
 #include <QQmlEngine>
@@ -61,6 +60,3 @@ private:
     llama_batch m_batch;
     bool m_batchAllocated = false;
 };
-
-
-#endif // QLLAMACONTEXT_H

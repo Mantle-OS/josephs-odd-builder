@@ -16,10 +16,10 @@ set(QLLAMA_HEADERS
     qllmacontext.h
     qllamamodel.h
     qllamavocab.h
-    qllamaengine.h
-    qllamalocalengine.h
-    qllamaclientengine.h
-    qllamaserverengine.h
+    qllamaengine.h          # abstraction
+    qllamalocalengine.h     # where I think I stopped on the whole reflection of objects
+    qllamaclientengine.h    # where I think I stopped on the whole reflection of objects
+    qllamaserverengine.h    # where I think I stopped on the whole reflection of objects
 )
 
 set(QLLAMA_CXX

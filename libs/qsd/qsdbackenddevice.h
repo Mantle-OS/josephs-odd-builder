@@ -3,7 +3,7 @@
 
 #include "qsdbaseparam.h"
 #include "qsdenums.h"
-
+// ALPHA needs work
 class QSdBackendDevice : public QSdBaseParam
 {
     Q_OBJECT

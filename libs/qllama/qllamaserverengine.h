@@ -1,8 +1,7 @@
-#ifndef QLLAMASERVERENGINE_H
-#define QLLAMASERVERENGINE_H
+#pragma once
 
-#include <QtNetwork/QTcpServer>
-#include <QtNetwork/QTcpSocket>
+#include <QTcpServer>
+#include <QTcpSocket>
 #include <QQueue>
 
 #include <property-macros.h>
@@ -45,5 +44,3 @@ private:
     bool m_isGenerating = false;
 };
 
-
-#endif // QLLASERVERENGINE_H

@@ -30,7 +30,7 @@ ApplicationWindow {
             Button{
                 Layout.fillWidth: true
                 text: qsTr("play")
-                onClicked: QPPSEngine.pause()
+                onClicked: QPPSEngine.start()
             }
             Button{
                 Layout.fillWidth: true

@@ -6,9 +6,9 @@
 
 #include <llama.h>
 
-QLlamaServerEngine::QLlamaServerEngine(QObject *parent)
-    : QLlamaBase(parent),
-      m_tcpServer(new QTcpServer(this))
+QLlamaServerEngine::QLlamaServerEngine(QObject *parent) :
+    QLlamaBase(parent),
+    m_tcpServer(new QTcpServer(this))
 {
 }
 

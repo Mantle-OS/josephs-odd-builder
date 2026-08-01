@@ -1,5 +1,4 @@
-#ifndef QLLAMASAMPLER_H
-#define QLLAMASAMPLER_H
+#pragma once
 
 #include <QObject>
 #include <QQmlEngine>
@@ -83,10 +82,13 @@ public:
 
         if (m_temperature > 0.0)
             llama_sampler_chain_add(m_chain, llama_sampler_init_temp(static_cast<float>(m_temperature)));
+
         if (m_topK > 0)
             llama_sampler_chain_add(m_chain, llama_sampler_init_top_k(m_topK));
+
         if (m_topP > 0.0 && m_topP < 1.0)
             llama_sampler_chain_add(m_chain, llama_sampler_init_top_p(static_cast<float>(m_topP), 1));
+
         if (m_minP > 0.0)
             llama_sampler_chain_add(m_chain, llama_sampler_init_min_p(static_cast<float>(m_minP), 1));
 
@@ -139,5 +141,3 @@ private:
     bool m_isDirty = true;
 };
 
-
-#endif // QLLAMASAMPLER_H

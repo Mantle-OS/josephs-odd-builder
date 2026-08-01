@@ -30,10 +30,9 @@ inline void computeForcesAndMixing(PhysicsContext& ctx)
     const float G_coupling      = 1.0f;
 
     for (size_t i = 0; i < ctx.count; ++i) {
-        // 1. Reset Physics (Acceleration always starts at 0 for the new frame)
+        // Reset Physics (Acceleration always starts at 0 for the new frame)
         ctx.particles[i].acceleration = Vec3f{0,0,0};
 
-        // 2. AI FIX: RESIDUAL CONNECTION
         // Initialize the output buffer with the particle's EXISTING thoughts (selfV).
         // This prevents "Amnesia" - if no one talks to me, I remember what I knew before.
         float *outV = ctx.valueOut + (i * ctx.stride) + 7;
@@ -87,7 +86,6 @@ inline void computeNbodyForces(std::vector<job::science::data::Particle> &partic
             Vec3f r = particles[j].position - particles[i].position;
             float distSq = r.x * r.x + r.y * r.y + r.z * r.z;
 
-            // FIX: Softening parameter prevents infinity when particles overlap.
             // Classic Plummer potential approach.
             float softDistSq = distSq + (epsilon * epsilon);
 

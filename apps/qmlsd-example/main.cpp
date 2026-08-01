@@ -7,7 +7,7 @@
 #include <qaiutils.h>
 
 Q_IMPORT_QML_PLUGIN(QSdPlugin)
-Q_IMPORT_QML_PLUGIN(QHFPlugin)
+// Q_IMPORT_QML_PLUGIN(QHFPlugin)
 
 static void debugQRCPaths()
 {
@@ -36,7 +36,7 @@ int main(int argc, char *argv[])
 
 
     Q_INIT_RESOURCE(qmake_QSd);
-    Q_INIT_RESOURCE(qmake_QHF);
+    // Q_INIT_RESOURCE(qmake_QHF);
     QQmlApplicationEngine engine;
 
     if(QAiUtils::dirExists(QAiUtils::pluginsDir))
