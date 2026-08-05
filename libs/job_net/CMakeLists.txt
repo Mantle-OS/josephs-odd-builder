@@ -10,6 +10,7 @@ set(JOBNET_HEADERS
     job_http_header.h
     job_url.h
 )
+
 set(JOBNET_SOURCES
     job_url.cpp
     job_http_header.cpp
@@ -48,6 +49,7 @@ set(JOBNET_SOCKETS_HEADERS
     sockets/tcp_socket.h
     sockets/udp_socket.h
     sockets/unix_socket.h
+    sockets/ssl_socket.h
 )
 
 set(JOBNET_SOCKETS_SOURCES)
@@ -58,6 +60,7 @@ if(JOB_WINDOWS)
         sockets/win32/tcp_socket_win32.cpp
         sockets/win32/udp_socket_win32.cpp
         sockets/win32/unix_socket_win32.cpp
+        sockets/win32/ssl_socket_win32.cpp
     )
 
 elseif(JOB_LINUX)
@@ -66,6 +69,7 @@ elseif(JOB_LINUX)
         sockets/linux/tcp_socket_linux.cpp
         sockets/linux/udp_socket_linux.cpp
         sockets/linux/unix_socket_linux.cpp
+        sockets/linux/ssl_socket_linux.cpp
     )
 endif()
 
@@ -73,24 +77,28 @@ set(JOBNET_SERVERS_HEADERS
     servers/tcp_server.h
     servers/udp_server.h
     servers/unix_socket_server.h
+    servers/ssl_server.h
 )
 
 set(JOBNET_SERVERS_SOURCES
     servers/tcp_server.cpp
     servers/udp_server.cpp
     servers/unix_socket_server.cpp
+    servers/ssl_server.cpp
 )
 
 set(JOBNET_CLIENTS_HEADERS
     clients/tcp_client.h
     clients/udp_client.h
     clients/unix_socket_client.h
+    clients/ssl_client.h
 )
 
 set(JOBNET_CLIENTS_SOURCES
     clients/tcp_client.cpp
     clients/udp_client.cpp
     clients/unix_socket_client.cpp
+    clients/ssl_client.cpp
 )
 
 if(BUILD_SHARED_LIBS)

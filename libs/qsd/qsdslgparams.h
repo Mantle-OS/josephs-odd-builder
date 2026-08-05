@@ -6,13 +6,15 @@
 #include <stable-diffusion.h>
 
 #include "qsdbaseparam.h"
-class QSdSlgParams : public QSdBaseParam
+#include "qmlsd_export.h"
+// NOT TESTED
+class QMLSD_EXPORT QSdSlgParams : public QSdBaseParam
 {
     Q_OBJECT
-    QP_RW(qsizetype,    layerCount,     0       )
-    QP_RW(float,        layerStart,     0.01f   )
-    QP_RW(float,        layerEnd,       0.2f    )
-    QP_RW(float,        scale,          0.f     )
+    QP_RW(qsizetype,  layerCount,  0       ) // The number of layers specified in the skip array.
+    QP_RW(float,      layerStart,  0.01f   ) // The timestep fraction (0.0 to 1.0) where layer skipping begins.
+    QP_RW(float,      layerEnd,    0.2f    ) // The timestep fraction (0.0 to 1.0) where layer skipping ends.
+    QP_RW(float,      scale,       0.f     ) // The scaling weight applied to the skip guidance (0.0 disables SLG).
     QML_ELEMENT
 public:
     explicit QSdSlgParams(QObject *parent = nullptr);

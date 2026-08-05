@@ -9,8 +9,9 @@
 #include "job_url.h"
 #include "resolve/job_ipaddr.h"
 #include "resolve/job_resolver.h"
+#include "jobnet_export.h"
 namespace job::net {
-class TcpClient {
+class JOBNET_EXPORT TcpClient {
 public:
     using Ptr = std::shared_ptr<TcpClient>;
     explicit TcpClient(threads::JobIoAsyncThread::Ptr loop, JobResolver::Ptr resolver = nullptr, uint16_t buffer_size = 4096);

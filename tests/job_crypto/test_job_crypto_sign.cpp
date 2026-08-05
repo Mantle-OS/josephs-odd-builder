@@ -13,7 +13,7 @@
 #include <job_crypto_sign.h>
 #include <job_secure_mem.h>
 
-#include "transient_test_file.h"
+#include "../transient_test_file.h"
 
 using namespace job::crypto;
 

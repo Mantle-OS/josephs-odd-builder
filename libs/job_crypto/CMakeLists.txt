@@ -15,6 +15,8 @@ set(JOBCRYPTO_HEADERS
     job_secret_box.h
     job_hash.h
     job_crypto.h
+    job_ssl_options.h
+    job_x509_generator.h
 )
 
 set(JOBCRYPTO_SOURCES
@@ -28,6 +30,20 @@ set(JOBCRYPTO_SOURCES
     job_hash.cpp
     job_crypto.cpp
 )
+
+if(JOB_WINDOWS)
+    list(APPEND JOBCRYPTO_SOURCES
+        win32/job_x509_generator_win32.cpp
+    )
+elseif(JOB_LINUX)
+    list(APPEND JOBCRYPTO_SOURCES
+        linux/job_x509_generator_linux.cpp
+    )
+else()
+    message(FATAL_ERROR "OSX and FreeBSD as currently unsupported atm libcrypto should work on both platforms. Merge requests welcome")
+endif()
+
+
 
 add_library(JosephsOddBuilder_Crypto SHARED
    ${JOBCRYPTO_HEADERS}
@@ -48,17 +64,25 @@ set_target_properties(JosephsOddBuilder_Crypto PROPERTIES
     VISIBILITY_INLINES_HIDDEN ON
 )
 
+
+if(JOB_WINDOWS)
+    target_link_libraries(JosephsOddBuilder_Crypto PRIVATE
+        crypt32
+        ncrypt
+        bcrypt
+    )
+elseif(JOB_LINUX)
+    target_link_libraries(JosephsOddBuilder_Crypto PUBLIC
+        atomic
+        ${LibCrypto_LIBRARIES}
+    )
+endif()
+
 target_link_libraries(JosephsOddBuilder_Crypto PUBLIC
     Threads::Threads
     ${LibSodium_LIBRARIES}
     JosephsOddBuilder_Core
 )
-
-if(JOB_LINUX)
-    target_link_libraries(JosephsOddBuilder_Crypto PUBLIC
-        atomic
-    )
-endif()
 
 target_include_directories(JosephsOddBuilder_Crypto PUBLIC
     ${LibSodium_INCLUDE_DIRS}

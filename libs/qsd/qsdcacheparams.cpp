@@ -8,7 +8,6 @@ QSdCacheParams::QSdCacheParams(QObject *parent) :
 
 QSdCacheParams::~QSdCacheParams()
 {
-    resetCacheParams();
 }
 
 sd_cache_params_t QSdCacheParams::cacheParams()
@@ -68,11 +67,7 @@ void QSdCacheParams::setCacheParams(sd_cache_params_t other)
     set_taylorseerNDerivatives(other.taylorseer_n_derivatives);
     set_taylorseerSkipInterval(other.taylorseer_skip_interval);
 
-    if(other.scm_mask){
-        set_scmMask(QString::fromLatin1(other.scm_mask));
-    }else{
-        set_scmMask("");
-    }
+    set_scmMask(other.scm_mask ? QString::fromUtf8(other.scm_mask) : QString{});
 
     set_scmPolicyDynamic(other.scm_policy_dynamic);
     set_spectrumW(other.spectrum_w);
@@ -88,7 +83,7 @@ void QSdCacheParams::setCacheParams(sd_cache_params_t other)
 void QSdCacheParams::resetCacheParams()
 {
     m_cacheParams.mode                        = SD_CACHE_DISABLED;
-    m_cacheParams.reuse_threshold             = INFINITY;
+    m_cacheParams.reuse_threshold             = qInf();
     m_cacheParams.start_percent               = 0.15f;
     m_cacheParams.end_percent                 = 0.95f;
     m_cacheParams.error_decay_rate            = 1.0f;
@@ -113,4 +108,3 @@ void QSdCacheParams::resetCacheParams()
     m_cacheParams.spectrum_stop_percent       = 0.9f;
     setCacheParams(m_cacheParams);
 }
-

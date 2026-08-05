@@ -1,73 +1,257 @@
 cmake_minimum_required(VERSION 3.16)
+
 project(JosephsOddBuilder_Ggml
     VERSION 0.1
     LANGUAGES CXX
 )
 
+# needs
+set(JOBGGML_DEVICE_HEADERS
+    device/job_ggml_device_caps.h
+    device/job_ggml_device_props.h
+    device/job_ggml_device_interface.h
+    device/job_ggml_device.h
+    device/job_ggml_device_manager.h
+)
 
-# [  4 bytes  ][ 4 bytes ][8 bytes][   8 bytes  ][      KV    ][     tensor info  ][      rest of file     ]
+# needs
+set(JOBGGML_BACKEND_HEADERS
+    backend/job_ggml_backend_reg.h
+    backend/job_ggml_backend_buffer_type.h
+    backend/job_ggml_backend_buffer.h
+    backend/job_ggml_backend_event.h
+    backend/job_ggml_backend_buffer_view.h  ## added
+    backend/job_ggml_backend.h
+    backend/job_ggml_backend_sched.h
+    backend/job_ggml_backend_graph_copy.h
+)
 
+# almost fully backported
+set(JOBGGML_CTX_HEADERS
+    ctx/job_ggml_init_params.h
+    ctx/job_ggml_context_view.h
+    ctx/job_ggml_context.h
+    ctx/job_ggml_cgraph.h
+)
+
+# done
+set(JOBGGML_TENSOR_HEADERS
+    tensor/job_ggml_tensor_extents.h
+    tensor/job_ggml_tensor_view.h
+    tensor/job_ggml_tensor_operation.h
+    tensor/job_ggml_tensor_data.h
+
+    tensor/job_ggml_tensor_rank.h
+
+    tensor/job_ggml_tensor_fiber.h
+    tensor/job_ggml_tensor_matrix.h
+    tensor/job_ggml_tensor_volume.h
+    tensor/job_ggml_tensor_batch.h
+    tensor/job_ggml_tensor_shapes.h
+
+    tensor/job_ggml_tensor_layout.h
+    tensor/job_ggml_tensor.h
+)
+
+# done
+set(JOBGGML_ALLOC_HEADERS
+    alloc/job_ggml_tensor_allocator.h
+    alloc/job_ggml_graph_allocator.h
+)
+
+
+set(JOBGGML_GGUF_HEADERS
+    gguf/job_gguf_init_params.h # done
+    gguf/job_gguf_tensor_info.h  # done
+
+    gguf/job_gguf_type_traits.h  # Done
+    gguf/job_gguf_kv.h           # DONE
+
+    gguf/job_gguf_context.h  #  DONE
+
+    gguf/job_gguf_reader.h       # NEXT
+
+    gguf/job_gguf_writer.h      #
+
+    gguf/job_gguf.h              # the API
+)
+
+# almost done
 set(JOBGGML_HEADERS
-    # job_gguf_val.h                  ## util value
-    # job_gguf_header.h               ## 1st 24 bytes and 8 padding                       owned by job_ggml_model
-    # job_gguf_abstract_kv.h          ## virtual kv                                       owned by job_ggml_model
-    # job_gguf_abstract_tensor_info.h ## virtual tensor information                       owned by job_ggml_model
-    job_ggml_weights.h              ## tensor storage.                                  owned by job_ggml_model
-    job_ggml_graph.h                ## manage the graph and ctx.                        owned by job_ggml_model
-    job_ggml_device.h               ## a single backend(sched is owned by manager).     owned by job_ggml_device_manager
-    job_ggml_device_manager.h       ## manager of all backends                          owned by job_ggml_model
-    job_ggml_model.h                ## god class                                        owned by application
+    job_ggml_enums.h
+    job_ggml_type_traits.h
+    job_ggml.h
+)
+
+
+set(JOBGGML_DEVICE_SOURCES
+    device/job_ggml_device_caps.cpp
+    device/job_ggml_device_props.cpp
+    device/job_ggml_device_interface.cpp
+    device/job_ggml_device.cpp
+    device/job_ggml_device_manager.cpp
+)
+
+set(JOBGGML_BACKEND_SOURCES
+    backend/job_ggml_backend_reg.cpp
+    backend/job_ggml_backend_buffer_type.cpp
+    backend/job_ggml_backend_buffer.cpp
+    backend/job_ggml_backend_event.cpp
+    backend/job_ggml_backend_buffer_view.cpp
+    backend/job_ggml_backend.cpp
+    backend/job_ggml_backend_sched.cpp
+    backend/job_ggml_backend_graph_copy.cpp
+)
+
+set(JOBGGML_CTX_SOURCES
+    ctx/job_ggml_init_params.cpp
+    ctx/job_ggml_context_view.h
+    ctx/job_ggml_context.cpp
+    ctx/job_ggml_cgraph.cpp
+)
+
+set(JOBGGML_TENSOR_SOURCES
+    tensor/job_ggml_tensor_extents.cpp
+    tensor/job_ggml_tensor_view.cpp
+    tensor/job_ggml_tensor_operation.cpp
+    tensor/job_ggml_tensor_data.cpp
+
+    tensor/job_ggml_tensor_fiber.cpp
+    tensor/job_ggml_tensor_matrix.cpp
+    tensor/job_ggml_tensor_volume.cpp
+    tensor/job_ggml_tensor_batch.cpp
+
+    tensor/job_ggml_tensor_layout.cpp
+    tensor/job_ggml_tensor.cpp
+)
+
+set(JOBGGML_ALLOC_SOURCES
+    alloc/job_ggml_tensor_allocator.cpp
+    alloc/job_ggml_graph_allocator.cpp
+)
+
+set(JOBGGML_GGUF_SOURCES
+    gguf/job_gguf_type_traits.cpp
+    gguf/job_gguf_kv.cpp
+    gguf/job_gguf_tensor_info.cpp
+
+    gguf/job_gguf_init_params.cpp
+    gguf/job_gguf_context.cpp
+
+    gguf/job_gguf_reader.cpp
+    gguf/job_gguf_writer.cpp
+
+    gguf/job_gguf.cpp
 )
 set(JOBGGML_SOURCES
-    job_ggml_device.cpp
-    job_ggml_device_manager.cpp
-    job_ggml_graph.cpp
-    job_ggml_weights.cpp
-    job_ggml_model.cpp
+    job_ggml_enums.cpp
+    job_ggml_type_traits.cpp
+    job_ggml.cpp
 )
 
-add_library(JosephsOddBuilder_Ggml SHARED
-    ${JOBGGML_HEADERS}
-    ${JOBGGML_SOURCES}
+set(JOBGGML_COMPILE_THIS
+    ${JOBGGML_DEVICE_HEADERS}       ${JOBGGML_DEVICE_SOURCES}
+    ${JOBGGML_BACKEND_HEADERS}      ${JOBGGML_BACKEND_SOURCES}
+    ${JOBGGML_CTX_HEADERS}          ${JOBGGML_CTX_SOURCES}
+    ${JOBGGML_TENSOR_HEADERS}       ${JOBGGML_TENSOR_SOURCES}
+    ${JOBGGML_ALLOC_HEADERS}        ${JOBGGML_ALLOC_SOURCES}
+    ${JOBGGML_GGUF_HEADERS}         ${JOBGGML_GGUF_SOURCES}
+    ${JOBGGML_HEADERS} ${JOBGGML_SOURCES}
+)
+
+
+if(BUILD_SHARED_LIBS)
+    add_library(JosephsOddBuilder_Ggml SHARED ${JOBGGML_COMPILE_THIS})
+else()
+    add_library(JosephsOddBuilder_Ggml STATIC ${JOBGGML_COMPILE_THIS})
+    target_compile_definitions(JosephsOddBuilder_Ggml PUBLIC JOBGGML_STATIC_DEFINE)
+endif()
+
+set(JOBGGML_EXPORT_HEADER "${CMAKE_CURRENT_BINARY_DIR}/jobggml_export.h")
+generate_export_header(JosephsOddBuilder_Ggml
+    BASE_NAME JOBGGML
+    EXPORT_FILE_NAME "${JOBGGML_EXPORT_HEADER}"
 )
 
 set_target_properties(JosephsOddBuilder_Ggml PROPERTIES
     VERSION ${PROJECT_VERSION}
     SOVERSION ${PROJECT_VERSION_MAJOR}
     OUTPUT_NAME "jobggml"
+    CXX_VISIBILITY_PRESET hidden
+    VISIBILITY_INLINES_HIDDEN ON
 )
 
 target_include_directories(JosephsOddBuilder_Ggml PUBLIC
-    ${LibGgml_INCLUDE_DIRS}
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobggml>
+
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/device>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobggml/device>
+
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/backend>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobggml/backend>
+
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/ctx>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobggml/ctx>
+
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/tensor>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobggml/tensor>
+
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/alloc>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobggml/alloc>
+
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/gguf>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobggml/gguf>
+
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
 )
 
-target_link_libraries(JosephsOddBuilder_Ggml PUBLIC
-    Threads::Threads
-    atomic
-    ${LibGgml_LIBRARIES}
-    ${LibGgmlBase}
-    JosephsOddBuilder_Core
+target_link_libraries(JosephsOddBuilder_Ggml
+    PUBLIC
+        Threads::Threads
+        $<BUILD_INTERFACE:ggml>
+        JosephsOddBuilder_Core
 )
+
+if(JOB_LINUX)
+    target_link_libraries(JosephsOddBuilder_Ggml PUBLIC atomic)
+elseif(JOB_WINDOWS)
+    target_compile_options(JosephsOddBuilder_Ggml PRIVATE /wd4251)
+endif()
 
 install(TARGETS JosephsOddBuilder_Ggml
-    EXPORT      JosephsOddBuilderGgmlTargets
-    LIBRARY     DESTINATION ${CMAKE_INSTALL_LIBDIR}
-    ARCHIVE     DESTINATION ${CMAKE_INSTALL_LIBDIR}
-    RUNTIME     DESTINATION ${CMAKE_INSTALL_BINDIR}
-    INCLUDES    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    EXPORT JosephsOddBuilderGgmlTargets
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobggml
 )
-install(FILES ${JOBGGML_HEADERS} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobggml)
 
-## PKGCONFIG
-set(PKGCONFIG_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/pkgconfig")
-set(PKGCONFIG_FILE "${CMAKE_CURRENT_BINARY_DIR}/jobggml.pc")
-configure_file("${CMAKE_CURRENT_SOURCE_DIR}/jobggml.pc.in" "${PKGCONFIG_FILE}" @ONLY)
 
-install(FILES "${PKGCONFIG_FILE}" DESTINATION "${PKGCONFIG_INSTALL_DIR}")
+install(FILES ${JOBGGML_EXPORT_HEADER}      DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobggml )
+install(FILES ${JOBGGML_HEADERS}            DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobggml )
+# other dirs
+install(FILES ${JOBGGML_DEVICE_HEADERS}     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobggml/device )
+install(FILES ${JOBGGML_BACKEND_HEADERS}    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobggml/backend )
+install(FILES ${JOBGGML_CTX_HEADERS}        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobggml/ctx )
+install(FILES ${JOBGGML_TENSOR_HEADERS}     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobggml/tensor )
+install(FILES ${JOBGGML_ALLOC_HEADERS}      DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobggml/alloc )
+install(FILES ${JOBGGML_GGUF_HEADERS}       DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobggml/gguf )
+
+
+if(JOB_LINUX)
+    set(PKGCONFIG_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/pkgconfig")
+    set(PKGCONFIG_FILE "${CMAKE_CURRENT_BINARY_DIR}/jobggml.pc")
+    configure_file(
+        "${CMAKE_CURRENT_SOURCE_DIR}/jobggml.pc.in"
+        "${PKGCONFIG_FILE}"
+        @ONLY
+    )
+    install(FILES "${PKGCONFIG_FILE}" DESTINATION "${PKGCONFIG_INSTALL_DIR}" )
+endif()
+
 install(EXPORT JosephsOddBuilderGgmlTargets
     FILE JosephsOddBuilderGgmlTargets.cmake
     NAMESPACE JOB::
-    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/JosephsOddBuilderGgml
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/JosephsOddBuilderGgml"
 )

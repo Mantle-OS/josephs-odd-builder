@@ -28,7 +28,6 @@ QLlamaEnums::~QLlamaEnums()
 
 
 void QLlamaEnums::fillAll(){
-    fillVocabTypes();
     fillRopeTypes();
     fillTokenTypes();
     fillTokenAttrs();

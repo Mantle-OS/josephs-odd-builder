@@ -3,6 +3,8 @@
 #include <QMetaObject>
 #include <QMetaProperty>
 
+#include <QDebug>
+
 #include <QFile>
 #include <QFileInfo>
 
@@ -10,12 +12,13 @@
 #include <QJsonArray>
 #include <QJsonValue>
 
+#include <qaiutils.h>
+#include <objectmodel.h>
+
 #include "qsdembedding.h"
 #include "qsdlora.h"
-#include "qaiutils.h"
-#include "objectmodel.h"
+#include "qsdimage.h"
 
-#include <QDebug>
 
 QSdBaseParam::QSdBaseParam(QObject *parent):
     QObject(parent)
@@ -187,14 +190,17 @@ void QSdBaseParam::fromJson(const QJsonObject &jsonObject) {
                         }
                         for (const QJsonValue &jsonValue : jsonArray) {
                             if (jsonValue.isObject()) {
-                                // // qDebug() << "List class name " << itemMetaObject->className() << "VS" <<  property.name();
-                                // // FIXME There has to be a better way for reflection here
+                                // MVC NOT FULLY DEFINED YET !!!!!
                                 if(strcmp(itemMetaObject->className(), "QSdLora") == 0){
                                     auto *i = new QSdLora;
                                     i->fromJson(jsonValue.toObject());
                                     list->append(i);
                                 }else if(strcmp(itemMetaObject->className(), "QSdEmbedding") == 0){
                                     auto *i = new QSdEmbedding;
+                                    i->fromJson(jsonValue.toObject());
+                                    list->append(i);
+                                } else if (strcmp(itemMetaObject->className(), "QSdImage") == 0){
+                                    auto *i = new QSdImage;
                                     i->fromJson(jsonValue.toObject());
                                     list->append(i);
                                 }
@@ -429,8 +435,11 @@ void QSdBaseParam::fromYaml(const YAML::Node &yamlNode)
                                     auto *i = new QSdEmbedding;
                                     i->fromYaml(itemNode);
                                     list->append(i);
+                                }else if (strcmp(itemMetaObject->className(), "QSdImage") == 0){
+                                    auto *i = new QSdImage;
+                                    i->fromYaml(itemNode);
+                                    list->append(i);
                                 }
-                                // Kit Session UsbDevice UartDevice User FlashTarget AvahiItem AvahiTxRecord
                             }else{
                                 // should not get here.
                                 qDebug() << "Breakpoint ";

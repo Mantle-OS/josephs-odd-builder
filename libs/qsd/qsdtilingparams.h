@@ -9,18 +9,19 @@
 
 #include "qsdbaseparam.h"
 
-class QSdTilingParams : public QSdBaseParam
+#include "qmlsd_export.h"
+class QMLSD_EXPORT QSdTilingParams : public QSdBaseParam
 {
     Q_OBJECT
 
-    QP_RW(bool,     isEnabled,          false       )
-    QP_RW(bool,     temporalTiling,     false       )
-    QP_RW(int,      tileSizeX,          0           )
-    QP_RW(int,      tileSizeY,          0           )
-    QP_RW(float,    targetOverlap,      0.5f        )
-    QP_RW(float,    relSizeX,           0.0f        )
-    QP_RW(float,    relSizeY,           0.0f        )
-    QP_RW(QString,  extraTilingArgs,    QString{}   )
+    QP_RW(bool,     isEnabled,          false       ) // Enables VAE/UNet tiling to generate huge images without blowing up VRAM.
+    QP_RW(bool,     temporalTiling,     false       ) // Enables tiling across the time dimension (frames) for video generation models.
+    QP_RW(int,      tileSizeX,          0           ) // Absolute width of each individual tile in pixels (0 for auto/default).
+    QP_RW(int,      tileSizeY,          0           ) // Absolute height of each individual tile in pixels (0 for auto/default).
+    QP_RW(float,    targetOverlap,      0.5f        ) // The overlap ratio between tiles to seamlessly blend edges (0.5 = 50% overlap).
+    QP_RW(float,    relSizeX,           0.0f        ) // Relative width multiplier for the tiles (alternative to absolute tileSizeX).
+    QP_RW(float,    relSizeY,           0.0f        ) // Relative height multiplier for the tiles (alternative to absolute tileSizeY).
+    QP_RW(QString,  extraTilingArgs,    QString{}   ) // Pass-through string for backend-specific tweaks (e.g. "temporal_tile_frames=24").
 
     QML_ELEMENT
 public:

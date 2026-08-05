@@ -3,7 +3,9 @@ cmake_minimum_required(VERSION 3.16)
 add_executable(test_job_net
     main.cpp
     # Utils and local helper
+    ../transient_test_file.h
     test_loop.h
+
     test_url.cpp
     test_ipaddr.cpp
     test_http_header.cpp
@@ -11,10 +13,12 @@ add_executable(test_job_net
     test_tcp_socket.cpp
     test_udp_socket.cpp
     test_unix_socket.cpp
+    test_ssl_socket.cpp
     # Clients / server testing
     test_tcp_client_server.cpp
     test_udp_client_server.cpp
     test_unix_client_server.cpp
+    test_ssl_client_server.cpp
 )
 
 target_link_libraries(test_job_net PRIVATE

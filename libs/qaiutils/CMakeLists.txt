@@ -115,6 +115,7 @@ if(BUILD_SHARED_LIBS)
     qt_add_library(qml-ai-utils SHARED)
 else()
     qt_add_library(qml-ai-utils STATIC)
+    add_compile_definitions(qml-ai-utils QMLAIUTILS_STATIC_DEFINE)
 endif()
 
 qt_add_qml_module(qml-ai-utils
@@ -156,6 +157,7 @@ target_link_libraries(qml-ai-utils
 set(QMLAIUTILS_INSTALL_DIR "${QML_INSTALL_DIR}/QAi")
 
 install(TARGETS qml-ai-utils
+    ${QMLAIUTILS_OUTPUT_TARGETS}
     EXPORT QmlAiUtilsTargets
     LIBRARY DESTINATION     "${QMLAIUTILS_INSTALL_DIR}"
     ARCHIVE DESTINATION     "${QMLAIUTILS_INSTALL_DIR}"
@@ -165,3 +167,8 @@ install(TARGETS qml-ai-utils
 install(FILES ${QMLAIUTILS_EXPORT_HEADER}   DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/qml-ai-utils")
 install(FILES ${QMLAIUTILS_HEADERS}         DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/qml-ai-utils")
 
+install(EXPORT QmlAiUtilsTargets
+    FILE QmlAiUtilsTargets.cmake
+    NAMESPACE JOB::
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/QmlAiUtilsTargets
+)

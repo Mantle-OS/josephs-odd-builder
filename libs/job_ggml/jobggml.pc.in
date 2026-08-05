@@ -6,5 +6,5 @@ includedir=@CMAKE_INSTALL_FULL_INCLUDEDIR@/jobggml
 Name: jobggml
 Description: GGML library for JOB (Joseph's Odd Builder)
 Version: @PROJECT_VERSION@
-Libs: -L${libdir} -lpthread -latomic -ljobcore -ljobthreads -lggml
+Libs: -L${libdir} -lpthread -latomic -ljobcore -ljobcore -lggml
 Cflags: -I${includedir}

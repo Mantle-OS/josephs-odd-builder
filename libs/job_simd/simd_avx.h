@@ -63,8 +63,10 @@ struct AVX_F {
 
     static inline  f16 cast_f32_f16(f32 reg){return _mm256_castps256_ps128(reg);}
 
+    // template<typename T>
+    // static inline  f16 ext_f16(f32 a, const T b){return _mm256_extractf128_ps(a, (int)b);}
     template<typename T>
-    static inline  f16 ext_f16(f32 a, const T b){return _mm256_extractf128_ps(a, (int)b);}
+    [[nodiscard]] static inline f16 ext_f16(f32 a, T b) { return static_cast<int>(b) == 0 ? _mm256_castps256_ps128(a) : _mm256_extractf128_ps(a, 1); }
     static inline  f16 add_f16(f16 a, f16 b){ return _mm_add_ps(a, b);}
 
     // Logic

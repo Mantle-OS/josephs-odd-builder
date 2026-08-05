@@ -19,22 +19,22 @@
 // fillmap that fills the datasets on startup
 // clear map that has the calls to clear the map and stringlist
 
+#include "qmlsd_export.h"
 
-
-class QSdEnums : public QObject
+class QMLSD_EXPORT QSdEnums : public QObject
 {
     Q_OBJECT
-    Q_PROPERTY(QStringList weightTypesList READ weightTypesList NOTIFY weightTypesListChanged FINAL)
-    Q_PROPERTY(QStringList rngTypesList READ rngTypesList NOTIFY rngTypesListChanged FINAL)
-    Q_PROPERTY(QStringList sampleTypesList READ sampleTypesList NOTIFY sampleTypesListChanged FINAL)
-    Q_PROPERTY(QStringList schedulerTypesList READ schedulerTypesList NOTIFY schedulerTypesListChanged FINAL)
-    Q_PROPERTY(QStringList predictionTypesList READ predictionTypesList NOTIFY predictionTypesListChanged FINAL)
-    Q_PROPERTY(QStringList previewTypesList READ previewTypesList NOTIFY previewTypesListChanged FINAL)
-    Q_PROPERTY(QStringList loraApplyModeTypesList READ loraApplyModeTypesList NOTIFY loraApplyModeTypesListChanged FINAL)
-    Q_PROPERTY(QStringList vaeFormatTypesList READ vaeFormatTypesList NOTIFY vaeFormatTypesListChanged FINAL)
-    Q_PROPERTY(QStringList logLevelTypesList READ logLevelTypesList NOTIFY logLevelTypesListChanged FINAL)
-    Q_PROPERTY(QStringList cacheModeTypesList READ cacheModeTypesList NOTIFY cacheModeTypesListChanged FINAL)
-    Q_PROPERTY(QStringList hiResUpscalerTypesList READ hiResUpscalerTypesList NOTIFY hiResUpscalerTypesListChanged FINAL)
+    Q_PROPERTY(QStringList weightTypesList          READ weightTypesList            NOTIFY weightTypesListChanged           FINAL)
+    Q_PROPERTY(QStringList rngTypesList             READ rngTypesList               NOTIFY rngTypesListChanged              FINAL)
+    Q_PROPERTY(QStringList sampleTypesList          READ sampleTypesList            NOTIFY sampleTypesListChanged           FINAL)
+    Q_PROPERTY(QStringList schedulerTypesList       READ schedulerTypesList         NOTIFY schedulerTypesListChanged        FINAL)
+    Q_PROPERTY(QStringList predictionTypesList      READ predictionTypesList        NOTIFY predictionTypesListChanged       FINAL)
+    Q_PROPERTY(QStringList previewTypesList         READ previewTypesList           NOTIFY previewTypesListChanged          FINAL)
+    Q_PROPERTY(QStringList loraApplyModeTypesList   READ loraApplyModeTypesList     NOTIFY loraApplyModeTypesListChanged    FINAL)
+    Q_PROPERTY(QStringList vaeFormatTypesList       READ vaeFormatTypesList         NOTIFY vaeFormatTypesListChanged        FINAL)
+    Q_PROPERTY(QStringList logLevelTypesList        READ logLevelTypesList          NOTIFY logLevelTypesListChanged         FINAL)
+    Q_PROPERTY(QStringList cacheModeTypesList       READ cacheModeTypesList         NOTIFY cacheModeTypesListChanged        FINAL)
+    Q_PROPERTY(QStringList hiResUpscalerTypesList   READ hiResUpscalerTypesList     NOTIFY hiResUpscalerTypesListChanged    FINAL)
 
     QML_ELEMENT
     QML_SINGLETON
@@ -177,7 +177,7 @@ public:
     QStringList predictionTypesList() const;
     static prediction_t sdPredictionType(const QSdPredictionTypes &type);
     static QSdPredictionTypes qsdPredictionType(prediction_t type);
-    Q_INVOKABLE QString schedulerTypeName(QSdPredictionTypes type);
+    Q_INVOKABLE QString predictionTypesName(QSdPredictionTypes type);
     Q_INVOKABLE QSdPredictionTypes predictionTypeFromString(const QString &type);
 
     ////////////////////////////////////////
@@ -279,9 +279,6 @@ public:
     static QSdHiResUpscalerTypes qsdHiResUpscalerType(sd_hires_upscaler_t type);
     Q_INVOKABLE QString hiResUpscalerTypeName(QSdHiResUpscalerTypes type);
     Q_INVOKABLE QSdHiResUpscalerTypes hiResUpscalerTypeFromString(const QString &type);
-
-
-
 
 
 

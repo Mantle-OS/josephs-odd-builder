@@ -182,8 +182,7 @@ target_link_libraries(qml-zstd
 
 set(QML_ZSTD_INSTALL_DIR "${QML_INSTALL_DIR}/QZstd")
 
-install(TARGETS
-    qml-zstd
+install(TARGETS qml-zstd
     ${QML_ZSTD_OUTPUT_TARGETS}
     EXPORT QmlZstdTargets
     LIBRARY DESTINATION "${QML_ZSTD_INSTALL_DIR}"

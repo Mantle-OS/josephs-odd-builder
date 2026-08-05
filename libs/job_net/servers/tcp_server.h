@@ -9,10 +9,10 @@
 
 #include "tcp_socket.h"
 #include "clients/tcp_client.h"
-
+#include "jobnet_export.h"
 namespace job::net {
 
-class TcpServer {
+class JOBNET_EXPORT TcpServer {
 public:
     using Ptr = std::shared_ptr<TcpServer>;
 

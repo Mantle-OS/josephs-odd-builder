@@ -1,0 +1,11 @@
+prefix=@CMAKE_INSTALL_PREFIX@
+exec_prefix=${prefix}
+libdir=@CMAKE_INSTALL_FULL_LIBDIR@
+includedir=@CMAKE_INSTALL_FULL_INCLUDEDIR@/qt-stable-diffusion
+
+Name: qt-stable-diffusion
+Description: Qt Stable Diffusion bindings for Qt in the framework (Joseph's Odd Builder)
+Version: @PROJECT_VERSION@
+Libs: -L${libdir} -lggml -lstable-diffusion -lyaml-cpp -lqt-ai-utils -lqml-ai-utils -lQt6Core -lQt6Gui -lQt6Network -lQt6Concurrent -lQt6Quick -lQt6Qml -lqml-stable-diffusion
+Cflags: -I${includedir}
+Requires: ggml stable-diffusion yaml-cpp qt-ai-utils qml-ai-utils Qt6Core Qt6Gui Qt6Network Qt6Concurrent Qt6Quick Qt6Qml

@@ -1,0 +1,12 @@
+prefix=@CMAKE_INSTALL_PREFIX@
+exec_prefix=${prefix}
+libdir=@CMAKE_INSTALL_FULL_LIBDIR@
+includedir=@CMAKE_INSTALL_FULL_INCLUDEDIR@/qt-llama
+
+Name: qt-llama
+Description: Qt llama.cpp bindings for the JOB Framework
+Version: @PROJECT_VERSION@
+Libs: -L${libdir} -lqllama
+Cflags: -I${includedir}
+Requires: Qt6Core Qt6Qml qt-ai-utils qml-ai-utils yaml-cpp llama llama-common llama-common-base
+Requires.private: Qt6Gui Qt6Quick Qt6Network Qt6Concurrent libsodium ggml

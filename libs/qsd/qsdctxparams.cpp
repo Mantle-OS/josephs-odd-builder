@@ -1,7 +1,7 @@
 #include "qsdctxparams.h"
 
 QSdCtxParams::QSdCtxParams(QObject *parent) :
-    m_embeddings{new ObjectListModel<QSdEmbedding>{this, "", ""}},
+    m_embeddings{new ObjectListModel<QSdEmbedding>{this, "display", "embeddingName"}},
     QSdBaseParam{parent}
 {
 }
@@ -138,7 +138,7 @@ sd_ctx_params_t QSdCtxParams::ctxParams()
     }
 
     if(!m_audioVaePath.isEmpty() && QAiUtils::fileExists(m_audioVaePath)){
-        m_audioVaePath = m_audioVaePath.toLocal8Bit();
+        tmp_audioVaePath = m_audioVaePath.toLocal8Bit();
         sd_ctx_params.audio_vae_path = tmp_audioVaePath.constData();
     } else {
         sd_ctx_params.audio_vae_path = nullptr;
@@ -153,9 +153,9 @@ sd_ctx_params_t QSdCtxParams::ctxParams()
 
     if(!m_controlNetPath.isEmpty() && QAiUtils::fileExists(m_controlNetPath)){
         tmp_controlNetPath = m_controlNetPath.toLocal8Bit();
-        sd_ctx_params.taesd_path = tmp_controlNetPath.constData();
+        sd_ctx_params.control_net_path = tmp_controlNetPath.constData();
     }else{
-        sd_ctx_params.taesd_path = nullptr;
+        sd_ctx_params.control_net_path = nullptr;
     }
 
     if(!m_photoMakerPath.isEmpty() && QAiUtils::fileExists(m_photoMakerPath)){
@@ -291,26 +291,30 @@ void QSdCtxParams::setCtxParams(sd_ctx_params_t *other)
 
 
     // Loop all the embeddings
-
     int eCnt = other->embedding_count;
-    std::vector<sd_embedding_t> tmpEmbed;
-    if(eCnt > 0){
+    if(eCnt > 0 && other->embeddings) {
+        // m_embeddings->clear(); // Wipe the list to prevent duplicates I dont think so  ....
+        for (uint32_t i = 0; i < eCnt; ++i) {
+            // Create a new real object
+            const QString n = other->embeddings[i].name ? QString::fromLatin1(other->embeddings[i].name) : QString();
+            auto *emb = m_embeddings->getByUid(n); // look in the has is it real ?
+            if(emb == Q_NULLPTR)
+                emb = new QSdEmbedding(m_embeddings);
 
+            emb->set_embeddingName(other->embeddings[i].name ? QString::fromLatin1(other->embeddings[i].name) : QString());
+            emb->set_embeddingPath(other->embeddings[i].path ? QString::fromLatin1(other->embeddings[i].path) : QString());
+            emb->set_isEnabled(false); // Always set to false.
+
+            m_embeddings->append(emb);
+        }
     }
-
-
-
-
-    // const sd_embedding_t* i = other->embeddings;
-    // m_embeddings->setEmbeddings(other->embeddings);
-    // if(m_embeddings){
-    // }
 
     // set_embeddingCount(other->embedding_count);
 
     set_numberOfThreads(other->n_threads);
     set_chromaT5MaskPad(other->chroma_t5_mask_pad);
-    set_maxVram(other->max_vram);
+    // set_maxVram(other->max_vram);
+    set_maxVram(other->max_vram ? QString::fromLatin1(other->max_vram) : QString("-1"));
     set_enableMmap(other->enable_mmap);
     set_flashAttn(other->flash_attn);
     set_diffusionFlashAttn(other->diffusion_flash_attn);

@@ -6,8 +6,9 @@
 #include "udp_socket.h"
 #include "resolve/job_ipaddr.h"
 #include "job_url.h"
+#include "jobnet_export.h"
 namespace job::net {
-class UdpServer {
+class JOBNET_EXPORT UdpServer {
 public:
     using MessageCallback = std::function<void(const char*, size_t, const JobIpAddr&)>;
     explicit UdpServer(threads::JobIoAsyncThread::Ptr loop, uint16_t buffer_size = 4096);

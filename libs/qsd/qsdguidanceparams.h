@@ -1,5 +1,6 @@
 #pragma once
 #include <QObject>
+#include <QtMath>
 #include <QQmlEngine>
 
 #include <stable-diffusion.h>
@@ -10,13 +11,14 @@
 #include "qsdbaseparam.h"
 #include "qsdslgparams.h"
 
-class QSdGuidanceParams : public QSdBaseParam
+#include "qmlsd_export.h"
+class QMLSD_EXPORT QSdGuidanceParams : public QSdBaseParam
 {
-    Q_OBJECT
-    QP_RW(float, txtCfg,            8.0f        )
-    QP_RW(float, imgCfg,            INFINITY    ) // should really use somthing else as the default macro in macro is never ....
-    QP_RW(float, distilledGuidance, 3.5f        )
-    QP_PTR_RO(QSdSlgParams, slg)
+    Q_OBJECT 
+    QP_RW(float,            txtCfg,            7.0f    ) // Text classifier-free guidance scale (higher = strictly follows prompt).
+    QP_RW(float,            imgCfg,            qInf()  ) // Image classifier-free guidance scale (using qInf() to dodge macro bugs).
+    QP_RW(float,            distilledGuidance, 3.5f    ) // Specialized guidance scale for distilled models like Flux.
+    QP_PTR_RO(QSdSlgParams, slg                        ) // Skip Layer Guidance parameter block.
 
     QML_ELEMENT
 

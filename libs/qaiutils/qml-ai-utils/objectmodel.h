@@ -454,7 +454,12 @@ protected: // internal stuff
                     m_indexByUid.remove(key);
                 }
             }
-            if (item->parent() == this) { // FIXME : maybe that's not the best way to test ownership ?
+            if (item->parent() == this) {
+                item->deleteLater();
+            }else if(item->parent() == Q_NULLPTR){
+                delete item;
+                item = Q_NULLPTR;
+            } else{
                 item->deleteLater();
             }
         }

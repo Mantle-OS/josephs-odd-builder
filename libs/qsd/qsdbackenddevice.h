@@ -1,10 +1,10 @@
-#ifndef QSDBACKENDDEVICE_H
-#define QSDBACKENDDEVICE_H
-
+#pragma once
 #include "qsdbaseparam.h"
 #include "qsdenums.h"
 // ALPHA needs work
-class QSdBackendDevice : public QSdBaseParam
+#include "qmlsd_export.h"
+
+class QMLSD_EXPORT QSdBackendDevice : public QSdBaseParam
 {
     Q_OBJECT
     QML_ELEMENT
@@ -16,8 +16,10 @@ class QSdBackendDevice : public QSdBaseParam
     QP_RW(int,          cpuThreadLimit,         4                                       ) // Tied directly to sd_backend_cpu_set_n_threads
 
 public:
-    explicit QSdBackendDevice(QObject *parent = nullptr) : QSdBaseParam(parent) {}
+    explicit QSdBackendDevice(QObject *parent = nullptr) :
+        QSdBaseParam(parent)
+    {
+
+    }
     ~QSdBackendDevice() = default;
 };
-
-#endif // QSDBACKENDDEVICE_H

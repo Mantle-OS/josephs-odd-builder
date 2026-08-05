@@ -14,64 +14,65 @@
 #include "qsdenums.h"
 #include "qsdembedding.h"
 
-class QSdCtxParams : public QSdBaseParam
+#include "qmlsd_export.h"
+class QMLSD_EXPORT QSdCtxParams : public QSdBaseParam
 {
     Q_OBJECT
+    QP_RW(QString,                              modelPath,                      ""                              ) // Path to the main model file (safetensors/ckpt/gguf).
+    QP_RW(QString,                              clipLPath,                      ""                              ) // Path to the CLIP-ViT-L text encoder.
+    QP_RW(QString,                              clipGPath,                      ""                              ) // Path to the CLIP-ViT-G text encoder (used in SDXL/SD3).
+    QP_RW(QString,                              clipVisionPath,                 ""                              ) // Path to the CLIP Vision encoder (for image conditioning).
+    QP_RW(QString,                              t5xxlPath,                      ""                              ) // Path to the T5-XXL text encoder (used in SD3/Flux).
+    QP_RW(QString,                              llmPath,                        ""                              ) // Path to the LLM for complex text understanding.
+    QP_RW(QString,                              llmVisionPath,                  ""                              ) // Path to the Vision LLM (for image-to-text or multimodal tasks).
+    QP_RW(QString,                              diffusionModelPath,             ""                              ) // Path to a standalone UNet or DiT (if separated from the main model).
+    QP_RW(QString,                              highNoiseDiffusionModelPath,    ""                              ) // Path to a secondary diffusion model for expert high-noise refinement.
+    QP_RW(QString,                              uncondDiffusionModelPath,       ""                              ) // Path to a specific unconditional diffusion model.
+    QP_RW(QString,                              embeddingsConnectorsPath,       ""                              ) // Path to the connectors mapping custom embeddings to the model.
+    QP_RW(QString,                              vaePath,                        ""                              ) // Path to a standalone Variational Autoencoder to override the baked-in one.
+    QP_RW(QString,                              audioVaePath,                   ""                              ) // Path to the audio VAE (for audio-reactive or generation models).
+    QP_RW(QString,                              taesdPath,                      ""                              ) // Path to the Tiny Autoencoder for ultra-fast UI previews.
+    QP_RW(QString,                              controlNetPath,                 ""                              ) // Path to a ControlNet model for structural conditioning.
+    QP_RW(QString,                              photoMakerPath,                 ""                              ) // Path to a PhotoMaker model for consistent character generation.
+    //
+    QP_RW(QString,                              tensorTypeRules,                ""                              ) // Comma-separated overrides for tensor quantization (e.g., 'blk.0.attn.weight=f16').
+    QP_RW(QString,                              backend,                        ""                              ) // Target compute backend for execution (e.g., 'cuda', 'metal', 'vulkan', 'cpu').
+    QP_RW(QString,                              paramsBackend,                  ""                              ) // Target compute backend specifically for parameter offloading.
+    QP_RW(QString,                              rpcServers,                     ""                              ) // Comma-separated list of RPC server IP:PORT for distributed inference.
+    //
+    QP_RW(QSdEnums::QSdWeightTypes,             weightType,                     QSdEnums::QSdCount              ) // The quantization format to use when loading weights into RAM/VRAM.
+    QP_RW(QSdEnums::QSdRngTypes,                rngType,                        QSdEnums::QSdCudaRNG            ) // The Random Number Generator engine for latent noise initialization.
+    QP_RW(QSdEnums::QSdRngTypes,                samplerRngType,                 QSdEnums::QSdRngTypeCount       ) // The RNG engine specifically for sampler step noise.
+    QP_RW(QSdEnums::QSdPredictionTypes,         prediction,                     QSdEnums::QSdPredictionCount    ) // The model's prediction objective (epsilon, v-prediction, flow, etc).
+    QP_RW(QSdEnums::QSdLoraApplyModeTypes,      loraApplyMode,                  QSdEnums::QSdLoraAuto           ) // When to apply LoRAs (at load time vs runtime inference).
+    QP_RW(QSdEnums::QSdVaeFormatTypes,          vaeFormat,                      QSdEnums::QSdVaeFormatAuto      ) // The expected VAE tensor format (Auto, SD3, Flux, etc).
+    //
+    QP_PTR_RO(ObjectListModel<QSdEmbedding>,    embeddings                                                      ) // MVC List of active textual inversion embeddings.
+    //
+    QP_RW(int,                                  numberOfThreads,                0                               ) // CPU threads to allocate for processing (0 = auto).
+    QP_RW(int,                                  chromaT5MaskPad,                1                               ) // Padding size for T5 masks in Chroma models.
+    //
+    QP_RW(QString,                              maxVram,                        "0"                             ) // GiB budget for graph-cut segmented param offload (0 = disabled, -1 = auto free VRAM minus 1 GiB).
+    //
+    QP_RW(bool,                                 enableMmap,                     false                           ) // Use memory mapping to load models instantly (requires weights to stay on disk).
+    QP_RW(bool,                                 flashAttn,                      false                           ) // Enable Flash Attention for massive memory savings and speedups.
+    QP_RW(bool,                                 diffusionFlashAttn,             false                           ) // Force Flash Attention specifically in the diffusion layers.
+    QP_RW(bool,                                 taePreviewOnly,                 false                           ) // Use Tiny Autoencoder exclusively for intermediate step previews, not the final decode.
+    QP_RW(bool,                                 diffusionConvDirect,            false                           ) // Use direct convolution mapping in diffusion layers (bypasses some im2col overhead).
+    QP_RW(bool,                                 vaeConvDirect,                  false                           ) // Use direct convolution mapping in the VAE layers.
+    QP_RW(bool,                                 circularX,                      false                           ) // Enable seamless tiling horizontally.
+    QP_RW(bool,                                 circularY,                      false                           ) // Enable seamless tiling vertically.
+    QP_RW(bool,                                 forceSdxlVaeConvScale,          false                           ) // Force compatibility scaling for SDXL VAE convolutions.
+    QP_RW(bool,                                 chromaUseDitMask,               true                            ) // Enable DiT masking for Chroma models.
+    QP_RW(bool,                                 chromaUseT5Mask,                false                           ) // Enable T5 text masking for Chroma models.
+    QP_RW(bool,                                 streamLayers,                   false                           ) // Enable residency+prefetch streaming on top of --max-vram (no effect without --max-vram).
+    QP_RW(bool,                                 qwenImageZero,                  false                           ) // Enable zero-initialization for Qwen vision embeddings.
+    //
+    QP_RW(bool,                                 weightsOnCpu,                   false                           ) // Force all model weights to remain in system RAM.
+    QP_RW(bool,                                 clipOnCpu,                      false                           ) // Force the CLIP text encoder to execute on the CPU.
+    QP_RW(bool,                                 vaeOnCpu,                       false                           ) // Force the VAE decoder to execute on the CPU (saves VRAM for high-res images).
+    QP_RW(bool,                                 controlNetOnCpu,                false                           ) // Force the ControlNet conditioning to execute on the CPU.
 
-    QP_RW(QString,                              modelPath,                      ""                              )
-    QP_RW(QString,                              clipLPath,                      ""                              )
-    QP_RW(QString,                              clipGPath,                      ""                              )
-    QP_RW(QString,                              clipVisionPath,                 ""                              )
-    QP_RW(QString,                              t5xxlPath,                      ""                              )
-    QP_RW(QString,                              llmPath,                        ""                              )
-    QP_RW(QString,                              llmVisionPath,                  ""                              )
-    QP_RW(QString,                              diffusionModelPath,             ""                              )
-    QP_RW(QString,                              highNoiseDiffusionModelPath,    ""                              )
-    QP_RW(QString,                              uncondDiffusionModelPath,       ""                              )
-    QP_RW(QString,                              embeddingsConnectorsPath,       ""                              )
-    QP_RW(QString,                              vaePath,                        ""                              )
-    QP_RW(QString,                              audioVaePath,                   ""                              )
-    QP_RW(QString,                              taesdPath,                      ""                              )
-    QP_RW(QString,                              controlNetPath,                 ""                              )
-    QP_RW(QString,                              photoMakerPath,                 ""                              )
-    //
-    QP_RW(QString,                              tensorTypeRules,                ""                              )
-    QP_RW(QString,                              backend,                        ""                              )
-    QP_RW(QString,                              paramsBackend,                  ""                              )
-    QP_RW(QString,                              rpcServers,                     ""                              )
-    //
-    QP_RW(QSdEnums::QSdWeightTypes,             weightType,                     QSdEnums::QSdCount              )
-    QP_RW(QSdEnums::QSdRngTypes,                rngType,                        QSdEnums::QSdCudaRNG            )
-    QP_RW(QSdEnums::QSdRngTypes,                samplerRngType,                 QSdEnums::QSdRngTypeCount       )
-    QP_RW(QSdEnums::QSdPredictionTypes,         prediction,                     QSdEnums::QSdPredictionCount    )
-    QP_RW(QSdEnums::QSdLoraApplyModeTypes,      loraApplyMode,                  QSdEnums::QSdLoraAuto           )
-    QP_RW(QSdEnums::QSdVaeFormatTypes,          vaeFormat,                      QSdEnums::QSdVaeFormatAuto      )
-    //
-    QP_PTR_RO(ObjectListModel<QSdEmbedding>,    embeddings                                                      ) // Q_PROPERTY(quint32 embeddingCount READ embeddingCount WRITE setEmbeddingCount NOTIFY embeddingCountChanged FINAL)
-    //
-    QP_RW(int,                                  numberOfThreads,                0                               )
-    QP_RW(int,                                  chromaT5MaskPad,                1                               )
-    //
-    QP_RW(QString,                              maxVram,                        "0"                             ) // GiB budget for graph-cut segmented param offload (0 = disabled, -1 = auto free VRAM minus 1 GiB)
-    //
-    QP_RW(bool,                                 enableMmap,                     false                           )
-    QP_RW(bool,                                 flashAttn,                      false                           )
-    QP_RW(bool,                                 diffusionFlashAttn,             false                           )
-    QP_RW(bool,                                 taePreviewOnly,                 false                           )
-    QP_RW(bool,                                 diffusionConvDirect,            false                           )
-    QP_RW(bool,                                 vaeConvDirect,                  false                           )
-    QP_RW(bool,                                 circularX,                      false                           )
-    QP_RW(bool,                                 circularY,                      false                           )
-    QP_RW(bool,                                 forceSdxlVaeConvScale,          false                           )
-    QP_RW(bool,                                 chromaUseDitMask,               true                            )
-    QP_RW(bool,                                 chromaUseT5Mask,                false                           )
-    QP_RW(bool,                                 streamLayers,                   false                           ) // Enable residency+prefetch streaming on top of --max-vram (no effect without --max-vram)
-    QP_RW(bool,                                 qwenImageZero,                  false                           )
-    //
-    QP_RW(bool,                                 weightsOnCpu,                   false                           )
-    QP_RW(bool,                                 clipOnCpu,                      false                           )
-    QP_RW(bool,                                 vaeOnCpu,                       false                           )
-    QP_RW(bool,                                 controlNetOnCpu,                false                           )
     QML_ELEMENT
     QML_UNCREATABLE("Use QSD.ContextParams...")
 public:

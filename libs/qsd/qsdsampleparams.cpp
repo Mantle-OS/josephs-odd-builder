@@ -9,11 +9,9 @@ QSdSampleParams::QSdSampleParams(QObject *parent) :
 
 QSdSampleParams::~QSdSampleParams()
 {
-    resetSampleParams();
-    if(m_guidance){
+    if(m_guidance)
         delete m_guidance;
-        m_guidance = nullptr;
-    }
+    m_guidance = nullptr;
 }
 
 sd_sample_params_t QSdSampleParams::sampleParams()
@@ -29,9 +27,9 @@ sd_sample_params_t QSdSampleParams::sampleParams()
         m_proxySigmas.clear();
         m_proxySigmas.resize(m_customSigmas.size());
 
-        for(float i : m_customSigmas.toList()){
+        for(float i : m_customSigmas.toList())
             m_proxySigmas.push_back(i);
-        }
+
         ret.custom_sigmas       = m_proxySigmas.data();
         ret.custom_sigmas_count = m_proxySigmas.size();
     }else{
@@ -60,19 +58,15 @@ void QSdSampleParams::setSampleParams(sd_sample_params_t other)
     set_eta(other.eta);
     set_shiftedTimestep(other.shifted_timestep);
     clearCustomSigmas();
-    if (other.custom_sigmas && other.custom_sigmas_count > 0) {
-        for (size_t i = 0; i < other.custom_sigmas_count; ++i) {
+    if (other.custom_sigmas && other.custom_sigmas_count > 0){
+        for (size_t i = 0; i < other.custom_sigmas_count; ++i)
             m_customSigmas.append(other.custom_sigmas[i]);
-        }
+        Q_EMIT customSigmasChanged();
     }
-
     set_flowShift(other.flow_shift);
 
-    if(other.extra_sample_args){
-        set_extraSampleArgs(QString::fromLatin1(other.extra_sample_args));
-    }else{
-        set_extraSampleArgs("");
-    }
+    set_extraSampleArgs(other.extra_sample_args ? QString::fromLatin1(other.extra_sample_args) : QString{});
+
     m_sampleParams = other;
 }
 
@@ -83,11 +77,11 @@ void QSdSampleParams::resetSampleParams()
     m_sampleParams.scheduler                   = SCHEDULER_COUNT;
     m_sampleParams.sample_method               = SAMPLE_METHOD_COUNT;
     m_sampleParams.sample_steps                = 20;
-    m_sampleParams.eta                         = 1.0f;
+    m_sampleParams.eta                         = qInf();
     m_sampleParams.shifted_timestep            = 0;
     m_sampleParams.custom_sigmas               = nullptr;
     m_sampleParams.custom_sigmas_count         = 0;
-    m_sampleParams.flow_shift                  = 1.0f;
+    m_sampleParams.flow_shift                  = qInf();
     m_sampleParams.extra_sample_args           = nullptr;
 
     setSampleParams(m_sampleParams);

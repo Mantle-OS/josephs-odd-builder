@@ -3,43 +3,41 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import QSd
 
-Pane{
+ItemDelegate {
+    width: ListView.view
+        ? ListView.view.width
+        : implicitWidth
 
     property QSdLora loraParams: null
-    ColumnLayout{
-        Layout.fillHeight: true
-        Layout.fillWidth: true
-        Label{ text: qsTr("LoRA Settings") }
-        MenuSeparator{Layout.fillWidth: true  }
 
-        // Q_PROPERTY(QString path READ path WRITE setPath NOTIFY pathChanged FINAL)
-        RowLayout{
-            Label{text: qsTr("LoRA Path:")}
-            TextField{readOnly: true; text: loraParams.path ; Layout.fillWidth: true }
-            Button{
-                text: qsTr("Change") ;
-                onClicked: {
-                    fileManager.open();
-                    openFileManager("loraParamsPath")
-                }
-            }
+    RowLayout {
+        anchors.fill: parent
+
+        Label {
+            text: qsTr("LoRA Path: ") + loraParams.path
+            Layout.fillWidth: true
         }
-        // Q_PROPERTY(float multiplier READ multiplier WRITE setMultiplier NOTIFY multiplierChanged FINAL)
-        RowLayout{
-            Label{text: qsTr("LoRA multiplier:")}
-            SpinBox{
-                from: 0.00
+
+        RowLayout {
+            Label {
+                text: qsTr("Strength:")
+            }
+
+            SpinBox {
                 value: loraParams.multiplier
-                onValueChanged: loraParams.multiplier = parseFloat(value)
+                onValueChanged: loraParams.multiplier = value
             }
         }
 
-        // Q_PROPERTY(bool isHighNoise READ isHighNoise WRITE setIsHighNoise NOTIFY isHighNoiseChanged FINAL)
-        Switch{
-            text: "Is High Noise"
+        Switch {
+            text: qsTr("Is High Noise")
             checked: loraParams.isHighNoise
-            onClicked:  loraParams.isHighNoise = checked
+            onClicked: loraParams.isHighNoise = checked
         }
 
+        Button {
+            text: qsTr("X")
+            onClicked: QSD.ImageGenerationParams.loras.remove(loraParams)
+        }
     }
 }

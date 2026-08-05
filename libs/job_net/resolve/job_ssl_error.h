@@ -33,6 +33,29 @@ public:
     // use recordError(SslErrNo, message) instead.
     void recordNativeError(int errCode) noexcept;
 
+    [[nodiscard]] static constexpr bool isFatalSslError(SslErrNo error) noexcept
+    {
+        switch (error) {
+        case SslErrNo::None:
+        case SslErrNo::WantRead:
+        case SslErrNo::WantWrite:
+        case SslErrNo::WantConnect:
+        case SslErrNo::WantAccept:
+        case SslErrNo::ZeroReturn:
+            return false;
+
+        case SslErrNo::Syscall:
+        case SslErrNo::HandshakeFailed:
+        case SslErrNo::CertificateVerifyFailed:
+        case SslErrNo::InvalidState:
+        case SslErrNo::InternalError:
+        case SslErrNo::OperationNotSupported:
+        case SslErrNo::Unknown:
+            return true;
+        }
+
+        return true;
+    }
     void recordError(SslErrNo err, const std::string &message = {}) noexcept
     {
         m_lastError = err;

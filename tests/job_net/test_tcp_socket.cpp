@@ -2,6 +2,7 @@
 #include <thread>
 #include <atomic>
 #include <cstring>
+
 TEST_CASE("TcpSocket basic creation and cleanup", "[tcp_socket][lifecycle]") {
     TestLoop loop;
     auto sock = TcpSocket::create(loop.loop);
@@ -10,6 +11,7 @@ TEST_CASE("TcpSocket basic creation and cleanup", "[tcp_socket][lifecycle]") {
     sock->disconnect();
     REQUIRE(sock->state() == ISocketIO::SocketState::Closed);
 }
+
 TEST_CASE("TcpSocket bind and listen on localhost", "[tcp_socket][bind][listen]") {
     TestLoop loop;
     auto server = TcpSocket::create(loop.loop);
@@ -22,6 +24,7 @@ TEST_CASE("TcpSocket bind and listen on localhost", "[tcp_socket][bind][listen]"
     server->disconnect();
     REQUIRE(server->state() == ISocketIO::SocketState::Closed);
 }
+
 TEST_CASE("TcpSocket handles async connect failure", "[tcp_socket][error][async]") {
     TestLoop loop;
     auto sock = TcpSocket::create(loop.loop);
@@ -45,6 +48,7 @@ TEST_CASE("TcpSocket handles async connect failure", "[tcp_socket][error][async]
     REQUIRE(sock->state() == ISocketIO::SocketState::Closed);
     REQUIRE(error_code.load() == ECONNREFUSED);
 }
+
 TEST_CASE("TcpSocket option toggling works", "[tcp_socket][options]") {
     TestLoop loop;
     auto sock = TcpSocket::create(loop.loop);
@@ -54,6 +58,7 @@ TEST_CASE("TcpSocket option toggling works", "[tcp_socket][options]") {
     sock->setOption(ISocketIO::SocketOption::KeepAlive, true);
     REQUIRE(sock->option(ISocketIO::SocketOption::KeepAlive));
 }
+
 TEST_CASE("TcpSocket loopback echo (v2.0)", "[tcp_socket][async][echo]") {
     TestLoop loop;
     std::atomic<bool> gotEcho{false};

@@ -19,7 +19,7 @@ add_subdirectory(job_ai)                    # not cross platform yet | will not 
 add_subdirectory(job_ansi)                  # not cross platform     | This one is gonna be pretty easy as long as windows talks Ansii lol
 add_subdirectory(job_tui)                   # see above as it depends on the whole ansi protocol
 
-# add_subdirectory(job_ggml)                ## old going away was just me playing around trying to learn the whole device, graph, weights and models
+add_subdirectory(job_ggml)                ## old going away was just me playing around trying to learn the whole device, graph, weights and models
 
 if(JOB_QT)
     if(JOB_BUILD_SERIALIZER_MSGPACK)
@@ -32,7 +32,7 @@ if(JOB_QT)
     add_subdirectory(qzstd)                 # fully cross platform | not tested on hardware for win32
 
     add_subdirectory(qsd)                   # fully cross platform | not tested on hardware for win32
-    add_subdirectory(qllama)                # fully cross platform | not tested on hardware for win32 | NOTE: I got towards the end of this and only exposed (get it working now deal) so much. This should be refactored to soon to "really" expose the whole lamma_cpp deal.
+    # add_subdirectory(qllama)                # fully cross platform | not tested on hardware for win32 | NOTE: I got towards the end of this and only exposed (get it working now deal) so much. This should be refactored to soon to "really" expose the whole lamma_cpp deal.
 
     # These are 99% done need package manager so that the session manager has that.
     # once the session manager has that the stack is 100% free.

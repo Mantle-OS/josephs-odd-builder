@@ -2,14 +2,20 @@
 
 #include <QObject>
 #include <QQmlEngine>
+
 #include <stable-diffusion.h>
+
 #include "qsdbaseparam.h"
-class QSdAudio : public QSdBaseParam
+#include "qmlsd_export.h"
+
+
+// NOT TESTED YET
+class QMLSD_EXPORT QSdAudio : public QSdBaseParam
 {
     Q_OBJECT
-    QP_RW(quint32,  sampleRate,      0)
-    QP_RW(quint32,  channels,        0)
-    QP_RW(quint64,  sampleCount,     0)
+    QP_RW(quint32,  sampleRate,      0) // The audio sample rate in Hz (e.g., 16000, 44100).
+    QP_RW(quint32,  channels,        0) // The number of audio channels (e.g., 1 for mono, 2 for stereo).
+    QP_RW(quint64,  sampleCount,     0) // The total number of float samples in the data buffer.
 
     // Q_PROPERTY(float *data READ data NOTIFY dataChanged FINAL) // ## not really for QML land
 

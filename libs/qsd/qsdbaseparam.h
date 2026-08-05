@@ -11,7 +11,8 @@
 #include <yaml-cpp/yaml.h>
 #include <property-macros.h>
 
-class QSdBaseParam : public QObject
+#include "qmlsd_export.h"
+class QMLSD_EXPORT QSdBaseParam : public QObject
 {
     Q_OBJECT
     QP_RW(QString,        lastErrorString,    ""          )

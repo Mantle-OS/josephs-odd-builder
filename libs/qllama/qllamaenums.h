@@ -12,25 +12,25 @@
 #include <pointer-macros.h>
 
 #include <qmlstringlist.h>
-
-class QLlamaEnums : public QObject
+#include "qllama_export.h"
+class QLLAMA_EXPORT QLlamaEnums : public QObject
 {
     Q_OBJECT
-    // 1)  create the pointer mappings as a stringList
-    QP_PTR_RO(QmlStringList, vocabTypesList)
-    QP_PTR_RO(QmlStringList, ropeTypesList)
-    QP_PTR_RO(QmlStringList, tokenTypesList)
-    QP_PTR_RO(QmlStringList, tokenAttrsList)
-    QP_PTR_RO(QmlStringList, fileTypesList)
-    QP_PTR_RO(QmlStringList, ropeScalingTypesList)
-    QP_PTR_RO(QmlStringList, poolingTypesList)
-    QP_PTR_RO(QmlStringList, attentionTypesList)
-    QP_PTR_RO(QmlStringList, flashAttnTypesList)
-    QP_PTR_RO(QmlStringList, splitModesList)
-    QP_PTR_RO(QmlStringList, contextTypesList)
-    QP_PTR_RO(QmlStringList, kvOverrideTypesList)
-    QP_PTR_RO(QmlStringList, modelMetaKeysList)
-    QP_PTR_RO(QmlStringList, vocabPreTypesList)
+    // 1)  create the pointer mappings as a stringList    
+    QP_PTR_RO(QmlStringList, vocabTypesList       ) // Human-readable llama vocabulary implementations for selection and inspection.
+    QP_PTR_RO(QmlStringList, ropeTypesList        ) // Human-readable rotary-position embedding layouts supported by llama.cpp.
+    QP_PTR_RO(QmlStringList, tokenTypesList       ) // Human-readable vocabulary token classifications.
+    QP_PTR_RO(QmlStringList, tokenAttrsList       ) // Human-readable token attribute flags; individual values may be combined.
+    QP_PTR_RO(QmlStringList, fileTypesList        ) // Human-readable model tensor and quantization file types.
+    QP_PTR_RO(QmlStringList, ropeScalingTypesList ) // Human-readable RoPE scaling strategies.
+    QP_PTR_RO(QmlStringList, poolingTypesList     ) // Human-readable embedding pooling strategies.
+    QP_PTR_RO(QmlStringList, attentionTypesList   ) // Human-readable causal and non-causal attention modes.
+    QP_PTR_RO(QmlStringList, flashAttnTypesList   ) // Human-readable Flash Attention selection modes.
+    QP_PTR_RO(QmlStringList, splitModesList       ) // Human-readable multi-device model split strategies.
+    QP_PTR_RO(QmlStringList, contextTypesList     ) // Human-readable context execution types.
+    QP_PTR_RO(QmlStringList, kvOverrideTypesList  ) // Human-readable metadata override value types.
+    QP_PTR_RO(QmlStringList, modelMetaKeysList    ) // Human-readable model metadata keys used for sampler defaults.
+    QP_PTR_RO(QmlStringList, vocabPreTypesList    ) // Human-readable vocabulary pre-tokenizer implementations.
     QML_ELEMENT
     QML_SINGLETON
 public:

@@ -115,10 +115,10 @@ set(JOB_SCIENCE_SOLVERS_HEADERS
     solvers/job_euler_integrator.h
 
     #
-    solvers/job_fmm_utils.h #new
-    solvers/job_fmm_concepts.h # new
-    solvers/job_fmm_kernel.h # new
-    solvers/job_fmm_integrator.h # new
+    solvers/job_fmm_utils.h
+    solvers/job_fmm_concepts.h
+    solvers/job_fmm_kernel.h
+    solvers/job_fmm_integrator.h
 )
 
 add_library(JosephsOddBuilder_Science SHARED

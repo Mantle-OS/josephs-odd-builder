@@ -41,7 +41,7 @@ TEST_CASE("TcpClient and TcpServer Full Echo Test", "[tcp_client_server][async][
 
     // Weak capture: this lambda is stored as client->onMessage, so capturing `client`
     // by value would make it hold a strong reference to itself through its own
-    // callback — same leak pattern fixed in TcpServer/UnixServer/the genome test
+    // callback same leak pattern fixed in TcpServer/UnixServer/the genome test
     // earlier in this session.
     std::weak_ptr<TcpClient> weakClient = client;
 

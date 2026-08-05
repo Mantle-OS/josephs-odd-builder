@@ -6,6 +6,7 @@
 #include "isocket_io.h"
 #include "job_socket_error.h"
 #include "jobnet_export.h"
+
 namespace job::net {
 class JOBNET_EXPORT TcpSocket : public ISocketIO {
 public:

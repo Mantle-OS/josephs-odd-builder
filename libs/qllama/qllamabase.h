@@ -9,7 +9,8 @@
 #include <qjsondocument.h>
 #include <yaml-cpp/yaml.h>
 
-class QLlamaBase : public QObject
+#include "qllama_export.h"
+class QLLAMA_EXPORT QLlamaBase : public QObject
 {
     Q_OBJECT
     QP_RW(QString,        lastErrorString,    ""          )

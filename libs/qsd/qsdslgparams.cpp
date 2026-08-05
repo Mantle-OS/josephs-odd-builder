@@ -8,8 +8,7 @@ QSdSlgParams::QSdSlgParams(QObject *parent) :
 
 QSdSlgParams::~QSdSlgParams()
 {
-    resetSlgParams();
-
+    m_slgParams = { nullptr, 0,  0.01f, 0.2f, 0.f };
     // [[RECHECK LATER WRITE INTO UNIT TEST]]I am not sure about ownershitp here some back later to this
     if(m_layers)
         m_layers = nullptr;

@@ -40,11 +40,15 @@ void QSdTilingParams::setTilingParams(sd_tiling_params_t  other)
     set_targetOverlap(other.target_overlap);
     set_relSizeX(other.rel_size_x);
     set_relSizeY(other.rel_size_y);
-    set_extraTilingArgs(QString::fromLatin1(other.extra_tiling_args));
+
+    tmp_extraTilingArgs = QByteArray(other.extra_tiling_args);
+    set_extraTilingArgs(QString::fromLatin1(tmp_extraTilingArgs));
+
 }
 
 void QSdTilingParams::resetTilingParams()
 {
     m_tilingParams = { false, false, 0, 0, 0.5f, 0.0f, 0.0f, nullptr };
     m_extraTilingArgs.clear();
+    setTilingParams(m_tilingParams);
 }

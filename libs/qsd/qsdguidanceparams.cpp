@@ -4,17 +4,22 @@ QSdGuidanceParams::QSdGuidanceParams(QObject *parent) :
     QSdBaseParam{parent},
     m_slg{new QSdSlgParams{this}}
 {
+
+    // This will start to get confusing on ownership ....
     // m_slg->setSlgParams(&m_guidanceParams->slg); // This was used in init propagation testing, keeping for now
     resetGuidanceParams();
 }
 
 QSdGuidanceParams::~QSdGuidanceParams()
 {
-    resetGuidanceParams();
-    if(m_slg){
+
+    m_guidanceParams.txt_cfg = 7.0f;
+    m_guidanceParams.img_cfg = qInf();
+    m_guidanceParams.distilled_guidance = 3.5f;
+
+    if(m_slg)
         delete m_slg;
-        m_slg = nullptr;
-    }
+    m_slg = nullptr;
 }
 
 sd_guidance_params_t QSdGuidanceParams::guidanceParams()
@@ -39,8 +44,8 @@ void QSdGuidanceParams::setGuidanceParams(sd_guidance_params_t other)
 
 void QSdGuidanceParams::resetGuidanceParams()
 {
-    set_txtCfg(8.0f);
-    set_imgCfg(INFINITY); // againn this should be a constexpres or whatever [[TODO]]
+    set_txtCfg(7.0f);
+    set_imgCfg(qInf());
     set_distilledGuidance(3.5f);
     m_slg->resetSlgParams();
 }

@@ -11,7 +11,7 @@ add_executable(test_job_science
     frames/test_frame_utils.cpp
     frames/test_frame_header.cpp
     frames/test_frame_file_serializer.cpp
-
+    ## THESE ONES
     solvers/test_verlet_integrator.cpp
     solvers/test_barnes_hut.cpp
     solvers/test_stencils.cpp

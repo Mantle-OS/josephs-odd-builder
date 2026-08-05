@@ -171,7 +171,7 @@ prediction_t QSdEnums::sdPredictionType(const QSdPredictionTypes &type)
     return static_cast<prediction_t>(type);
 }
 
-QString QSdEnums::schedulerTypeName(QSdPredictionTypes type)
+QString QSdEnums::predictionTypesName(QSdPredictionTypes type)
 {
     if(m_predictionTypesMap.contains(type))
         return m_predictionTypesMap[type];

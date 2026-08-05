@@ -18,15 +18,17 @@
 #include "qsdimggenparams.h"
 #include "qsdvidgenparams.h"
 
-// Alpha code not fully implementeed yet ..
+#include "qmlsd_export.h"
 
+// this might need more .....
 struct SdGenerationResult {
     sd_image_t* resultImages = nullptr;
     QSdImage* targetImageElement = nullptr;
     bool triggerAutoSave = false;
 };
 
-class QSD : public QObject
+
+class QMLSD_EXPORT QSD : public QObject
 {
     Q_OBJECT
     Q_PROPERTY(qint32   numPhysicalCores    READ numPhysicalCores   NOTIFY numPhysicalCoresChanged  FINAL   )
@@ -48,13 +50,26 @@ class QSD : public QObject
     QP_PTR_RO(QSdVidGenParams,                   VideoGenerationParams                                      ) // inherits QSdBaseParam
     QP_PTR_RO(ObjectListModel<QSdBackendDevice>, Backend                                                    ) // QSdBackendDevice inherits QSdBaseParam
 
-
+    // add th
     QML_ELEMENT
     QML_SINGLETON
 
 public:
     explicit QSD(QObject *parent = nullptr);
     ~QSD();
+
+    enum QSDState{
+        Starting = 0,
+        Idel,
+        Running,
+        Finished,
+
+        Unknown = 99,
+
+    };
+    Q_ENUMS(QSDState)
+
+
 
     static void progressionCallback(int step, int steps, float time, void *data)
     {
@@ -69,8 +84,6 @@ public:
 
     static void loggingCallback(enum sd_log_level_t level, const char *text, void* data)
     {
-
-
         QSD *ctx = static_cast<QSD *>(data);
         if (!ctx)
             return;
@@ -91,11 +104,7 @@ public:
             qErrnoWarning(text);
             break;
         }
-
-
-
-        qDebug() << log;
-
+        // qDebug() << log;
     }
 
 
@@ -207,6 +216,7 @@ Q_SIGNALS:
     void totalStepsChanged();
     void progressionTimeChanged();
 
+    void stateChanged(QSD::QSDState state);
 private:
     void setNumPhysicalCores();
     void setSystemInfo();

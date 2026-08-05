@@ -8,11 +8,11 @@ QSdAudio::QSdAudio(QObject *parent) :
 
 QSdAudio::~QSdAudio()
 {
-    resetAudio();
-    if(m_data) {
-        delete m_data;
+    if (m_data) {
+        delete[] m_data; // Use free(m_data) if stable-diffusion.h uses malloc!
         m_data = nullptr;
     }
+    resetAudio();
 }
 
 sd_audio_t QSdAudio::audio()

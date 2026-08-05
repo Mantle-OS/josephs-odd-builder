@@ -19,6 +19,7 @@ QSD::QSD(QObject *parent) :
     sd_set_log_callback(loggingCallback, (void*)this);
 
     auto s = m_ContextParams->ctxParams();
+    Q_EMIT stateChanged(Starting);
     m_ctx = new_sd_ctx(&s);
     if(m_ctx){
         qDebug() << "SD main backend done.";
@@ -29,6 +30,7 @@ QSD::QSD(QObject *parent) :
     connect(&m_imageWatcher, &QFutureWatcher<sd_image_t*>::finished,
             this, &QSD::onGenerationFinished);
 
+    Q_EMIT stateChanged(Idel);
 }
 
 QSD::~QSD()
@@ -71,7 +73,8 @@ qint32 QSD::numPhysicalCores() const
 void QSD::setNumPhysicalCores()
 {
     qint32 newNumPhysicalCores = sd_get_num_physical_cores();
-    if (m_numPhysicalCores == newNumPhysicalCores) return;
+    if (m_numPhysicalCores == newNumPhysicalCores)
+        return;
     m_numPhysicalCores = newNumPhysicalCores;
     Q_EMIT numPhysicalCoresChanged();
 }
@@ -84,7 +87,8 @@ QString QSD::systemInfo() const
 void QSD::setSystemInfo()
 {
     QString  newSystemInfo = QString::fromLatin1(sd_get_system_info());
-    if (m_systemInfo == newSystemInfo) return;
+    if (m_systemInfo == newSystemInfo)
+        return;
     m_systemInfo = newSystemInfo;
     Q_EMIT systemInfoChanged();
 }
@@ -97,7 +101,8 @@ QString QSD::sdVersion() const
 void QSD::setSdVersion()
 {
     QString  newSdVersion = QString::fromLatin1(sd_version());
-    if (m_sdVersion == newSdVersion) return;
+    if (m_sdVersion == newSdVersion)
+        return;
     m_sdVersion = newSdVersion;
     Q_EMIT sdVersionChanged();
 }
@@ -110,7 +115,8 @@ QString QSD::sdCommit() const
 void QSD::setSdCommit()
 {
     QString newSdCommit = QString::fromLatin1(sd_commit());
-    if (m_sdCommit == newSdCommit) return;
+    if (m_sdCommit == newSdCommit)
+        return;
     m_sdCommit = newSdCommit;
     Q_EMIT sdCommitChanged();
 }
@@ -148,7 +154,8 @@ float QSD::progressionTime() const
 
 void QSD::setProgressionTime(float newProgressionTime)
 {
-    if (qFuzzyCompare(m_progressionTime, newProgressionTime)) return;
+    if (qFuzzyCompare(m_progressionTime, newProgressionTime))
+        return;
     m_progressionTime = newProgressionTime;
     Q_EMIT progressionTimeChanged();
 }
@@ -173,9 +180,7 @@ QSdEnums::QSdSampleTypes QSD::getDefaultSampleMethod()
 QSdEnums::QSdSchedulerTypes QSD::getDefaultScheduler(QSdEnums::QSdSampleTypes type)
 {
     if(m_ctx)
-        return QSdEnums::qsdSchedulerType(
-            sd_get_default_scheduler(m_ctx, QSdEnums::sdSampleType(type))
-            );
+        return QSdEnums::qsdSchedulerType( sd_get_default_scheduler(m_ctx, QSdEnums::sdSampleType(type)));
 
     return QSdEnums::QSdDiscrete;
 }
@@ -183,9 +188,7 @@ QSdEnums::QSdSchedulerTypes QSD::getDefaultScheduler(QSdEnums::QSdSampleTypes ty
 void QSD::generateImage(QSdImage *outImage, bool autoSave)
 {
 
-
-
-
+    Q_EMIT stateChanged(Running);
     if (outImage)
         m_que.append(outImage);
 
@@ -210,8 +213,7 @@ void QSD::generateImage(QSdImage *outImage, bool autoSave)
     if (!m_ctx || !m_ImageGenerationParams)
         return;
 
-    sd_img_gen_params_t params =
-        m_ImageGenerationParams->imgGenParms();
+    sd_img_gen_params_t params = m_ImageGenerationParams->imgGenParms();
 
     qDebug() << "sample_method =" << params.sample_params.sample_method
              << "scheduler =" << params.sample_params.scheduler
@@ -227,6 +229,7 @@ void QSD::generateImage(QSdImage *outImage, bool autoSave)
              << "seed =" << params.seed
              << "batch_count =" << params.batch_count;
 
+    // could Q_EMIT generationStared or whatever
     // sd_img_gen_params_t stableParamsSnapshot = m_ImageGenerationParams->imgGenParms();
     QFuture<SdGenerationResult> future = QtConcurrent::run(
         &QSD::runImageGenerationWorker,
@@ -326,4 +329,8 @@ void QSD::onGenerationFinished()
         free_sd_ctx(m_ctx);
         m_ctx = nullptr;
     }
+
+    Q_EMIT stateChanged(Finished);
+
+    Q_EMIT stateChanged(Idel);
 }

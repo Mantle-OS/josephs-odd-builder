@@ -20,4 +20,4 @@ if(JOB_CUDA)
     add_subdirectory(job_cuda)
 endif()
 
-# add_subdirectory(job_ggml)
+add_subdirectory(job_ggml)

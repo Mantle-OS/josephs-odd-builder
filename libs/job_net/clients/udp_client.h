@@ -9,8 +9,9 @@
 #include "job_url.h"
 #include "resolve/job_ipaddr.h"
 #include "resolve/job_resolver.h"
+#include "jobnet_export.h"
 namespace job::net {
-class UdpClient {
+class JOBNET_EXPORT UdpClient {
 public:
     using Ptr = std::shared_ptr<UdpClient>;
     explicit UdpClient(threads::JobIoAsyncThread::Ptr loop, JobResolver::Ptr resolver = nullptr, uint16_t buffer_size = 4096);

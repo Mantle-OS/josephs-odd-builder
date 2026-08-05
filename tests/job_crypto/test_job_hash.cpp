@@ -12,7 +12,7 @@
 #include <sodium.h>
 
 #include "job_hash.h"
-#include "transient_test_file.h"
+#include "../transient_test_file.h"
 
 using namespace job::crypto;
 

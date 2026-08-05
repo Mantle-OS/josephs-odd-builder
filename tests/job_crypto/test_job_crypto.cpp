@@ -11,7 +11,7 @@
 #include "job_crypto.h"
 #include "job_secure_mem.h"
 #include "job_crypto_utils.h"
-#include "transient_test_file.h"
+#include "../transient_test_file.h"
 
 using namespace job::crypto;
 

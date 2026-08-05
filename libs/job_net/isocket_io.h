@@ -9,6 +9,7 @@
 // threads
 #include <job_io_async_thread.h>
 #include <job_logger.h>
+#include <job_assert.h>
 #include "job_url.h"
 #include "resolve/job_ipaddr.h"
 #include "resolve/job_resolver.h"
@@ -47,7 +48,6 @@ public:
     virtual ~ISocketIO() = default;
 
     virtual bool connectToHost(const JobIpAddr &ipaddr) = 0;
-
     virtual bool connectToHost(const JobUrl &url)
     {
         if (!m_resolver) {
@@ -109,6 +109,28 @@ public:
 
     void setResolver(JobResolver::Ptr resolver) { m_resolver = std::move(resolver); }
     [[nodiscard]] JobResolver::Ptr resolver() const noexcept { return m_resolver; }
+
+    [[nodiscard]] virtual bool setEvents(threads::IOEvent events) noexcept
+    {
+        if (m_fd < 0) {
+            JOB_LOG_ERROR("[ISocketIO] fd is invalid");
+            return false;
+        }
+
+        const auto loop = m_loop.lock();
+
+        if (!loop) {
+            JOB_LOG_ERROR("[ISocketIO] event loop is invalid");
+            return false;
+        }
+
+        if (!loop->modifyFD(m_fd, events)) [[unlikely]] {
+            JOB_LOG_ERROR("[ISocketIO] Failed to modify events for fd {}", m_fd);
+            return false;
+        } else {
+            return true;
+        }
+    }
 
     std::function<void()> onConnect;
     std::function<void(const char*, size_t)> onRead;

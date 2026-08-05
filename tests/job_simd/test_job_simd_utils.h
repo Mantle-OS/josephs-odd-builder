@@ -53,7 +53,7 @@ inline void sweepAndCheckMaxError(ApproxFn approxFn, ReferenceFn refFn,
 }
 
 
-#ifdef JOB_TEST_BENCHMARKS
+// #ifdef JOB_TEST_BENCHMARKS
 
 
 template <typename ApproxFn, typename ReferenceFn>
@@ -350,7 +350,7 @@ inline f32 benchTileLog(float* __restrict__ data, size_t stride)
 
     return sum;
 }
-#endif // JOB_TEST_BENCHMARKS
+// #endif // JOB_TEST_BENCHMARKS
 
 
 
