@@ -20,7 +20,7 @@ elseif(APPLE)
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     set(JOB_LINUX ON)
     add_compile_definitions(JOB_LINUX)
-    include(cmake/linux/check_hardware_linux.cmake)
+    include(cmake/linux/check_hardware_linux.cmake)  ## HERE this is new
 elseif(CMAKE_SYSTEM_NAME MATCHES "FreeBSD")
     set(JOB_FREE_BSD ON)
     add_compile_definitions(JOB_FREE_BSD)

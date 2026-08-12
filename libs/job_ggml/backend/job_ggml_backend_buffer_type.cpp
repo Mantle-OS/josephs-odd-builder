@@ -8,11 +8,8 @@ namespace job::ggml {
 JobGgmlBackendBufferType::JobGgmlBackendBufferType(ggml_backend_buffer_type_t bufferType) :
     m_bufferType{bufferType}
 {
-    if (!m_bufferType) {
-        throw std::invalid_argument{
-            "JobGgmlBackendBufferType requires a valid ggml_backend_buffer_type_t"
-        };
-    }
+    if (!m_bufferType)
+        throw std::invalid_argument{ "JobGgmlBackendBufferType requires a valid ggml_backend_buffer_type_t" };
 
     const char *nativeName = ggml_backend_buft_name(m_bufferType);
     setName(nativeName ? nativeName : "unknown");
@@ -67,75 +64,23 @@ void JobGgmlBackendBufferType::setIsHost(bool isHost) noexcept
         m_isHost = isHost;
 }
 
-// ggml_backend_buffer_ptr JobGgmlBackendBufferType::allocateBuffer(std::size_t size) const
-// {
-//     if (!isValid()) {
-//         throw std::runtime_error{
-//             "Cannot allocate a buffer from an invalid GGML backend buffer type"
-//         };
-//     }
-
-//     if (size == 0) {
-//         throw std::invalid_argument{
-//             "allocateBuffer requires a size greater than zero"
-//         };
-//     }
-
-//     if (m_maxSize > 0 && size > m_maxSize) {
-//         throw std::length_error{
-//             "Requested GGML backend buffer exceeds the maximum supported size"
-//         };
-//     }
-
-//     ggml_backend_buffer_ptr buffer{
-//         ggml_backend_buft_alloc_buffer(
-//             m_bufferType,
-//             size
-//             )
-//     };
-
-//     if (!buffer) {
-//         throw std::runtime_error{
-//             "Failed to allocate a GGML backend buffer"
-//         };
-//     }
-
-//     return buffer;
-// }
-
 std::unique_ptr<JobGgmlBackendBuffer> JobGgmlBackendBufferType::allocateBuffer(std::size_t size) const
 {
-    if (!isValid()) {
-        throw std::runtime_error{
-            "Cannot allocate a buffer from an invalid GGML backend buffer type"
-        };
-    }
+    if (!isValid())
+        throw std::runtime_error{ "Cannot allocate a buffer from an invalid GGML backend buffer type" };
 
-    if (size == 0) {
-        throw std::invalid_argument{
-            "allocateBuffer requires a size greater than zero"
-        };
-    }
+    if (size == 0)
+        throw std::invalid_argument{ "allocateBuffer requires a size greater than zero" };
 
-    if (m_maxSize > 0 &&
-        size > m_maxSize) {
-        throw std::length_error{
-            "Requested GGML backend buffer exceeds the maximum supported size"
-        };
-    }
+    if (m_maxSize > 0 && size > m_maxSize)
+        throw std::length_error{ "Requested GGML backend buffer exceeds the maximum supported size" };
 
     ggml_backend_buffer_ptr nativeBuffer{
-        ggml_backend_buft_alloc_buffer(
-            m_bufferType,
-            size
-            )
+        ggml_backend_buft_alloc_buffer(m_bufferType, size)
     };
 
-    if (!nativeBuffer) {
-        throw std::runtime_error{
-            "Failed to allocate a GGML backend buffer"
-        };
-    }
+    if (!nativeBuffer)
+        throw std::runtime_error{ "Failed to allocate a GGML backend buffer" };
 
     return std::make_unique<JobGgmlBackendBuffer>(std::move(nativeBuffer));
 }

@@ -1,10 +1,10 @@
 #include "test_loop.h"
 #include "../transient_test_file.h"
 
-#ifdef JOB_TEST_BENCHMARKS
+// #ifdef JOB_TEST_BENCHMARKS
 #include <catch2/benchmark/catch_benchmark.hpp>
 #include <stdexcept>
-#endif
+// #endif
 
 #include <atomic>
 #include <chrono>
@@ -133,7 +133,7 @@ struct LocalIdentity {
 
 
 
-#ifdef JOB_TEST_BENCHMARKS
+// #ifdef JOB_TEST_BENCHMARKS
 
 
 
@@ -297,7 +297,7 @@ struct LocalIdentity {
     return succeeded;
 }
 
-#endif
+// #endif
 
 
 } // namespace
@@ -673,8 +673,7 @@ TEST_CASE("SslClient rejects an untrusted server certificate",
     REQUIRE_FALSE(reportedSslErrorString.empty());
 }
 
-TEST_CASE("SslServer stop disconnects active encrypted clients",
-          "[job_net][ssl_client][ssl_server][edge][shutdown]")
+TEST_CASE("SslServer stop disconnects active encrypted clients", "[job_net][ssl_client][ssl_server][edge][shutdown]")
 {
     TestLoop loop;
     LocalIdentity identity;
@@ -802,7 +801,7 @@ TEST_CASE("SslServer stop disconnects active encrypted clients",
  * Block three: benchmarks and stress
  */
 
-#ifdef JOB_TEST_BENCHMARKS
+// #ifdef JOB_TEST_BENCHMARKS
 
 TEST_CASE("SslClient and SslServer encrypted echo performance", "[job_net][ssl_client][ssl_server][benchmark]")
 {
@@ -840,4 +839,4 @@ TEST_CASE("SslClient and SslServer repeated TLS lifecycles remain stable", "[job
     }
 }
 
-#endif
+// #endif

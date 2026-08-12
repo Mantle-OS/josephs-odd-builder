@@ -310,7 +310,7 @@ Pane {
 
             QSdImage {
                 id: outputImage
-                visible: !isGenerating.running
+                // visible: !isGenerating.running
                 Layout.fillWidth: true
                 Layout.fillHeight: true
             }

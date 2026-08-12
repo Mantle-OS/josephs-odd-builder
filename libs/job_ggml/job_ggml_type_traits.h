@@ -60,6 +60,8 @@ public:
     [[nodiscard]] bool canConvertToFloat() const noexcept;
     [[nodiscard]] bool canConvertFromFloat() const noexcept;
 
+
+
     void convertToFloat(const void *source, float *destination, std::int64_t elementCount) const;
     void convertFromFloatReference(const float *source, void *destination, std::int64_t elementCount) const;
     void setTypeTraits(const struct ggml_type_traits *typeTraits, enum ggml_type type);
@@ -70,6 +72,54 @@ public:
 
     [[nodiscard]] static constexpr JobGgmlType fromGgmlType(enum ggml_type type) noexcept { return static_cast<JobGgmlType>(type); }
     [[nodiscard]] static constexpr enum ggml_type toGgmlType(JobGgmlType type) noexcept { return static_cast<enum ggml_type>(type); }
+
+
+    // IEEE 754-2008 half-precision float16
+    [[nodiscard]] static float fp16ToFp32(ggml_fp16_t value) noexcept
+    {
+        return ggml_fp16_to_fp32(value);
+    }
+
+    [[nodiscard]] static ggml_fp16_t fp32ToFp16(float value) noexcept
+    {
+        return ggml_fp32_to_fp16(value);
+    }
+
+    static void fp16ToFp32Row(const ggml_fp16_t *source, float *destination, std::int64_t count)
+    {
+        ggml_fp16_to_fp32_row(source, destination, count);
+    }
+
+    static void fp32ToFp16Row(const float *source, ggml_fp16_t *destination, std::int64_t count)
+    {
+        ggml_fp32_to_fp16_row(source, destination, count);
+    }
+
+    // Google Brain bfloat16
+    [[nodiscard]] static ggml_bf16_t fp32ToBf16(float value) noexcept
+    {
+        return ggml_fp32_to_bf16(value);
+    }
+
+    [[nodiscard]] static float bf16ToFp32(ggml_bf16_t value) noexcept
+    {
+        return ggml_bf16_to_fp32(value);
+    }
+
+    static void bf16ToFp32Row(const ggml_bf16_t *source, float *destination, std::int64_t count)
+    {
+        ggml_bf16_to_fp32_row(source, destination, count);
+    }
+
+    static void fp32ToBf16RowRef(const float *source, ggml_bf16_t *destination, std::int64_t count)
+    {
+        ggml_fp32_to_bf16_row_ref(source, destination, count);
+    }
+
+    static void fp32ToBf16Row(const float *source, ggml_bf16_t *destination, std::int64_t count)
+    {
+        ggml_fp32_to_bf16_row(source, destination, count);
+    }
 
 private:
     void fillTypeTraits();

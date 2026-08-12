@@ -49,10 +49,10 @@ class QMLSD_EXPORT QSdCtxParams : public QSdBaseParam
     //
     QP_PTR_RO(ObjectListModel<QSdEmbedding>,    embeddings                                                      ) // MVC List of active textual inversion embeddings.
     //
-    QP_RW(int,                                  numberOfThreads,                0                               ) // CPU threads to allocate for processing (0 = auto).
+    QP_RW(int,                                  numberOfThreads,                sd_get_num_physical_cores()     ) // CPU threads to allocate for processing (0 = auto).
     QP_RW(int,                                  chromaT5MaskPad,                1                               ) // Padding size for T5 masks in Chroma models.
     //
-    QP_RW(QString,                              maxVram,                        "0"                             ) // GiB budget for graph-cut segmented param offload (0 = disabled, -1 = auto free VRAM minus 1 GiB).
+    QP_RW(QString,                              maxVram,                        ""                              ) // GiB budget for graph-cut segmented param offload (0 = disabled, -1 = auto free VRAM minus 1 GiB).
     //
     QP_RW(bool,                                 enableMmap,                     false                           ) // Use memory mapping to load models instantly (requires weights to stay on disk).
     QP_RW(bool,                                 flashAttn,                      false                           ) // Enable Flash Attention for massive memory savings and speedups.

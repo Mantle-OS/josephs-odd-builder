@@ -75,7 +75,7 @@ if(BUILD_SHARED_LIBS)
     qt_add_library(qml-stable-diffusion SHARED)
 else()
     qt_add_library(qml-stable-diffusion STATIC)
-    add_compile_definitions(qml-stable-diffusion QSD_STATIC_DEFINE)
+    add_compile_definitions(QSD_STATIC_DEFINE)
 endif()
 
 qt_add_qml_module(qml-stable-diffusion
@@ -119,11 +119,13 @@ target_link_libraries(qml-stable-diffusion
         Qt6::Qml
         qt-ai-utils
         qml-ai-utils
+        JosephsOddBuilder_Core
     PRIVATE
         ${YAMLCpp_LIBRARIES}
         $<BUILD_INTERFACE:stable-diffusion>
         $<BUILD_INTERFACE:ggml>
         Qt6::Concurrent
+        JosephsOddBuilder_Simd
 )
 
 set(QML_SD_INSTALL_DIR "${QML_INSTALL_DIR}/QmlSd")

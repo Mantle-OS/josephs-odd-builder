@@ -43,10 +43,7 @@ void *JobGgmlBackendReg::procAddress(const std::string &name) const noexcept
     if (name.empty())
         return nullptr;
 
-    return ggml_backend_reg_get_proc_address(
-        m_backendReg,
-        name.c_str()
-        );
+    return ggml_backend_reg_get_proc_address(m_backendReg, name.c_str());
 }
 
 ggml_backend_reg_t JobGgmlBackendReg::backendReg() const noexcept

@@ -44,24 +44,15 @@ public:
      * Borrowed object views.
      * These wrappers never free their native objects. The native aggregate stored in m_graphCopy remains the sole owner and must outlive every returned view.
      */
-    [[nodiscard]] JobGgmlBackendBufferView::UPtr
-    bufferObject() const;
+    [[nodiscard]] JobGgmlBackendBufferView::UPtr bufferObject() const;
+    [[nodiscard]] JobGgmlContextView::UPtr allocatedContextObject() const;
+    [[nodiscard]] JobGgmlContextView::UPtr unallocatedContextObject() const;
+    [[nodiscard]] JobGgmlCGraph::UPtr graphObject() const;
 
-    [[nodiscard]] JobGgmlContextView::UPtr
-    allocatedContextObject() const;
-
-    [[nodiscard]] JobGgmlContextView::UPtr
-    unallocatedContextObject() const;
-
-    [[nodiscard]] JobGgmlCGraph::UPtr
-    graphObject() const;
-
-    // Native escape hatches. All returned pointers are borrowed from m_graphCopy.
     [[nodiscard]] ggml_backend_buffer_t buffer() const noexcept;
 
     [[nodiscard]] ggml_context *allocatedContext() noexcept;
-    [[nodiscard]] const ggml_context *
-    allocatedContext() const noexcept;
+    [[nodiscard]] const ggml_context * allocatedContext() const noexcept;
 
     [[nodiscard]] ggml_context *unallocatedContext() noexcept;
     [[nodiscard]] const ggml_context *
@@ -70,18 +61,12 @@ public:
     [[nodiscard]] ggml_cgraph *graph() noexcept;
     [[nodiscard]] const ggml_cgraph *graph() const noexcept;
 
-    [[nodiscard]] const struct ggml_backend_graph_copy &
-    graphCopy() const noexcept;
+    [[nodiscard]] const struct ggml_backend_graph_copy &graphCopy() const noexcept;
 
     void reset() noexcept;
 
 private:
-    /*
-     * Owned as one aggregate and released only through
-     * ggml_backend_graph_copy_free().
-     * Its native members must never be placed into independently owning JOB wrappers.
-     */
-    struct ggml_backend_graph_copy m_graphCopy{};
+    struct ggml_backend_graph_copy m_graphCopy{}; // Owned as one aggregate and released only through ggml_backend_graph_copy_free(). Its native members must never be placed into independently owning JOB wrappers.
 };
 
 } // namespace job::ggml

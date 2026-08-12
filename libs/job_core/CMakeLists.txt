@@ -7,7 +7,9 @@ project(JosephOddBuild_Core
 set(JOBCORE_SOURCES
     job_logger.cpp
     job_timer.cpp
+    job_siphash.cpp
 )
+
 set(JOBCORE_HEADERS
     crc32.h
     endian_utils.h
@@ -17,6 +19,13 @@ set(JOBCORE_HEADERS
     job_assert.h
     split_mix64.h
     aligned_allocator.h
+    job_siphash.h
+    job_container_concept.h
+    job_list.h
+    job_hash_container.h
+    job_map.h
+    job_obj_hash_concept.h
+    job_obj_hash.h
 )
 
 add_library(JosephsOddBuilder_Core SHARED
@@ -44,6 +53,13 @@ target_include_directories(JosephsOddBuilder_Core PUBLIC
     ## export file
     $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
 )
+
+target_link_libraries(JosephsOddBuilder_Core PUBLIC JosephsOddBuilder_Simd)
+
+if(JOB_WINDOWS)
+    ## siphash
+    target_link_libraries(JosephsOddBuilder_Core PRIVATE bcrypt )
+endif()
 
 install(TARGETS JosephsOddBuilder_Core
     EXPORT JosephsOddBuilderCoreTargets

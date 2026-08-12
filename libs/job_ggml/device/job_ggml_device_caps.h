@@ -17,8 +17,15 @@ public:
     explicit JobGgmlDeviceCaps(ggml_backend_dev_caps caps);
     ~JobGgmlDeviceCaps() = default;
 
-    [[nodiscard]] static Ptr  createShared(ggml_backend_dev_caps caps) { return std::make_shared<JobGgmlDeviceCaps>(caps); }
-    [[nodiscard]] static UPtr createUniq(ggml_backend_dev_caps caps)   { return std::make_unique<JobGgmlDeviceCaps>(caps); }
+    [[nodiscard]] static Ptr  createShared(ggml_backend_dev_caps caps)
+    {
+        return std::make_shared<JobGgmlDeviceCaps>(caps);
+    }
+
+    [[nodiscard]] static UPtr createUniq(ggml_backend_dev_caps caps)
+    {
+        return std::make_unique<JobGgmlDeviceCaps>(caps);
+    }
 
     JobGgmlDeviceCaps(const JobGgmlDeviceCaps &) = delete;
     JobGgmlDeviceCaps &operator=(const JobGgmlDeviceCaps &) = delete;
@@ -50,11 +57,11 @@ private:
         return {false, false, false, false};
     }
 
-    ggml_backend_dev_caps m_caps{defaultCaps()}; // Upstream tracker.
-    bool                  m_async{false};        // Supports asynchronous operations.
-    bool                  m_hostBuffer{false};   // Supports pinned host buffers.
-    bool                  m_bufferFromHostPtr{false}; // Supports creating buffers from host pointers.
-    bool                  m_events{false};       // Supports backend event synchronization.
+    ggml_backend_dev_caps m_caps{defaultCaps()};
+    bool                  m_async{false};
+    bool                  m_hostBuffer{false};
+    bool                  m_bufferFromHostPtr{false};
+    bool                  m_events{false};
 };
 
 } // namespace job::ggml

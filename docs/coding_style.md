@@ -344,8 +344,8 @@ This section governs how code bridges boundaries—both compiler boundaries (Tra
 Headers are blueprints meant for sharing identical definitions across translation units. 
 They must never pollute or fragment the global space, nor trigger duplicate storage states.
 
-*   **Banned: Anonymous Namespaces in Headers.** 
-Never place an anonymous (unnamed) namespace inside a header file (`Rule SF.22`). 
+*   **Banned: Anonymous Namespaces** 
+Never place an anonymous (unnamed) namespace inside a header (OR ANYWHERE) file (`Rule SF.22`). 
 It forces internal linkage, creating isolated duplicate copies of objects and functions in every translation unit that includes it, 
 leading to hidden ODR (One Definition Rule) violations and massive code bloat.
 *   **Banned: `static` Global Variables in Headers.** Similar to anonymous namespaces, marking a non-templated variable as `static` in a header creates a unique instance per translation unit. 

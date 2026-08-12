@@ -12,9 +12,9 @@ set(JOBSIMD_HEADERS
     transpose.h
     simd_provider.h
     simd_math.h
-    simd_for.h
 )
 
+# these LOAD when the providor is used
 if(JOB_AVX_512_VNNI_FLAG OR JOB_AVX_512_FLAG)
     list(APPEND  JOBSIMD_HEADERS simd_avx512.h)
 elseif(JOB_AVX_FLAG OR JOB_AVX_TWO_FLAG OR JOB_AVX_VNNI_FLAG)
@@ -25,16 +25,23 @@ else()
     message(FATAL_ERROR "AVX mismatch you have to set it up. see cmake/build_options")
 endif()
 
+if(BUILD_SHARED_LIBS)
 add_library(JosephsOddBuilder_Simd SHARED
     ${JOBSIMD_HEADERS}
     ${JOBSIMD_SOURCES}
 )
-## nothing really needs this .... Yet but I am here right now so.
-set(JOB_SIMD_EXPORT_FILE
-    ${CMAKE_CURRENT_BINARY_DIR}/jobsimd_export.h
-)
+else()
+    add_library(JosephsOddBuilder_Simd STATIC
+        ${JOBSIMD_HEADERS}
+        ${JOBSIMD_SOURCES}
+    )
+    add_compile_definitions(JOBSIMD_STATIC_DEFINE)
+endif()
 
+## nothing really needs this .... Yet but I am here right now so.
+set(JOB_SIMD_EXPORT_FILE ${CMAKE_CURRENT_BINARY_DIR}/jobsimd_export.h)
 generate_export_header(JosephsOddBuilder_Simd
+    BASE_NAME JOBSIMD
     EXPORT_FILE_NAME "${JOB_SIMD_EXPORT_FILE}"
 )
 
@@ -48,11 +55,6 @@ elseif(JOB_WINDOWS)
         ws2_32
     )
 endif()
-
-target_link_libraries(JosephsOddBuilder_Simd PUBLIC
-    JosephsOddBuilder_Core
-    JosephsOddBuilder_Threads
-)
 
 set_target_properties(JosephsOddBuilder_Simd PROPERTIES
     VERSION ${PROJECT_VERSION}

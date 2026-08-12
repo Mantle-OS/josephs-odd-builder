@@ -27,9 +27,6 @@ public:
     using WPtr = std::weak_ptr<JobGgufKv>;
     using UPtr = std::unique_ptr<JobGgufKv>;
 
-    /*
-     * Scalar GGUF value.
-     */
     template<JobGgufValueType T>
     explicit JobGgufKv(std::string key, const T &value) :
         m_key{std::move(key)}
@@ -37,12 +34,6 @@ public:
         setValue(value);
     }
 
-    /*
-     * GGUF array.
-     *
-     * The stored type remains the array element type. serializedType()
-     * reports JobGgufType::Array when isArray() is true.
-     */
     template<JobGgufValueType T>
     explicit JobGgufKv(std::string key, const std::vector<T> &values) :
         m_key{std::move(key)}

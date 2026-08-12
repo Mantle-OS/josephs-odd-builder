@@ -1,8 +1,8 @@
+add_subdirectory(job_simd)                  # fully cross platform | not tested on hardware for win32
 add_subdirectory(job_core)                  # fully cross platform | not tested on hardware for win32
 add_subdirectory(job_threads)               # fully cross platform | not tested on hardware for win32
 add_subdirectory(job_crypto)                # fully cross platform | not tested on hardware for win32
 add_subdirectory(job_zstd)                  # fully cross platform | not tested on hardware for win32
-add_subdirectory(job_simd)                  # fully cross platform | not tested on hardware for win32
 
 if(JOB_CUDA)
     add_subdirectory(job_cuda)              # This was just me playing around with cuda to see if I could get my cuda_bridge and a gemm that I could test against of job_ai benchmarks

@@ -26,7 +26,7 @@ class QMLSD_EXPORT QSdImgGenParams : public QSdBaseParam
     QP_RW(QString,                          negativePrompt,         ""      ) // Negative prompt describing what to avoid in the image.
     QP_RW(int,                              clipSkip,               -1      ) // Number of final CLIP layers to skip (-1 = model default).
     QP_PTR_RW(QSdImage,                     initImage                       ) // Source image for img2img; null for pure txt2img.
-    QP_PTR_RO(ObjectListModel<QSdImage>,    refImages                      ) // MVC list of reference images for image-conditioned generation.
+    QP_PTR_RO(ObjectListModel<QSdImage>,    refImages                       ) // MVC list of reference images for image-conditioned generation.
     QP_RW(int,                              refImagesCount,         0       ) // Number of reference images currently supplied.
     QP_RW(bool,                             autoResizeRefImage,     false   ) // If true, automatically resizes the reference image to match the target output dimensions.
     QP_RW(bool,                             increaseRefIndex,       false   ) // If true, advances to the next reference image slot/index on each use.

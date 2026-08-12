@@ -109,21 +109,14 @@ float JobRandom::normal(float mean, float stddev)
 
 bool JobRandom::bernoulli(float p)
 {
-    std::bernoulli_distribution dist(
-        static_cast<double>(p)
-        );
-
+    std::bernoulli_distribution dist(static_cast<double>(p));
     return dist(engine());
 }
 
 std::vector<std::uint8_t> JobRandom::randomSalt() noexcept
 {
     initRandom();
-
-    std::vector<std::uint8_t> salt(
-        crypto_pwhash_SALTBYTES
-        );
-
+    std::vector<std::uint8_t> salt(crypto_pwhash_SALTBYTES);
     randombytes_buf(salt.data(), salt.size());
     return salt;
 }

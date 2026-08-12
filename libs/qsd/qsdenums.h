@@ -154,8 +154,11 @@ public:
         QSdLcmScheduler,
         QSdBong,
         QSdLtx2,
+        QSdLogitNormal,
         QSdSchedulerCount // Scheduler
     };
+
+
     Q_ENUM(QSdSchedulerTypes)
     QStringList schedulerTypesList() const;
     static scheduler_t sdSchedulerType(const QSdSchedulerTypes &type);

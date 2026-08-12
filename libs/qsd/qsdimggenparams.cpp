@@ -249,7 +249,7 @@ void QSdImgGenParams::resetImgGenParms()
     m_imgGenParms.ref_images                = nullptr;
     m_imgGenParms.ref_images_count          = 0;
 
-    m_imgGenParms.auto_resize_ref_image     = true;
+    m_imgGenParms.auto_resize_ref_image     = false;
     m_imgGenParms.increase_ref_index        = false;
 
     m_imgGenParms.mask_image                = m_maskImage->img();

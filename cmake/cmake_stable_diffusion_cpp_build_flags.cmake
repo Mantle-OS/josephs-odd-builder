@@ -6,6 +6,7 @@ set(SD_CUDA ON)
 set(SD_VULKAN ON)
 set(SD_OPENCL ON)
 
+## ggml is a git submodule to STABLE_DIFFUSION_CPP
 include(${CMAKE_CURRENT_LIST_DIR}/cmake_ggml_build_flags.cmake)
 add_subdirectory(3rdparty/stable-diffusion.cpp)
 

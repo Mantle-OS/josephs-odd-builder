@@ -37,7 +37,7 @@ public:
     [[nodiscard]] int nodeCount() const noexcept;
 
     /*
-     * JOSEPH:
+     * [[FORWARD_PORT]] JOSEPH: KEEP AN EYE UPSTREAM
      * GGML does not currently expose ggml_graph_n_leafs().
      * Keep tracking upstream before adding leafCount().
      */

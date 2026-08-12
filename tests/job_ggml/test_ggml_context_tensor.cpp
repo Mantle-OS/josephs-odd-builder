@@ -28,45 +28,34 @@
 #include <job_ggml_tensor_view.h>
 #include <job_ggml_tensor_volume.h>
 
-#include "test_ggml_utils.h"
+#include <job_ggml_tensor_op.h>
 
+// #include "test_ggml_utils.h"
 using namespace job::ggml;
 using Catch::Approx;
-
-namespace {
-
-[[nodiscard]] JobGgmlContext::UPtr createHostContext(std::size_t tensorCount, std::size_t graphSize = GGML_DEFAULT_GRAPH_SIZE, bool gradients = false)
-{
-    JobGgmlInitParams initParams{
-        ggml_init_params{
-            testGgmlContextMetadataSize(tensorCount, graphSize, gradients),
-            nullptr,
-            false
-        }
-    };
-
-    return JobGgmlContext::createUniq(initParams);
-}
-
-} // namespace
 
 // ============================================================================
 // Block one: usage / examples
 // ============================================================================
-
 TEST_CASE("Context creates inspectable tensors of every supported rank", "[ggml][context_tensor][usage][rank]")
 {
-    auto context = createHostContext(4);
+    constexpr std::size_t payloadBytes =
+        8 * sizeof(float) +
+        4 * 3 * sizeof(float) +
+        4 * 3 * 2 * sizeof(float) +
+        4 * 3 * 2 * 5 * sizeof(float);
+
+    auto initParams = JobGgmlInitParams::createUniqMetadataFor(4, GGML_DEFAULT_GRAPH_SIZE, false, payloadBytes, false);
+    auto context = JobGgmlContext::createUniq(*initParams);
 
     REQUIRE(context != nullptr);
     REQUIRE(context->isValid());
     REQUIRE_FALSE(context->noAlloc());
 
-    auto fiber = context->newTensor1d(JobGgmlType::F32, 8);
-
-    auto matrix = context->newTensor2d( JobGgmlType::F32, 4, 3 );
-    auto volume = context->newTensor3d( JobGgmlType::F32, 4, 3, 2 );
-    auto batch = context->newTensor4d( JobGgmlType::F32, 4, 3, 2, 5 );
+    auto fiber  = context->newTensor1d(JobGgmlType::F32, 8);
+    auto matrix = context->newTensor2d(JobGgmlType::F32, 4, 3);
+    auto volume = context->newTensor3d(JobGgmlType::F32, 4, 3, 2);
+    auto batch  = context->newTensor4d(JobGgmlType::F32, 4, 3, 2, 5);
 
     REQUIRE(fiber != nullptr);
     REQUIRE(matrix != nullptr);
@@ -162,8 +151,10 @@ TEST_CASE("Context creates inspectable tensors of every supported rank", "[ggml]
 
 TEST_CASE("Tensor exposes type shape stride and layout inspection", "[ggml][context_tensor][usage][inspection]")
 {
-    auto context = createHostContext(1);
-    auto tensor = context->newTensor2d( JobGgmlType::F32, 4, 3);
+    constexpr std::size_t payloadBytes = 4 * 3 * sizeof(float);
+    auto initParams = JobGgmlInitParams::createUniqMetadataFor(1, GGML_DEFAULT_GRAPH_SIZE, false, payloadBytes, false);
+    auto context = JobGgmlContext::createUniq(*initParams);
+    auto tensor = context->newTensor2d(JobGgmlType::F32, 4, 3);
 
     REQUIRE(tensor != nullptr);
     REQUIRE(tensor->isValid());
@@ -175,7 +166,7 @@ TEST_CASE("Tensor exposes type shape stride and layout inspection", "[ggml][cont
     REQUIRE(tensor->view() != nullptr);
 
     REQUIRE(tensor->type() == JobGgmlType::F32);
-    REQUIRE(tensor->ggmlType() == GGML_TYPE_F32);
+    REQUIRE(toGgmlType(tensor->type()) == GGML_TYPE_F32);
     REQUIRE(std::string{tensor->typeName()} == "f32");
     REQUIRE_FALSE(tensor->isQuantized());
 
@@ -209,7 +200,9 @@ TEST_CASE("Tensor exposes type shape stride and layout inspection", "[ggml][cont
 
 TEST_CASE("Tensor host data supports fill flat indexing and coordinates", "[ggml][context_tensor][usage][data]")
 {
-    auto context = createHostContext(2);
+    constexpr std::size_t payloadBytes = 3 * 2 * sizeof(float) + 4 * sizeof(std::int32_t);
+    auto initParams = JobGgmlInitParams::createUniqMetadataFor(2, GGML_DEFAULT_GRAPH_SIZE, false, payloadBytes, false);
+    auto context = JobGgmlContext::createUniq(*initParams);
     auto floats = context->newTensor2d(JobGgmlType::F32, 3, 2);
     auto integers = context->newTensor1d(JobGgmlType::I32, 4);
 
@@ -230,10 +223,9 @@ TEST_CASE("Tensor host data supports fill flat indexing and coordinates", "[ggml
     for (std::int64_t index = 0; index < floats->elementCount(); ++index)
         REQUIRE( floats->data()->valueF32(index) == Approx(2.5f) );
 
-
     floats->data()->setValueF32( 1, 7.25f );
-
     REQUIRE( floats->data()->valueF32(1) == Approx(7.25f) );
+
     floats->data()->setValueF32( 2, 1, 0, 0, 13.5f );
     REQUIRE( floats->data()->valueF32( 2, 1, 0, 0 ) == Approx(13.5f) );
 
@@ -244,13 +236,19 @@ TEST_CASE("Tensor host data supports fill flat indexing and coordinates", "[ggml
 
     integers->data()->setValueI32( 2, -17 );
     REQUIRE( integers->data()->valueI32(2) == -17 );
+
     integers->data()->setValueI32( 3, 0, 0, 0, 99 );
     REQUIRE(integers->data()->valueI32(3, 0, 0, 0 ) == 99);
 }
 
 TEST_CASE("Context names looks up and iterates tensors", "[ggml][context_tensor][usage][lookup]")
 {
-    auto context = createHostContext(3);
+    constexpr std::size_t payloadBytes =
+        4 * sizeof(float) +
+        2 * 2 * sizeof(float) +
+        2 * 2 * 2 * sizeof(std::int32_t);
+    auto initParams = JobGgmlInitParams::createUniqMetadataFor(3, GGML_DEFAULT_GRAPH_SIZE, false, payloadBytes, false);
+    auto context = JobGgmlContext::createUniq(*initParams);
     auto first   = context->newTensor1d(JobGgmlType::F32, 4);
     auto second  = context->newTensor2d(JobGgmlType::F32, 2, 2);
     auto third   = context->newTensor3d(JobGgmlType::I32, 2, 2, 2);
@@ -293,9 +291,11 @@ TEST_CASE("Context names looks up and iterates tensors", "[ggml][context_tensor]
 
 TEST_CASE("Context duplicates tensors and creates borrowed views", "[ggml][context_tensor][usage][view]")
 {
-    auto context = createHostContext(3);
+    constexpr std::size_t payloadBytes = 2 * 4 * 3 * sizeof(float);
+    auto initParams = JobGgmlInitParams::createUniqMetadataFor(3, GGML_DEFAULT_GRAPH_SIZE, false, payloadBytes, false);
+    auto context = JobGgmlContext::createUniq(*initParams);
 
-    auto source = context->newTensor2d( JobGgmlType::F32, 4, 3 );
+    auto source = context->newTensor2d(JobGgmlType::F32, 4, 3);
 
     REQUIRE(source != nullptr);
 
@@ -329,7 +329,9 @@ TEST_CASE("Context duplicates tensors and creates borrowed views", "[ggml][conte
 
 TEST_CASE("Tensor flags describe graph roles", "[ggml][context_tensor][usage][flags]")
 {
-    auto context = createHostContext(3);
+    constexpr std::size_t payloadBytes = 4 * sizeof(float) + 4 * sizeof(float) + sizeof(float);
+    auto initParams = JobGgmlInitParams::createUniqMetadataFor(3, GGML_DEFAULT_GRAPH_SIZE, false, payloadBytes, false);
+    auto context = JobGgmlContext::createUniq(*initParams);
 
     auto input = context->newTensor1d(JobGgmlType::F32, 4);
 
@@ -375,30 +377,31 @@ TEST_CASE("Tensor flags describe graph roles", "[ggml][context_tensor][usage][fl
 
 TEST_CASE("Tensor operation inspection describes a simple addition", "[ggml][context_tensor][usage][operation]")
 {
-    auto context = createHostContext(3);
-    auto left = context->newTensor1d( JobGgmlType::F32, 4);
+    constexpr std::size_t payloadBytes = 3 * 4 * sizeof(float);
+    auto initParams = JobGgmlInitParams::createUniqMetadataFor(3, GGML_DEFAULT_GRAPH_SIZE, false, payloadBytes, false);
+    auto context = JobGgmlContext::createUniq(*initParams);
+    auto left = context->newTensor1d(JobGgmlType::F32, 4);
     auto right = context->newTensor1d(JobGgmlType::F32, 4);
 
     REQUIRE(left != nullptr);
     REQUIRE(right != nullptr);
 
-    ggml_tensor *nativeResult = ggml_add( context->context(), left->tensor(), right->tensor() );
+    auto op = JobGgmlTensorOp::createUniq(left->tensor(), context.get());
+    REQUIRE(op != nullptr);
+    REQUIRE(op->isValid());
 
-    REQUIRE(nativeResult != nullptr);
-
-    auto result = JobGgmlTensor::createUniq( nativeResult );
-
+    auto result = op->add(*right);
     REQUIRE(result != nullptr);
     REQUIRE(result->isValid());
 
     REQUIRE(result->hasOperation());
-    REQUIRE(result->ggmlOperation() == GGML_OP_ADD );
+    REQUIRE(result->tensorOperation() == JobGgmlOp::Add);
     REQUIRE(result->sourceCount() == 2);
 
-    REQUIRE(result->operation()->source(0) == left->tensor() );
-    REQUIRE(result->operation()->source(1) == right->tensor() );
-    REQUIRE(result->operation()->hasSource( left->tensor() ) );
-    REQUIRE(result->operation()->hasSource( right->tensor() ) );
+    REQUIRE(result->operation()->source(0) == left->tensor());
+    REQUIRE(result->operation()->source(1) == right->tensor());
+    REQUIRE(result->operation()->hasSource( left->tensor()));
+    REQUIRE(result->operation()->hasSource( right->tensor()));
 }
 
 TEST_CASE("Semantic tensor shapes describe logical model dimensions", "[ggml][context_tensor][usage][semantic_shape]")
@@ -437,7 +440,8 @@ TEST_CASE("Semantic tensor shapes describe logical model dimensions", "[ggml][co
 
 TEST_CASE("Context rejects invalid tensor dimensions", "[ggml][context_tensor][edge][creation]")
 {
-    auto context = createHostContext(1);
+    auto initParams = JobGgmlInitParams::createUniqMetadataFor(1, GGML_DEFAULT_GRAPH_SIZE, false, 0, false);
+    auto context = JobGgmlContext::createUniq(*initParams);
 
     REQUIRE_THROWS_AS(context->newTensor1d(JobGgmlType::F32, 0 ), std::invalid_argument);
     REQUIRE_THROWS_AS(context->newTensor2d(JobGgmlType::F32, 4, 0 ), std::invalid_argument);
@@ -450,7 +454,9 @@ TEST_CASE("Context rejects invalid tensor dimensions", "[ggml][context_tensor][e
 
 TEST_CASE( "Context lookup rejects empty and missing names", "[ggml][context_tensor][edge][lookup]")
 {
-    auto context = createHostContext(1);
+    constexpr std::size_t payloadBytes = 4 * sizeof(float);
+    auto initParams = JobGgmlInitParams::createUniqMetadataFor(1, GGML_DEFAULT_GRAPH_SIZE, false, payloadBytes, false);
+    auto context = JobGgmlContext::createUniq(*initParams);
     auto tensor = context->newTensor1d(JobGgmlType::F32, 4);
     REQUIRE(tensor != nullptr);
     tensor->setName("present");
@@ -462,7 +468,9 @@ TEST_CASE( "Context lookup rejects empty and missing names", "[ggml][context_ten
 
 TEST_CASE("Tensor rejects out of range host data access", "[ggml][context_tensor][edge][data]")
 {
-    auto context = createHostContext(2);
+    constexpr std::size_t payloadBytes = 3 * 2 * sizeof(float) + 4 * sizeof(std::int32_t);
+    auto initParams = JobGgmlInitParams::createUniqMetadataFor(2, GGML_DEFAULT_GRAPH_SIZE, false, payloadBytes, false);
+    auto context = JobGgmlContext::createUniq(*initParams);
     auto floats = context->newTensor2d(JobGgmlType::F32, 3, 2);
     auto integers = context->newTensor1d(JobGgmlType::I32, 4);
 
@@ -479,7 +487,13 @@ TEST_CASE("Tensor rejects out of range host data access", "[ggml][context_tensor
 
 TEST_CASE("Tensor shape comparisons distinguish compatible tensors", "[ggml][context_tensor][edge][shape]")
 {
-    auto context = createHostContext(4);
+    constexpr std::size_t payloadBytes =
+        4 * 3 * sizeof(float) +
+        4 * 3 * sizeof(float) +
+        5 * 3 * sizeof(float) +
+        1 * 3 * sizeof(float);
+    auto initParams = JobGgmlInitParams::createUniqMetadataFor(4, GGML_DEFAULT_GRAPH_SIZE, false, payloadBytes, false);
+    auto context = JobGgmlContext::createUniq(*initParams);
 
     auto first = context->newTensor2d(JobGgmlType::F32, 4, 3);
     auto same = context->newTensor2d(JobGgmlType::F32, 4, 3);
@@ -500,7 +514,9 @@ TEST_CASE("Tensor shape comparisons distinguish compatible tensors", "[ggml][con
 
 TEST_CASE("Context reset releases its internal object arena", "[ggml][context_tensor][edge][reset]")
 {
-    auto context = createHostContext(2);
+    constexpr std::size_t payloadBytes = 64 * sizeof(float) + 8 * 8 * sizeof(float);
+    auto initParams = JobGgmlInitParams::createUniqMetadataFor(2, GGML_DEFAULT_GRAPH_SIZE, false, payloadBytes, false);
+    auto context = JobGgmlContext::createUniq(*initParams);
 
     auto first = context->newTensor1d(JobGgmlType::F32, 64);
     auto second = context->newTensor2d(JobGgmlType::F32, 8, 8);
@@ -522,7 +538,13 @@ TEST_CASE("Context reset releases its internal object arena", "[ggml][context_te
 
 TEST_CASE("Rank-specific tensor conversion accepts only matching ranks", "[ggml][context_tensor][edge][rank]")
 {
-    auto context = createHostContext(4);
+    constexpr std::size_t payloadBytes =
+        4 * sizeof(float) +
+        4 * 3 * sizeof(float) +
+        4 * 3 * 2 * sizeof(float) +
+        4 * 3 * 2 * 2 * sizeof(float);
+    auto initParams = JobGgmlInitParams::createUniqMetadataFor(4, GGML_DEFAULT_GRAPH_SIZE, false, payloadBytes, false);
+    auto context = JobGgmlContext::createUniq(*initParams);
 
     auto fiber = context->newTensor1d(JobGgmlType::F32, 4);
     auto matrix = context->newTensor2d(JobGgmlType::F32, 4, 3);
@@ -552,7 +574,9 @@ TEST_CASE("Rank-specific tensor conversion accepts only matching ranks", "[ggml]
 
 TEST_CASE("GGML collapses trailing singleton tensor dimensions", "[ggml][context_tensor][edge][rank][singleton]")
 {
-    auto context = createHostContext(1);
+    constexpr std::size_t payloadBytes = 4 * 3 * 2 * sizeof(float);
+    auto initParams = JobGgmlInitParams::createUniqMetadataFor(1, GGML_DEFAULT_GRAPH_SIZE, false, payloadBytes, false);
+    auto context = JobGgmlContext::createUniq(*initParams);
     auto tensor = context->newTensor4d(JobGgmlType::F32, 4, 3, 2, 1);
 
     REQUIRE(tensor != nullptr);
@@ -572,14 +596,17 @@ TEST_CASE("GGML collapses trailing singleton tensor dimensions", "[ggml][context
 TEST_CASE( "Context tensor creation performance", "[ggml][context_tensor][benchmark][creation]" )
 {
     BENCHMARK("create one context and tensor") {
-        auto context = createHostContext(1);
+        constexpr std::size_t payloadBytes = 64 * 64 * sizeof(float);
+        auto initParams = JobGgmlInitParams::createUniqMetadataFor(1, GGML_DEFAULT_GRAPH_SIZE, false, payloadBytes, false);
+        auto context = JobGgmlContext::createUniq(*initParams);
         return context->newTensor2d(JobGgmlType::F32, 64, 64);
     };
 }
 
 TEST_CASE("Tensor metadata inspection performance", "[ggml][context_tensor][benchmark][inspection]")
 {
-    auto context = createMetadataContext(1);
+    auto initParams = JobGgmlInitParams::createUniqMetadataFor(1);
+    auto context = JobGgmlContext::createUniq(*initParams);
     auto tensor = context->newTensor4d(JobGgmlType::F32, 64, 32, 8, 2);
 
     REQUIRE(tensor != nullptr);
@@ -600,8 +627,9 @@ TEST_CASE("Tensor host indexed access performance", "[ggml][context_tensor][benc
     constexpr std::size_t elementCount = 1024;
     constexpr std::size_t payloadBytes = elementCount * sizeof(float);
 
-    auto context = createAllocatedHostContext(1, payloadBytes);
-    auto tensor = context->newTensor1d( JobGgmlType::F32, static_cast<std::int64_t>(elementCount));
+    auto initParams = JobGgmlInitParams::createUniqMetadataFor(1, GGML_DEFAULT_GRAPH_SIZE, false, payloadBytes, false);
+    auto context = JobGgmlContext::createUniq(*initParams);
+    auto tensor = context->newTensor1d(JobGgmlType::F32, static_cast<std::int64_t>(elementCount));
 
     REQUIRE(tensor != nullptr);
     REQUIRE(tensor->data() != nullptr);
@@ -616,3 +644,4 @@ TEST_CASE("Tensor host indexed access performance", "[ggml][context_tensor][benc
 }
 
 #endif
+

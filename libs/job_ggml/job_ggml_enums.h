@@ -7,7 +7,9 @@
 
 #include <ggml.h>
 #include <ggml-backend.h>
+#include <ggml-opt.h>
 #include <gguf.h>
+#include <ggml-cpu.h>
 
 namespace job::ggml {
 
@@ -17,6 +19,16 @@ enum class JobGgmlStatus : std::int8_t {
     Success     = GGML_STATUS_SUCCESS,
     Aborted     = GGML_STATUS_ABORTED
 };
+
+[[nodiscard]] static constexpr JobGgmlStatus fromGgmlStatus(enum ggml_status status) noexcept
+{
+    return static_cast<JobGgmlStatus>(status);
+}
+
+[[nodiscard]] static constexpr enum ggml_status toGgmlStatus(JobGgmlStatus status) noexcept
+{
+    return static_cast<enum ggml_status>(status);
+}
 
 enum class JobGgmlType : std::uint8_t {
     F32     = GGML_TYPE_F32,
@@ -55,6 +67,76 @@ enum class JobGgmlType : std::uint8_t {
     Q1_0    = GGML_TYPE_Q1_0,
     Count   = GGML_TYPE_COUNT
 };
+[[nodiscard]] static constexpr JobGgmlType fromGgmlType(enum ggml_type type) noexcept
+{
+    return static_cast<JobGgmlType>(type);
+}
+
+[[nodiscard]] static constexpr enum ggml_type toGgmlType(JobGgmlType type) noexcept
+{
+    return static_cast<enum ggml_type>(type);
+}
+
+
+
+
+
+
+
+// We intentionally do not use only `type >= 0 && type < GGML_TYPE_COUNT`.
+// A range check would automatically accept any new ggml_type inserted by
+// upstream before GGML_TYPE_COUNT, even though JOB has not reviewed or mapped
+// that type yet. The explicit switch makes support opt-in: new types are
+// rejected until they are deliberately added, while removed or renamed types
+// produce a compile-time failure at the stale case label.
+// The parameter uses `enum ggml_type` rather than an integer because callers
+// should pass the native upstream type directly. This preserves type intent,
+// avoids accepting arbitrary integer values at the API boundary, and keeps the
+// function aligned one-to-one with GGML.
+[[nodiscard]] constexpr bool isValidGgmlType(enum ggml_type type) noexcept
+{
+    switch (type) {
+    case GGML_TYPE_F32:
+    case GGML_TYPE_F16:
+    case GGML_TYPE_Q4_0:
+    case GGML_TYPE_Q4_1:
+    case GGML_TYPE_Q5_0:
+    case GGML_TYPE_Q5_1:
+    case GGML_TYPE_Q8_0:
+    case GGML_TYPE_Q8_1:
+    case GGML_TYPE_Q2_K:
+    case GGML_TYPE_Q3_K:
+    case GGML_TYPE_Q4_K:
+    case GGML_TYPE_Q5_K:
+    case GGML_TYPE_Q6_K:
+    case GGML_TYPE_Q8_K:
+    case GGML_TYPE_IQ2_XXS:
+    case GGML_TYPE_IQ2_XS:
+    case GGML_TYPE_IQ3_XXS:
+    case GGML_TYPE_IQ1_S:
+    case GGML_TYPE_IQ4_NL:
+    case GGML_TYPE_IQ3_S:
+    case GGML_TYPE_IQ2_S:
+    case GGML_TYPE_IQ4_XS:
+    case GGML_TYPE_I8:
+    case GGML_TYPE_I16:
+    case GGML_TYPE_I32:
+    case GGML_TYPE_I64:
+    case GGML_TYPE_F64:
+    case GGML_TYPE_IQ1_M:
+    case GGML_TYPE_BF16:
+    case GGML_TYPE_TQ1_0:
+    case GGML_TYPE_TQ2_0:
+    case GGML_TYPE_MXFP4:
+    case GGML_TYPE_NVFP4:
+    case GGML_TYPE_Q1_0:
+        return true;
+
+    case GGML_TYPE_COUNT:
+    default:
+        return false;
+    }
+}
 
 enum class JobGgmlPrecision : std::uint8_t {
     Default = GGML_PREC_DEFAULT,
@@ -95,6 +177,7 @@ enum class JobGgmlFileType : std::int16_t {
     MostlyNVFP4     = GGML_FTYPE_MOSTLY_NVFP4,
     MostlyQ1_0      = GGML_FTYPE_MOSTLY_Q1_0
 };
+
 
 enum class JobGgmlOp : std::uint16_t {
     None                 = GGML_OP_NONE,
@@ -206,6 +289,24 @@ enum class JobGgmlOp : std::uint16_t {
 
     Count                = GGML_OP_COUNT
 };
+
+
+[[nodiscard]] static constexpr JobGgmlOp fromGgmlOp(enum ggml_op op) noexcept
+{
+    return static_cast<JobGgmlOp>(op);
+}
+
+[[nodiscard]] static constexpr enum ggml_op toGgmlOp(JobGgmlType op) noexcept
+{
+    return static_cast<enum ggml_op>(op);
+}
+
+
+
+
+
+
+
 
 enum class JobGgmlUnaryOp : std::uint8_t {
     Abs       = GGML_UNARY_OP_ABS,
@@ -320,6 +421,17 @@ enum class JobGgmlDeviceType : std::uint8_t {
     Meta  = GGML_BACKEND_DEVICE_TYPE_META
 };
 
+[[nodiscard]] static constexpr JobGgmlDeviceType fromGgmlBackendDeviceType(enum ggml_backend_dev_type devType) noexcept
+{
+    return static_cast<JobGgmlDeviceType>(devType);
+}
+
+[[nodiscard]] static constexpr enum ggml_backend_dev_type toGgmlBackendDeviceType(JobGgmlDeviceType devType) noexcept
+{
+    return static_cast<enum ggml_backend_dev_type>(devType);
+}
+
+
 enum class JobGgmlMetaSplitAxis : std::uint8_t {
     Axis0    = GGML_BACKEND_SPLIT_AXIS_0,
     Axis1    = GGML_BACKEND_SPLIT_AXIS_1,
@@ -330,6 +442,124 @@ enum class JobGgmlMetaSplitAxis : std::uint8_t {
     None     = GGML_BACKEND_SPLIT_AXIS_NONE,
     Unknown  = GGML_BACKEND_SPLIT_AXIS_UNKNOWN
 };
+
+[[nodiscard]] constexpr JobGgmlTensorFlag operator|(JobGgmlTensorFlag lhs, JobGgmlTensorFlag rhs) noexcept
+{
+    return static_cast<JobGgmlTensorFlag>(
+        static_cast<std::uint32_t>(lhs) |
+        static_cast<std::uint32_t>(rhs)
+        );
+}
+
+[[nodiscard]] constexpr JobGgmlTensorFlag operator&(JobGgmlTensorFlag lhs, JobGgmlTensorFlag rhs) noexcept
+{
+    return static_cast<JobGgmlTensorFlag>(
+        static_cast<std::uint32_t>(lhs) &
+        static_cast<std::uint32_t>(rhs)
+        );
+}
+
+constexpr JobGgmlTensorFlag &operator|=(JobGgmlTensorFlag &lhs, JobGgmlTensorFlag rhs) noexcept
+{
+    lhs = lhs | rhs;
+    return lhs;
+}
+
+constexpr JobGgmlTensorFlag &operator&=(JobGgmlTensorFlag &lhs, JobGgmlTensorFlag rhs) noexcept
+{
+    lhs = lhs & rhs;
+    return lhs;
+}
+
+[[nodiscard]] constexpr bool hasFlag(JobGgmlTensorFlag value, JobGgmlTensorFlag flag) noexcept
+{
+    return (value & flag) == flag;
+}
+
+[[nodiscard]] constexpr JobGgmlScaleFlag operator|(JobGgmlScaleFlag lhs, JobGgmlScaleFlag rhs) noexcept
+{
+    return static_cast<JobGgmlScaleFlag>(
+        static_cast<std::uint32_t>(lhs) | static_cast<std::uint32_t>(rhs)
+        );
+}
+
+[[nodiscard]] constexpr JobGgmlScaleFlag operator&(JobGgmlScaleFlag lhs, JobGgmlScaleFlag rhs) noexcept
+{
+    return static_cast<JobGgmlScaleFlag>(static_cast<std::uint32_t>(lhs) & static_cast<std::uint32_t>(rhs));
+}
+
+constexpr JobGgmlScaleFlag &operator|=(JobGgmlScaleFlag &lhs, JobGgmlScaleFlag rhs) noexcept
+{
+    lhs = lhs | rhs;
+    return lhs;
+}
+
+constexpr JobGgmlScaleFlag &operator&=(JobGgmlScaleFlag &lhs, JobGgmlScaleFlag rhs) noexcept
+{
+    lhs = lhs & rhs;
+    return lhs;
+}
+
+[[nodiscard]] constexpr bool hasFlag(JobGgmlScaleFlag value, JobGgmlScaleFlag flag) noexcept
+{
+    return (value & flag) == flag;
+}
+
+// START OPT
+enum class JobGgmlOptLossType : std::int32_t {
+    Mean             = GGML_OPT_LOSS_TYPE_MEAN,
+    Sum              = GGML_OPT_LOSS_TYPE_SUM,
+    CrossEntropy     = GGML_OPT_LOSS_TYPE_CROSS_ENTROPY,
+    MeanSquaredError = GGML_OPT_LOSS_TYPE_MEAN_SQUARED_ERROR
+};
+
+enum class JobGgmlOptBuildType : std::int32_t {
+    Forward = GGML_OPT_BUILD_TYPE_FORWARD,
+    Grad    = GGML_OPT_BUILD_TYPE_GRAD,
+    Opt     = GGML_OPT_BUILD_TYPE_OPT
+};
+
+enum class JobGgmlOptOptimizerType : std::int32_t {
+    AdamW = GGML_OPT_OPTIMIZER_TYPE_ADAMW,
+    Sgd   = GGML_OPT_OPTIMIZER_TYPE_SGD,
+    Count = GGML_OPT_OPTIMIZER_TYPE_COUNT
+};
+
+[[nodiscard]] constexpr enum ggml_opt_loss_type toGgmlOptLossType(JobGgmlOptLossType type) noexcept
+{
+    return static_cast<enum ggml_opt_loss_type>(type);
+}
+
+[[nodiscard]] constexpr JobGgmlOptLossType fromGgmlOptLossType(enum ggml_opt_loss_type type) noexcept
+{
+    return static_cast<JobGgmlOptLossType>(type);
+}
+
+[[nodiscard]] constexpr enum ggml_opt_build_type toGgmlOptBuildType(JobGgmlOptBuildType type) noexcept
+{
+    return static_cast<enum ggml_opt_build_type>(type);
+}
+
+[[nodiscard]] constexpr JobGgmlOptBuildType fromGgmlOptBuildType(enum ggml_opt_build_type type) noexcept
+{
+    return static_cast<JobGgmlOptBuildType>(type);
+}
+
+[[nodiscard]] constexpr enum ggml_opt_optimizer_type toGgmlOptOptimizerType(JobGgmlOptOptimizerType type) noexcept
+{
+    return static_cast<enum ggml_opt_optimizer_type>(type);
+}
+
+[[nodiscard]] constexpr JobGgmlOptOptimizerType fromGgmlOptOptimizerType(enum ggml_opt_optimizer_type type) noexcept
+{
+    return static_cast<JobGgmlOptOptimizerType>(type);
+}
+
+
+static_assert(static_cast<std::int32_t>(JobGgmlOptLossType::Mean) == GGML_OPT_LOSS_TYPE_MEAN);
+static_assert(static_cast<std::int32_t>(JobGgmlOptBuildType::Opt) == GGML_OPT_BUILD_TYPE_OPT);
+static_assert(static_cast<std::int32_t>(JobGgmlOptOptimizerType::Count) == GGML_OPT_OPTIMIZER_TYPE_COUNT);
+// END OPT
 
 // START GGUF
 enum class JobGgufType : std::uint32_t {
@@ -429,69 +659,124 @@ static_assert(JobGgufTypeNames.size() == static_cast<std::size_t>(GGUF_TYPE_COUN
 {
     return static_cast<JobGgufType>(type);
 }
-
 // END GGUF
 
-[[nodiscard]] constexpr JobGgmlTensorFlag operator|(JobGgmlTensorFlag lhs, JobGgmlTensorFlag rhs) noexcept
+// START CPU (ggml-cpu.h)
+enum class JobGgmlNumaStrategy : std::uint8_t {
+    Disabled   = GGML_NUMA_STRATEGY_DISABLED,
+    Distribute = GGML_NUMA_STRATEGY_DISTRIBUTE,
+    Isolate    = GGML_NUMA_STRATEGY_ISOLATE,
+    Numactl    = GGML_NUMA_STRATEGY_NUMACTL,
+    Mirror     = GGML_NUMA_STRATEGY_MIRROR
+};
+[[nodiscard]] constexpr enum ggml_numa_strategy toGgmlNumaStrategy(JobGgmlNumaStrategy strategy) noexcept
 {
-    return static_cast<JobGgmlTensorFlag>(
-        static_cast<std::uint32_t>(lhs) |
-        static_cast<std::uint32_t>(rhs)
-        );
+    return static_cast<enum ggml_numa_strategy>(strategy);
 }
 
-[[nodiscard]] constexpr JobGgmlTensorFlag operator&(JobGgmlTensorFlag lhs, JobGgmlTensorFlag rhs) noexcept
+[[nodiscard]] constexpr JobGgmlNumaStrategy fromGgmlNumaStrategy(enum ggml_numa_strategy strategy) noexcept
 {
-    return static_cast<JobGgmlTensorFlag>(
-        static_cast<std::uint32_t>(lhs) &
-        static_cast<std::uint32_t>(rhs)
-        );
+    return static_cast<JobGgmlNumaStrategy>(strategy);
 }
 
-constexpr JobGgmlTensorFlag &operator|=(JobGgmlTensorFlag &lhs, JobGgmlTensorFlag rhs) noexcept
+enum class JobGgmlSchedPriority : std::int8_t {
+    Low      = GGML_SCHED_PRIO_LOW,
+    Normal   = GGML_SCHED_PRIO_NORMAL,
+    Medium   = GGML_SCHED_PRIO_MEDIUM,
+    High     = GGML_SCHED_PRIO_HIGH,
+    Realtime = GGML_SCHED_PRIO_REALTIME
+};
+[[nodiscard]] constexpr enum ggml_sched_priority toGgmlSchedPriority(JobGgmlSchedPriority priority) noexcept
 {
-    lhs = lhs | rhs;
-    return lhs;
+    return static_cast<enum ggml_sched_priority>(priority);
 }
 
-constexpr JobGgmlTensorFlag &operator&=(JobGgmlTensorFlag &lhs, JobGgmlTensorFlag rhs) noexcept
+[[nodiscard]] constexpr JobGgmlSchedPriority fromGgmlSchedPriority(enum ggml_sched_priority priority) noexcept
 {
-    lhs = lhs & rhs;
-    return lhs;
+    return static_cast<JobGgmlSchedPriority>(priority);
+}
+// END CPU
+
+
+
+// START LOCAL
+enum class JobGgmlDeviceImpl : std::uint8_t {
+    Fallback,
+    Cpu,
+    Blas,
+    Cuda,
+    Vulkan,
+    WebGpu,
+    Zdnn,
+    VirtGpu,
+    Metal,
+    Sycl,
+    OpenVino,
+    OpenCl,
+    Hexagon,
+    ZenDnn,
+    Cann,
+    Rpc,
+
+    Count
+};
+
+// What they are called in the cpp file they MUST MATCH or we have no lookup table
+inline constexpr std::array<std::string_view, 16> JobGgmlDeviceImplNames{
+    "Fallback",
+    "CPU",
+    "BLAS",
+    "CUDA",
+    "Vulkan",
+    "WebGPU",
+    "zDNN",
+    "VirtGPU",
+    "Metal",
+    "SYCL",
+    "OpenVINO",
+    "OpenCL",
+    "Hexagon",
+    "ZenDNN",
+    "CANN",
+    "RPC"
+};
+
+[[nodiscard]] constexpr std::string_view deviceImplName(JobGgmlDeviceImpl impl) noexcept
+{
+    const auto index = static_cast<std::size_t>(impl);
+    return index < JobGgmlDeviceImplNames.size() ? JobGgmlDeviceImplNames[index] : "Fallback";
 }
 
-[[nodiscard]] constexpr bool hasFlag(JobGgmlTensorFlag value, JobGgmlTensorFlag flag) noexcept
+[[nodiscard]] constexpr JobGgmlDeviceImpl deviceImplFromName(std::string_view name) noexcept
 {
-    return (value & flag) == flag;
+    if (name == "CPU")      return JobGgmlDeviceImpl::Cpu;
+    if (name == "BLAS")     return JobGgmlDeviceImpl::Blas;
+    if (name == "CUDA")     return JobGgmlDeviceImpl::Cuda;
+    if (name == "Vulkan")   return JobGgmlDeviceImpl::Vulkan;
+    if (name == "OpenCL")   return JobGgmlDeviceImpl::OpenCl;
+    if (name == "Metal")    return JobGgmlDeviceImpl::Metal;
+    if (name == "SYCL")     return JobGgmlDeviceImpl::Sycl;
+    if (name == "OpenVINO") return JobGgmlDeviceImpl::OpenVino;
+    if (name == "WebGPU")   return JobGgmlDeviceImpl::WebGpu;
+    if (name == "VirtGPU")  return JobGgmlDeviceImpl::VirtGpu;
+    if (name == "Hexagon")  return JobGgmlDeviceImpl::Hexagon;
+    if (name == "zDNN")     return JobGgmlDeviceImpl::Zdnn;
+    if (name == "ZenDNN")   return JobGgmlDeviceImpl::ZenDnn;
+    if (name == "CANN")     return JobGgmlDeviceImpl::Cann;
+    if (name == "RPC")      return JobGgmlDeviceImpl::Rpc;
+
+    return JobGgmlDeviceImpl::Fallback;
 }
 
-[[nodiscard]] constexpr JobGgmlScaleFlag operator|(JobGgmlScaleFlag lhs, JobGgmlScaleFlag rhs) noexcept
-{
-    return static_cast<JobGgmlScaleFlag>(
-        static_cast<std::uint32_t>(lhs) | static_cast<std::uint32_t>(rhs)
-        );
-}
+static_assert(JobGgmlDeviceImplNames.size() == static_cast<std::size_t>(JobGgmlDeviceImpl::Count));
 
-[[nodiscard]] constexpr JobGgmlScaleFlag operator&(JobGgmlScaleFlag lhs, JobGgmlScaleFlag rhs) noexcept
+// Device mangers "state machine"
+enum class DeviceManagerState : uint8_t
 {
-    return static_cast<JobGgmlScaleFlag>(static_cast<std::uint32_t>(lhs) & static_cast<std::uint32_t>(rhs));
-}
-
-constexpr JobGgmlScaleFlag &operator|=(JobGgmlScaleFlag &lhs, JobGgmlScaleFlag rhs) noexcept
-{
-    lhs = lhs | rhs;
-    return lhs;
-}
-
-constexpr JobGgmlScaleFlag &operator&=(JobGgmlScaleFlag &lhs, JobGgmlScaleFlag rhs) noexcept
-{
-    lhs = lhs & rhs;
-    return lhs;
-}
-
-[[nodiscard]] constexpr bool hasFlag(JobGgmlScaleFlag value, JobGgmlScaleFlag flag) noexcept
-{
-    return (value & flag) == flag;
-}
+    Uninitialized = 0,
+    Scanning,
+    Ready,
+    Error
+};
 
 } // namespace job::ggml

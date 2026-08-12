@@ -7,8 +7,6 @@
 #include <catch2/benchmark/catch_benchmark.hpp>
 #endif
 
-#include <job_logger.h>
-
 #include <job_ggml_backend.h>
 #include <job_ggml_backend_sched.h>
 #include <job_ggml_device.h>
@@ -17,530 +15,414 @@
 
 #include "test_ggml_utils.h"
 
-using namespace job::ggml;
-
-namespace {
-
-JobGgmlDeviceManager &readyDeviceManager()
-{
-    JobGgmlDeviceManager &manager =
-        testDeviceManager();
-
-    manager.scan();
-
-    return manager;
-}
-
-} // namespace
-
 // ============================================================================
 // Block one: usage / examples
 // ============================================================================
-
-TEST_CASE(
-    "Device manager discovers a usable CPU device",
-    "[ggml][device_manager][usage]"
-    )
+TEST_CASE("Device manager discovers a usable CPU device", "[ggml][device_manager][usage]")
 {
-    JobGgmlDeviceManager &manager =
-        readyDeviceManager();
+    JobGgmlDeviceManager *manager = g_jobGgml->deviceManager();
+    REQUIRE(manager != nullptr);
 
-    REQUIRE(
-        manager.state() ==
-        JobGgmlDeviceManager::ManagerState::Ready
-        );
+    REQUIRE(manager->state() == DeviceManagerState::Ready);
+    REQUIRE(manager->isReady());
+    REQUIRE(manager->isValid());
+    REQUIRE(manager->errorString().empty());
+    REQUIRE(manager->hasCpu());
 
-    REQUIRE(manager.isReady());
-    REQUIRE(manager.isValid());
-    REQUIRE(manager.errorString().empty());
-
-    JobGgmlDevice *cpu =
-        manager.cpuDevice();
+    JobGgmlCpu *cpu = manager->cpu();
 
     REQUIRE(cpu != nullptr);
     REQUIRE(cpu->isValid());
-
     REQUIRE(cpu->props() != nullptr);
+    REQUIRE(cpu->props()->deviceType() == JobGgmlDeviceType::Cpu);
+    REQUIRE_FALSE(cpu->uid().empty());
+    REQUIRE(cpu->uid() != "unknown");
 
-    REQUIRE(
-        cpu->props()->type() ==
-        GGML_BACKEND_DEVICE_TYPE_CPU
-        );
-
-    REQUIRE(
-        cpu->props()->deviceType() ==
-        JobGgmlDeviceType::Cpu
-        );
-
-    REQUIRE_FALSE(
-        cpu->props()->name().empty()
-        );
-
-    JOB_LOG_INFO(manager.debugString());
+    INFO(manager->debugString());
 }
 
-TEST_CASE(
-    "Device manager looks up a discovered device by name",
-    "[ggml][device_manager][usage]"
-    )
+TEST_CASE("Device manager exposes canonical devices by uid", "[ggml][device_manager][usage][objects]")
 {
-    JobGgmlDeviceManager &manager =
-        readyDeviceManager();
+    JobGgmlDeviceManager *manager = g_jobGgml->deviceManager();
+    REQUIRE(manager != nullptr);
+    const auto &devices = manager->devices();
 
-    JobGgmlDevice *cpu =
-        manager.cpuDevice();
+    REQUIRE_FALSE(devices.isEmpty());
+    REQUIRE(manager->deviceCount() == devices.size());
+
+    for (const auto &[uid, device] : devices) {
+        REQUIRE_FALSE(uid.empty());
+        REQUIRE(uid != "unknown");
+        REQUIRE(device != nullptr);
+        REQUIRE(device->isValid());
+        REQUIRE(device->uid() == uid);
+        REQUIRE(manager->device(uid) == device.get());
+    }
+}
+
+TEST_CASE("Device manager exposes complete device object maps", "[ggml][device_manager][usage][objects]")
+{
+    JobGgmlDeviceManager *manager = g_jobGgml->deviceManager();
+    REQUIRE(manager != nullptr);
+
+    for (const auto &[uid, device] : manager->devices()) {
+        INFO("uid: " << uid);
+
+        REQUIRE(device != nullptr);
+        REQUIRE(device->isValid());
+        REQUIRE(device->device() != nullptr);
+        REQUIRE(device->deviceInterface() != nullptr);
+        REQUIRE(device->deviceInterface()->isValid());
+        REQUIRE(device->props() != nullptr);
+        REQUIRE(device->caps() != nullptr);
+        REQUIRE(device->bufferType() != nullptr);
+        REQUIRE(device->bufferType()->isValid());
+        REQUIRE(device->hasBackend());
+        REQUIRE(device->backend() != nullptr);
+        REQUIRE(device->backend()->isValid());
+        REQUIRE(device->hasHostBufferType() == (device->hostBufferType() != nullptr));
+    }
+}
+
+TEST_CASE("Device manager resolves canonical devices by uid and index", "[ggml][device_manager][usage][lookup]")
+{
+    JobGgmlDeviceManager *manager = g_jobGgml->deviceManager();
+    REQUIRE(manager != nullptr);
+    JobGgmlCpu *cpu = manager->cpu();
 
     REQUIRE(cpu != nullptr);
-    REQUIRE(cpu->props() != nullptr);
 
-    const std::string name =
-        cpu->props()->name();
+    const std::string uid = cpu->uid();
 
-    REQUIRE_FALSE(name.empty());
+    REQUIRE_FALSE(uid.empty());
+    REQUIRE(uid != "unknown");
+    REQUIRE(manager->device(uid) == cpu);
 
-    JobGgmlDevice *lookup =
-        manager.deviceByName(name);
+    bool found = false;
+    for (std::size_t idx = 0; idx < manager->deviceCount(); ++idx) {
+        JobGgmlDevice *device = manager->device(idx);
 
-    REQUIRE(lookup != nullptr);
+        REQUIRE(device != nullptr);
 
-    /*
-     * The manager owns canonical device wrappers. A lookup should return the
-     * same wrapper, not construct another object around the native device.
-     */
-    REQUIRE(lookup == cpu);
+        if (device == cpu)
+            found = true;
+    }
 
-    const JobGgmlDevice::Ptr sharedLookup =
-        manager.deviceByNameShared(name);
-
-    REQUIRE(sharedLookup != nullptr);
-    REQUIRE(sharedLookup.get() == cpu);
+    REQUIRE(found);
 }
 
-TEST_CASE(
-    "Device manager builds a scheduler from discovered devices",
-    "[ggml][device_manager][usage][scheduler]"
-    )
+TEST_CASE("Device manager builds a scheduler from discovered devices", "[ggml][device_manager][usage][scheduler]")
 {
-    JobGgmlDeviceManager &manager =
-        readyDeviceManager();
+    JobGgmlDeviceManager *manager = g_jobGgml->deviceManager();
+    REQUIRE(manager != nullptr);
+    JobGgmlCpu *cpu = manager->cpu();
 
-    manager.resetScheduler();
+    REQUIRE(cpu != nullptr);
 
-    REQUIRE_FALSE(manager.hasScheduler());
-    REQUIRE(manager.scheduler() == nullptr);
+    manager->resetScheduler();
 
-    JobGgmlBackendSched::Ptr scheduler =
-        manager.buildScheduler();
+    REQUIRE_FALSE(manager->hasScheduler());
+    REQUIRE(manager->scheduler() == nullptr);
+
+    JobGgmlBackendSched::Ptr scheduler = manager->buildScheduler(cpu->uid(),
+                                                                 GGML_DEFAULT_GRAPH_SIZE,
+                                                                 false,
+                                                                 true);
 
     REQUIRE(scheduler != nullptr);
     REQUIRE(scheduler->isValid());
-
-    REQUIRE(manager.hasScheduler());
-    REQUIRE(manager.scheduler() == scheduler);
-
+    REQUIRE(manager->hasScheduler());
+    REQUIRE(manager->scheduler() == scheduler);
     REQUIRE(scheduler->backendCount() >= 1);
     REQUIRE(scheduler->graphSize() == GGML_DEFAULT_GRAPH_SIZE);
 
-    /*
-     * GPUs are placed first and the CPU backend last, but a CPU-only system
-     * still produces a valid single-backend scheduler.
-     */
-    for (int index = 0;
-         index < scheduler->backendCount();
-         ++index) {
-        JobGgmlBackend::Ptr backend =
-            scheduler->backend(index);
+    for (int index = 0; index < scheduler->backendCount(); ++index) {
+        JobGgmlBackend::Ptr backend = scheduler->backend(index);
 
         REQUIRE(backend != nullptr);
         REQUIRE(backend->isValid());
 
-        JobGgmlBackendBufferType::Ptr bufferType =
-            scheduler->bufferType(*backend);
+        JobGgmlBackendBufferType::Ptr bufferType = scheduler->bufferType(*backend);
 
         REQUIRE(bufferType != nullptr);
         REQUIRE(bufferType->isValid());
     }
 }
 
-TEST_CASE(
-    "Device manager exposes complete device object maps",
-    "[ggml][device_manager][usage][objects]"
-    )
-{
-    JobGgmlDeviceManager &manager =
-        readyDeviceManager();
-
-    REQUIRE(manager.deviceCount() >= 1);
-
-    for (std::size_t index = 0;
-         index < manager.deviceCount();
-         ++index) {
-        JobGgmlDevice *device =
-            manager.device(index);
-
-        REQUIRE(device != nullptr);
-        REQUIRE(device->isValid());
-
-        REQUIRE(device->device() != nullptr);
-
-        REQUIRE(
-            device->deviceInterface() != nullptr
-            );
-
-        REQUIRE(
-            device->deviceInterface()->isValid()
-            );
-
-        REQUIRE(device->props() != nullptr);
-        REQUIRE(device->caps() != nullptr);
-
-        REQUIRE(device->bufferType() != nullptr);
-        REQUIRE(device->bufferType()->isValid());
-
-        REQUIRE(device->hasBackend());
-        REQUIRE(device->backend() != nullptr);
-        REQUIRE(device->backend()->isValid());
-
-        REQUIRE(
-            device->hasHostBufferType() ==
-            (device->hostBufferType() != nullptr)
-            );
-    }
-}
-
 // ============================================================================
 // Block two: edge cases / invariants
 // ============================================================================
-
-TEST_CASE(
-    "Repeated device scans preserve canonical wrapper identity",
-    "[ggml][device_manager][edge][identity]"
-    )
+TEST_CASE("Repeated device scans preserve canonical wrapper identity", "[ggml][device_manager][edge][identity]")
 {
-    JobGgmlDeviceManager &manager =
-        readyDeviceManager();
-
-    JobGgmlDevice *firstCpu =
-        manager.cpuDevice();
+    JobGgmlDeviceManager *manager = g_jobGgml->deviceManager();
+    REQUIRE(manager != nullptr);
+    JobGgmlCpu *firstCpu = manager->cpu();
 
     REQUIRE(firstCpu != nullptr);
 
-    const std::size_t firstDeviceCount =
-        manager.deviceCount();
+    const std::size_t firstDeviceCount = manager->deviceCount();
+    const std::string cpuUid = firstCpu->uid();
 
-    const std::size_t firstGpuCount =
-        manager.gpuDeviceCount();
+    manager->scan();
 
-    const auto firstGpus =
-        manager.gpuDevices();
+    REQUIRE(manager->state() == DeviceManagerState::Ready);
+    REQUIRE(manager->deviceCount() == firstDeviceCount);
+    REQUIRE(manager->cpu() == firstCpu);
+    REQUIRE(manager->device(cpuUid) == firstCpu);
+}
 
-    manager.scan();
+TEST_CASE("Canonical device uids are valid and unique", "[ggml][device_manager][edge][identity]")
+{
+    JobGgmlDeviceManager *manager = g_jobGgml->deviceManager();
+    REQUIRE(manager != nullptr);
+    const auto &devices = manager->devices();
 
-    REQUIRE(
-        manager.state() ==
-        JobGgmlDeviceManager::ManagerState::Ready
-        );
+    REQUIRE_FALSE(devices.isEmpty());
 
-    REQUIRE(
-        manager.deviceCount() ==
-        firstDeviceCount
-        );
-
-    REQUIRE(
-        manager.gpuDeviceCount() ==
-        firstGpuCount
-        );
-
-    REQUIRE(
-        manager.cpuDevice() ==
-        firstCpu
-        );
-
-    const auto secondGpus =
-        manager.gpuDevices();
-
-    REQUIRE(
-        secondGpus.size() ==
-        firstGpus.size()
-        );
-
-    for (std::size_t index = 0;
-         index < firstGpus.size();
-         ++index) {
-        REQUIRE(
-            secondGpus[index] ==
-            firstGpus[index]
-            );
+    for (const auto &[uid, device] : devices) {
+        REQUIRE_FALSE(uid.empty());
+        REQUIRE(uid != "unknown");
+        REQUIRE(device != nullptr);
+        REQUIRE(device->uid() == uid);
+        REQUIRE(manager->device(uid) == device.get());
     }
 }
 
-TEST_CASE(
-    "GPU availability matches the discovered GPU list",
-    "[ggml][device_manager][edge][gpu]"
-    )
+TEST_CASE("Device implementation indexes reference canonical objects", "[ggml][device_manager][edge][identity][index]")
 {
-    JobGgmlDeviceManager &manager =
-        readyDeviceManager();
+    JobGgmlDeviceManager *manager = g_jobGgml->deviceManager();
+    REQUIRE(manager != nullptr);
 
-    const auto gpuDevices =
-        manager.gpuDevices();
+#ifdef JOB_GGML_CUDA
+    for (const auto &[uid, device] : manager->cudaDevices()) {
+        REQUIRE(device != nullptr);
+        REQUIRE(device->impl() == JobGgmlDeviceImpl::Cuda);
+        REQUIRE(manager->device(uid) == device);
+        REQUIRE(manager->cuda(uid) == device);
+    }
 
-    REQUIRE(
-        manager.hasGpu() ==
-        !gpuDevices.empty()
-        );
+    REQUIRE(manager->hasCuda() == !manager->cudaDevices().isEmpty());
+#endif
 
-    REQUIRE(
-        manager.gpuDeviceCount() ==
-        gpuDevices.size()
-        );
+#ifdef JOB_GGML_VULKAN
+    for (const auto &[uid, device] : manager->vulkanDevices()) {
+        REQUIRE(device != nullptr);
+        REQUIRE(device->impl() == JobGgmlDeviceImpl::Vulkan);
+        REQUIRE(manager->device(uid) == device);
+        REQUIRE(manager->vulkan(uid) == device);
+    }
 
-    for (JobGgmlDevice *device : gpuDevices) {
+    REQUIRE(manager->hasVulkan() == !manager->vulkanDevices().isEmpty());
+#endif
+
+#ifdef JOB_GGML_OPENCL
+    for (const auto &[uid, device] : manager->openClDevices()) {
+        REQUIRE(device != nullptr);
+        REQUIRE(device->impl() == JobGgmlDeviceImpl::OpenCl);
+        REQUIRE(manager->device(uid) == device);
+        REQUIRE(manager->openCl(uid) == device);
+    }
+
+    REQUIRE(manager->hasOpenCl() == !manager->openClDevices().isEmpty());
+#endif
+
+#ifdef JOB_GGML_BLAS
+    for (const auto &[uid, device] : manager->blasDevices()) {
+        REQUIRE(device != nullptr);
+        REQUIRE(device->impl() == JobGgmlDeviceImpl::Blas);
+        REQUIRE(manager->device(uid) == device);
+        REQUIRE(manager->blas(uid) == device);
+    }
+
+    REQUIRE(manager->hasBlas() == !manager->blasDevices().isEmpty());
+#endif
+}
+
+TEST_CASE("Fallback GPU index contains only generic GPU devices", "[ggml][device_manager][edge][gpu][fallback]")
+{
+    JobGgmlDeviceManager *manager = g_jobGgml->deviceManager();
+    REQUIRE(manager != nullptr);
+
+    for (const auto &[uid, device] : manager->fallbackGpus()) {
         REQUIRE(device != nullptr);
         REQUIRE(device->isValid());
         REQUIRE(device->props() != nullptr);
+        REQUIRE(manager->device(uid) == device);
 
-        const enum ggml_backend_dev_type type =
-            device->props()->type();
+        const JobGgmlDeviceType type = device->props()->deviceType();
 
-        REQUIRE(
-            (type == GGML_BACKEND_DEVICE_TYPE_GPU ||
-             type == GGML_BACKEND_DEVICE_TYPE_IGPU)
-            );
+        REQUIRE((type == JobGgmlDeviceType::Gpu ||
+                 type == JobGgmlDeviceType::IGpu));
     }
 }
 
-TEST_CASE(
-    "Device manager rejects out-of-range indexes and empty lookups",
-    "[ggml][device_manager][edge][lookup]"
-    )
+TEST_CASE("Device manager rejects empty and unknown uid lookups", "[ggml][device_manager][edge][lookup]")
 {
-    JobGgmlDeviceManager &manager =
-        readyDeviceManager();
-
-    REQUIRE(
-        manager.device(manager.deviceCount()) ==
-        nullptr
-        );
-
-    REQUIRE(
-        manager.deviceShared(manager.deviceCount()) ==
-        nullptr
-        );
-
-    REQUIRE(
-        manager.deviceByName("") ==
-        nullptr
-        );
-
-    REQUIRE(
-        manager.deviceByNameShared("") ==
-        nullptr
-        );
-
-    REQUIRE(
-        manager.deviceById("") ==
-        nullptr
-        );
-
-    REQUIRE(
-        manager.deviceByIdShared("") ==
-        nullptr
-        );
-
-    REQUIRE(
-        manager.deviceByName(
-            "JOB test device that cannot exist"
-            ) == nullptr
-        );
+    JobGgmlDeviceManager *manager = g_jobGgml->deviceManager();
+    REQUIRE(manager != nullptr);
+    REQUIRE(manager->device("") == nullptr);
+    REQUIRE(manager->device("unknown") == nullptr);
+    REQUIRE(manager->device("JOB test device that cannot exist") == nullptr);
+    REQUIRE(manager->device("JOB test device that cannot exist") == nullptr);
 }
 
-TEST_CASE(
-    "Device memory reporting remains internally consistent",
-    "[ggml][device_manager][edge][memory]"
-    )
+TEST_CASE("Device memory reporting remains internally consistent", "[ggml][device_manager][edge][memory]")
 {
-    JobGgmlDeviceManager &manager =
-        readyDeviceManager();
+    JobGgmlDeviceManager *manager = g_jobGgml->deviceManager();
+    REQUIRE(manager != nullptr);
 
-    for (const JobGgmlDevice::Ptr &device :
-         manager.devices()) {
+    for (const auto &[uid, device] : manager->devices()) {
+        INFO("uid: " << uid);
+
         REQUIRE(device != nullptr);
         REQUIRE(device->props() != nullptr);
 
-        const std::size_t freeMemory =
-            device->props()->memoryFree();
+        const std::size_t freeMemory = device->props()->memoryFree();
+        const std::size_t totalMemory = device->props()->memoryTotal();
 
-        const std::size_t totalMemory =
-            device->props()->memoryTotal();
-
-        /*
-         * Some backends may report 0/0 when memory reporting is unavailable.
-         * The universally valid invariant is that free memory cannot exceed
-         * total memory.
-         */
         REQUIRE(freeMemory <= totalMemory);
     }
 }
 
-TEST_CASE(
-    "Scheduler construction requires a completed device scan",
-    "[ggml][device_manager][edge][scheduler]"
-    )
+TEST_CASE("Device manager can defer scanning", "[ggml][device_manager][edge][scan]")
 {
-    JobGgmlDeviceManager manager;
+    JobGgmlDeviceManager manager{false};
 
-    REQUIRE(
-        manager.state() ==
-        JobGgmlDeviceManager::ManagerState::Uninitialized
-        );
-
-    REQUIRE_FALSE(manager.isReady());
-    REQUIRE_FALSE(manager.hasScheduler());
-
-    REQUIRE_THROWS_AS(
-        manager.buildScheduler(),
-        std::runtime_error
-        );
-}
-
-TEST_CASE(
-    "Scheduler construction rejects an empty explicit device list",
-    "[ggml][device_manager][edge][scheduler]"
-    )
-{
-    JobGgmlDeviceManager &manager =
-        readyDeviceManager();
-
-    const std::vector<JobGgmlDevice *> noDevices;
-
-    REQUIRE_THROWS_AS(
-        manager.buildScheduler(noDevices),
-        std::invalid_argument
-        );
-}
-
-TEST_CASE(
-    "Scheduler reset preserves discovered devices",
-    "[ggml][device_manager][edge][scheduler]"
-    )
-{
-    JobGgmlDeviceManager &manager =
-        readyDeviceManager();
-
-    JobGgmlDevice *cpu =
-        manager.cpuDevice();
-
-    REQUIRE(cpu != nullptr);
-
-    JobGgmlBackendSched::Ptr scheduler =
-        manager.buildScheduler();
-
-    REQUIRE(scheduler != nullptr);
-    REQUIRE(manager.hasScheduler());
-
-    manager.resetScheduler();
-
-    REQUIRE_FALSE(manager.hasScheduler());
-    REQUIRE(manager.scheduler() == nullptr);
-
-    /*
-     * Resetting only the scheduler must not invalidate the canonical device
-     * map.
-     */
-    REQUIRE(manager.isReady());
-    REQUIRE(manager.cpuDevice() == cpu);
-    REQUIRE(cpu->isValid());
-}
-
-TEST_CASE(
-    "Device manager reset clears state and allows a new scan",
-    "[ggml][device_manager][edge][reset]"
-    )
-{
-    JobGgmlDeviceManager &manager =
-        readyDeviceManager();
-
-    REQUIRE(manager.isReady());
-    REQUIRE(manager.deviceCount() >= 1);
-
-    REQUIRE(manager.buildScheduler());
-
-    REQUIRE(manager.hasScheduler());
-
-    manager.reset();
-
-    REQUIRE(
-        manager.state() ==
-        JobGgmlDeviceManager::ManagerState::Uninitialized
-        );
-
+    REQUIRE(manager.state() == DeviceManagerState::Uninitialized);
     REQUIRE_FALSE(manager.isReady());
     REQUIRE_FALSE(manager.isValid());
-
-    REQUIRE(manager.deviceCount() == 0);
-    REQUIRE(manager.gpuDeviceCount() == 0);
-
-    REQUIRE(manager.cpuDevice() == nullptr);
-    REQUIRE(manager.scheduler() == nullptr);
-
-    REQUIRE_FALSE(manager.hasCpu());
-    REQUIRE_FALSE(manager.hasGpu());
     REQUIRE_FALSE(manager.hasScheduler());
+    REQUIRE(manager.deviceCount() == 0);
+    REQUIRE(manager.cpu() == nullptr);
 
-    REQUIRE(manager.errorString().empty());
-
-    /*
-     * Restore the shared manager for any test Catch2 chooses to run after
-     * this one.
-     */
     manager.scan();
 
     REQUIRE(manager.isReady());
     REQUIRE(manager.isValid());
-    REQUIRE(manager.cpuDevice() != nullptr);
+    REQUIRE(manager.cpu() != nullptr);
+}
+
+TEST_CASE("Scheduler construction requires a completed device scan", "[ggml][device_manager][edge][scheduler]")
+{
+    JobGgmlDeviceManager manager{false};
+
+    REQUIRE(manager.state() == DeviceManagerState::Uninitialized);
+    REQUIRE_FALSE(manager.isReady());
+    REQUIRE_FALSE(manager.hasScheduler());
+    REQUIRE_THROWS_AS(manager.buildScheduler("CPU"), std::runtime_error);
+}
+
+TEST_CASE("Scheduler reset preserves canonical devices", "[ggml][device_manager][edge][scheduler]")
+{
+    JobGgmlDeviceManager *manager = g_jobGgml->deviceManager();
+    REQUIRE(manager != nullptr);
+    JobGgmlCpu *cpu = manager->cpu();
+
+    REQUIRE(cpu != nullptr);
+
+    const std::string uid = cpu->uid();
+    JobGgmlBackendSched::Ptr scheduler = manager->buildScheduler(cpu);
+
+    REQUIRE(scheduler != nullptr);
+    REQUIRE(manager->hasScheduler());
+
+    manager->resetScheduler();
+
+    REQUIRE_FALSE(manager->hasScheduler());
+    REQUIRE(manager->scheduler() == nullptr);
+    REQUIRE(manager->isReady());
+    REQUIRE(manager->cpu() == cpu);
+    REQUIRE(manager->device(uid) == cpu);
+    REQUIRE(cpu->isValid());
+}
+
+TEST_CASE("Device manager reset clears state and allows a new scan", "[ggml][device_manager][edge][reset]")
+{
+    JobGgmlDeviceManager *manager = g_jobGgml->deviceManager();
+    REQUIRE(manager != nullptr);
+
+    REQUIRE(manager->isReady());
+    REQUIRE(manager->deviceCount() >= 1);
+    REQUIRE(manager->buildScheduler("CPU"));
+    REQUIRE(manager->hasScheduler());
+
+    manager->reset();
+
+    REQUIRE(manager->state() == DeviceManagerState::Uninitialized);
+    REQUIRE_FALSE(manager->isReady());
+    REQUIRE_FALSE(manager->isValid());
+    REQUIRE(manager->deviceCount() == 0);
+    REQUIRE(manager->cpu() == nullptr);
+    REQUIRE(manager->scheduler() == nullptr);
+    REQUIRE_FALSE(manager->hasCpu());
+    REQUIRE_FALSE(manager->hasGpu());
+    REQUIRE_FALSE(manager->hasScheduler());
+    REQUIRE(manager->errorString().empty());
+    REQUIRE(manager->devices().isEmpty());
+    REQUIRE(manager->fallbackGpus().isEmpty());
+
+#ifdef JOB_GGML_CUDA
+    REQUIRE(manager->cudaDevices().isEmpty());
+#endif
+
+#ifdef JOB_GGML_VULKAN
+    REQUIRE(manager->vulkanDevices().isEmpty());
+#endif
+
+#ifdef JOB_GGML_OPENCL
+    REQUIRE(manager->openClDevices().isEmpty());
+#endif
+
+#ifdef JOB_GGML_BLAS
+    REQUIRE(manager->blasDevices().isEmpty());
+#endif
+
+    // Restore the shared manager for any test Catch2 chooses to run next.
+    manager->scan();
+
+    REQUIRE(manager->isReady());
+    REQUIRE(manager->isValid());
+    REQUIRE(manager->cpu() != nullptr);
 }
 
 // ============================================================================
 // Block three: benchmarks / stress
 // ============================================================================
-
 #ifdef JOB_TEST_BENCHMARKS
-
-TEST_CASE("Repeated fresh device discovery throughput", "[ggml][device_manager][benchmark][stress]")
+TEST_CASE("Repeated cold start device discovery throughput", "[ggml][device_manager][benchmark][stress]")
 {
-    BENCHMARK_ADVANCED("50 fresh manager scans")(Catch::Benchmark::Chronometer meter){
-        meter.measure([]{
-                constexpr std::size_t scans = 50;
-                bool ready = true;
-                for (std::size_t i = 0; i < scans; ++i) {
-                    JobGgmlDeviceManager manager;
-                    manager.scan();
-                    ready = ready && manager.isReady() && manager.cpuDevice() != nullptr;
-                }
-                return ready;
-            });
+
+    BENCHMARK_ADVANCED("50 fresh manager scans")(Catch::Benchmark::Chronometer meter) {
+        meter.measure([] {
+            constexpr std::size_t scans = 50;
+            bool ready = true;
+
+            for (std::size_t i = 0; i < scans; ++i) {
+                JobGgmlDeviceManager manager{};
+                ready = ready && manager.isReady() && manager.cpu() != nullptr;
+            }
+
+            return ready;
+        });
     };
 }
 
-TEST_CASE("Fresh device discovery performance", "[ggml][device_manager][benchmark][cold]")
+TEST_CASE("Cold start device discovery performance", "[ggml][device_manager][benchmark][cold]")
 {
     BENCHMARK("construct manager and scan") {
-        JobGgmlDeviceManager manager;
-        manager.scan();
-        return manager.isReady() && manager.cpuDevice() != nullptr;
+        JobGgmlDeviceManager manager{};
+        return manager.isReady() && manager.cpu() != nullptr;
     };
 }
 
-TEST_CASE("Repeated fresh device discovery remains stable", "[ggml][device_manager][stress]")
+TEST_CASE("100 cold start fresh device discovery remains stable", "[ggml][device_manager][stress]")
 {
     constexpr std::size_t iterations = 100;
 
     for (std::size_t i = 0; i < iterations; ++i) {
-        JobGgmlDeviceManager manager;
-        manager.scan();
+        JobGgmlDeviceManager manager{};
         REQUIRE(manager.isReady());
-        REQUIRE(manager.cpuDevice() != nullptr);
+        REQUIRE(manager.cpu() != nullptr);
         REQUIRE(manager.deviceCount() >= 1);
     }
 }
@@ -548,41 +430,49 @@ TEST_CASE("Repeated fresh device discovery remains stable", "[ggml][device_manag
 TEST_CASE("Ready-state scan performance", "[ggml][device_manager][benchmark]")
 {
     JobGgmlDeviceManager manager;
-    manager.scan();
     REQUIRE(manager.isReady());
-    JobGgmlDevice *cpu = manager.cpuDevice();
-
+    JobGgmlDevice *cpu = manager.cpu();
     REQUIRE(cpu != nullptr);
     BENCHMARK("idempotent scan") {
         manager.scan();
-        return manager.cpuDevice() == cpu;
+        return manager.cpu() == cpu;
     };
 }
 
-TEST_CASE("Device lookup performance", "[ggml][device_manager][benchmark]")
+TEST_CASE("Device uid lookup performance", "[ggml][device_manager][benchmark][lookup]")
 {
-    JobGgmlDeviceManager &manager = readyDeviceManager();
-    JobGgmlDevice *cpu = manager.cpuDevice();
-
+    JobGgmlDeviceManager *manager = g_jobGgml->deviceManager();
+    REQUIRE(manager != nullptr);
+    JobGgmlCpu *cpu = manager->cpu();
     REQUIRE(cpu != nullptr);
-    REQUIRE(cpu->props() != nullptr);
+    const std::string uid = cpu->uid();
+    REQUIRE_FALSE(uid.empty());
+    REQUIRE(uid != "unknown");
+    BENCHMARK("deviceByUid") {
+        return manager->device(uid);
+    };
+}
+
+TEST_CASE("Device name lookup performance", "[ggml][device_manager][benchmark][lookup]")
+{
+    JobGgmlDeviceManager *manager = g_jobGgml->deviceManager();
+    REQUIRE(manager != nullptr);
+    JobGgmlCpu *cpu = manager->cpu();
+    REQUIRE(cpu != nullptr);
     const std::string name = cpu->props()->name();
-
     REQUIRE_FALSE(name.empty());
-
     BENCHMARK("deviceByName") {
-        return manager.deviceByName(name);
+        return manager->device(name);
     };
 }
 
 TEST_CASE("Scheduler construction performance", "[ggml][device_manager][benchmark]")
 {
-    JobGgmlDeviceManager &manager = readyDeviceManager();
-
+    JobGgmlDeviceManager *manager = g_jobGgml->deviceManager();
+    REQUIRE(manager != nullptr);
     BENCHMARK("build scheduler") {
-        manager.resetScheduler();
-        return manager.buildScheduler();
+        manager->resetScheduler();
+        return manager->buildScheduler(manager->cpu());
     };
 }
-
 #endif

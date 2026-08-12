@@ -7,7 +7,7 @@
 
 #include "qsdbaseparam.h"
 #include "qmlsd_export.h"
-// NOT TESTED
+
 class QMLSD_EXPORT QSdSlgParams : public QSdBaseParam
 {
     Q_OBJECT

@@ -9,7 +9,7 @@
 
 #include <job_logger.h>
 
-// Link against your new header
+
 #include <activation.h>
 
 using Catch::Approx;

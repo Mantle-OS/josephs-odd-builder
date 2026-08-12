@@ -2,7 +2,10 @@
 #include <QObject>
 #include <QtMath>
 #include <QQmlEngine>
+
 #include <stable-diffusion.h>
+
+#include <real_type.h>
 
 #include "qsdenums.h"
 #include "qsdbaseparam.h"
@@ -12,7 +15,7 @@ class QMLSD_EXPORT QSdCacheParams : public QSdBaseParam
 {
     Q_OBJECT    
     QP_RW(QSdEnums::QSdCacheModeTypes, mode,                     QSdEnums::QSdCacheDisabled ) // The caching algorithm to use (e.g., Disabled, TeaCache, TaylorSeer).
-    QP_RW(float,                       reuseThreshold,           qInf()                     ) // Threshold for tensor reuse; higher means more speed but lower quality.
+    QP_RW(float,                       reuseThreshold,           job::core::safeInfinity() ) // qInf()                     ) // Threshold for tensor reuse; higher means more speed but lower quality.
     QP_RW(float,                       startPercent,             0.15f                      ) // Timestep fraction (0.0 to 1.0) to begin applying the cache.
     QP_RW(float,                       endPercent,               0.95f                      ) // Timestep fraction (0.0 to 1.0) to stop applying the cache.
     QP_RW(float,                       errorDecayRate,           1.0f                       ) // Rate at which accumulated caching error decays.

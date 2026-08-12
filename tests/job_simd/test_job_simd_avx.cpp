@@ -534,10 +534,23 @@ TEST_CASE("Benchmark: Scalar Loop vs Vectorized Kernel (mul_plus, mask-select)",
     };
 
     BENCHMARK("mask-select (Tile)") {
-        f32 total = SIMD::zero();
+        f32 total = SIMD::zero(); // cost here
         for (std::size_t t = 0; t < tileCount; ++t)
             total = SIMD::add(total, benchTileMaskSelect(&tileData[t * width * width], width, maskEps));
         return hsum(total);
     };
+
+
+    BENCHMARK("mask-select (Tile)") {
+        f32 total = SIMD::zero(); // cost here
+        for (std::size_t t = 0; t < tileCount; ++t)
+            total = SIMD::add(total, benchTileMaskSelect(&tileData[t * width * width], width, maskEps));
+        return hsum(total);
+    };
+
+
+
+
+
 }
 #endif

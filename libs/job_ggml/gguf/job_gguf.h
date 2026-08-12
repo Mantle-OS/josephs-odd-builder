@@ -28,6 +28,7 @@ public:
     using UPtr = std::unique_ptr<JobGguf>;
 
     explicit JobGguf(JobGgmlContext::UPtr *contextOutput = nullptr);
+
     ~JobGguf() = default;
 
     [[nodiscard]] static Ptr createShared(JobGgmlContext::UPtr *contextOutput = nullptr)

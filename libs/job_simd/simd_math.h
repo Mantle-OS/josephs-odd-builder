@@ -1,6 +1,8 @@
 #pragma once
 
+#include <cstdint>
 #include "simd_provider.h"
+
 namespace job::simd {
 
 // EXP Schraudolph "Fast Math/BitHack"
@@ -204,7 +206,71 @@ namespace job::simd {
     return SIMD::blendv(res, SIMD::qnan(), invalid_mask);
 }
 
+[[nodiscard]] static inline i64 avx_siphash(i64 m0, i64 m1, i64 k0, i64 k1) noexcept
+{
+    i64 v0 = SIMD::xor_i64( SIMD::set1_i64( 0x736f6d6570736575ULL ), k0 );
+    i64 v1 = SIMD::xor_i64( SIMD::set1_i64( 0x646f72616e646f6dULL ), k1 );
+    i64 v2 = SIMD::xor_i64( SIMD::set1_i64( 0x6c7967656e657261ULL ), k0 );
+    i64 v3 = SIMD::xor_i64( SIMD::set1_i64( 0x7465646279746573ULL ), k1 );
 
+#define SIPROUND_I64() \
+    do { \
+            v0 = SIMD::add_i64( v0, v1 ) ; \
+            v2 = SIMD::add_i64( v2, v3 ) ; \
+            v1 = SIMD::rotl_i64<13>( v1 ) ; \
+            v3 = SIMD::rotl_i64<16>( v3 ) ; \
+            v1 = SIMD::xor_i64( v1, v0 ) ; \
+            v3 = SIMD::xor_i64( v3, v2 ) ; \
+            v0 = SIMD::rotl_i64<32>( v0 ) ; \
+            v2 = SIMD::add_i64( v2, v1 ) ; \
+            v0 = SIMD::add_i64( v0, v3 ) ; \
+            v1 = SIMD::rotl_i64<17>( v1 ) ; \
+            v3 = SIMD::rotl_i64<21>( v3 ) ; \
+            v1 = SIMD::xor_i64( v1, v2 ) ; \
+            v3 = SIMD::xor_i64( v3, v0 ) ; \
+            v2 = SIMD::rotl_i64<32>( v2 ) ; \
+    } while (0)
+
+        // Process Block 0 (m0 = lower 8 bytes)
+        v3 = SIMD::xor_i64( v3, m0 );
+    SIPROUND_I64();
+    SIPROUND_I64();
+    v0 = SIMD::xor_i64( v0, m0 );
+
+    // Process Block 1 (m1 = upper 8 bytes)
+    v3 = SIMD::xor_i64( v3, m1 );
+    SIPROUND_I64();
+    SIPROUND_I64();
+    v0 = SIMD::xor_i64( v0, m1 );
+
+    // Process Block 2 (len_b = 16ULL << 56)
+    const i64 len_b = SIMD::set1_i64( static_cast<std::int64_t>( 16ULL << 56 ) );
+    v3 = SIMD::xor_i64( v3, len_b );
+    SIPROUND_I64();
+    SIPROUND_I64();
+    v0 = SIMD::xor_i64( v0, len_b );
+
+    // Finalization (v2 ^= 0xff)
+    v2 = SIMD::xor_i64( v2, SIMD::set1_i64( 0xff ) );
+    SIPROUND_I64();
+    SIPROUND_I64();
+    SIPROUND_I64();
+    SIPROUND_I64();
+
+#undef SIPROUND_I64
+
+    return SIMD::xor_i64( SIMD::xor_i64( v0, v1 ), SIMD::xor_i64( v2, v3 ) );
+}
+
+[[nodiscard]] static inline i64 avx_siphash_tile4(const std::uint64_t *uids, std::uint64_t k0, std::uint64_t k1) noexcept
+{
+    i64 m0;
+    i64 m1;
+    SIMD::loadSipHashTile4( uids, m0, m1 );
+    const i64 vk0 = SIMD::set1_u64( k0 );
+    const i64 vk1 = SIMD::set1_u64( k1 );
+    return avx_siphash( m0, m1, vk0, vk1 );
+}
 
 [[nodiscard]]  __attribute__((always_inline))
 inline float hsum(f32 x) noexcept
@@ -216,7 +282,5 @@ inline float hsum(f32 x) noexcept
         s += tmp[i];
     return s;
 }
-
-
 
 }

@@ -562,6 +562,7 @@ void QSdEnums::fillSchedulerTypes()
                            { QSdLcmScheduler,   QStringLiteral("Lcm") },
                            { QSdBong,           QStringLiteral("Bong") },
                            { QSdLtx2,           QStringLiteral("Ltx2.3") },
+                           { QSdLogitNormal,    QStringLiteral("LogitNormal")},
                            { QSdSchedulerCount, QStringLiteral("Count") },
                            };
     QMapIterator<QSdSchedulerTypes, QString> it(m_schedulerTypesMap);

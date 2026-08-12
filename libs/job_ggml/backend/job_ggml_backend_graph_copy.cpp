@@ -6,27 +6,19 @@ namespace job::ggml {
 
 JobGgmlBackendGraphCopy::JobGgmlBackendGraphCopy(JobGgmlBackend &backend, JobGgmlCGraph &graph)
 {
-    if (!backend.isValid()) {
-        throw std::invalid_argument{
-            "JobGgmlBackendGraphCopy requires a valid JobGgmlBackend"
-        };
-    }
+    if (!backend.isValid())
+        throw std::invalid_argument{ "JobGgmlBackendGraphCopy requires a valid JobGgmlBackend" };
 
-    if (!graph.isValid()) {
-        throw std::invalid_argument{
-            "JobGgmlBackendGraphCopy requires a valid JobGgmlCGraph"
-        };
-    }
+    if (!graph.isValid())
+        throw std::invalid_argument{ "JobGgmlBackendGraphCopy requires a valid JobGgmlCGraph" };
 
     m_graphCopy = ggml_backend_graph_copy(backend.backend(), graph.graph());
 
     if (!isValid()) {
         reset();
-
-        throw std::runtime_error{
-            "Failed to copy the GGML graph to the requested backend"
-        };
+        throw std::runtime_error{ "Failed to copy the GGML graph to the requested backend" };
     }
+
 }
 
 JobGgmlBackendGraphCopy::~JobGgmlBackendGraphCopy()

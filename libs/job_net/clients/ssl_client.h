@@ -80,8 +80,6 @@ private:
     void closeSocket() noexcept;
     void readAvailableData();
 
-
-
     threads::JobIoAsyncThread::Ptr m_loop;
     JobSslContext::Ptr             m_context;
     JobResolver::Ptr               m_resolver;

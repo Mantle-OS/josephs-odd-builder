@@ -145,5 +145,10 @@ bool JobGgmlDevice::isValid() const noexcept
            m_backend->isValid();
 }
 
+JobGgmlDeviceImpl JobGgmlDevice::impl() const noexcept
+{
+    return JobGgmlDeviceImpl::Fallback;
+}
+
 
 } // namespace job::ggml

@@ -33,9 +33,6 @@ public:
     [[nodiscard]] bool operator==(const JobGgmlDeviceProps &other) const noexcept;
     [[nodiscard]] bool operator!=(const JobGgmlDeviceProps &other) const noexcept;
 
-    [[nodiscard]] enum ggml_backend_dev_type type() const noexcept;
-    void setGgmlType(enum ggml_backend_dev_type type);
-
     [[nodiscard]] JobGgmlDeviceType deviceType() const noexcept;
     void setDeviceType(JobGgmlDeviceType type);
 
@@ -82,8 +79,11 @@ private:
     }
 
     ggml_backend_dev_props      m_props{defaultProps()};
+
+    [[nodiscard]] enum ggml_backend_dev_type type() const noexcept;
+    void setGgmlType(enum ggml_backend_dev_type type);
     enum ggml_backend_dev_type  m_ggmlDeviceType{GGML_BACKEND_DEVICE_TYPE_CPU};
-    JobGgmlDeviceType           m_deviceType{JobGgmlDeviceType::Cpu};
+
     std::string                 m_name{"cpu"};
     std::string                 m_description{"unknown"};
     std::size_t                 m_memoryFree{0};

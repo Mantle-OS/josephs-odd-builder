@@ -10,7 +10,7 @@ if(JOB_CUDA)
     set(CMAKE_CUDA_STANDARD 20)
     set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 
-    find_package(CUDAToolkit REQUIRED)
+    find_package(CUDAToolkit REQUIRED) ## oddly this works here and is a workaround ....
 
     set(CMAKE_CUDA_TOOLKIT_ROOT_DIR "${JOB_CUDA_TOOLKIT_ROOT_DIR}")
     set(CMAKE_CUDA_COMPILER         "${JOB_CUDA_COMPILER}")

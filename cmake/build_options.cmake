@@ -17,7 +17,7 @@ endif()
 # AVX Settings
 ##############################
 option(JOB_AVX_FLAG           "build with avx" OFF)
-option(JOB_AVX_TWO_FLAG         "build with avx two" OFF)
+option(JOB_AVX_TWO_FLAG       "build with avx two" OFF)
 option(JOB_AVX_VNNI_FLAG      "build with avx vnni" ON)
 option(JOB_AVX_512_FLAG       "build with avx 512f" OFF)
 option(JOB_AVX_512_VNNI_FLAG  "build with avx 512vnni" OFF)
@@ -68,6 +68,9 @@ else()
 endif()
 
 
+
+## These(options below) are not yet intergrated but will be later on
+
 ##############################
 # Core Libraries
 ##############################
@@ -81,11 +84,10 @@ option(JOB_BUILD_CUDA "Build the job_cuda library" ON)
 option(JOB_BUILD_IO "Build the job_io library" ON)
 option(JOB_BUILD_UART "Build the job_uart library" ON)
 option(JOB_BUILD_NET "Build the job_net library" ON)
-
+option(JOB_GGML "Build JobGgml " ON)
 option(JOB_BUILD_SERIALIZER "Build the job_serializer library" ON)
 option(JOB_BUILD_SERIALIZER_MSGPACK "Enable MsgPack backend for Job Serlizer" ON)
 option(JOB_BUILD_SERIALIZER_FLATBUFFERS "Enable FlatBuffers backend" OFF)
-
 option(JOB_BUILD_SCIENCE "Build the job_science library" ON)
 option(JOB_BUILD_AI "Build the job_ai library" ON)
 option(JOB_BUILD_ANSI "Build the job_ansi library" ON)

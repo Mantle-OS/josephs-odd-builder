@@ -83,7 +83,7 @@ void QSdCacheParams::setCacheParams(sd_cache_params_t other)
 void QSdCacheParams::resetCacheParams()
 {
     m_cacheParams.mode                        = SD_CACHE_DISABLED;
-    m_cacheParams.reuse_threshold             = qInf();
+    m_cacheParams.reuse_threshold             = job::core::safeInfinity(); // qInf();
     m_cacheParams.start_percent               = 0.15f;
     m_cacheParams.end_percent                 = 0.95f;
     m_cacheParams.error_decay_rate            = 1.0f;

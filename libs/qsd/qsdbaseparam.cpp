@@ -84,6 +84,7 @@ QJsonObject QSdBaseParam::toJson() const {
             }
             if (value.typeId() == QMetaType::Int ||
                 value.typeId() == QMetaType::Double ||
+                value.typeId() == QMetaType::Float ||
                 value.typeId() == QMetaType::QString ||
                 value.typeId() == QMetaType::Bool) {
                 // Handle primitive types
@@ -162,6 +163,7 @@ void QSdBaseParam::fromJson(const QJsonObject &jsonObject) {
             QVariant value = property.read(this);
             if (value.typeId() == QMetaType::Int ||
                 value.typeId() == QMetaType::Double ||
+                value.typeId() == QMetaType::Float ||
                 value.typeId() == QMetaType::QString ||
                 value.typeId() == QMetaType::Bool ||
                 value.typeId() == QMetaType::IsEnumeration) {
@@ -403,6 +405,8 @@ void QSdBaseParam::fromYaml(const YAML::Node &yamlNode)
                 property.write(this, QVariant(QString::fromStdString(yamlNode[property.name()].as<std::string>())));
             } else if (value.typeId() == QMetaType::Bool) {
                 property.write(this, yamlNode[property.name()].as<bool>());
+            } else if (value.typeId() == QMetaType::Float){
+                property.write(this, QVariant(yamlNode[property.name()].as<float>()));
             }
 
             else if (value.typeId() == QMetaType::QStringList){

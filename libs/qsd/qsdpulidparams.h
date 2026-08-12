@@ -27,5 +27,5 @@ public:
 
 private:
     QByteArray tmp_idEmbeddingPath = "";
-    sd_pulid_params_t m_pulid_params = {nullptr, 0.0f};
+    sd_pulid_params_t m_pulid_params = {nullptr, 1.0f};
 };

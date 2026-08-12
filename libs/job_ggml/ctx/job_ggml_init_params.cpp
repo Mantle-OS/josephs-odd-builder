@@ -1,6 +1,13 @@
 #include "job_ggml_init_params.h"
 
+#include <job_ggml_cgraph.h>
+
 namespace job::ggml {
+JobGgmlInitParams::JobGgmlInitParams(std::size_t mem, void *buffer, bool noAlloc)
+{
+    ggml_init_params initParams{mem, buffer, noAlloc};
+    setInitParams(initParams);
+}
 
 JobGgmlInitParams::JobGgmlInitParams(const ggml_init_params &initParams)
 {
@@ -53,14 +60,8 @@ void JobGgmlInitParams::setInitParams(
 
 ggml_init_params JobGgmlInitParams::initParams() noexcept
 {
-    ggml_init_params ret{
-        memorySize(),
-        memoryBuffer(),
-        noAlloc()
-    };
-
+    ggml_init_params ret { memorySize(), memoryBuffer(), noAlloc() };
     m_initParams = ret;
-
     return m_initParams;
 }
 
@@ -68,6 +69,11 @@ void JobGgmlInitParams::resetInitParams() noexcept
 {
     m_initParams = defaultInitParams();
     setInitParams(m_initParams);
+}
+
+std::size_t JobGgmlInitParams::estCtxCost(std::size_t tensors, std::size_t graphSize, bool grad, std::size_t pad) noexcept
+{
+    return tensors * ggml_tensor_overhead() + JobGgmlCGraph::overheadCustom(graphSize, grad) + pad;
 }
 
 } // namespace job::ggml

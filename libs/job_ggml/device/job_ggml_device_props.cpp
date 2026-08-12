@@ -13,7 +13,6 @@ bool JobGgmlDeviceProps::operator==(const JobGgmlDeviceProps &other) const noexc
 {
     const bool capsEqual = m_caps && other.m_caps ? *m_caps == *other.m_caps : !m_caps && !other.m_caps;
     return m_ggmlDeviceType == other.m_ggmlDeviceType &&
-           m_deviceType     == other.m_deviceType     &&
            m_name           == other.m_name           &&
            m_description    == other.m_description    &&
            m_memoryFree     == other.m_memoryFree     &&
@@ -40,13 +39,14 @@ void JobGgmlDeviceProps::setGgmlType(enum ggml_backend_dev_type type)
 
 JobGgmlDeviceType JobGgmlDeviceProps::deviceType() const noexcept
 {
-    return m_deviceType;
+    return  fromGgmlBackendDeviceType(m_ggmlDeviceType);
 }
 
 void JobGgmlDeviceProps::setDeviceType(JobGgmlDeviceType type)
 {
-    if (m_deviceType != type)
-        m_deviceType = type;
+    auto dType = toGgmlBackendDeviceType(type);
+    if (m_ggmlDeviceType != dType)
+        m_ggmlDeviceType = dType;
 }
 
 const std::string &JobGgmlDeviceProps::name() const noexcept

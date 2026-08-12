@@ -17,9 +17,9 @@ JobZstd::JobZstd()
 
 JobZstd::~JobZstd()
 {
-    // No real cancellation exists here -- std::async gives no cooperative
+    // No real cancellation exists here std::async gives no cooperative
     // way to interrupt work already in flight, same as Qt's own
-    // QFuture::cancel() couldn't actually stop a plain running function
+    // cancel() couldn't actually stop a plain running function
     // either. This just waits for whatever's already running to finish
     // before the owned objects get destroyed out from under it.
     if (m_compressFuture.valid())

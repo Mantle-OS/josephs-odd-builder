@@ -23,6 +23,7 @@ public:
     using Ptr  = std::shared_ptr<JobGgmlContext>;
     using WPtr = std::weak_ptr<JobGgmlContext>;
     using UPtr = std::unique_ptr<JobGgmlContext>;
+    using CustomPayloads = std::vector<std::shared_ptr<void>>;
 
     explicit JobGgmlContext(const JobGgmlInitParams &initParams);
     explicit JobGgmlContext(const ggml_init_params &initParams);
@@ -31,13 +32,57 @@ public:
     ~JobGgmlContext() = default;
 
     [[nodiscard]] static Ptr createShared(const JobGgmlInitParams &initParams){ return std::make_shared<JobGgmlContext>(initParams); }
-
     [[nodiscard]] static Ptr createShared(const ggml_init_params &initParams) { return std::make_shared<JobGgmlContext>(initParams); }
     [[nodiscard]] static Ptr createShared(ggml_context_ptr context) { return std::make_shared<JobGgmlContext>(std::move(context)); }
+    [[nodiscard]] static Ptr createHostContext(std::size_t tensors,
+                                               std::size_t payloadBytes,
+                                               std::size_t graphSize = GGML_DEFAULT_GRAPH_SIZE,
+                                               std::size_t pad = 0,
+                                               bool gradients = false)
+    {
+        const auto sz = JobGgmlInitParams::estCtxCost(tensors, graphSize, gradients) + payloadBytes + pad;
+        JobGgmlInitParams initParams {sz, nullptr, false};
+        return job::ggml::JobGgmlContext::createShared(initParams);
+    }
+    [[nodiscard]] static Ptr createSharedMetadata(std::size_t tensorCount,
+                                                        std::size_t graphSize = GGML_DEFAULT_GRAPH_SIZE,
+                                                        bool gradients = false)
+    {
+        const auto sz = JobGgmlInitParams::estCtxCost(tensorCount, graphSize, gradients);
+        JobGgmlInitParams initParams(sz);
+        return JobGgmlContext::createUniq(initParams);
+    }
 
     [[nodiscard]] static UPtr createUniq(const JobGgmlInitParams &initParams){ return std::make_unique<JobGgmlContext>(initParams);}
     [[nodiscard]] static UPtr createUniq(const ggml_init_params &initParams) { return std::make_unique<JobGgmlContext>(initParams); }
-    [[nodiscard]] static UPtr createUniq(ggml_context_ptr context) { return std::make_unique<JobGgmlContext>(std::move(context)); }
+    [[nodiscard]] static UPtr createUniq(ggml_context_ptr context) { return std::make_unique<JobGgmlContext>(std::move(context)); }    
+    [[nodiscard]] static UPtr createUniqHostContext(std::size_t tensors,
+                                                std::size_t payloadBytes,
+                                                std::size_t graphSize = GGML_DEFAULT_GRAPH_SIZE,
+                                                std::size_t pad = 0,
+                                                bool gradients = false)
+    {
+        const auto sz = JobGgmlInitParams::estCtxCost(tensors, graphSize, gradients) + payloadBytes + pad;
+        JobGgmlInitParams initParams {sz, nullptr, false};
+        return JobGgmlContext::createUniq(initParams);
+    }
+
+
+    [[nodiscard]] static UPtr createUniqMetadata(std::size_t tensorCount,
+                                                    std::size_t graphSize = GGML_DEFAULT_GRAPH_SIZE,
+                                                    bool gradients = false)
+    {
+        const auto sz = JobGgmlInitParams::estCtxCost(tensorCount, graphSize, gradients);
+        JobGgmlInitParams initParams(sz);
+        return JobGgmlContext::createUniq(initParams);
+    }
+
+
+
+
+
+
+
 
     JobGgmlContext(const JobGgmlContext &) = delete;
     JobGgmlContext &operator=(const JobGgmlContext &) = delete;
@@ -81,10 +126,30 @@ public:
     [[nodiscard]] JobGgmlCGraph::UPtr newGraphCustom(std::size_t size, bool gradients);
     [[nodiscard]] JobGgmlCGraph::UPtr duplicateGraph(JobGgmlCGraph &graph, bool forceGradients);
 
+    // Custom Operations Life time management
+
+    template<typename T, typename... Args>
+    [[nodiscard]] T *createPayload(Args &&...args)
+    {
+        auto payload = std::make_shared<T>(
+            std::forward<Args>(args)...
+            );
+        T *ptr = payload.get();
+        m_payloads.emplace_back(std::move(payload));
+        return ptr;
+    }
+
+
+
+
+
+
+
 private:
     [[nodiscard]] static constexpr enum ggml_type toGgmlType(JobGgmlType type) noexcept { return static_cast<enum ggml_type>(type); }
 
-    ggml_context_ptr m_context; // Owned by this object.
+    CustomPayloads      m_payloads;     // Owned by this object.
+    ggml_context_ptr    m_context;      // Owned by this object.
 };
 
 } // namespace job::ggml

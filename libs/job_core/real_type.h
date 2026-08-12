@@ -11,6 +11,15 @@ namespace job::core {
     std::uint32_t exponent = (u & 0x7F800000) >> 23;
     return exponent != 255;
 }
+[[nodiscard]] constexpr float safeInfinity() noexcept
+{
+    return std::bit_cast<float>(std::uint32_t{0x7F800000U});
+}
+
+[[nodiscard]] constexpr float safeNaN() noexcept
+{
+    return std::bit_cast<float>(std::uint32_t{0x7FC00000U});
+}
 
 inline constexpr float piToTheFace = 3.141592653589793238462643383279502884L;
 

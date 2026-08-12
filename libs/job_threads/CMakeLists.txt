@@ -57,6 +57,7 @@ set(JOBTHREADS_UTILS_HEADERS
 
     # utils/job_monte_carlo_concept.h
     utils/job_monte_carlo.h
+    utils/simd_for.h
 )
 set(JOBTHREADS_UTILS_SOURCES
     utils/job_thread_graph.cpp
@@ -179,6 +180,7 @@ endif()
 target_link_libraries(JosephsOddBuilder_Threads PUBLIC
     Threads::Threads
     JosephsOddBuilder_Core
+    JosephsOddBuilder_Simd
 )
 
 target_include_directories(JosephsOddBuilder_Threads PUBLIC

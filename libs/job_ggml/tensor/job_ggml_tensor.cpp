@@ -2,6 +2,8 @@
 
 #include <stdexcept>
 
+#include "job_ggml_context.h"
+
 namespace job::ggml {
 
 JobGgmlTensor::JobGgmlTensor(struct ggml_tensor *tensor) :
@@ -19,6 +21,27 @@ JobGgmlTensor::JobGgmlTensor(struct ggml_tensor *tensor) :
      * JobGgmlTensor can escape.
      */
 }
+
+JobGgmlTensor::Ptr JobGgmlTensor::createSharedNamedTensor2d(JobGgmlContext &context, const std::string &name, JobGgmlType type, int64_t ne0, int64_t ne1)
+{
+    auto tensor = context.newTensor2d(type, ne0, ne1);
+    if (!tensor)
+        return nullptr;
+
+    tensor->setName(name);
+    return tensor;
+}
+
+JobGgmlTensor::UPtr JobGgmlTensor::createUniqNamedTensor2d(JobGgmlContext &context, const std::string &name, JobGgmlType type, int64_t ne0, int64_t ne1)
+{
+    auto tensor = context.newTensor2d(type, ne0, ne1);
+    if (!tensor)
+        return nullptr;
+
+    tensor->setName(name);
+    return tensor;
+}
+
 
 bool JobGgmlTensor::isValid() const noexcept
 {
@@ -164,8 +187,7 @@ std::size_t JobGgmlTensor::paddedByteCount() const noexcept
 
 bool JobGgmlTensor::isScalar() const noexcept
 {
-    return m_extents &&
-           m_extents->isScalar();
+    return m_extents && m_extents->isScalar();
 }
 
 bool JobGgmlTensor::isVector() const noexcept

@@ -7,14 +7,10 @@ namespace job::ggml {
 JobGgmlBackendBufferView::JobGgmlBackendBufferView(ggml_backend_buffer_t buffer) :
     m_buffer{buffer}
 {
-    if (!m_buffer) {
-        throw std::invalid_argument{
-            "JobGgmlBackendBufferView requires a valid ggml_backend_buffer_t"
-        };
-    }
+    if (!m_buffer)
+        throw std::invalid_argument{ "JobGgmlBackendBufferView requires a valid ggml_backend_buffer_t" };
 
     const char *bufferName = ggml_backend_buffer_name(m_buffer);
-
     setName(bufferName ? bufferName : "unknown");
 }
 

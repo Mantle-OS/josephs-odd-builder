@@ -201,10 +201,13 @@ sd_ctx_params_t QSdCtxParams::ctxParams()
     sd_ctx_params.qwen_image_zero_cond_t            = m_qwenImageZero;
     sd_ctx_params.stream_layers                     = m_streamLayers;  // Enable residency+prefetch streaming on top of --max-vram (no effect without --max-vram)
     // GiB budget for graph-cut segmented param offload (0 = disabled, -1 = auto free VRAM minus 1 GiB)
-    if(!m_maxVram.isEmpty()){
-        tmp_maxVram = m_maxVram.toLocal8Bit();
-        sd_ctx_params.max_vram = tmp_maxVram.constData();
-    }
+
+    sd_ctx_params.max_vram = nullptr;
+    // FIXME
+    // if(!m_maxVram.isEmpty()){
+    //     tmp_maxVram = m_maxVram.toLocal8Bit();
+    //     sd_ctx_params.max_vram = tmp_maxVram.constData();
+    // }
 
     if(!m_backend.isEmpty()){
 
@@ -325,7 +328,7 @@ void QSdCtxParams::setCtxParams(sd_ctx_params_t *other)
     set_circularY(other->circular_y);
     set_forceSdxlVaeConvScale(other->force_sdxl_vae_conv_scale);
     set_chromaUseDitMask(other->chroma_use_dit_mask);
-    set_chromaUseT5Mask(other->chroma_t5_mask_pad);
+    set_chromaUseT5Mask(other->chroma_use_t5_mask);
     set_streamLayers(other->stream_layers);
     set_qwenImageZero(other->qwen_image_zero_cond_t);
 

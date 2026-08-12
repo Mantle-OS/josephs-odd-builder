@@ -76,9 +76,9 @@ QVariantMap qMapToVariant(const QMap<Key, T> &map) {
 
 
 // custom foreach for QList, which uses no copy and check pointer non-null
-#define FOREACH_PTR_IN_QLIST(_type_, _var_, _list_) \
-for (typename QList<_type_ *>::const_iterator it = _list_.constBegin (); it != _list_.constEnd (); ++it) \
-        if (_type_ * _var_ = (* it))
+#define FOREACH_PTR_IN_QLIST( _type_ ,  _var_ , _list_ ) \
+for ( typename QList<_type_ *>::const_iterator it = _list_.constBegin ( ) ; it != _list_.constEnd ( ) ; ++it ) \
+        if ( _type_ * _var_ = ( * it ) )
 
 class QMLAIUTILS_EXPORT ObjectListModelBase : public QAbstractListModel { // abstract Qt base class
     Q_OBJECT

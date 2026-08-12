@@ -24,7 +24,7 @@ public:
     using UPtr = std::unique_ptr<JobGgmlDevice>;
 
     explicit JobGgmlDevice(ggml_backend_dev_t device, JobGgmlBackendReg::Ptr backendReg = nullptr);
-    ~JobGgmlDevice() = default;
+    virtual ~JobGgmlDevice() = default;
 
     [[nodiscard]] static Ptr createShared(ggml_backend_dev_t device, JobGgmlBackendReg::Ptr backendReg = nullptr) { return std::make_shared<JobGgmlDevice>(device, std::move(backendReg)); }
     [[nodiscard]] static UPtr createUniq(ggml_backend_dev_t device, JobGgmlBackendReg::Ptr backendReg = nullptr) { return std::make_unique<JobGgmlDevice>( device, std::move(backendReg) ); }
@@ -38,6 +38,8 @@ public:
 
     [[nodiscard]] JobGgmlDeviceInterface *deviceInterface() noexcept;
     [[nodiscard]] const JobGgmlDeviceInterface *deviceInterface() const noexcept;
+
+    std::string uid() const noexcept { return m_props ?  m_props->name() : "unknown"; }
 
     [[nodiscard]] JobGgmlDeviceProps *props() noexcept;
     [[nodiscard]] const JobGgmlDeviceProps *props() const noexcept;
@@ -60,6 +62,11 @@ public:
     [[nodiscard]] bool hasHostBufferType() const noexcept;
 
     [[nodiscard]] bool isValid() const noexcept;
+
+    // For the devices/impl.
+    [[nodiscard]] virtual JobGgmlDeviceImpl impl() const noexcept;
+
+    [[nodiscard]] virtual std::string dump(){return std::string{};};
 
 private:
     ggml_backend_dev_t                   m_device{nullptr}; // Borrowed from the GGML registry.

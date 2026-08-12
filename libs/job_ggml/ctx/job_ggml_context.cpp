@@ -8,6 +8,7 @@ namespace job::ggml {
 JobGgmlContext::JobGgmlContext(const JobGgmlInitParams &initParams) :
     JobGgmlContext{ggml_init_params{initParams.memorySize(), initParams.memoryBuffer(), initParams.noAlloc()}}
 {
+
 }
 
 JobGgmlContext::JobGgmlContext(const ggml_init_params &initParams) :
@@ -49,6 +50,9 @@ void JobGgmlContext::reset() noexcept
 {
     if (m_context)
         ggml_reset(m_context.get());
+
+    if(!m_payloads.empty())
+        m_payloads.clear();
 }
 
 std::size_t JobGgmlContext::usedMemory() const noexcept
@@ -161,11 +165,8 @@ JobGgmlTensor::UPtr JobGgmlContext::newTensor(JobGgmlType type, int dimensions, 
 
 JobGgmlTensor::UPtr JobGgmlContext::newTensor1d(JobGgmlType type, std::int64_t ne0)
 {
-    if (!m_context) {
-        throw std::runtime_error{
-            "Cannot create a tensor from an invalid GGML context"
-        };
-    }
+    if (!m_context)
+        throw std::runtime_error{ "Cannot create a tensor from an invalid GGML context" };
 
     if (ne0 <= 0) {
         throw std::invalid_argument{

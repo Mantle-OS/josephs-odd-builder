@@ -5,6 +5,8 @@
 
 #include <stable-diffusion.h>
 
+#include <real_type.h>
+
 #include <pointer-macros.h>
 #include <property-macros.h>
 
@@ -14,9 +16,9 @@
 #include "qmlsd_export.h"
 class QMLSD_EXPORT QSdGuidanceParams : public QSdBaseParam
 {
-    Q_OBJECT 
+    Q_OBJECT
     QP_RW(float,            txtCfg,            7.0f    ) // Text classifier-free guidance scale (higher = strictly follows prompt).
-    QP_RW(float,            imgCfg,            qInf()  ) // Image classifier-free guidance scale (using qInf() to dodge macro bugs).
+    QP_RW(float,            imgCfg,            job::core::safeInfinity()) // qInf()  ) // Image classifier-free guidance scale (using qInf() to dodge macro bugs).
     QP_RW(float,            distilledGuidance, 3.5f    ) // Specialized guidance scale for distilled models like Flux.
     QP_PTR_RO(QSdSlgParams, slg                        ) // Skip Layer Guidance parameter block.
 

@@ -126,15 +126,10 @@ void JobGgmlBackendBuffer::setUsage(JobGgmlBackendBufferUsage usage) noexcept
     if (!m_buffer)
         return;
 
-    const enum ggml_backend_buffer_usage nativeUsage =
-        toGgmlBufferUsage(usage);
+    const enum ggml_backend_buffer_usage nativeUsage = toGgmlBufferUsage(usage);
 
-    if (ggml_backend_buffer_get_usage(m_buffer.get()) != nativeUsage) {
-        ggml_backend_buffer_set_usage(
-            m_buffer.get(),
-            nativeUsage
-            );
-    }
+    if (ggml_backend_buffer_get_usage(m_buffer.get()) != nativeUsage)
+        ggml_backend_buffer_set_usage(m_buffer.get(), nativeUsage);
 }
 
 void JobGgmlBackendBuffer::clear(std::uint8_t value) noexcept

@@ -8,7 +8,7 @@ using SIMD = AVX512_F;
 
 #elif defined(HAS_AVX) || defined(HAS_AVX_TWO) || defined(HAS_AVX_VNNI)
 
-    #include "simd_avx.h" // 8 width floats
+#include "simd_avx.h" // 8 width floats
 namespace job::simd {
 using SIMD = AVX_F;
 }
@@ -33,4 +33,13 @@ namespace job::simd {
 inline f32 SIMD::exp(f32 x)      { return exp_estrin(x); }
 inline f32 SIMD::log(f32 x)      { return avx_log(x); }
 inline f32 SIMD::exp_fast(f32 x) { return exp_schraudolph(x); }
+inline i64 SIMD::siphash(i64 m0, i64 m1, i64 k0, i64 k1) noexcept
+{
+    return avx_siphash(m0, m1, k0, k1);
+}
+inline i64 SIMD::siphashTile4(const std::uint64_t *uids, std::uint64_t k0, std::uint64_t k1) noexcept
+{
+    return avx_siphash_tile4(uids, k0, k1);
+}
+
 }

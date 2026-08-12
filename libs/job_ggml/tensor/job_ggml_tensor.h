@@ -16,10 +16,12 @@
 #include "job_ggml_tensor_operation.h"
 #include "job_ggml_tensor_view.h"
 #include "job_ggml_tensor_volume.h"
+#include "job_ggml_enums.h"
+
 #include "jobggml_export.h"
 
 namespace job::ggml {
-
+class JobGgmlContext;
 class JOBGGML_EXPORT JobGgmlTensor
 {
 public:
@@ -31,8 +33,19 @@ public:
     ~JobGgmlTensor() = default;
 
     [[nodiscard]] static Ptr createShared(struct ggml_tensor *tensor) { return std::make_shared<JobGgmlTensor>( tensor ); }
+    [[nodiscard]] static Ptr createSharedNamedTensor2d(JobGgmlContext &context,
+                                                  const std::string &name,
+                                                  JobGgmlType type = job::ggml::JobGgmlType::F32,
+                                                  std::int64_t ne0 = 8,
+                                                  std::int64_t ne1 = 4);
+
 
     [[nodiscard]] static UPtr createUniq(struct ggml_tensor *tensor) { return std::make_unique<JobGgmlTensor>(tensor); }
+    [[nodiscard]] static UPtr createUniqNamedTensor2d(JobGgmlContext &context,
+                                           const std::string &name,
+                                           JobGgmlType type = job::ggml::JobGgmlType::F32,
+                                           std::int64_t ne0 = 8,
+                                           std::int64_t ne1 = 4);
 
     JobGgmlTensor(const JobGgmlTensor &) = delete;
     JobGgmlTensor &operator=(const JobGgmlTensor &) = delete;
@@ -94,7 +107,6 @@ public:
 
     // Type and storage shortcuts
     [[nodiscard]] JobGgmlType type() const noexcept;
-    [[nodiscard]] enum ggml_type ggmlType() const noexcept;
 
     [[nodiscard]] const char *typeName() const noexcept;
 
@@ -110,7 +122,6 @@ public:
 
     // Operation shortcuts
     [[nodiscard]] JobGgmlOp tensorOperation() const noexcept;
-    [[nodiscard]] enum ggml_op ggmlOperation() const noexcept;
 
     [[nodiscard]] bool hasOperation() const noexcept;
     [[nodiscard]] std::size_t sourceCount() const noexcept;
@@ -148,6 +159,8 @@ public:
     [[nodiscard]] JobGgmlTensorBatch::UPtr asBatch();
 
 private:
+    [[nodiscard]] enum ggml_op ggmlOperation() const noexcept;
+    [[nodiscard]] enum ggml_type ggmlType() const noexcept;
     struct ggml_tensor *m_tensor{nullptr}; // Borrowed from the owning GGML context.
 
     JobGgmlTensorExtents::UPtr   m_extents;

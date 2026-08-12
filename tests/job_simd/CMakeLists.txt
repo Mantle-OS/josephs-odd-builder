@@ -5,7 +5,7 @@ add_executable(test_job_simd
     test_job_simd_utils.h
     test_job_simd_avx.cpp
     test_job_simd_math.cpp
-    test_job_simd_for.cpp
+    test_job_simd_for.cpp ## should get moved over to threads
     test_job_simd_transpose.cpp
 )
 
@@ -17,9 +17,9 @@ endif()
 
 target_link_libraries(test_job_simd PRIVATE
     ${CatchTwo_LIBRARIES}
+    JosephsOddBuilder_Simd
     JosephsOddBuilder_Core
     JosephsOddBuilder_Threads
-    JosephsOddBuilder_Simd
 )
 
 target_include_directories(test_job_simd PRIVATE

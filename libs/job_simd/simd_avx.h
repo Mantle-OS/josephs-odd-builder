@@ -1,4 +1,6 @@
 #pragma once
+
+#include <cstdint>
 #include <immintrin.h>
 #include "rounding_mode.h"
 namespace job::simd  {
@@ -6,6 +8,7 @@ namespace job::simd  {
 using f16 = __m128;
 using f32 = __m256;
 using i32 = __m256i;
+using i64 = __m256i;
 
 // Floats
 struct AVX_F {
@@ -105,9 +108,63 @@ struct AVX_F {
     template<int Mask>
     static inline f32 shuffle(f32 reg_a, f32 reg_b) { return _mm256_shuffle_ps(reg_a, reg_b, Mask); }
 
+
+    ///////////////// i64 //////////////////////////////
+
+    static inline i64 zero_i64() {                              return _mm256_setzero_si256(); }
+    static inline i64 set1_i64(std::int64_t v) {                return _mm256_set1_epi64x(v); }
+    static inline i64 set1_u64(std::uint64_t v) {                return _mm256_set1_epi64x(static_cast<std::int64_t>(v)); }
+    static inline i64 pull_i64(const std::int64_t *p) {         return _mm256_loadu_si256(reinterpret_cast<const __m256i *>(p)); }
+    static inline void mov_i64(std::int64_t *p, i64 reg) {      _mm256_storeu_si256(reinterpret_cast<__m256i *>(p), reg); }
+
+    static inline i64 add_i64(i64 reg_a, i64 reg_b) {           return _mm256_add_epi64(reg_a, reg_b); }
+    static inline i64 sub_i64(i64 reg_a, i64 reg_b) {           return _mm256_sub_epi64(reg_a, reg_b); }
+
+    [[nodiscard]] static inline i64 xor_i64(i64 a, i64 b) {     return _mm256_xor_si256(a, b); }
+    [[nodiscard]] static inline i64 or_i64(i64 a, i64 b) {      return _mm256_or_si256(a, b); }
+
+    template<int Shift>
+    [[nodiscard]] static inline i64 slli_i64(i64 a)
+    {
+        return _mm256_slli_epi64(a, Shift);
+    }
+
+    template<int Shift>
+    [[nodiscard]] static inline i64 srli_i64(i64 a)
+    {
+        return _mm256_srli_epi64(a, Shift);
+    }
+
+    template<int Shift>
+    [[nodiscard]] static inline i64 rotl_i64(i64 a)
+    {
+        return or_i64(slli_i64<Shift>(a), srli_i64<64 - Shift>(a));
+    }
+    static inline void loadSipHashTile4(const std::uint64_t *p, i64 &m0, i64 &m1) noexcept
+    {
+        // a = [ A0, A1, B0, B1 ]
+        // b = [ C0, C1, D0, D1 ]
+        const i64 a = _mm256_loadu_si256(reinterpret_cast<const __m256i *>(p));
+        const i64 b = _mm256_loadu_si256(reinterpret_cast<const __m256i *>(p + 4));
+
+        // Combine lower 128 bits: t0 = [ A0, A1, C0, C1 ]
+        const i64 t0 = _mm256_permute2x128_si256(a, b, 0x20); // 0x20 = low(a), low(b)
+
+        // Combine upper 128 bits: t1 = [ B0, B1, D0, D1 ]
+        const i64 t1 = _mm256_permute2x128_si256(a, b, 0x31); // 0x31 = high(a), high(b)
+
+        // Unpack 64-bit values across contiguous blocks:
+        // m0 = [ A0, B0, C0, D0 ]
+        // m1 = [ A1, B1, C1, D1 ]
+        m0 = _mm256_unpacklo_epi64(t0, t1);
+        m1 = _mm256_unpackhi_epi64(t0, t1);
+    }
+
     // complex Math (See simd_provider.h -> simd_math.h)
     static f32 exp(f32 x);
     static f32 log(f32 x);
     static f32 exp_fast(f32 x);
+    [[nodiscard]] static i64 siphash(i64 m0, i64 m1, i64 k0, i64 k1) noexcept;
+    [[nodiscard]] static i64 siphashTile4(const std::uint64_t *uids, std::uint64_t k0, std::uint64_t k1) noexcept;
 };
 }

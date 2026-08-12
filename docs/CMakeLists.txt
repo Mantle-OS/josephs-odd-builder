@@ -1,5 +1,7 @@
 add_custom_target(JOB_Documentation SOURCES
     ../README.md
+    ../LICENSE.txt
+    ../COMMERCIAL.txt
     coding_style.md
     job/job.md
     job/ansi_overview.md
@@ -48,4 +50,18 @@ add_custom_target(QTAI_Documentation SOURCES
     qtai/qai-schema/aisession.md
     qtai/qai-schema/ailedger.md
     qtai/qai-schema/aipkg.md
+)
+
+add_custom_target(JOBGGML_Documentation SOURCES
+    job_ggml/overview.md
+    job_ggml/devices.md
+    job_ggml/impl_devices.md
+    job_ggml/backend.md
+    job_ggml/context.md
+    job_ggml/tensors.md
+    job_ggml/operations.md
+    job_ggml/gguf.md
+    job_ggml/optimizer.md
+    job_ggml/quant.md
+    job_ggml/misc.md  # this is enums & type_traits and abort callback threadpool stuff;
 )

@@ -44,10 +44,7 @@ public:
      * The buffer is never freed by this object. Its native owner must outlive
      * the JobGgmlBackendBufferView.
      */
-    explicit JobGgmlBackendBufferView(
-        ggml_backend_buffer_t buffer
-        );
-
+    explicit JobGgmlBackendBufferView(ggml_backend_buffer_t buffer);
     ~JobGgmlBackendBufferView() = default;
 
     [[nodiscard]] static Ptr createShared(ggml_backend_buffer_t buffer)
@@ -61,9 +58,7 @@ public:
     }
 
     JobGgmlBackendBufferView(const JobGgmlBackendBufferView &) = delete;
-
     JobGgmlBackendBufferView &operator=(const JobGgmlBackendBufferView &) = delete;
-
     JobGgmlBackendBufferView(JobGgmlBackendBufferView &&) = delete;
     JobGgmlBackendBufferView &operator=(JobGgmlBackendBufferView &&) = delete;
 

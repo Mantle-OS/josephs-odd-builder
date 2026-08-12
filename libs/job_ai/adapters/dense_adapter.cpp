@@ -93,7 +93,7 @@ void DenseAdapter::apply(const cords::AttentionShape &shape, const cords::ViewR 
         auto v_max = SIMD::set1(maxVal);
         f32 v_sum = SIMD::zero();
 
-        simd_for(S,
+        threads::simd_for(S,
                  [&](size_t j) {
                      auto v_val = SIMD::pull(row + j);
                      auto v_exp = SIMD::exp_fast(SIMD::sub(v_val, v_max)); // Fast Schraudolph
@@ -120,7 +120,7 @@ void DenseAdapter::apply(const cords::AttentionShape &shape, const cords::ViewR 
         float invSum = 1.0f / sum;
         auto v_inv = SIMD::set1(invSum);
 
-        simd_for(S,
+        threads::simd_for(S,
                  [&](size_t j) {
                      SIMD::mov(row + j, SIMD::mul(SIMD::pull(row + j), v_inv));
                  },

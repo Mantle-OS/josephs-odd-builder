@@ -185,6 +185,7 @@ QSdEnums::QSdSchedulerTypes QSD::getDefaultScheduler(QSdEnums::QSdSampleTypes ty
     return QSdEnums::QSdDiscrete;
 }
 
+
 void QSD::generateImage(QSdImage *outImage, bool autoSave)
 {
 
@@ -204,31 +205,40 @@ void QSD::generateImage(QSdImage *outImage, bool autoSave)
         return;
     }
 
-    if (m_ctx == nullptr) {
-        fillBackend();
-        auto ctxP = m_ContextParams->ctxParams();
-        m_ctx = new_sd_ctx(&ctxP);
+    // if (m_ctx == nullptr) {
+    //     qDebug() << "CREATING NEW SD CONTEXT";
+    //     fillBackend();
+    //     auto ctxP = m_ContextParams->ctxParams();
+    //     m_ctx = new_sd_ctx(&ctxP);
+    // }else{
+    //     qDebug() << "USING SD CONTEXT is not null";
+    // }
+
+    if (m_ctx) {
+        free_sd_ctx(m_ctx);
+        m_ctx = nullptr;
     }
+
+    fillBackend();
+    auto ctxP = m_ContextParams->ctxParams();
+    m_ctx = new_sd_ctx(&ctxP);
+
 
     if (!m_ctx || !m_ImageGenerationParams)
         return;
 
+    qDebug() << "CONTEXT " << m_ContextParams->toJson();
+    qDebug() <<  m_ImageGenerationParams->toJson();
+
     sd_img_gen_params_t params = m_ImageGenerationParams->imgGenParms();
 
-    qDebug() << "sample_method =" << params.sample_params.sample_method
-             << "scheduler =" << params.sample_params.scheduler
-             << "steps =" << params.sample_params.sample_steps
-             << "eta =" << params.sample_params.eta
-             << "flow_shift =" << params.sample_params.flow_shift
-             << "txt_cfg =" << params.sample_params.guidance.txt_cfg
-             << "img_cfg =" << params.sample_params.guidance.img_cfg
-             << "distilled =" << params.sample_params.guidance.distilled_guidance
-             << "strength =" << params.strength
-             << "width =" << params.width
-             << "height =" << params.height
-             << "seed =" << params.seed
-             << "batch_count =" << params.batch_count;
+    qDebug() <<  m_ImageGenerationParams->debugString();
+    qDebug() <<  sd_img_gen_params_to_str(&params);
 
+    qDebug() << Qt::hex
+             << std::bit_cast<quint32>(params.sample_params.eta)
+             << std::bit_cast<quint32>(params.sample_params.flow_shift)
+             << std::bit_cast<quint32>(params.sample_params.guidance.img_cfg);
     // could Q_EMIT generationStared or whatever
     // sd_img_gen_params_t stableParamsSnapshot = m_ImageGenerationParams->imgGenParms();
     QFuture<SdGenerationResult> future = QtConcurrent::run(
@@ -269,11 +279,11 @@ void QSD::onGenerationFinished()
         qInfo() << "Inference worker complete. Updating canvas texture data...";
         const sd_image_t &raw = rawImagesArray[0];
 
-        // qDebug() << "Native result:"
-        //          << "width =" << raw.width
-        //          << "height =" << raw.height
-        //          << "channel =" << raw.channel
-        //          << "data =" << static_cast<void *>(raw.data);
+        qDebug() << "Native result:"
+                 << "width =" << raw.width
+                 << "height =" << raw.height
+                 << "channel =" << raw.channel
+                 << "data =" << static_cast<void *>(raw.data);
 
         if (raw.data && raw.width && raw.height && raw.channel) {
             const qsizetype byteCount =
@@ -292,23 +302,23 @@ void QSD::onGenerationFinished()
                 sum += value;
             }
 
-            // qDebug() << "Native pixels:"
-            //          << "bytes =" << byteCount
-            //          << "min =" << minimum
-            //          << "max =" << maximum
-            //          << "average ="
-            //          << static_cast<double>(sum) /
-            //                 static_cast<double>(byteCount);
+            qDebug() << "Native pixels:"
+                     << "bytes =" << byteCount
+                     << "min =" << minimum
+                     << "max =" << maximum
+                     << "average ="
+                     << static_cast<double>(sum) /
+                            static_cast<double>(byteCount);
         }
         // -pixels onto target canvas object
         targetCanvas->setImg(rawImagesArray[0]);
 
 
-        // qDebug() << "Copied target:"
-        //          << "width =" << targetCanvas->img().width
-        //          << "height =" << targetCanvas->img().height
-        //          << "channel =" << targetCanvas->img().channel
-        //          << "data =" << static_cast<void *>(targetCanvas->data());
+        qDebug() << "Copied target:"
+                 << "width =" << targetCanvas->img().width
+                 << "height =" << targetCanvas->img().height
+                 << "channel =" << targetCanvas->img().channel
+                 << "data =" << static_cast<void *>(targetCanvas->data());
         // Clean up
         free_sd_images(rawImagesArray, 1);
 

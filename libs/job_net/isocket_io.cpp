@@ -19,6 +19,30 @@ void ISocketIO::setLoop(const threads::JobIoAsyncThread::Ptr &loop)
     m_loop = loop;
 }
 
+
+void ISocketIO::registerEvents(threads::IOEvent events)
+{
+    if (m_fd < 0) {
+        JOB_LOG_ERROR("[ISocketIO] registerEvents called on invalid fd");
+        return;
+    }
+
+    if (auto loop = m_loop.lock()) {
+        const auto weakSelf = weak_from_this();
+
+        if (!loop->registerFD(m_fd, events, [weakSelf](threads::IOEvent e) {
+                const auto self = weakSelf.lock();
+
+                if (self)
+                    self->onEvents(e);
+            })) {
+            JOB_LOG_ERROR("[ISocketIO] Failed to register FD {}", m_fd);
+        }
+    } else {
+        JOB_LOG_ERROR("[ISocketIO] Failed to register FD {}: Event loop is null", m_fd);
+    }
+}
+/*
 void ISocketIO::registerEvents(threads::IOEvent events)
 {
     if (m_fd < 0) {
@@ -34,7 +58,7 @@ void ISocketIO::registerEvents(threads::IOEvent events)
         JOB_LOG_ERROR("[ISocketIO] Failed to register FD {}: Event loop is null", m_fd);
     }
 }
-
+*/
 void ISocketIO::modifyEvents(threads::IOEvent events)
 {
     if (m_fd < 0) {

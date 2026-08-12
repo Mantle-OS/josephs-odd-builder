@@ -20,6 +20,7 @@
 #include <cstddef>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include <ggml.h>
 
@@ -34,6 +35,7 @@ public:
     using Ptr  = std::shared_ptr<JobGgmlContextView>;
     using WPtr = std::weak_ptr<JobGgmlContextView>;
     using UPtr = std::unique_ptr<JobGgmlContextView>;
+    using CustomPayloads = std::vector<std::shared_ptr<void>>;
 
     /*
      * Borrows the supplied native context. The context is never freed by this object.
@@ -79,7 +81,7 @@ public:
     [[nodiscard]] JobGgmlTensor::UPtr tensor(const std::string &name);
 
 private:
-    ggml_context *m_context{nullptr}; // Borrowed; never freed by this object.
+    ggml_context    *m_context{nullptr}; // Borrowed; never freed by this object.
 };
 
 } // namespace job::ggml

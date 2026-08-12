@@ -7,11 +7,8 @@ namespace job::ggml {
 JobGgmlDeviceInterface::JobGgmlDeviceInterface(ggml_backend_dev_t device) :
     m_device{device}
 {
-    if (!m_device) {
-        throw std::invalid_argument{
-            "JobGgmlDeviceInterface requires a valid ggml_backend_dev_t"
-        };
-    }
+    if (!m_device)
+        throw std::invalid_argument{ "JobGgmlDeviceInterface requires a valid ggml_backend_dev_t" };
 }
 
 bool JobGgmlDeviceInterface::isValid() const noexcept
@@ -25,7 +22,6 @@ std::string JobGgmlDeviceInterface::name() const
         return {};
 
     const char *nativeName = ggml_backend_dev_name(m_device);
-
     return nativeName ? std::string{nativeName} : std::string{};
 }
 
@@ -49,18 +45,16 @@ void JobGgmlDeviceInterface::memory(std::size_t &freeMemory, std::size_t &totalM
     ggml_backend_dev_memory(m_device, &freeMemory, &totalMemory);
 }
 
-enum ggml_backend_dev_type JobGgmlDeviceInterface::type() const noexcept
+JobGgmlDeviceType JobGgmlDeviceInterface::type() const noexcept
 {
-    return m_device ? ggml_backend_dev_type(m_device) : GGML_BACKEND_DEVICE_TYPE_CPU;
+    return m_device ? fromGgmlBackendDeviceType(ggml_backend_dev_type(m_device)) : JobGgmlDeviceType::Cpu;
 }
 
 JobGgmlDeviceProps::UPtr JobGgmlDeviceInterface::props() const
 {
-    if (!m_device) {
-        throw std::runtime_error{
-            "Cannot query properties from an invalid GGML device interface"
-        };
-    }
+    if (!m_device)
+        throw std::runtime_error{ "Cannot query properties from an invalid GGML device interface" };
+
 
     ggml_backend_dev_props nativeProps{};
     ggml_backend_dev_get_props(m_device, &nativeProps);
@@ -69,24 +63,15 @@ JobGgmlDeviceProps::UPtr JobGgmlDeviceInterface::props() const
 
 JobGgmlBackend::UPtr JobGgmlDeviceInterface::initBackend(const std::string &params) const
 {
-    if (!m_device) {
-        throw std::runtime_error{
-            "Cannot initialize a backend from an invalid GGML device interface"
-        };
-    }
+    if (!m_device)
+        throw std::runtime_error{ "Cannot initialize a backend from an invalid GGML device interface" };
 
-    ggml_backend_ptr nativeBackend{
-        ggml_backend_dev_init(
-            m_device,
-            params.empty() ? nullptr : params.c_str()
-            )
-    };
+    ggml_backend_ptr nativeBackend{ggml_backend_dev_init(m_device,
+                                                         params.empty() ? nullptr : params.c_str()
+                                                         )};
 
-    if (!nativeBackend) {
-        throw std::runtime_error{
-            "Failed to initialize GGML backend"
-        };
-    }
+    if (!nativeBackend)
+        throw std::runtime_error{ "Failed to initialize GGML backend" };
 
     return JobGgmlBackend::createUniq(std::move(nativeBackend));
 }
@@ -111,42 +96,27 @@ JobGgmlBackendBufferType::Ptr JobGgmlDeviceInterface::hostBufferType() const
 
 JobGgmlBackendBuffer::UPtr JobGgmlDeviceInterface::bufferFromHostPtr(void *ptr, std::size_t size, std::size_t maxTensorSize) const
 {
-    if (!m_device) {
-        throw std::runtime_error{
-            "Cannot create a host-backed buffer from an invalid GGML device interface"
-        };
-    }
+    if (!m_device)
+        throw std::runtime_error{ "Cannot create a host-backed buffer from an invalid GGML device interface" };
 
-    if (!ptr) {
-        throw std::invalid_argument{
-            "bufferFromHostPtr requires a valid host pointer"
-        };
-    }
+    if (!ptr)
+        throw std::invalid_argument{ "bufferFromHostPtr requires a valid host pointer" };
 
-    if (size == 0) {
-        throw std::invalid_argument{
-            "bufferFromHostPtr requires a size greater than zero"
-        };
-    }
+    if (size == 0)
+        throw std::invalid_argument{ "bufferFromHostPtr requires a size greater than zero" };
 
     ggml_backend_buffer_ptr nativeBuffer{
-        ggml_backend_dev_buffer_from_host_ptr(
-            m_device,
-            ptr,
-            size,
-            maxTensorSize
-            )
+        ggml_backend_dev_buffer_from_host_ptr( m_device,
+                                              ptr,
+                                              size,
+                                              maxTensorSize
+                                              )
     };
 
-    if (!nativeBuffer) {
-        throw std::runtime_error{
-            "Failed to create a GGML backend buffer from the host pointer"
-        };
-    }
+    if (!nativeBuffer)
+        throw std::runtime_error{ "Failed to create a GGML backend buffer from the host pointer" };
 
-    return JobGgmlBackendBuffer::createUniq(
-        std::move(nativeBuffer)
-        );
+    return JobGgmlBackendBuffer::createUniq(std::move(nativeBuffer));
 }
 
 bool JobGgmlDeviceInterface::supportsOp(const JobGgmlTensor &operation) const noexcept
@@ -166,32 +136,20 @@ bool JobGgmlDeviceInterface::offloadOp(const JobGgmlTensor &operation) const noe
 
 JobGgmlBackendEvent::UPtr JobGgmlDeviceInterface::createEvent() const
 {
-    if (!m_device) {
-        throw std::runtime_error{
-            "Cannot create an event from an invalid GGML device interface"
-        };
-    }
+    if (!m_device)
+        throw std::runtime_error{ "Cannot create an event from an invalid GGML device interface" };
 
-    /*
-     * JobGgmlBackendEvent creates and owns the native event associated with
-     * this borrowed device.
-     */
+    // JobGgmlBackendEvent creates and owns the native event associated with this borrowed device.
     return JobGgmlBackendEvent::createUniq(m_device);
 }
 
 void JobGgmlDeviceInterface::synchronizeEvent(JobGgmlBackendEvent &event) const
 {
-    if (!m_device) {
-        throw std::runtime_error{
-            "Cannot synchronize an event with an invalid GGML device interface"
-        };
-    }
+    if (!m_device)
+        throw std::runtime_error{ "Cannot synchronize an event with an invalid GGML device interface" };
 
-    if (!event.isValid()) {
-        throw std::invalid_argument{
-            "synchronizeEvent requires a valid JobGgmlBackendEvent"
-        };
-    }
+    if (!event.isValid())
+        throw std::invalid_argument{ "synchronizeEvent requires a valid JobGgmlBackendEvent" };
 
     event.synchronize();
 }

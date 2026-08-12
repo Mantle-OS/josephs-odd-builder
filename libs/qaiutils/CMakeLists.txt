@@ -115,7 +115,7 @@ if(BUILD_SHARED_LIBS)
     qt_add_library(qml-ai-utils SHARED)
 else()
     qt_add_library(qml-ai-utils STATIC)
-    add_compile_definitions(qml-ai-utils QMLAIUTILS_STATIC_DEFINE)
+    add_compile_definitions(QMLAIUTILS_STATIC_DEFINE)
 endif()
 
 qt_add_qml_module(qml-ai-utils

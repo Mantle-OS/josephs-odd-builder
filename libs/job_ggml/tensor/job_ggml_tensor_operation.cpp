@@ -201,14 +201,12 @@ JobGgmlGluOp JobGgmlTensorOperation::gluOperation() const noexcept
 
 bool JobGgmlTensorOperation::isUnaryOperation() const noexcept
 {
-    return m_tensor &&
-           m_tensor->op == GGML_OP_UNARY;
+    return m_tensor && m_tensor->op == GGML_OP_UNARY;
 }
 
 bool JobGgmlTensorOperation::isGluOperation() const noexcept
 {
-    return m_tensor &&
-           m_tensor->op == GGML_OP_GLU;
+    return m_tensor && m_tensor->op == GGML_OP_GLU;
 }
 
 struct ggml_tensor *JobGgmlTensorOperation::tensor() noexcept

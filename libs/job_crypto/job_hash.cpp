@@ -17,9 +17,7 @@ std::vector<unsigned char> JobHash::hashBuffer(const std::vector<unsigned char> 
                                                std::size_t keylen) noexcept
 {
     if (!JobCryptoInit::isInitialized() && !JobCryptoInit::initialize()){
-        JOB_LOG_DEBUG(
-            "[JobHash] Buffer hashing stopped because the crypto runtime is unavailable."
-            );
+        JOB_LOG_DEBUG("[JobHash] Buffer hashing stopped because the crypto runtime is unavailable.");
         return {};
     }
 

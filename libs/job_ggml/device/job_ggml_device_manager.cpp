@@ -1,40 +1,41 @@
 #include "job_ggml_device_manager.h"
 
-#include <algorithm>
+// #include <algorithm>
 #include <sstream>
 #include <stdexcept>
 #include <utility>
 
+#ifndef NDEBUG
+#include <job_logger.h>
+#endif
+
 namespace job::ggml {
+
+JobGgmlDeviceManager::JobGgmlDeviceManager(bool autoScan)
+{
+    if (autoScan)
+        scan();
+}
 
 void JobGgmlDeviceManager::scan()
 {
-    // Preserve canonical wrapper identity across repeated scans.
-    if (m_state == ManagerState::Ready)
+    if (m_state == DeviceManagerState::Ready)
         return;
 
-    setState(ManagerState::Scanning);
-    clearError();
-
-    // A previous failed scan may have left a partial object map.
-    resetScheduler();
-    m_cpuDevice.reset();
-    m_gpuDevices.clear();
-    m_devices.clear();
-    m_backendRegistries.clear();
+    reset();
+    setState(DeviceManagerState::Scanning);
 
     try {
-        // Load and register all known dynamic GGML backends before querying the process-wide device registry.
-        ggml_backend_load_all();
+        static const bool backendsLoaded = []() {
+            ggml_backend_load_all();
+            return true;
+        }();
+        (void)backendsLoaded;
 
-        const std::size_t nativeDeviceCount =
-            ggml_backend_dev_count();
+        const std::size_t nativeDeviceCount = ggml_backend_dev_count();
 
-        if (nativeDeviceCount == 0) {
-            throw std::runtime_error{
-                "GGML did not report any registered backend devices"
-            };
-        }
+        if (nativeDeviceCount == 0)
+            throw std::runtime_error{ "GGML did not report any registered backend devices" };
 
         m_devices.reserve(nativeDeviceCount);
 
@@ -44,92 +45,165 @@ void JobGgmlDeviceManager::scan()
             if (!nativeDevice)
                 continue;
 
-
-            // This normally cannot find anything during a fresh scan, but it protects the canonical map if GGML exposes the same native device more than once.
-            if (deviceFromNative(nativeDevice))
-                continue;
-
             JobGgmlBackendReg::Ptr backendReg;
-
-            const ggml_backend_reg_t nativeReg =
-                ggml_backend_dev_backend_reg(nativeDevice);
-
+            const ggml_backend_reg_t nativeReg = ggml_backend_dev_backend_reg(nativeDevice);
             if (nativeReg) {
-                backendReg =
-                    registryFromNative(nativeReg);
+                backendReg = registryFromNative(nativeReg);
 
                 if (!backendReg) {
                     backendReg = JobGgmlBackendReg::createShared(nativeReg);
-                    m_backendRegistries.push_back(backendReg);
+                    m_backendRegistries.append(backendReg);
                 }
             }
 
-            JobGgmlDevice::Ptr wrappedDevice = JobGgmlDevice::createShared(nativeDevice, std::move(backendReg));
+            const JobGgmlDeviceImpl impl = backendReg ? deviceImplFromName(backendReg->name()) : JobGgmlDeviceImpl::Fallback;
+            JobGgmlDevice::Ptr wrappedDevice;
 
-            if (!wrappedDevice || !wrappedDevice->isValid()) {
-                throw std::runtime_error{
-                    "Failed to construct a valid JobGgmlDevice"
-                };
+            switch (impl) {
+            case JobGgmlDeviceImpl::Cpu:
+                wrappedDevice = JobGgmlCpu::createShared(nativeDevice, std::move(backendReg));
+                break;
+
+            case JobGgmlDeviceImpl::Fallback:
+                wrappedDevice = JobGgmlDevice::createShared(nativeDevice, std::move(backendReg));
+                break;
+
+            case JobGgmlDeviceImpl::Vulkan:
+#ifdef JOB_GGML_VULKAN
+                wrappedDevice = JobGgmlVulkan::createShared(nativeDevice, std::move(backendReg));
+#else
+                wrappedDevice = JobGgmlDevice::createShared(nativeDevice, std::move(backendReg));
+#endif
+                break;
+
+            case JobGgmlDeviceImpl::Cuda:
+#ifdef JOB_GGML_CUDA
+                wrappedDevice = JobGgmlCuda::createShared(nativeDevice, std::move(backendReg));
+#else
+                wrappedDevice = JobGgmlDevice::createShared(nativeDevice, std::move(backendReg));
+#endif
+                break;
+
+            case JobGgmlDeviceImpl::OpenCl:
+#ifdef JOB_GGML_OPENCL
+                wrappedDevice = JobGgmlOpenCl::createShared(nativeDevice, std::move(backendReg));
+#else
+                wrappedDevice = JobGgmlDevice::createShared(nativeDevice, std::move(backendReg));
+#endif
+                break;
+
+            case JobGgmlDeviceImpl::Blas:
+#ifdef JOB_GGML_BLAS
+                wrappedDevice = JobGgmlBlas::createShared(nativeDevice, std::move(backendReg));
+#else
+                wrappedDevice = JobGgmlDevice::createShared(nativeDevice, std::move(backendReg));
+#endif
+                break;
+
+            case JobGgmlDeviceImpl::Hexagon:
+#ifdef JOB_GGML_HEXAGON
+                wrappedDevice = JobGgmlHexagon::createShared(nativeDevice, std::move(backendReg));
+#else
+                wrappedDevice = JobGgmlDevice::createShared(nativeDevice, std::move(backendReg));
+#endif
+                break;
+
+            case JobGgmlDeviceImpl::OpenVino:
+#ifdef JOB_GGML_OPENVINO
+                wrappedDevice = JobGgmlOpenVino::createShared(nativeDevice, std::move(backendReg));
+#else
+                wrappedDevice = JobGgmlDevice::createShared(nativeDevice, std::move(backendReg));
+#endif
+                break;
+
+            case JobGgmlDeviceImpl::Sycl:
+#ifdef JOB_GGML_SYCL
+                wrappedDevice = JobGgmlSycl::createShared(nativeDevice, std::move(backendReg));
+#else
+                wrappedDevice = JobGgmlDevice::createShared(nativeDevice, std::move(backendReg));
+#endif
+                break;
+
+            case JobGgmlDeviceImpl::WebGpu:
+#ifdef JOB_GGML_WEBGPU
+                wrappedDevice = JobGgmlWebGpu::createShared(nativeDevice, std::move(backendReg));
+#else
+                wrappedDevice = JobGgmlDevice::createShared(nativeDevice, std::move(backendReg));
+#endif
+                break;
+
+            case JobGgmlDeviceImpl::Zdnn:
+#ifdef JOB_GGML_ZDNN
+                wrappedDevice =
+                    JobGgmlZdnn::createShared(nativeDevice, std::move(backendReg));
+#else
+                wrappedDevice = JobGgmlDevice::createShared(nativeDevice, std::move(backendReg));
+#endif
+                break;
+
+            case JobGgmlDeviceImpl::VirtGpu:
+            case JobGgmlDeviceImpl::Metal:
+            case JobGgmlDeviceImpl::ZenDnn:
+            case JobGgmlDeviceImpl::Cann:
+            case JobGgmlDeviceImpl::Rpc:
+            case JobGgmlDeviceImpl::Count:
+#ifndef NDEBUG
+                JOB_LOG_DEBUG(
+                    "Device implementation has not yet been added; "
+                    "falling back to JobGgmlDevice. Device name: {}",
+                    backendReg ? backendReg->name() : "unknown"
+                    );
+#endif
+                wrappedDevice = JobGgmlDevice::createShared(nativeDevice, std::move(backendReg));
+                break;
             }
 
-            m_devices.push_back(std::move(wrappedDevice));
+            if (!wrappedDevice || !wrappedDevice->isValid())
+                throw std::runtime_error{ "Failed to construct a valid JobGgmlDevice" };
+
+            const std::string uid = wrappedDevice->uid();
+
+            if (uid.empty() || uid == "unknown")
+                throw std::runtime_error{ "GGML device did not provide a usable uid" };
+
+            m_devices.insert(wrappedDevice);
+            indexDevice(uid, impl, wrappedDevice);
         }
 
-        if (m_devices.empty()) {
-            throw std::runtime_error{
-                "GGML devices were registered, but none could be wrapped"
-            };
-        }
+        if (m_devices.isEmpty())
+            throw std::runtime_error{ "GGML devices were registered, but none could be wrapped" };
 
-        rebuildDeviceLists();
+        if (!m_cpuDevice)
+            throw std::runtime_error{ "GGML did not report a usable CPU device" };
 
-        if (!m_cpuDevice) {
-            throw std::runtime_error{
-                "GGML did not report a usable CPU device"
-            };
-        }
-
-        setState(ManagerState::Ready);
+        setState(DeviceManagerState::Ready);
     } catch (const std::exception &error) {
-        resetScheduler();
-
-        m_cpuDevice.reset();
-        m_gpuDevices.clear();
-        m_devices.clear();
-        m_backendRegistries.clear();
+        reset();
 
         setErrorString(error.what());
-        setState(ManagerState::Error);
+        setState(DeviceManagerState::Error);
     } catch (...) {
-        resetScheduler();
+        reset();
 
-        m_cpuDevice.reset();
-        m_gpuDevices.clear();
-        m_devices.clear();
-        m_backendRegistries.clear();
-
-        setErrorString(
-            "Unknown error while scanning GGML devices"
-            );
-
-        setState(ManagerState::Error);
+        setErrorString("Unknown error while scanning GGML devices");
+        setState(DeviceManagerState::Error);
     }
 }
 
-JobGgmlDeviceManager::ManagerState JobGgmlDeviceManager::state() const noexcept
+DeviceManagerState JobGgmlDeviceManager::state() const noexcept
 {
     return m_state;
 }
 
 bool JobGgmlDeviceManager::isReady() const noexcept
 {
-    return m_state == ManagerState::Ready;
+    return m_state == DeviceManagerState::Ready;
 }
 
 bool JobGgmlDeviceManager::isValid() const noexcept
 {
     return isReady() &&
-           !m_devices.empty() &&
+           !m_devices.isEmpty() &&
            m_cpuDevice &&
            m_cpuDevice->isValid();
 }
@@ -146,272 +220,425 @@ std::size_t JobGgmlDeviceManager::deviceCount() const noexcept
 
 std::size_t JobGgmlDeviceManager::gpuDeviceCount() const noexcept
 {
-    return m_gpuDevices.size();
+    std::size_t ret = 0;
+    for (auto i = m_devices.begin(); i != m_devices.end(); ++i)
+        if (i->second->props()->deviceType() == JobGgmlDeviceType::IGpu || i->second->props()->deviceType() == JobGgmlDeviceType::Gpu)
+            ++ret;
+    return ret;
 }
 
-JobGgmlDevice *JobGgmlDeviceManager::device(std::size_t index) noexcept
+const JobGgmlDeviceManager::Devices &JobGgmlDeviceManager::devices() const noexcept
 {
-    if (index >= m_devices.size())
+    return m_devices; // This sucks and should be owneed ... *
+}
+
+JobGgmlDevice *JobGgmlDeviceManager::device(const std::string &uid)
+{
+    if (uid.empty() || !m_devices.contains(uid))
         return nullptr;
 
-    return m_devices[index].get();
+    return m_devices.at(uid);
 }
 
-const JobGgmlDevice *JobGgmlDeviceManager::device(std::size_t index) const noexcept
+JobGgmlDevice *JobGgmlDeviceManager::device(std::size_t idx)
 {
-    if (index >= m_devices.size())
+    if(idx >= m_devices.size())
         return nullptr;
-
-    return m_devices[index].get();
+    return m_devices.at(idx);
 }
 
-JobGgmlDevice::Ptr JobGgmlDeviceManager::deviceShared(std::size_t index) const noexcept
+JobGgmlCpu *JobGgmlDeviceManager::cpu()
 {
-    if (index >= m_devices.size())
+    if (!m_cpuDevice || !m_cpuDevice->isValid())
         return nullptr;
-
-    return m_devices[index];
-}
-
-const std::vector<JobGgmlDevice::Ptr> &JobGgmlDeviceManager::devices() const noexcept
-{
-    return m_devices;
-}
-
-JobGgmlDevice *JobGgmlDeviceManager::cpuDevice() noexcept
-{
     return m_cpuDevice.get();
 }
 
-const JobGgmlDevice *JobGgmlDeviceManager::cpuDevice() const noexcept
+#ifdef JOB_GGML_VULKAN
+JobGgmlDeviceManager::VulkanDevices JobGgmlDeviceManager::vulkanDevices()
 {
-    return m_cpuDevice.get();
+    return m_vulkanDevices;
 }
 
-JobGgmlDevice::Ptr JobGgmlDeviceManager::cpuDeviceShared() const noexcept
+JobGgmlVulkan *JobGgmlDeviceManager::vulkan(const std::string &uid)
 {
-    return m_cpuDevice;
+    if(uid.empty() || !m_vulkanDevices.contains(uid))
+        return nullptr;
+    return m_vulkanDevices.at(uid);
 }
 
-std::vector<JobGgmlDevice*> JobGgmlDeviceManager::gpuDevices() noexcept
+JobGgmlVulkan *JobGgmlDeviceManager::vulkan(std::size_t idx)
 {
-    std::vector<JobGgmlDevice *> devices;
-    devices.reserve(m_gpuDevices.size());
-
-    for (const JobGgmlDevice::Ptr &device :
-         m_gpuDevices) {
-        devices.push_back(device.get());
-    }
-
-    return devices;
+    if (idx >= m_vulkanDevices.size())
+        return nullptr;
+    return m_vulkanDevices.at(idx);
 }
 
-std::vector<const JobGgmlDevice*> JobGgmlDeviceManager::gpuDevices() const noexcept
+bool JobGgmlDeviceManager::hasVulkan() const noexcept
 {
-    std::vector<const JobGgmlDevice *> devices;
-    devices.reserve(m_gpuDevices.size());
-    for (const JobGgmlDevice::Ptr &device : m_gpuDevices)
-        devices.push_back(device.get());
+    return !m_vulkanDevices.isEmpty();
+}
+#endif
 
-    return devices;
+#ifdef JOB_GGML_CUDA
+JobGgmlDeviceManager::CudaDevices JobGgmlDeviceManager::cudaDevices()
+{
+    return m_cudaDevices;
 }
 
-const std::vector<JobGgmlDevice::Ptr> &JobGgmlDeviceManager::gpuDevicesShared() const noexcept
+JobGgmlCuda *JobGgmlDeviceManager::cuda(const std::string &uid)
 {
-    return m_gpuDevices;
+    if (uid.empty() || !m_cudaDevices.contains(uid))
+        return nullptr;
+
+    return m_cudaDevices.at(uid);
+}
+
+JobGgmlCuda *JobGgmlDeviceManager::cuda(std::size_t idx)
+{
+    if(idx >= m_cudaDevices.size())
+        return nullptr;
+    return m_cudaDevices.at(idx);
+}
+
+bool JobGgmlDeviceManager::hasCuda() const noexcept
+{
+    return !m_cudaDevices.isEmpty();
+}
+#endif
+
+#ifdef JOB_GGML_OPENCL
+JobGgmlDeviceManager::OpenClDevices JobGgmlDeviceManager::openClDevices()
+{
+    return m_openClDevices;
+}
+
+JobGgmlOpenCl *JobGgmlDeviceManager::openCl(const std::string &uid)
+{
+    if (uid.empty() || !m_openClDevices.contains(uid))
+        return nullptr;
+
+    return m_openClDevices.at(uid);
+}
+JobGgmlOpenCl *JobGgmlDeviceManager::openCl(std::size_t idx)
+{
+    if (idx >= m_openClDevices.size())
+        return nullptr;
+
+    return m_openClDevices.at(idx);
+}
+
+bool JobGgmlDeviceManager::hasOpenCl() const noexcept
+{
+    return !m_openClDevices.isEmpty();
+}
+#endif
+
+#ifdef JOB_GGML_BLAS
+JobGgmlDeviceManager::BlasDevices JobGgmlDeviceManager::blasDevices()
+{
+    return m_blasDevices;
+}
+
+JobGgmlBlas *JobGgmlDeviceManager::blas(const std::string &uid)
+{
+    if(uid.empty() || !m_blasDevices.contains(uid))
+        return nullptr;
+
+    return m_blasDevices.at(uid);
+}
+
+JobGgmlBlas *JobGgmlDeviceManager::blas(std::size_t idx)
+{
+    if(idx >= m_blasDevices.count())
+        return nullptr;
+    return m_blasDevices.at(idx);
+}
+
+bool JobGgmlDeviceManager::hasBlas() const noexcept
+{
+    return !m_blasDevices.isEmpty();
+}
+#endif
+
+#ifdef JOB_GGML_HEXAGON
+JobGgmlDeviceManager::HexagonDevices JobGgmlDeviceManager::hexagonDevices()
+{
+    return m_hexagonDevices;
+}
+
+JobGgmlHexagon *JobGgmlDeviceManager::hexagon(const std::string &uid)
+{
+    if(uid.empty() || !m_hexagonDevices.contains(uid))
+        return nullptr;
+    return m_hexagonDevices.at(uid);
+}
+
+JobGgmlHexagon *JobGgmlDeviceManager::hexagon(std::size_t idx)
+{
+    if (idx >= m_hexagonDevices.size())
+        return nullptr;
+    return m_hexagonDevices.at(idx);
+}
+
+bool JobGgmlDeviceManager::hasHexagon() const noexcept
+{
+    return !m_hexagonDevices.isEmpty();
+}
+#endif
+
+#ifdef JOB_GGML_OPENVINO
+JobGgmlDeviceManager::OpenVinoDevices JobGgmlDeviceManager::openVinoDevices()
+{
+    return m_openVinoDevices;
+}
+
+JobGgmlOpenVino *JobGgmlDeviceManager::openVino(const std::string &uid)
+{
+    if (uid.empty() || !m_openVinoDevices.contains(uid))
+        return nullptr;
+    return m_openVinoDevices.at(uid);
+}
+
+JobGgmlOpenVino *JobGgmlDeviceManager::openVino(std::size_t idx)
+{
+    if (idx >= m_openVinoDevices.size())
+        return nullptr;
+    return m_openVinoDevices.at(idx);
+}
+
+bool JobGgmlDeviceManager::hasOpenVino() const noexcept
+{
+    return !m_openVinoDevices.isEmpty();
+}
+#endif
+
+#ifdef JOB_GGML_SYCL
+JobGgmlDeviceManager::SyclDevices JobGgmlDeviceManager::syclDevices()
+{
+    return m_syclDevices;
+}
+
+JobGgmlSycl *JobGgmlDeviceManager::sycl(const std::string &uid)
+{
+    if (uid.empty() || !m_syclDevices.contains(uid))
+        return nullptr;
+    return m_syclDevices.at(uid);
+}
+
+JobGgmlSycl *JobGgmlDeviceManager::sycl(std::size_t idx)
+{
+    if (idx >= m_syclDevices.size())
+        return nullptr;
+    return m_syclDevices.at(idx);
+}
+
+bool JobGgmlDeviceManager::hasSycl() const noexcept
+{
+    return !m_syclDevices.isEmpty();
+}
+#endif
+
+#ifdef JOB_GGML_WEBGPU
+JobGgmlDeviceManager::WebGpuDevices JobGgmlDeviceManager::webGpuDevices()
+{
+    return m_webGpuDevices;
+}
+
+JobGgmlWebGpu *JobGgmlDeviceManager::webGpu(const std::string &uid)
+{
+    if (uid.empty() || !m_webGpuDevices.contains(uid))
+        return nullptr;
+
+    return m_webGpuDevices.at(uid);
+}
+
+JobGgmlWebGpu *JobGgmlDeviceManager::webGpu(std::size_t idx)
+{
+    if (idx >= m_webGpuDevices.size())
+        return nullptr;
+
+    return m_webGpuDevices.at(idx);
+}
+
+bool JobGgmlDeviceManager::hasWebGpu() const noexcept
+{
+    return !m_webGpuDevices.isEmpty();
+}
+
+#endif
+
+#ifdef JOB_GGML_ZDNN
+JobGgmlDeviceManager::ZdnnDevices &JobGgmlDeviceManager::zdnnDevices()
+{
+    return m_zdnnDevices;
+}
+
+JobGgmlZdnn *JobGgmlDeviceManager::zdnn(const std::string &uid)
+{
+    if (uid.empty() || !m_zdnnDevices.contains(uid))
+        return nullptr;
+
+    return m_zdnnDevices.at(uid);
+}
+
+JobGgmlZdnn *JobGgmlDeviceManager::zdnn(std::size_t idx)
+{
+    if (idx >= m_zdnnDevices.size())
+        return nullptr;
+
+    return m_zdnnDevices.at(idx);
+}
+
+bool JobGgmlDeviceManager::hasZdnn() const noexcept
+{
+    return !m_zdnnDevices.isEmpty();
+}
+#endif
+
+JobGgmlDeviceManager::GpuDevices JobGgmlDeviceManager::fallbackGpus()
+{
+    return m_fallbackGpus;
 }
 
 bool JobGgmlDeviceManager::hasCpu() const noexcept
 {
-    return m_cpuDevice &&
-           m_cpuDevice->isValid();
+    return m_cpuDevice && m_cpuDevice->isValid();
 }
 
 bool JobGgmlDeviceManager::hasGpu() const noexcept
 {
-    return !m_gpuDevices.empty();
+    if (!m_fallbackGpus.isEmpty())
+        return true;
+
+#ifdef JOB_GGML_VULKAN
+    if (!m_vulkanDevices.isEmpty())
+        return true;
+#endif
+
+#ifdef JOB_GGML_CUDA
+    if (!m_cudaDevices.isEmpty())
+        return true;
+#endif
+
+#ifdef JOB_GGML_OPENCL
+    if (!m_openClDevices.isEmpty())
+        return true;
+#endif
+
+#ifdef JOB_GGML_HEXAGON
+    if (!m_hexagonDevices.isEmpty())
+        return true;
+#endif
+
+#ifdef JOB_GGML_OPENVINO
+    if (!m_openVinoDevices.isEmpty())
+        return true;
+#endif
+
+#ifdef JOB_GGML_SYCL
+    if (!m_syclDevices.isEmpty())
+        return true;
+#endif
+
+#ifdef JOB_GGML_WEBGPU
+    if (!m_webGpuDevices.isEmpty())
+        return true;
+#endif
+
+    return false;
 }
 
-JobGgmlDevice *JobGgmlDeviceManager::deviceByName(
-    const std::string &name
-    ) noexcept
+
+std::vector<JobGgmlBackendSched::Ptr> JobGgmlDeviceManager::buildScheduler(const std::vector<std::string> &uids,
+                                                                           const std::vector<std::size_t> &graphSizes,
+                                                                           const std::vector<bool> &parallelFlags,
+                                                                           const std::vector<bool> &opOffloadFlags)
 {
-    return const_cast<JobGgmlDevice *>(std::as_const(*this).deviceByName(name));
-}
+    const std::size_t count = uids.size();
 
-const JobGgmlDevice *JobGgmlDeviceManager::deviceByName(const std::string &name) const noexcept
-{
-    if (name.empty())
-        return nullptr;
-
-    const JobGgmlDevice::Ptr device = deviceByNameShared(name);
-
-    return device.get();
-}
-
-JobGgmlDevice::Ptr JobGgmlDeviceManager::deviceByNameShared(const std::string &name) const noexcept
-{
-    if (name.empty())
-        return nullptr;
-
-    for (const JobGgmlDevice::Ptr &device :
-         m_devices) {
-        if (!device || !device->props())
-            continue;
-
-        if (device->props()->name() == name)
-            return device;
-    }
-
-    return nullptr;
-}
-
-JobGgmlDevice *JobGgmlDeviceManager::deviceById(const std::string &deviceId) noexcept
-{
-    return const_cast<JobGgmlDevice *>(std::as_const(*this).deviceById(deviceId));
-}
-
-const JobGgmlDevice *JobGgmlDeviceManager::deviceById(const std::string &deviceId) const noexcept
-{
-    if (deviceId.empty())
-        return nullptr;
-
-    const JobGgmlDevice::Ptr device = deviceByIdShared(deviceId);
-    return device.get();
-}
-
-JobGgmlDevice::Ptr JobGgmlDeviceManager::deviceByIdShared(const std::string &deviceId) const noexcept
-{
-    if (deviceId.empty())
-        return nullptr;
-
-    for (const JobGgmlDevice::Ptr &device : m_devices) {
-
-        if (!device || !device->props())
-            continue;
-
-        if (device->props()->deviceId() == deviceId)
-            return device;
-
-    }
-
-    return nullptr;
-}
-
-JobGgmlBackendSched::Ptr JobGgmlDeviceManager::buildScheduler(std::size_t graphSize, bool parallel, bool opOffload)
-{
-    if (!isReady()) {
-        throw std::runtime_error{
-            "Cannot build a scheduler before the device manager is ready"
-        };
-    }
-
-    std::vector<JobGgmlDevice *> orderedDevices;
-    orderedDevices.reserve(m_gpuDevices.size() + (m_cpuDevice ? 1U : 0U));
-
-
-    // API(on code) says GGML gives lower-index backends higher priority.
-    for (const JobGgmlDevice::Ptr &gpu :
-         m_gpuDevices) {
-        if (gpu)
-            orderedDevices.push_back(gpu.get());
-    }
-
-    if (m_cpuDevice)
-        orderedDevices.push_back(m_cpuDevice.get());
-
-    return buildScheduler(orderedDevices, graphSize, parallel, opOffload);
-}
-
-JobGgmlBackendSched::Ptr JobGgmlDeviceManager::buildScheduler(const std::vector<JobGgmlDevice *> &devices, std::size_t graphSize, bool parallel, bool opOffload)
-{
-    if (!isReady()) {
-        throw std::runtime_error{
-            "Cannot build a scheduler before the device manager is ready"
-        };
-    }
-
-    if (devices.empty()) {
+    if (graphSizes.size() != count ||
+        parallelFlags.size() != count ||
+        opOffloadFlags.size() != count) {
         throw std::invalid_argument{
-            "buildScheduler requires at least one device"
+            "buildScheduler requires equally sized scheduler parameter lists"
         };
     }
-
-    if (graphSize == 0) {
-        throw std::invalid_argument{
-            "buildScheduler requires a graph size greater than zero"
-        };
+    std::vector<JobGgmlBackendSched::Ptr> schedulers;
+    schedulers.reserve(count);
+    for (std::size_t index = 0; index < count; ++index) {
+        schedulers.push_back(buildScheduler(uids[index],
+                                            graphSizes[index],
+                                            parallelFlags[index],
+                                            opOffloadFlags[index]));
     }
 
-    std::vector<JobGgmlBackend::Ptr> backends;
-    backends.reserve(devices.size());
+    return schedulers;
+}
 
-    for (JobGgmlDevice *device : devices) {
-        if (!device || !device->isValid()) {
-            throw std::invalid_argument{
-                "buildScheduler requires valid JobGgmlDevice objects"
-            };
-        }
 
-        /*
-         * Require canonical devices owned by this manager. This prevents a
-         * scheduler created here from silently depending on unrelated device
-         * lifetimes.
-         */
-        const JobGgmlDevice::Ptr canonical = deviceFromNative(device->device());
+JobGgmlBackendSched::Ptr JobGgmlDeviceManager::buildScheduler(const std::string &uid,
+                                                              std::size_t graphSize,
+                                                              bool parallel,
+                                                              bool opOffload)
+{
+    if (!isReady())
+        throw std::runtime_error{ "Cannot build a scheduler before the device manager is ready" };
 
-        if (!canonical || canonical.get() != device) {
-            throw std::invalid_argument{
-                "buildScheduler requires devices owned by this manager"
-            };
-        }
+    if (uid.empty())
+        throw std::invalid_argument{ "buildScheduler requires a device uid" };
 
-        JobGgmlBackend::Ptr backend = device->backend();
+    if (graphSize == 0)
+        throw std::invalid_argument{ "buildScheduler requires a graph size greater than zero" };
 
-        if (!backend || !backend->isValid()) {
-            throw std::invalid_argument{
-                "buildScheduler requires devices with valid backends"
-            };
-        }
+    JobGgmlDevice *dev = device(uid);
+    if (!dev || !dev->isValid())
+        throw std::invalid_argument{ "buildScheduler requires a valid device owned by this manager" };
 
-        const auto duplicate = std::find_if(backends.cbegin(), backends.cend(),
-                                            [&backend](const JobGgmlBackend::Ptr &candidate) {
-                                                return candidate &&
-                                                       candidate->backend() ==
-                                                           backend->backend();
-                                            });
+    JobGgmlBackend::Ptr backend = dev->backend();
 
-        if (duplicate == backends.cend())
-            backends.push_back(std::move(backend));
+    if (!backend || !backend->isValid())
+        throw std::runtime_error{ "Requested device does not expose a valid backend" };
+
+    // core::JobList<JobGgmlBackend::Ptr> backends;
+    JobGgmlBackendSched::Backends  backends;
+    backends.push_back(backend);
+
+    if (dev != m_cpuDevice.get()) {
+        if (!m_cpuDevice || !m_cpuDevice->isValid())
+            throw std::runtime_error{ "A CPU device is required as the scheduler fallback" };
+
+        JobGgmlBackend::Ptr cpuBackend = m_cpuDevice->backend();
+
+        if (!cpuBackend || !cpuBackend->isValid())
+            throw std::runtime_error{ "CPU device does not expose a valid backend" };
+
+        if (cpuBackend->backend() != backend->backend())
+            backends.push_back(std::move(cpuBackend));
     }
 
-    if (backends.empty()) {
-        throw std::runtime_error{
-            "No usable GGML backends were available for the scheduler"
-        };
-    }
+    JobGgmlBackendSched::BufferTypes bufferTypes;
+    auto scheduler = JobGgmlBackendSched::createShared(
+        std::move(backends),
+        std::move(bufferTypes),
+        graphSize,
+        parallel,
+        opOffload
+        );
 
+    if (!scheduler || !scheduler->isValid())
+        throw std::runtime_error{ "Failed to create a valid GGML backend scheduler" };
 
-    // An empty buffer-type vector asks the scheduler wrapper to use the backends' default buffer types.
-    std::vector<JobGgmlBackendBufferType::Ptr> bufferTypes;
-
-    m_scheduler =
-        JobGgmlBackendSched::createShared(
-            std::move(backends),
-            std::move(bufferTypes),
-            graphSize,
-            parallel,
-            opOffload
-            );
-
-    if (!m_scheduler || !m_scheduler->isValid()) {
-        m_scheduler.reset();
-        throw std::runtime_error{
-            "Failed to create a valid GGML backend scheduler"
-        };
-    }
-
+    m_scheduler = scheduler;
     return m_scheduler;
+}
+
+JobGgmlBackendSched::Ptr JobGgmlDeviceManager::buildScheduler(JobGgmlDevice *dev, std::size_t graphSize, bool parallel, bool opOffload)
+{
+    if (!dev)
+        throw std::invalid_argument{ "buildScheduler requires a valid device" };
+
+    return buildScheduler(dev->uid(), graphSize, parallel, opOffload);
 }
 
 JobGgmlBackendSched::Ptr JobGgmlDeviceManager::scheduler() const noexcept
@@ -432,15 +659,51 @@ void JobGgmlDeviceManager::resetScheduler() noexcept
 void JobGgmlDeviceManager::reset() noexcept
 {
     resetScheduler();
-
     m_cpuDevice.reset();
-    m_gpuDevices.clear();
+    m_fallbackGpus.clear();
 
+#ifdef JOB_GGML_VULKAN
+    m_vulkanDevices.clear();
+#endif
+
+#ifdef JOB_GGML_CUDA
+    m_cudaDevices.clear();
+#endif
+
+#ifdef JOB_GGML_OPENCL
+    m_openClDevices.clear();
+#endif
+
+#ifdef JOB_GGML_BLAS
+    m_blasDevices.clear();
+#endif
+
+#ifdef JOB_GGML_HEXAGON
+    m_hexagonDevices.clear();
+#endif
+
+#ifdef JOB_GGML_OPENVINO
+    m_openVinoDevices.clear();
+#endif
+
+#ifdef JOB_GGML_SYCL
+    m_syclDevices.clear();
+#endif
+
+#ifdef JOB_GGML_WEBGPU
+    m_webGpuDevices.clear();
+#endif
+
+#ifdef JOB_GGML_ZDNN
+    m_zdnnDevices.clear();
+#endif
+
+    // Canonical owner last.
     m_devices.clear();
     m_backendRegistries.clear();
 
     clearError();
-    setState(ManagerState::Uninitialized);
+    setState(DeviceManagerState::Uninitialized);
 }
 
 std::string JobGgmlDeviceManager::debugString() const
@@ -452,26 +715,27 @@ std::string JobGgmlDeviceManager::debugString() const
         << "state=";
 
     switch (m_state) {
-    case ManagerState::Uninitialized:
+    case DeviceManagerState::Uninitialized:
         stream << "Uninitialized";
         break;
 
-    case ManagerState::Scanning:
+    case DeviceManagerState::Scanning:
         stream << "Scanning";
         break;
 
-    case ManagerState::Ready:
+    case DeviceManagerState::Ready:
         stream << "Ready";
         break;
 
-    case ManagerState::Error:
+    case DeviceManagerState::Error:
         stream << "Error";
         break;
     }
 
     stream
         << ", devices=" << m_devices.size()
-        << ", gpus=" << m_gpuDevices.size()
+        << ", gpus=" << gpuDeviceCount()
+        << ", fallbackGpus=" << m_fallbackGpus.size()
         << ", hasCpu=" << (hasCpu() ? "true" : "false")
         << ", hasScheduler="
         << (hasScheduler() ? "true" : "false");
@@ -488,7 +752,7 @@ std::string JobGgmlDeviceManager::debugString() const
     return stream.str();
 }
 
-void JobGgmlDeviceManager::setState(ManagerState state) noexcept
+void JobGgmlDeviceManager::setState(DeviceManagerState state) noexcept
 {
     m_state = state;
 }
@@ -503,61 +767,191 @@ void JobGgmlDeviceManager::clearError() noexcept
     m_errorString.clear();
 }
 
-JobGgmlDevice::Ptr JobGgmlDeviceManager::deviceFromNative(ggml_backend_dev_t device) const noexcept
-{
-    if (!device)
-        return nullptr;
-
-    for (const JobGgmlDevice::Ptr &candidate : m_devices)
-        if (candidate && candidate->device() == device)
-            return candidate;
-
-    return nullptr;
-}
-
 JobGgmlBackendReg::Ptr JobGgmlDeviceManager::registryFromNative(ggml_backend_reg_t backendReg) const noexcept
 {
     if (!backendReg)
         return nullptr;
 
-    for (const JobGgmlBackendReg::Ptr &candidate : m_backendRegistries)
+    for (const JobGgmlBackendReg::Ptr &candidate : m_backendRegistries) {
         if (candidate && candidate->backendReg() == backendReg)
             return candidate;
+    }
 
     return nullptr;
 }
 
-void JobGgmlDeviceManager::rebuildDeviceLists()
+void JobGgmlDeviceManager::indexDevice(const std::string &uid,
+                                       JobGgmlDeviceImpl impl,
+                                       const JobGgmlDevice::Ptr &device)
 {
-    m_cpuDevice.reset();
-    m_gpuDevices.clear();
+    if (uid.empty() || uid == "unknown")
+        throw std::invalid_argument{ "Cannot index a JobGgmlDevice without a usable uid" };
 
-    m_gpuDevices.reserve(m_devices.size());
+    if (!device || !device->isValid())
+        throw std::invalid_argument{ "Cannot index an invalid JobGgmlDevice" };
 
-    for (const JobGgmlDevice::Ptr &device : m_devices) {
+    const JobGgmlDeviceType deviceType = device->props()->deviceType();
+    switch (impl) {
+    case JobGgmlDeviceImpl::Cpu:
+    {
+        JobGgmlCpu::Ptr cpu = std::dynamic_pointer_cast<JobGgmlCpu>(device);
+        if (!cpu)
+            throw std::runtime_error{ "GGML CPU device was not wrapped as JobGgmlCpu" };
 
-        if (!device || !device->isValid() || !device->props())
-            continue;
+        if (!m_cpuDevice)
+            m_cpuDevice = std::move(cpu);
 
+        break;
+    }
 
-        switch (device->props()->type()) {
-        case GGML_BACKEND_DEVICE_TYPE_CPU:
-            // Preserve the first CPU as the manager's canonical CPU device.
-            if (!m_cpuDevice)
-                m_cpuDevice = device;
+    case JobGgmlDeviceImpl::Vulkan:
+#ifdef JOB_GGML_VULKAN
+    {
+        if (m_vulkanDevices.contains(uid))
+            break;
+        JobGgmlVulkan *vulkan = dynamic_cast<JobGgmlVulkan *>(device.get());
+        if (!vulkan)
+            throw std::runtime_error{ "GGML Vulkan device was not wrapped as JobGgmlVulkan" };
+        m_vulkanDevices.insert(uid, vulkan);
+        break;
+    }
+#else
+        break;
+#endif
+
+    case JobGgmlDeviceImpl::Cuda:
+#ifdef JOB_GGML_CUDA
+    {
+        if (m_cudaDevices.contains(uid))
+            break;
+        JobGgmlCuda *cuda = dynamic_cast<JobGgmlCuda *>(device.get());
+
+        if (!cuda)
+            throw std::runtime_error{ "GGML CUDA device was not wrapped as JobGgmlCuda" };
+        m_cudaDevices.insert(uid, cuda);
+        break;
+    }
+#else
+        break;
+#endif
+
+    case JobGgmlDeviceImpl::OpenCl:
+#ifdef JOB_GGML_OPENCL
+    {
+        if (m_openClDevices.contains(uid))
+            break;
+        JobGgmlOpenCl *openCl = dynamic_cast<JobGgmlOpenCl *>(device.get());
+        if (!openCl)
+            throw std::runtime_error{ "GGML OpenCL device was not wrapped as JobGgmlOpenCl" };
+        m_openClDevices.insert(uid, openCl);
+        break;
+    }
+#else
+        break;
+#endif
+
+    case JobGgmlDeviceImpl::Blas:
+#ifdef JOB_GGML_BLAS
+    {
+        if (m_blasDevices.contains(uid))
+            break;
+        JobGgmlBlas *blas = dynamic_cast<JobGgmlBlas *>(device.get());
+        if (!blas)
+            throw std::runtime_error{ "GGML BLAS device was not wrapped as JobGgmlBlas" };
+        m_blasDevices.insert(uid, blas);
+        break;
+    }
+#else
+        break;
+#endif
+
+    case JobGgmlDeviceImpl::Hexagon:
+#ifdef JOB_GGML_HEXAGON
+    {
+        if (m_hexagonDevices.contains(uid))
+            break;
+        JobGgmlHexagon *hexagon = dynamic_cast<JobGgmlHexagon *>(device.get());
+        if (!hexagon)
+            throw std::runtime_error{ "GGML Hexagon device was not wrapped as JobGgmlHexagon" };
+        m_hexagonDevices.insert(uid, hexagon);
+        break;
+    }
+#else
+        break;
+#endif
+
+    case JobGgmlDeviceImpl::OpenVino:
+#ifdef JOB_GGML_OPENVINO
+    {
+        if (m_openVinoDevices.contains(uid))
             break;
 
-        case GGML_BACKEND_DEVICE_TYPE_GPU:
-        case GGML_BACKEND_DEVICE_TYPE_IGPU:
-            m_gpuDevices.push_back(device);
-            break;
+        JobGgmlOpenVino *openVino = dynamic_cast<JobGgmlOpenVino *>(device.get());
+        if (!openVino)
+            throw std::runtime_error{ "GGML OpenVINO device was not wrapped as JobGgmlOpenVino" };
+        m_openVinoDevices.insert(uid, openVino);
+        break;
+    }
+#else
+        break;
+#endif
 
-        case GGML_BACKEND_DEVICE_TYPE_ACCEL:
-        case GGML_BACKEND_DEVICE_TYPE_META:
-            // TODO
-            // These remain available through devices(), device(), name and ID lookup, but are not reported as GPUs
+    case JobGgmlDeviceImpl::Sycl:
+#ifdef JOB_GGML_SYCL
+    {
+        if (m_syclDevices.contains(uid))
             break;
+        JobGgmlSycl *sycl = dynamic_cast<JobGgmlSycl *>(device.get());
+        if (!sycl)
+            throw std::runtime_error{ "GGML SYCL device was not wrapped as JobGgmlSycl" };
+        m_syclDevices.insert(uid, sycl);
+        break;
+    }
+#else
+        break;
+#endif
+
+    case JobGgmlDeviceImpl::WebGpu:
+#ifdef JOB_GGML_WEBGPU
+    {
+        if (m_webGpuDevices.contains(uid))
+            break;
+        JobGgmlWebGpu *webGpu = dynamic_cast<JobGgmlWebGpu *>(device.get());
+        if (!webGpu)
+            throw std::runtime_error{ "GGML WebGPU device was not wrapped as JobGgmlWebGpu" };
+        m_webGpuDevices.insert(uid, webGpu);
+        break;
+    }
+#else
+        break;
+#endif
+
+    case JobGgmlDeviceImpl::Zdnn:
+#ifdef JOB_GGML_ZDNN
+    {
+        if (m_zdnnDevices.contains(uid))
+            break;
+        JobGgmlZdnn *zdnn = dynamic_cast<JobGgmlZdnn *>(device.get());
+        if (!zdnn)
+            throw std::runtime_error{ "GGML zDNN device was not wrapped as JobGgmlZdnn" };
+        m_zdnnDevices.insert(uid, zdnn);
+        break;
+    }
+#else
+        break;
+#endif
+
+    case JobGgmlDeviceImpl::Fallback:
+    case JobGgmlDeviceImpl::VirtGpu:
+    case JobGgmlDeviceImpl::Metal:
+    case JobGgmlDeviceImpl::ZenDnn:
+    case JobGgmlDeviceImpl::Cann:
+    case JobGgmlDeviceImpl::Rpc:
+    case JobGgmlDeviceImpl::Count:
+        if ((deviceType == JobGgmlDeviceType::Gpu || deviceType == JobGgmlDeviceType::IGpu) && !m_fallbackGpus.contains(uid)){
+            m_fallbackGpus.insert(uid, device.get());
         }
+        break;
     }
 }
 

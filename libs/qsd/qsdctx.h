@@ -101,7 +101,7 @@ public:
             break;
         case SD_LOG_ERROR:
             ctx->set_lastLog(log);
-            qErrnoWarning(text);
+            qWarning().noquote() << text;
             break;
         }
         // qDebug() << log;

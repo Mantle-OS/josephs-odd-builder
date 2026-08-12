@@ -45,10 +45,7 @@ JobThread::StartResult JobThread::start()
         return StartResult::ThreadError;
     }
 
-    int const createResult = pthread_create(
-        &provider(m_handleStorage), nullptr,
-        &JobThread::threadEntry, args
-        );
+    int const createResult = pthread_create(&provider(m_handleStorage), nullptr, &JobThread::threadEntry, args);
 
     if (createResult != 0) {
         delete args;

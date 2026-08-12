@@ -3,90 +3,65 @@
 #include <stdexcept>
 #include <utility>
 #include <vector>
+#include <algorithm>
 
 namespace job::ggml {
-JobGgmlBackendSched::JobGgmlBackendSched(std::vector<JobGgmlBackend::Ptr> backends, std::vector<JobGgmlBackendBufferType::Ptr> bufferTypes, std::size_t graphSize, bool parallel, bool opOffload) :
+JobGgmlBackendSched::JobGgmlBackendSched(JobGgmlBackendSched::Backends backends,
+                                         JobGgmlBackendSched::BufferTypes bufferTypes,
+                                         std::size_t graphSize, bool parallel, bool opOffload) :
     m_backends{std::move(backends)},
     m_bufferTypes{std::move(bufferTypes)},
     m_graphSize{graphSize},
     m_parallel{parallel},
     m_opOffload{opOffload}
 {
-    if (m_backends.empty()) {
-        throw std::invalid_argument{
-            "JobGgmlBackendSched requires at least one backend"
-        };
-    }
+    if (m_backends.empty())
+        throw std::invalid_argument{ "JobGgmlBackendSched requires at least one backend" };
 
-    if (m_graphSize == 0) {
-        throw std::invalid_argument{
-            "JobGgmlBackendSched requires a graph size greater than zero"
-        };
-    }
+    if (m_graphSize == 0)
+        throw std::invalid_argument{ "JobGgmlBackendSched requires a graph size greater than zero" };
 
-    if (!m_bufferTypes.empty() &&
-        m_bufferTypes.size() != m_backends.size()) {
-        throw std::invalid_argument{
-            "JobGgmlBackendSched requires one buffer type per backend"
-        };
-    }
+    if (!m_bufferTypes.empty() && m_bufferTypes.size() != m_backends.size())
+        throw std::invalid_argument{ "JobGgmlBackendSched requires one buffer type per backend" };
 
     std::vector<ggml_backend_t> nativeBackends;
     nativeBackends.reserve(m_backends.size());
-
     for (const auto &backend : m_backends) {
-        if (!backend || !backend->isValid()) {
-            throw std::invalid_argument{
-                "JobGgmlBackendSched received an invalid backend"
-            };
-        }
+        if (!backend || !backend->isValid())
+            throw std::invalid_argument{ "JobGgmlBackendSched received an invalid backend" };
 
         nativeBackends.push_back(backend->backend());
     }
 
     std::vector<ggml_backend_buffer_type_t> nativeBufferTypes;
-
     if (!m_bufferTypes.empty()) {
         nativeBufferTypes.reserve(m_bufferTypes.size());
 
         for (const auto &bufferType : m_bufferTypes) {
-            if (!bufferType || !bufferType->isValid()) {
-                throw std::invalid_argument{
-                    "JobGgmlBackendSched received an invalid buffer type"
-                };
-            }
+            if (!bufferType || !bufferType->isValid())
+                throw std::invalid_argument{ "JobGgmlBackendSched received an invalid buffer type" };
 
             nativeBufferTypes.push_back(bufferType->bufferType());
         }
     }
 
-    m_scheduler.reset(
-        ggml_backend_sched_new(
-            nativeBackends.data(),
-            nativeBufferTypes.empty() ? nullptr : nativeBufferTypes.data(),
-            static_cast<int>(nativeBackends.size()),
-            m_graphSize,
-            m_parallel,
-            m_opOffload
-            )
-        );
+    m_scheduler.reset(ggml_backend_sched_new(nativeBackends.data(),
+                                             nativeBufferTypes.empty() ? nullptr : nativeBufferTypes.data(),
+                                             static_cast<int>(nativeBackends.size()),
+                                             m_graphSize,
+                                             m_parallel,
+                                             m_opOffload));
 
-    if (!m_scheduler) {
-        throw std::runtime_error{
-            "Failed to create GGML backend scheduler"
-        };
-    }
+    if (!m_scheduler)
+        throw std::runtime_error{ "Failed to create GGML backend scheduler" };
 
     // If the caller did not explicitly supply buffer types, GGML selected the defaults. Wrap them now so the rest of the scheduler always has canonical buffer-type objects.
     if (m_bufferTypes.empty()) {
         m_bufferTypes.reserve(m_backends.size());
         for (const auto &backend : m_backends) {
             ggml_backend_buffer_type_t nativeBufferType = ggml_backend_sched_get_buffer_type( m_scheduler.get(), backend->backend());
-            if (!nativeBufferType) {
-                throw std::runtime_error{
-                    "GGML scheduler failed to provide a backend buffer type"
-                };
-            }
+            if (!nativeBufferType)
+                throw std::runtime_error{ "GGML scheduler failed to provide a backend buffer type" };
 
             m_bufferTypes.push_back(JobGgmlBackendBufferType::createShared(nativeBufferType));
         }
@@ -131,7 +106,7 @@ JobGgmlBackend::Ptr JobGgmlBackendSched::backend(int index) const noexcept
     if (!m_scheduler || index < 0 || index >= backendCount())
         return nullptr;
 
-    return backendFromNative( ggml_backend_sched_get_backend(m_scheduler.get(), index) );
+    return backendFromNative(ggml_backend_sched_get_backend(m_scheduler.get(), index));
 }
 
 int JobGgmlBackendSched::splitCount() const noexcept
@@ -168,17 +143,11 @@ std::size_t JobGgmlBackendSched::bufferSize(const JobGgmlBackend &backend) const
 
 void JobGgmlBackendSched::reserveSize(JobGgmlCGraph &measureGraph, std::vector<std::size_t> &sizes)
 {
-    if (!m_scheduler) {
-        throw std::runtime_error{
-            "Cannot reserve scheduler sizes with an invalid scheduler"
-        };
-    }
+    if (!m_scheduler)
+        throw std::runtime_error{ "Cannot reserve scheduler sizes with an invalid scheduler" };
 
-    if (!measureGraph.isValid()) {
-        throw std::invalid_argument{
-            "reserveSize requires a valid JobGgmlCGraph"
-        };
-    }
+    if (!measureGraph.isValid())
+        throw std::invalid_argument{ "reserveSize requires a valid JobGgmlCGraph" };
 
     sizes.resize(static_cast<std::size_t>(backendCount()), 0);
 
@@ -187,46 +156,28 @@ void JobGgmlBackendSched::reserveSize(JobGgmlCGraph &measureGraph, std::vector<s
 
 bool JobGgmlBackendSched::reserve(JobGgmlCGraph &measureGraph)
 {
-    if (!m_scheduler) {
-        throw std::runtime_error{
-            "Cannot reserve scheduler buffers with an invalid scheduler"
-        };
-    }
+    if (!m_scheduler)
+        throw std::runtime_error{ "Cannot reserve scheduler buffers with an invalid scheduler" };
 
-    if (!measureGraph.isValid()) {
-        throw std::invalid_argument{
-            "reserve requires a valid JobGgmlCGraph"
-        };
-    }
+    if (!measureGraph.isValid())
+        throw std::invalid_argument{ "reserve requires a valid JobGgmlCGraph" };
 
     return ggml_backend_sched_reserve(m_scheduler.get(), measureGraph.graph());
 }
 
 void JobGgmlBackendSched::setTensorBackend(JobGgmlTensor &tensor, const JobGgmlBackend &backend)
 {
-    if (!m_scheduler) {
-        throw std::runtime_error{
-            "Cannot assign a tensor with an invalid scheduler"
-        };
-    }
+    if (!m_scheduler)
+        throw std::runtime_error{ "Cannot assign a tensor with an invalid scheduler" };
 
-    if (!tensor.isValid()) {
-        throw std::invalid_argument{
-            "setTensorBackend requires a valid JobGgmlTensor"
-        };
-    }
+    if (!tensor.isValid())
+        throw std::invalid_argument{ "setTensorBackend requires a valid JobGgmlTensor" };
 
-    if (!backend.isValid()) {
-        throw std::invalid_argument{
-            "setTensorBackend requires a valid JobGgmlBackend"
-        };
-    }
+    if (!backend.isValid())
+        throw std::invalid_argument{ "setTensorBackend requires a valid JobGgmlBackend" };
 
-    if (!backendFromNative(backend.backend())) {
-        throw std::invalid_argument{
-            "setTensorBackend requires a backend owned by this scheduler"
-        };
-    }
+    if (!backendFromNative(backend.backend()))
+        throw std::invalid_argument{ "setTensorBackend requires a backend owned by this scheduler" };
 
     ggml_backend_sched_set_tensor_backend(m_scheduler.get(), tensor.tensor(), backend.backend());
 }
@@ -236,39 +187,29 @@ JobGgmlBackend::Ptr JobGgmlBackendSched::tensorBackend(const JobGgmlTensor &tens
     if (!m_scheduler || !tensor.isValid())
         return nullptr;
 
-    return backendFromNative(ggml_backend_sched_get_tensor_backend(m_scheduler.get(), const_cast<ggml_tensor *>(tensor.tensor())));
+    return backendFromNative(ggml_backend_sched_get_tensor_backend(m_scheduler.get(),
+                                                                   const_cast<ggml_tensor *>(tensor.tensor()))
+                             );
 }
 
 void JobGgmlBackendSched::splitGraph(JobGgmlCGraph &graph)
 {
-    if (!m_scheduler) {
-        throw std::runtime_error{
-            "Cannot split a graph with an invalid scheduler"
-        };
-    }
+    if (!m_scheduler)
+        throw std::runtime_error{ "Cannot split a graph with an invalid scheduler" };
 
-    if (!graph.isValid()) {
-        throw std::invalid_argument{
-            "splitGraph requires a valid JobGgmlCGraph"
-        };
-    }
+    if (!graph.isValid())
+        throw std::invalid_argument{ "splitGraph requires a valid JobGgmlCGraph" };
 
     ggml_backend_sched_split_graph(m_scheduler.get(), graph.graph());
 }
 
 bool JobGgmlBackendSched::allocateGraph(JobGgmlCGraph &graph)
 {
-    if (!m_scheduler) {
-        throw std::runtime_error{
-            "Cannot allocate a graph with an invalid scheduler"
-        };
-    }
+    if (!m_scheduler)
+        throw std::runtime_error{ "Cannot allocate a graph with an invalid scheduler" };
 
-    if (!graph.isValid()) {
-        throw std::invalid_argument{
-            "allocateGraph requires a valid JobGgmlCGraph"
-        };
-    }
+    if (!graph.isValid())
+        throw std::invalid_argument{ "allocateGraph requires a valid JobGgmlCGraph" };
 
     return ggml_backend_sched_alloc_graph(m_scheduler.get(), graph.graph());
 }
@@ -278,7 +219,9 @@ JobGgmlStatus JobGgmlBackendSched::computeGraph(JobGgmlCGraph &graph)
     if (!m_scheduler || !graph.isValid())
         return JobGgmlStatus::Failed;
 
-    return JobGgmlBackend::fromGgmlStatus(ggml_backend_sched_graph_compute(m_scheduler.get(), graph.graph())
+    return fromGgmlStatus(
+        ggml_backend_sched_graph_compute(m_scheduler.get(),
+                                         graph.graph())
         );
 }
 
@@ -287,44 +230,34 @@ JobGgmlStatus JobGgmlBackendSched::computeGraphAsync(JobGgmlCGraph &graph)
     if (!m_scheduler || !graph.isValid())
         return JobGgmlStatus::Failed;
 
-    return JobGgmlBackend::fromGgmlStatus(ggml_backend_sched_graph_compute_async(m_scheduler.get(), graph.graph()));
+    return fromGgmlStatus(ggml_backend_sched_graph_compute_async(m_scheduler.get(), graph.graph()));
 }
 
 void JobGgmlBackendSched::synchronize()
 {
-    if (!m_scheduler) {
-        throw std::runtime_error{
-            "Cannot synchronize an invalid GGML backend scheduler"
-        };
-    }
+    if (!m_scheduler)
+        throw std::runtime_error{ "Cannot synchronize an invalid GGML backend scheduler" };
 
     ggml_backend_sched_synchronize(m_scheduler.get());
 }
 
 void JobGgmlBackendSched::reset()
 {
-    if (!m_scheduler) {
-        throw std::runtime_error{
-            "Cannot reset an invalid GGML backend scheduler"
-        };
-    }
+    if (!m_scheduler)
+        throw std::runtime_error{ "Cannot reset an invalid GGML backend scheduler" };
 
     ggml_backend_sched_reset(m_scheduler.get());
 }
 
 void JobGgmlBackendSched::setEvalCallback(EvalCallback callback)
 {
-    if (!m_scheduler) {
-        throw std::runtime_error{
-            "Cannot set an evaluation callback on an invalid scheduler"
-        };
-    }
+    if (!m_scheduler)
+        throw std::runtime_error{ "Cannot set an evaluation callback on an invalid scheduler" };
 
     m_evalCallback = std::move(callback);
-    ggml_backend_sched_set_eval_callback( m_scheduler.get(),
-        m_evalCallback ? &JobGgmlBackendSched::evalCallbackTrampoline : nullptr,
-        m_evalCallback ? this : nullptr
-        );
+    ggml_backend_sched_set_eval_callback(m_scheduler.get(),
+                                         m_evalCallback ? &JobGgmlBackendSched::evalCallbackTrampoline : nullptr,
+                                         m_evalCallback ? this : nullptr);
 }
 
 void JobGgmlBackendSched::clearEvalCallback() noexcept
@@ -359,14 +292,11 @@ JobGgmlBackend::Ptr JobGgmlBackendSched::backendFromNative(ggml_backend_t backen
     if (!backend)
         return nullptr;
 
-    for (const auto &candidate : m_backends) {
-        if (candidate &&
-            candidate->backend() == backend) {
-            return candidate;
-        }
-    }
+    const auto it = std::find_if(m_backends.cbegin(), m_backends.cend(), [backend](const auto &candidate) {
+        return candidate && candidate->backend() == backend;
+    });
 
-    return nullptr;
+    return (it != m_backends.cend()) ? *it : nullptr;
 }
 
 JobGgmlBackendBufferType::Ptr JobGgmlBackendSched::bufferTypeFromNative(ggml_backend_buffer_type_t bufferType) const noexcept
@@ -374,14 +304,11 @@ JobGgmlBackendBufferType::Ptr JobGgmlBackendSched::bufferTypeFromNative(ggml_bac
     if (!bufferType)
         return nullptr;
 
-    for (const auto &candidate : m_bufferTypes) {
-        if (candidate &&
-            candidate->bufferType() == bufferType) {
-            return candidate;
-        }
-    }
+    const auto it = std::find_if(m_bufferTypes.cbegin(), m_bufferTypes.cend(), [bufferType](const auto &candidate) {
+        return candidate && candidate->bufferType() == bufferType;
+    });
 
-    return nullptr;
+    return (it != m_bufferTypes.cend()) ? *it : nullptr;
 }
 
 } // namespace job::ggml
