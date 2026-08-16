@@ -85,13 +85,15 @@ option(JOB_BUILD_IO "Build the job_io library" ON)
 option(JOB_BUILD_UART "Build the job_uart library" ON)
 option(JOB_BUILD_NET "Build the job_net library" ON)
 option(JOB_GGML "Build JobGgml " ON)
-option(JOB_BUILD_SERIALIZER "Build the job_serializer library" ON)
-option(JOB_BUILD_SERIALIZER_MSGPACK "Enable MsgPack backend for Job Serlizer" ON)
-option(JOB_BUILD_SERIALIZER_FLATBUFFERS "Enable FlatBuffers backend" OFF)
+    option(JOB_BUILD_SERIALIZER "Build the job_serializer library" ON)
+    option(JOB_BUILD_SERIALIZER_MSGPACK "Enable MsgPack backend for Job Serlizer" ON)
+    option(JOB_BUILD_SERIALIZER_FLATBUFFERS "Enable FlatBuffers backend" OFF)
 option(JOB_BUILD_SCIENCE "Build the job_science library" ON)
 option(JOB_BUILD_AI "Build the job_ai library" ON)
 option(JOB_BUILD_ANSI "Build the job_ansi library" ON)
 option(JOB_BUILD_TUI "Build the job_tui library" ON)
+option(JOB_BUILD_SOUND "Build the job_sound pipeline alsa stack library" ON)
+
 
 ##############################
 # Qt Adapter Libraries

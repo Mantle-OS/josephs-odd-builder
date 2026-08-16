@@ -321,6 +321,17 @@ set_target_properties(JosephsOddBuilder_Ggml PROPERTIES
     VISIBILITY_INLINES_HIDDEN ON
 )
 
+target_compile_definitions(JosephsOddBuilder_Ggml PUBLIC
+    $<$<BOOL:${GGML_CPU}>:JOB_GGML_CPU>
+    $<$<BOOL:${GGML_CUDA}>:JOB_GGML_CUDA>
+    $<$<BOOL:${GGML_VULKAN}>:JOB_GGML_VULKAN>
+    $<$<BOOL:${GGML_OPENCL}>:JOB_GGML_OPENCL>
+    $<$<BOOL:${GGML_BLAS}>:JOB_GGML_BLAS>
+    $<$<BOOL:${GGML_SYCL}>:JOB_GGML_SYCL>
+    $<$<BOOL:${GGML_WEBGPU}>:JOB_GGML_WEBGPU>
+)
+
+
 target_include_directories(JosephsOddBuilder_Ggml PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobggml>

@@ -1,25 +1,37 @@
-add_subdirectory(job_simd)                  # fully cross platform | not tested on hardware for win32
-add_subdirectory(job_core)                  # fully cross platform | not tested on hardware for win32
-add_subdirectory(job_threads)               # fully cross platform | not tested on hardware for win32
-add_subdirectory(job_crypto)                # fully cross platform | not tested on hardware for win32
-add_subdirectory(job_zstd)                  # fully cross platform | not tested on hardware for win32
+add_subdirectory(job_simd)
+add_subdirectory(job_core)
+add_subdirectory(job_threads)
+add_subdirectory(job_crypto)
+add_subdirectory(job_zstd)
 
 if(JOB_CUDA)
-    add_subdirectory(job_cuda)              # This was just me playing around with cuda to see if I could get my cuda_bridge and a gemm that I could test against of job_ai benchmarks
+    add_subdirectory(job_cuda)
 endif()
 
-add_subdirectory(job_io)                    # not cross platform yet JobSharedMNemory and the Pty parts are gonna be tough esp tyhe shared memory
-add_subdirectory(job_uart)                  # not cross platform currently uses udev for monotor of serial bus | look into what windows has for this.... "Here is looking at you putty"
-add_subdirectory(job_net)                   # SEMI cross platform. | not tested on hardware for win32
+add_subdirectory(job_io)
+add_subdirectory(job_uart)
+add_subdirectory(job_net)
+add_subdirectory(job_serializer)
+add_subdirectory(job_science)
+add_subdirectory(job_ai)
+add_subdirectory(job_ansi)
+add_subdirectory(job_tui)
 
-add_subdirectory(job_serializer)            # fully cross platform but needs to generate and export the stupid dll exports
+add_subdirectory(job_ggml)
+add_subdirectory(job_token)
+add_subdirectory(job_model)
 
-add_subdirectory(job_science)               # not cross platform yet | will not be that hard to port
-add_subdirectory(job_ai)                    # not cross platform yet | will not port the whole goal of this library was to see if science and AI algoritums would prove out to work on a very limited(NO GPU, TPU, ETC) hardware rig think less than a gig of ram on a SOM
-add_subdirectory(job_ansi)                  # not cross platform     | This one is gonna be pretty easy as long as windows talks Ansii lol
-add_subdirectory(job_tui)                   # see above as it depends on the whole ansi protocol
+add_subdirectory(job_sound)
 
-add_subdirectory(job_ggml)                ## old going away was just me playing around trying to learn the whole device, graph, weights and models
+
+# add_subdirectory(job_video)
+# add_subdirectory(job_media)
+
+# add_subdirectory(job_gui)
+# add_subdirectory(job_wm)
+
+
+
 
 if(JOB_QT)
     if(JOB_BUILD_SERIALIZER_MSGPACK)

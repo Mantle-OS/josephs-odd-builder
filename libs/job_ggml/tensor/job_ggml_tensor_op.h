@@ -67,10 +67,9 @@ public:
     {
         auto *payload = m_ctx->createPayload<JobGgmlCustom1OpPayload>(
             JobGgmlCustom1OpPayload{std::move(func), userdata}
-        );
+            );
         return operate<&ggml_map_custom1>(callBouncer1, n_tasks, payload);
     }
-    // START FIXME
     [[nodiscard]] UPtr mapCustom1Inplace(JobGgmlCustom1OpFn func, int n_tasks, void *userdata = nullptr)
     {
         auto *payload = m_ctx->createPayload<JobGgmlCustom1OpPayload>(JobGgmlCustom1OpPayload{std::move(func), userdata});
@@ -154,6 +153,7 @@ public:
         return customInplace(nativeArgs.data(), static_cast<int>(nativeArgs.size()),
                              std::move(func), n_tasks, userdata);
     }
+
     // Unary Operations
     [[nodiscard]] UPtr dup() { return operate<&ggml_dup>(); }
     [[nodiscard]] UPtr dupInplace() { return operate<&ggml_dup_inplace>(); }
@@ -451,7 +451,7 @@ private:
     {
         if (!m_ctx || !m_ctx->isValid() || !isValid()) throw std::runtime_error{ "JobGgmlTensorOp requires a valid tensor and context" };
         (validateArg(args), ...);
-        struct ggml_tensor *result = Function(m_ctx->context(), tensor(), nativeArg(std::forward<Args>(args))...);
+        struct ggml_tensor *result = Function(m_ctx->context(), const_cast<struct ggml_tensor*>(tensor()), nativeArg(std::forward<Args>(args))...);
         if (!result) throw std::runtime_error{ "GGML operation failed to create a tensor" };
         return createUniq(result, m_ctx);
     }
@@ -482,9 +482,9 @@ private:
     {
         using DecayedT = std::remove_cvref_t<T>;
         if constexpr (std::is_base_of_v<JobGgmlTensor, DecayedT>) {
-            return value.tensor();
+            return const_cast<struct ggml_tensor *>(value.tensor());
         } else if constexpr (requires { value->tensor(); }) {
-            return value ? value->tensor() : nullptr;
+            return value ? const_cast<struct ggml_tensor *>(value->tensor()) : nullptr;
         } else if constexpr (std::is_enum_v<DecayedT>) {
             if constexpr (std::is_same_v<DecayedT, JobGgmlType>)          return static_cast<enum ggml_type>(value);
             else if constexpr (std::is_same_v<DecayedT, JobGgmlPrecision>) return static_cast<enum ggml_prec>(value);

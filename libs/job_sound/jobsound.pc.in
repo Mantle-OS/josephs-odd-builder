@@ -1,0 +1,11 @@
+prefix=@CMAKE_INSTALL_PREFIX@
+exec_prefix=${prefix}
+libdir=@CMAKE_INSTALL_FULL_LIBDIR@
+includedir=@CMAKE_INSTALL_FULL_INCLUDEDIR@/jobsound
+
+Name: jobsound
+Description: Soundlibrary for JOB (Joseph's Odd Builder)
+Version: @PROJECT_VERSION@
+Libs: -L${libdir} -ljobsound -ljobthreads -ljobcore -lpthread -latomic -lalsa -llibspa-0.2 -llibpipewire-0.3 -lwireplumber-0.5
+Cflags: -I${includedir}
+Requires: alsa libspa-0.2 libpipewire-0.3 wireplumber-0.5

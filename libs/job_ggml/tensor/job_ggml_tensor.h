@@ -158,9 +158,9 @@ public:
     [[nodiscard]] JobGgmlTensorVolume::UPtr asVolume();
     [[nodiscard]] JobGgmlTensorBatch::UPtr asBatch();
 
-private:
     [[nodiscard]] enum ggml_op ggmlOperation() const noexcept;
     [[nodiscard]] enum ggml_type ggmlType() const noexcept;
+private:
     struct ggml_tensor *m_tensor{nullptr}; // Borrowed from the owning GGML context.
 
     JobGgmlTensorExtents::UPtr   m_extents;

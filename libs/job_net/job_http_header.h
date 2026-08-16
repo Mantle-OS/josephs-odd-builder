@@ -58,8 +58,17 @@ public:
     [[nodiscard]] std::string_view valueAt(size_t pos) const;
     [[nodiscard]] std::forward_list<std::string_view> values(std::string_view name) const;
 
-    JobHttpHeader & operator=(JobHttpHeader &&other);
-    JobHttpHeader & operator=(const JobHttpHeader &other);
+    JobHttpHeader &operator=(JobHttpHeader &&other);
+    JobHttpHeader &operator=(const JobHttpHeader &other);
+    [[nodiscard]] bool operator==(const JobHttpHeader &other) const noexcept
+    {
+        return m_header_list == other.m_header_list;
+    }
+
+    [[nodiscard]] bool operator!=(const JobHttpHeader &other) const noexcept
+    {
+        return !(*this == other);
+    }
 
     [[nodiscard]] auto begin() noexcept
     {
@@ -90,6 +99,7 @@ private:
     struct HeaderValue {
         std::string displayKey;
         std::string value;
+        [[nodiscard]] bool operator==(const HeaderValue &) const noexcept = default;
     };
 
     std::vector<std::pair<std::string, HeaderValue>> m_header_list;

@@ -213,9 +213,11 @@ public:
             if constexpr (std::is_pointer_v<Ptr>) {
                 destroy(value);
             }
-            throw std::invalid_argument("JobObjHash cannot insert a duplicate uid");
+            throw std::invalid_argument("JobObjHash cannot insert a duplicate uid " + uid );
         }
     }
+
+
 
     [[nodiscard]] Ptr take(const std::string &uid)
     {

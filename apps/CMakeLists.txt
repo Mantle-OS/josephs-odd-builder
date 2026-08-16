@@ -21,3 +21,13 @@ if(JOB_QT)
     # add_subdirectory(qllama-qml-client-server-example)
     add_subdirectory(qmlsd-example)
 endif()
+
+
+
+add_subdirectory(job-inference-test)
+
+
+
+
+
+

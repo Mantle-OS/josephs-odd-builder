@@ -9,12 +9,16 @@ set(JOBNET_HEADERS
     job_iana.h
     job_http_header.h
     job_url.h
+    job_request.h
+    job_replay.h
+    job_downloader.h
 )
 
 set(JOBNET_SOURCES
     job_url.cpp
     job_http_header.cpp
     isocket_io.cpp
+
 )
 
 set(JOBNET_RESOLVE_HEADERS

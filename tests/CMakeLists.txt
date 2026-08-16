@@ -15,9 +15,13 @@ endif()
 add_subdirectory(job_ansi)
 add_subdirectory(job_science)
 add_subdirectory(job_ai)
+add_subdirectory(job_sound)
 
 if(JOB_CUDA)
     add_subdirectory(job_cuda)
 endif()
 
 add_subdirectory(job_ggml)
+add_subdirectory(job_token)
+# add_subdirectory(job_model)
+
