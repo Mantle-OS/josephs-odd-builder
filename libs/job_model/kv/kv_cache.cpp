@@ -1,185 +1,160 @@
 #include "kv/kv_cache.h"
 
 #include <format>
-#include <job_logger.h>
+#include <stdexcept>
 
-#include <job_ggml_enums.h>
-#include <job_ggml_device.h>
 #include <alloc/job_ggml_tensor_allocator.h>
+#include <job_ggml_init_params.h>
 
+#ifndef NDEBUG
+#include <job_logger.h>
+#endif
 namespace job::model {
 
-KvCache::~KvCache()
+KvCache::KvCache(const ModelConfig &config, const ggml::JobGgmlBackendBufferType &bufferType, uint32_t maxContextLength, ggml::JobGgmlType kvType) :
+    m_maxCtx{maxContextLength > 0 ? maxContextLength : config.transformerConfig().contextLength()},
+    m_nHeadKv{config.attentionConfig().headCountKv()},
+    m_headDimKv{config.attentionConfig().headDimensionKv(config.transformerConfig().embeddingLength())},
+    m_kvType{kvType}
 {
-    clear();
-}
-
-KvCache::KvCache(KvCache&& other) noexcept
-    : m_ctx(std::move(other.m_ctx))
-    , m_buffer(std::move(other.m_buffer))
-    , m_layers(std::move(other.m_layers))
-    , m_currentPos(other.m_currentPos)
-    , m_maxCtx(other.m_maxCtx)
-    , m_nHeadKv(other.m_nHeadKv)
-    , m_headDimKv(other.m_headDimKv)
-    , m_kvType(other.m_kvType)
-    , m_totalSizeBytes(other.m_totalSizeBytes)
-{
-    other.m_currentPos = 0;
-    other.m_maxCtx = 0;
-    other.m_totalSizeBytes = 0;
-}
-
-KvCache& KvCache::operator=(KvCache&& other) noexcept
-{
-    if (this != &other) {
-        clear();
-
-        m_ctx = std::move(other.m_ctx);
-        m_buffer = std::move(other.m_buffer);
-        m_layers = std::move(other.m_layers);
-        m_currentPos = other.m_currentPos;
-        m_maxCtx = other.m_maxCtx;
-        m_nHeadKv = other.m_nHeadKv;
-        m_headDimKv = other.m_headDimKv;
-        m_kvType = other.m_kvType;
-        m_totalSizeBytes = other.m_totalSizeBytes;
-
-        other.m_currentPos = 0;
-        other.m_maxCtx = 0;
-        other.m_totalSizeBytes = 0;
-    }
-    return *this;
-}
-
-void KvCache::clear() noexcept
-{
-    m_layers.clear();
-    m_buffer.reset(); // Release buffer memory first before destroying context descriptors
-    m_ctx.reset();
-    m_currentPos = 0;
-    m_maxCtx = 0;
-    m_nHeadKv = 0;
-    m_headDimKv = 0;
-    m_totalSizeBytes = 0;
-}
-
-bool KvCache::init(const ModelConfig& config, ggml::JobGgmlBackend* backend, uint32_t maxContextLength, ggml::JobGgmlType kvType)
-{
-    clear();
-
-    if (!backend || !backend->isValid()) {
-        JOB_LOG_ERROR("[KvCache] Cannot initialize KV cache: borrowed backend is null or invalid");
-        return false;
-    }
-
     const uint32_t numLayers = config.transformerConfig().blockCount();
-    m_maxCtx    = (maxContextLength > 0) ? maxContextLength : config.transformerConfig().contextLength();
-    m_nHeadKv   = config.attentionConfig().headCountKv();
-    m_headDimKv = config.attentionConfig().headDimensionKv();
-    m_kvType    = kvType;
 
-    if (numLayers == 0 || m_maxCtx == 0 || m_nHeadKv == 0 || m_headDimKv == 0) {
-        JOB_LOG_ERROR("[KvCache] Invalid parameters for KV cache init (Layers: {}, Ctx: {}, Heads: {}, Dim: {})",
-                      numLayers, m_maxCtx, m_nHeadKv, m_headDimKv);
-        return false;
-    }
+    if (!bufferType.isValid())
+        throw std::invalid_argument{"KvCache requires a valid JobGgmlBackendBufferType"};
 
-    const int64_t kvRowSize = static_cast<int64_t>(m_nHeadKv) * static_cast<int64_t>(m_headDimKv);
+    if (numLayers == 0)
+        throw std::invalid_argument{"KvCache requires at least one transformer layer"};
 
-    // 1. Create Metadata-Only Context (no_alloc = true)
-    // Estimate size strictly for tensor descriptor overheads, not payload bytes
-    const size_t tensorOverhead = 2 * numLayers * ggml_tensor_overhead();
-    const size_t metaCtxSize = tensorOverhead + 4096;
+    if (m_maxCtx == 0)
+        throw std::invalid_argument{"KvCache requires a context length greater than zero"};
 
-    ggml::JobGgmlInitParams initParams(metaCtxSize, nullptr, true);
-    m_ctx = ggml::JobGgmlContext::createUniq(initParams);
+    if (m_nHeadKv == 0)
+        throw std::invalid_argument{"KvCache requires at least one KV head"};
 
-    if (!m_ctx || !m_ctx->isValid()) {
-        JOB_LOG_ERROR("[KvCache] Failed to initialize metadata JobGgmlContext for KV cache");
-        clear();
-        return false;
-    }
+    if (m_headDimKv == 0)
+        throw std::invalid_argument{"KvCache requires a KV head dimension greater than zero"};
 
-    m_layers.resize(numLayers);
+    const std::size_t tensorCount = static_cast<std::size_t>(numLayers) * 2;
 
-    // 2. Instantiate 2D tensor descriptors across all layers
+    //
+    // The context owns tensor metadata only. K/V payload storage is owned by
+    // m_buffer and allocated using the caller-resolved backend buffer type.
+    //
+    m_ctx = ggml::JobGgmlContext::createUniqMetadata(tensorCount);
+
+    if (!m_ctx || !m_ctx->isValid())
+        throw std::runtime_error{"Failed to create KV cache metadata context"};
+
+    const int64_t kvRowSize =
+        static_cast<int64_t>(m_nHeadKv) *
+        static_cast<int64_t>(m_headDimKv);
+
+    m_layers.reserve(numLayers);
+
     for (uint32_t i = 0; i < numLayers; ++i) {
-        LayerKvEntry& entry = m_layers[i];
+        LayerKvEntry entry;
         entry.layerIndex = i;
 
-        entry.k = m_ctx->newTensor2d(kvType, kvRowSize, m_maxCtx);
-        entry.v = m_ctx->newTensor2d(kvType, kvRowSize, m_maxCtx);
+        entry.k = m_ctx->newTensor2d(
+            m_kvType,
+            kvRowSize,
+            static_cast<int64_t>(m_maxCtx));
 
-        if (!entry.k || !entry.v || !entry.k->isValid() || !entry.v->isValid()) {
-            JOB_LOG_ERROR("[KvCache] Failed to create KV tensor descriptors for layer {}", i);
-            clear();
-            return false;
-        }
+        entry.v = m_ctx->newTensor2d(
+            m_kvType,
+            kvRowSize,
+            static_cast<int64_t>(m_maxCtx));
+
+        if (!entry.k || !entry.k->isValid())
+            throw std::runtime_error{
+                std::format("Failed to create KV key tensor for layer {}", i)
+            };
+
+        if (!entry.v || !entry.v->isValid())
+            throw std::runtime_error{
+                std::format("Failed to create KV value tensor for layer {}", i)
+            };
 
         entry.k->setName(std::format("cache_k_l{}", i));
         entry.v->setName(std::format("cache_v_l{}", i));
+
+        m_layers.emplace_back(std::move(entry));
     }
 
-    // 3. Use JobGgmlTensorAllocator to compute buffer size and allocate physical VRAM buffer via backend device buffer type
-    auto* device = backend->device();
-    if (!device || !device->isValid()) {
-        JOB_LOG_ERROR("[KvCache] Failed to retrieve valid device from borrowed backend");
-        clear();
-        return false;
+    //
+    // Determine the physical buffer size using the actual buffer type selected
+    // by the runtime. Backend buffer types may impose alignment and allocation
+    // requirements that differ from the tensor's logical byte size.
+    //
+    const std::size_t alignment = bufferType.alignment();
+
+    std::size_t requiredBytes = 0;
+
+    for (const LayerKvEntry &entry : m_layers) {
+        requiredBytes = alignUp(requiredBytes, alignment);
+        requiredBytes += bufferType.allocationSize(*entry.k);
+
+        requiredBytes = alignUp(requiredBytes, alignment);
+        requiredBytes += bufferType.allocationSize(*entry.v);
     }
 
-    auto buft = device->bufferType();
-    if (!buft) {
-        JOB_LOG_ERROR("[KvCache] Failed to retrieve backend buffer type from device");
-        clear();
-        return false;
+    if (requiredBytes == 0)
+        throw std::runtime_error{"KV cache resolved to an empty backend allocation"};
+
+    //
+    // JobGgmlBackendBufferType currently returns unique ownership. Promote the
+    // allocated buffer into the shared ownership model used by
+    // JobGgmlTensorAllocator.
+    //
+    m_buffer = ggml::JobGgmlBackendBuffer::Ptr{
+        bufferType.allocateBuffer(requiredBytes)
+    };
+
+    if (!m_buffer || !m_buffer->isValid())
+        throw std::runtime_error{"Failed to allocate KV cache backend buffer"};
+
+    ggml::JobGgmlTensorAllocator allocator{m_buffer};
+
+    if (!allocator.isValid())
+        throw std::runtime_error{"Failed to create KV cache tensor allocator"};
+
+    for (LayerKvEntry &entry : m_layers) {
+        if (allocator.allocate(*entry.k) != ggml::JobGgmlStatus::Success) {
+            throw std::runtime_error{
+                std::format("Failed to allocate KV key tensor for layer {}", entry.layerIndex)
+            };
+        }
+
+        if (allocator.allocate(*entry.v) != ggml::JobGgmlStatus::Success) {
+            throw std::runtime_error{
+                std::format("Failed to allocate KV value tensor for layer {}", entry.layerIndex)
+            };
+        }
     }
 
-    // Initialize allocator for the context graph/tensors
-    ggml::JobGgmlTensorAllocator allocator(buft);
+    m_totalSizeBytes = m_buffer->size();
 
-    // Add all KV tensors to the allocator allocation list
-    for (uint32_t i = 0; i < numLayers; ++i) {
-        allocator.addTensor(*m_layers[i].k);
-        allocator.addTensor(*m_layers[i].v);
-    }
+#ifndef NDEBUG
+    JOB_LOG_INFO(
+        "[KvCache] Allocated KV cache: layers={}, ctx={}, heads={}, dim={}, buffer={}, size={:.2f} MB",
+        numLayers,
+        m_maxCtx,
+        m_nHeadKv,
+        m_headDimKv,
+        bufferType.name(),
+        static_cast<double>(m_totalSizeBytes) / (1024.0 * 1024.0));
+#endif
 
-    m_totalSizeBytes = allocator.size();
-    m_buffer = allocator.alloc();
-
-    if (!m_buffer || !m_buffer->isValid()) {
-        JOB_LOG_ERROR("[KvCache] Failed to allocate physical backend buffer for KV cache ({:.2f} MB)",
-                      static_cast<double>(m_totalSizeBytes) / (1024.0 * 1024.0));
-        clear();
-        return false;
-    }
-
-    JOB_LOG_INFO("[KvCache] Natively allocated VRAM KV cache across {} layers (Ctx: {}, Heads: {}, Dim: {}, VRAM: {:.2f} MB)",
-                 numLayers, m_maxCtx, m_nHeadKv, m_headDimKv,
-                 static_cast<double>(m_totalSizeBytes) / (1024.0 * 1024.0));
-
-    return true;
 }
 
-const LayerKvEntry& KvCache::layer(uint32_t layerIdx) const
+const LayerKvEntry &KvCache::layer(uint32_t layerIdx) const
 {
-    if (layerIdx >= m_layers.size()) {
-        static const LayerKvEntry s_empty{};
-        JOB_LOG_ERROR("[KvCache] Layer index {} out of range (total: {})", layerIdx, m_layers.size());
-        return s_empty;
-    }
-    return m_layers[layerIdx];
+    return m_layers.at(layerIdx);
 }
 
-LayerKvEntry& KvCache::layer(uint32_t layerIdx)
+LayerKvEntry &KvCache::layer(uint32_t layerIdx)
 {
-    if (layerIdx >= m_layers.size()) {
-        static LayerKvEntry s_empty{};
-        JOB_LOG_ERROR("[KvCache] Layer index {} out of range (total: {})", layerIdx, m_layers.size());
-        return s_empty;
-    }
-    return m_layers[layerIdx];
+    return m_layers.at(layerIdx);
 }
 
 } // namespace job::model

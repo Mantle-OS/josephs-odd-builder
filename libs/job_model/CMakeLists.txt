@@ -24,24 +24,26 @@ set(JOBMODEL_CONFIG_HEADERS
     config/rope_config.h
     config/feed_forward_config.h
     config/device_config.h
+    config/lora_config.h
 
     config/model_config.h
-    config/arch/qwen/qwen3_instruct_2507.h   # garbage for now.
+    config/arch/qwen/qwen3_instruct_2507.h   # refactor time
 )
 
 set(JOBMODEL_CONFIG_SOURCES
     config/arch_config.cpp
     config/sampler_config.cpp
     config/moe_config.cpp
-    config/attention_config.h
+    config/attention_config.cpp
     config/output_head_config.cpp
     config/norm_config.cpp
     config/rope_config.cpp
     config/feed_forward_config.cpp
+    config/transformer_config.cpp
     config/device_config.cpp
+    config/lora_config.cpp
 
     config/model_config.cpp
-    config/transformer_config.cpp
 )
 
 set(JOBMODEL_IO_HEADERS
@@ -72,16 +74,49 @@ set(JOBMODEL_WEIGHTS_SOURCES
 set(JOBMODEL_KV_HEADERS
     kv/kv_cache.h
 )
+
 set(JOBMODEL_KV_SOURCES
     kv/kv_cache.cpp
 )
 
 set(JOBMODEL_GRAPH_HEADERS
-    graph/compute_graph_builder.h
+    graph/linear_graph.h
+    graph/norm_graph.h
+    graph/rope_graph.h
+    graph/gqa_graph.h
+    graph/attention_graph.h
+    graph/gated_ffn_graph.h
+    graph/embedding_graph.h
+    graph/residual_graph.h
+    graph/graph_builder.h
+    # graph/compute_graph_builder.h  Kick rocks bro
 )
+
 set(JOBMODEL_GRAPH_SOURCES
-    graph/compute_graph_builder.cpp
+    graph/linear_graph.cpp
+    graph/norm_graph.cpp
+    graph/rope_graph.cpp
+    graph/gqa_graph.cpp
+    graph/attention_graph.cpp
+    graph/gated_ffn_graph.cpp
+    graph/embedding_graph.cpp
+    graph/residual_graph.cpp
+    graph/graph_builder.cpp
+    # graph/compute_graph_builder.cpp  # Kick rocks bro
 )
+
+
+set(JOBMODEL_GRAPH_ARCH_HEADERS
+    graph/arch/qwen_graph_builder.h
+)
+
+set(JOBMODEL_GRAPH_ARCH_SOURCES
+    graph/arch/qwen_graph_builder.cpp
+)
+
+
+
+
 
 set(JOBMODEL_SAMPLE_HEADERS
     sample/sampler.h
@@ -97,6 +132,7 @@ set(JOBMODEL_COMPILE_THIS
     ${JOBMODEL_WEIGHTS_HEADERS}    ${JOBMODEL_WEIGHTS_SOURCES}
     ${JOBMODEL_KV_HEADERS}         ${JOBMODEL_KV_SOURCES}
     ${JOBMODEL_GRAPH_HEADERS}      ${JOBMODEL_GRAPH_SOURCES}
+    ${JOBMODEL_GRAPH_ARCH_HEADERS} ${JOBMODEL_GRAPH_ARCH_SOURCES}
     ${JOBMODEL_SAMPLE_HEADERS}     ${JOBMODEL_SAMPLE_SOURCES}
 )
 
@@ -141,6 +177,10 @@ target_include_directories(JosephsOddBuilder_Model PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/graph>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobmodel/graph>
 
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/graph/arch>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobmodel/graph/arch>
+
+
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/sample>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobmodel/sample>
 
@@ -176,10 +216,11 @@ install(TARGETS JosephsOddBuilder_Model
 install(FILES ${JOBMODEL_HEADERS}              DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobmodel)
 install(FILES ${JOBMODEL_EXPORT_HEADER}        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobmodel)
 install(FILES ${JOBMODEL_CONFIG_HEADERS}       DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobmodel/config)
-install(FILES ${JOBMODEL_IO_HEADERS}            DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobmodel/io)
+install(FILES ${JOBMODEL_IO_HEADERS}           DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobmodel/io)
 install(FILES ${JOBMODEL_WEIGHTS_HEADERS}      DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobmodel/weights)
 install(FILES ${JOBMODEL_KV_HEADERS}           DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobmodel/kv)
 install(FILES ${JOBMODEL_GRAPH_HEADERS}        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobmodel/graph)
+install(FILES ${JOBMODEL_GRAPH_ARCH_HEADERS}   DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobmodel/graph/arch)
 install(FILES ${JOBMODEL_SAMPLE_HEADERS}       DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobmodeln/sample)
 
 if(JOB_LINUX)

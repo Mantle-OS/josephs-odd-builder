@@ -58,10 +58,10 @@ public:
     [[nodiscard]] ggml::JobGgmlVDShape tokenEmbeddingShape() const noexcept;
 
 private:
-    uint32_t m_contextLength{4096};
-    uint32_t m_embeddingLength{4096};
-    uint32_t m_blockCount{32};
-    uint32_t m_vocabSize{32000};
+    uint32_t m_contextLength{0};
+    uint32_t m_embeddingLength{0};
+    uint32_t m_blockCount{0};
+    uint32_t m_vocabSize{0};
 };
 
 } // namespace job::model

@@ -185,7 +185,8 @@ ggml::JobGgmlTensorOp::UPtr ComputeGraphBuilder::buildFeedForward(
     JOB_LOG_INFO("[Graph] Layer {}: ffnGate mulMat", layerIdx);
     auto gateOp = ggml::JobGgmlTensorOp::createUniq(const_cast<struct ggml_tensor*>(lw.ffnGate->tensor()), &ctx);
     auto gate = gateOp->mulMat(*xCont->cast(ggml::JobGgmlType::F16));
-    if (lw.ffnGateBias) gate = gate->add(*lw.ffnGateBias);
+    if (lw.ffnGateBias)
+        gate = gate->add(*lw.ffnGateBias);
     auto gateAct = gate->silu();
 
     JOB_LOG_INFO("[Graph] Layer {}: ffnUp mulMat", layerIdx);

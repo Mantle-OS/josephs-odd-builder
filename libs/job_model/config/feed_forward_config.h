@@ -37,7 +37,7 @@ public:
     [[nodiscard]] bool isValid() const noexcept;
 
 private:
-    uint32_t m_feedForwardLength{11008};
+    uint32_t m_feedForwardLength{0};
 };
 
 } // namespace job::model

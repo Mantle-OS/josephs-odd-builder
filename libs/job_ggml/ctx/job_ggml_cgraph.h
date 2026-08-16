@@ -7,8 +7,8 @@
 
 #include <ggml.h>
 
-#include "job_ggml_tensor.h"
 
+#include "job_ggml_tensor.h"
 #include "jobggml_export.h"
 
 namespace job::ggml {

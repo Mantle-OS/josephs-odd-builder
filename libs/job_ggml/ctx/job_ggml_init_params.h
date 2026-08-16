@@ -9,6 +9,8 @@
 
 namespace job::ggml {
 
+inline constexpr std::size_t kDefaultMetadataPadding = 4096;
+
 class JOBGGML_EXPORT JobGgmlInitParams
 {
 public:
@@ -37,7 +39,7 @@ public:
     [[nodiscard]] static Ptr createMetadataFor(std::size_t tensors,
                                            std::size_t graphSize = GGML_DEFAULT_GRAPH_SIZE,
                                            bool grad = false,
-                                           std::size_t pad = 0,
+                                           std::size_t pad = kDefaultMetadataPadding,
                                            bool noAlloc = true)
     {
 
@@ -62,7 +64,7 @@ public:
     [[nodiscard]] static UPtr createUniqMetadataFor(std::size_t tensors,
                                             std::size_t graphSize = GGML_DEFAULT_GRAPH_SIZE,
                                             bool grad = false,
-                                            std::size_t pad = 0,
+                                            std::size_t pad = kDefaultMetadataPadding,
                                             bool noAlloc = true)
     {
 
@@ -92,7 +94,7 @@ public:
     [[nodiscard]] static std::size_t estCtxCost(std::size_t tensors,
                                                 std::size_t graphSize = GGML_DEFAULT_GRAPH_SIZE,
                                                 bool grad = false,
-                                                std::size_t pad = 0) noexcept;
+                                                std::size_t pad = kDefaultMetadataPadding) noexcept;
 
 
 private:

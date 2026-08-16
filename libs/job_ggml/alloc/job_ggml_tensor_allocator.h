@@ -46,6 +46,7 @@ public:
 
     [[nodiscard]] JobGgmlStatus allocate(JobGgmlTensor &tensor) noexcept;
     [[nodiscard]] JobGgmlStatus allocate(struct ggml_tensor *tensor) noexcept;
+    [[nodiscard]] static std::size_t requiredBufferSize(const JobGgmlBackendBufferType &bufferType, const JobGgmlTensor &tensor) noexcept;
 
     void setTensorAllocator(const struct ggml_tallocr &other) noexcept;
     [[nodiscard]] struct ggml_tallocr tensorAllocator() noexcept;

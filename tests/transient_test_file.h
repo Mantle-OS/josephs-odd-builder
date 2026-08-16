@@ -41,6 +41,16 @@ public:
                 );
         }
     }
+    TransientTestFile(std::string path, std::string_view data) :
+        m_path(std::move(path))
+    {
+        std::ofstream stream(m_path, std::ios::binary);
+
+        if (!stream)
+            throw std::runtime_error{"Failed to create transient test file"};
+
+        stream.write(data.data(), static_cast<std::streamsize>(data.size()));
+    }
 
     ~TransientTestFile()
     {

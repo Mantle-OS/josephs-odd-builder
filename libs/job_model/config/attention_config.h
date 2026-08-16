@@ -89,8 +89,8 @@ private:
     float    m_attnLogitSoftCapping{0.0f};
     uint32_t m_slidingWindowSize{0};
 
-    uint32_t m_headCount{32};
-    uint32_t m_headCountKv{32};
+    uint32_t m_headCount{0};
+    uint32_t m_headCountKv{0};
     uint32_t m_keyLength{0};
     uint32_t m_valueLength{0};
 };

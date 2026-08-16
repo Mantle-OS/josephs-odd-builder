@@ -23,5 +23,5 @@ endif()
 
 add_subdirectory(job_ggml)
 add_subdirectory(job_token)
-# add_subdirectory(job_model)
+add_subdirectory(job_model)
 

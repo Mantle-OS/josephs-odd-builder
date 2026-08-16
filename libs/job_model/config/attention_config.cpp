@@ -100,13 +100,10 @@ ggml::JobGgmlBSHDShape AttentionConfig::kvActivationShape(int64_t batch, int64_t
 
 bool AttentionConfig::isValid() const noexcept
 {
-    // slidingWindowSize and attentionBias have no invalid representation
-    // on their own -- slidingWindowSize's real constraint (must not exceed
-    // TransformerConfig::contextLength()) is a cross-config check this
-    // class can't see, so it stays out here, same as embeddingLength above.
     return core::isSafeFinite(m_attnLogitSoftCapping) &&
            m_attnLogitSoftCapping >= 0.0f &&
-           m_headCount > 0;
+           m_headCount > 0 &&
+           m_headCountKv > 0;
 }
 
 } // namespace job::model

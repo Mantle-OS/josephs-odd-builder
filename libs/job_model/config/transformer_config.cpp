@@ -6,8 +6,9 @@ TransformerConfig::TransformerConfig() = default;
 
 bool TransformerConfig::isValid() const noexcept
 {
-    return m_blockCount > 0 &&
+    return m_contextLength > 0 &&
            m_embeddingLength > 0 &&
+           m_blockCount > 0 &&
            m_vocabSize > 0;
 }
 

@@ -1,4 +1,5 @@
 #include "job_ggml_tensor_allocator.h"
+#include "job_ggml_backend_buffer_type.h"
 
 #include <stdexcept>
 #include <utility>
@@ -109,6 +110,16 @@ JobGgmlStatus JobGgmlTensorAllocator::allocate(struct ggml_tensor *tensor) noexc
     setTensorAllocator(m_tensorAllocator);
 
     return fromGgmlStatus(status);
+}
+
+std::size_t JobGgmlTensorAllocator::requiredBufferSize(const JobGgmlBackendBufferType &bufferType, const JobGgmlTensor &tensor) noexcept
+{
+    if (!bufferType.isValid() || !tensor.isValid())
+        return 0;
+
+    return std::max(
+        bufferType.allocationSize(tensor),
+        tensor.paddedByteCount());
 }
 
 void JobGgmlTensorAllocator::setTensorAllocator(const struct ggml_tallocr &other) noexcept

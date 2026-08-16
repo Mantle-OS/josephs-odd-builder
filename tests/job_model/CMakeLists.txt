@@ -1,14 +1,21 @@
 cmake_minimum_required(VERSION 3.16)
 
-# ../transient_test_file.h
 
 add_executable(test_job_model
+    ../transient_test_file.h
     main.cpp
     test_model_config.cpp
+    test_io_hf_config.cpp
+    test_io_gguf_config.cpp
+    test_io_safetensor_config.cpp
     test_kv_cache.cpp
-    test_compute_graph_builder.cpp
     test_weights.cpp
-    test_model.cpp
+
+    test_graph_primitives.cpp
+    test_graph_attention.cpp
+    test_graph_ffn.cpp
+    test_graph_qwen.cpp ## DONT PANIC !!!
+    test_model.cpp  ## the real final boss !!!!!
 )
 target_compile_definitions(test_job_model PRIVATE
     JOB_TEST_GGUF_FILE="/srv/ai/ComfyUI/models/text_encoders/ZImage_Turbo/Qwen3-4B-Instruct-2507-Q4_K_M.gguf"
@@ -16,6 +23,10 @@ target_compile_definitions(test_job_model PRIVATE
 
 target_compile_definitions(test_job_model PRIVATE
     JOB_MODEL_TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/hf/Qwen/Qwen3-4B-Instruct-2507"
+)
+
+target_compile_definitions(test_job_model PRIVATE
+    JOB_TEST_SAFETENSORS_DIR="${CMAKE_SOURCE_DIR}/3rdparty/tiny-stories-19M"
 )
 
 target_link_libraries(test_job_model PRIVATE

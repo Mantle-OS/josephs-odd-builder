@@ -1,351 +1,680 @@
 #include "job_model.h"
 
-#include <format>
+#include <algorithm>
+#include <exception>
+#include <stdexcept>
+#include <utility>
+
 #include <job_logger.h>
 
-#include <job_ggml.h>
+#include <alloc/job_ggml_tensor_allocator.h>
+#include <job_ggml_backend_buffer.h>
 #include <job_ggml_backend_buffer_type.h>
+#include <job_ggml_init_params.h>
 #include <job_ggml_tensor_data.h>
 #include <job_ggml_tensor_op.h>
-#include <graph/compute_graph_builder.h>
+#include <job_gguf.h>
+
+#include "graph/arch/qwen_graph_builder.h"
+#include "io/gguf_model_config_reader.h"
+
+
 
 namespace job::model {
 
-JobModel::JobModel()
-    : m_ggmlSubsystem(ggml::JobGgml::createUniq())
-    , m_config()
-    , m_weights()
-    , m_kvCache()
-    , m_weightCtx(nullptr)
-    , m_computeCtx(nullptr)
-    , m_backend(nullptr)
-    , m_scheduler(nullptr)
+JobModel::JobModel(ggml::JobGgmlDevice &device,
+                   ggml::JobGgmlBackendSched &scheduler,
+                   DeviceConfig deviceConfig) :
+    m_device{device},
+    m_scheduler{scheduler},
+    m_deviceConfig{std::move(deviceConfig)}
 {
-}
+    if (!m_device.isValid())
+        throw std::invalid_argument{"JobModel requires a valid GGML device"};
 
-JobModel::~JobModel()
-{
-    reset();
-}
+    if (!m_device.hasBackend())
+        throw std::invalid_argument{"JobModel requires a device with a valid backend"};
 
-JobModel::JobModel(JobModel&&) noexcept = default;
-JobModel& JobModel::operator=(JobModel&&) noexcept = default;
+    if (!m_scheduler.isValid())
+        throw std::invalid_argument{"JobModel requires a valid GGML scheduler"};
+
+    if (!m_deviceConfig.isValid())
+        throw std::invalid_argument{"JobModel requires a valid DeviceConfig"};
+}
 
 bool JobModel::isLoaded() const noexcept
 {
-    return m_weights.isLoaded() && m_kvCache.isAllocated() && m_scheduler != nullptr;
+    return
+        m_config.isValid() &&
+        m_weights.isLoaded() &&
+        m_weightCtx &&
+        m_weightCtx->isValid() &&
+        m_computeCtx &&
+        m_computeCtx->isValid() &&
+        m_kvCache &&
+        m_graphBuilder;
 }
 
-void JobModel::reset()
+void JobModel::reset() noexcept
 {
-    m_scheduler.reset();
-    m_backend.reset();
+    //
+    // Destroy graph/session objects before the contexts and weights they
+    // borrow from.
+    //
+    m_graphBuilder.reset();
+    m_kvCache.reset();
+
     m_computeCtx.reset();
-    m_weightCtx.reset();
-    m_kvCache.clear();
+
     m_weights.clear();
+    m_weightCtx.reset();
+
     m_config = ModelConfig{};
+
+    //
+    // m_device and m_scheduler are borrowed runtime resources.
+    // DeviceConfig is application policy and survives model reset.
+    //
 }
 
-bool JobModel::load(const std::filesystem::path& ggufPath, ModelConfig config, uint32_t maxContextLength)
+bool JobModel::load(const std::filesystem::path &ggufPath,
+                    uint32_t maxContextLength)
 {
     reset();
 
-    if (!std::filesystem::exists(ggufPath)) {
-        JOB_LOG_ERROR("[JobModel] GGUF path does not exist: {}", ggufPath.string());
-        return false;
-    }
-
-    // 1. Enforce explicit preset configuration directly
-    m_config = std::move(config);
-    if (!m_config.isValid()) {
-        JOB_LOG_ERROR("[JobModel] Provided ModelConfig preset failed validation");
-        return false;
-    }
-
-    // 2. Open GGUF file container with weight context redirection
-    ggml::JobGgmlContext::UPtr loadedWeightCtx;
-    ggml::JobGguf gguf(&loadedWeightCtx);
-
-    if (!gguf.open(ggufPath)) {
-        JOB_LOG_ERROR("[JobModel] Failed to open GGUF file: {}", gguf.errorString());
-        return false;
-    }
-
-    if (!loadedWeightCtx || !loadedWeightCtx->isValid()) {
-        JOB_LOG_ERROR("[JobModel] GGUF reader failed to produce a valid weight context");
-        return false;
-    }
-
-    m_weightCtx = std::move(loadedWeightCtx);
-
-    // 3. Load weights from GGUF into weight context using preset dimensions
-    if (!m_weights.loadFromContext(*m_weightCtx, m_config)) {
-        JOB_LOG_ERROR("[JobModel] Failed to bind model weights from context (Layers expected: {})",
-                      m_config.m_transformerConfig.m_blockCount);
+    if (!loadConfigFromGguf(ggufPath)) {
         reset();
         return false;
     }
 
-    // 4. Initialize KV cache using preset config and safe inference context length
-    const uint32_t ctxLen = (maxContextLength > 0) ? maxContextLength : 4096;
-    if (!m_kvCache.init(m_config, ctxLen, ggml::JobGgmlType::F16)) {
-        JOB_LOG_ERROR("[JobModel] Failed to initialize KV cache for {} layers", m_config.m_transformerConfig.m_blockCount);
+    if (!loadWeights(ggufPath)) {
         reset();
         return false;
     }
 
-    // 5. Initialize Subsystem, Device Selection, and Scheduler via DeviceManager
-    if (!m_ggmlSubsystem || !m_ggmlSubsystem->isValid()) {
-        JOB_LOG_ERROR("[JobModel] Failed to initialize JobGgml subsystem");
+    if (!createKvCache(maxContextLength)) {
         reset();
         return false;
     }
 
-    ggml::JobGgmlDeviceManager *manager = m_ggmlSubsystem->deviceManager();
-    if (!manager || !manager->isReady()) {
-        JOB_LOG_ERROR("[JobModel] JobGgmlDeviceManager is not ready");
+    if (!createComputeContext()) {
         reset();
         return false;
     }
 
-    // Pick primary CUDA device (RTX 5070 Ti) if available, otherwise fallback to CPU
-    ggml::JobGgmlDevice *targetDevice = nullptr;
-    if (manager->hasCuda() && !manager->cudaDevices().isEmpty()) {
-        targetDevice = manager->cuda(0);
-        JOB_LOG_INFO("[JobModel] Using discovered CUDA device: {}", targetDevice->uid());
-    } else {
-        targetDevice = manager->cpu();
-        JOB_LOG_INFO("[JobModel] Fallback: Using CPU device");
-    }
-
-    if (!targetDevice || !targetDevice->isValid() || !targetDevice->hasBackend()) {
-        JOB_LOG_ERROR("[JobModel] Target device or its backend is invalid");
+    if (!createGraphBuilder()) {
         reset();
         return false;
     }
 
-    m_backend = targetDevice->backend();
-    if (!m_backend || !m_backend->isValid()) {
-        JOB_LOG_ERROR("[JobModel] Failed to retrieve valid backend from target device");
-        reset();
-        return false;
-    }
-
-    // Let DeviceManager handle scheduler creation + CPU fallback bundling automatically
-    m_scheduler = manager->buildScheduler(targetDevice, 131072, false, true);
-    if (!m_scheduler || !m_scheduler->isValid()) {
-        JOB_LOG_ERROR("[JobModel] Failed to build scheduler from device manager");
-        reset();
-        return false;
-    }
-
-    // Helper lambda to bind all model weights and KV cache tensors to the active backend
-    auto bindAllWeightsToBackend = [this]() {
-        if (!m_backend || !m_scheduler) return;
-
-        auto bindTensor = [this](const ggml::JobGgmlTensor* t) {
-            if (t && t->isValid()) {
-                ggml_tensor* raw = const_cast<ggml_tensor*>(t->tensor());
-                if (raw) {
-                    ggml::JobGgmlTensor nonConst(raw);
-                    m_scheduler->setTensorBackend(nonConst, *m_backend);
-                }
-            }
-        };
-
-        // Global weights
-        bindTensor(m_weights.tokenEmbd());
-        bindTensor(m_weights.outputNorm());
-        bindTensor(m_weights.outputNormBias());
-        bindTensor(m_weights.output());
-        bindTensor(m_weights.positionEmbd());
-        bindTensor(m_weights.typeEmbd());
-
-        // Per-layer weights across all transformer blocks
-        for (uint32_t i = 0; i < m_config.m_transformerConfig.m_blockCount; ++i) {
-            const auto& lw = m_weights.layer(i);
-            bindTensor(lw.attnNorm.get());
-            bindTensor(lw.attnNormBias.get());
-            bindTensor(lw.attnQ.get());
-            bindTensor(lw.attnQBias.get());
-            bindTensor(lw.attnK.get());
-            bindTensor(lw.attnKBias.get());
-            bindTensor(lw.attnV.get());
-            bindTensor(lw.attnVBias.get());
-            bindTensor(lw.attnOut.get());
-            bindTensor(lw.attnOutBias.get());
-            bindTensor(lw.attnQNorm.get());
-            bindTensor(lw.attnKNorm.get());
-            bindTensor(lw.postAttnNorm.get());
-            bindTensor(lw.ffnNorm.get());
-            bindTensor(lw.ffnNormBias.get());
-            bindTensor(lw.ffnGate.get());
-            bindTensor(lw.ffnGateBias.get());
-            bindTensor(lw.ffnUp.get());
-            bindTensor(lw.ffnUpBias.get());
-            bindTensor(lw.ffnDown.get());
-            bindTensor(lw.ffnDownBias.get());
-            bindTensor(lw.postFfnNorm.get());
-
-            // CRITICAL: Bind per-layer KV cache tensors so graph splitter resolves them on CUDA0
-            const auto& kvEntry = m_kvCache.layer(i);
-            if (kvEntry.k) bindTensor(kvEntry.k.get());
-            if (kvEntry.v) bindTensor(kvEntry.v.get());
-        }
-    };
-
-    bindAllWeightsToBackend();
-
-    // 6. Allocate Compute Execution Context with ample node headroom
-    const size_t computeCtxSize = ggml::JobGgmlInitParams::estCtxCost(4000000, GGML_DEFAULT_GRAPH_SIZE, false, 1024 * 1024 * 1024);
-    ggml::JobGgmlInitParams computeInit(computeCtxSize, nullptr, false);
-    m_computeCtx = ggml::JobGgmlContext::createUniq(computeInit);
-
-    JOB_LOG_INFO("[JobModel] Successfully loaded '{}' with static preset (Layers: {}, Ctx: {})",
-                 m_config.m_archConfig.m_modelName,
-                 m_config.m_transformerConfig.m_blockCount,
-                 ctxLen);
+    JOB_LOG_INFO(
+        "[JobModel] Loaded '{}' (architecture={}, layers={}, ctx={})",
+        m_config.archConfig().modelName(),
+        m_config.architectureName(),
+        m_config.transformerConfig().blockCount(),
+        m_kvCache->maxContextLength());
 
     return true;
 }
 
-bool JobModel::load(const std::filesystem::path& ggufPath, uint32_t maxContextLength)
+bool JobModel::load(const std::filesystem::path &ggufPath,
+                    ModelConfig config,
+                    uint32_t maxContextLength)
 {
-    return load(ggufPath, m_config, maxContextLength);
+    reset();
+
+    if (!std::filesystem::exists(ggufPath)) {
+        JOB_LOG_ERROR(
+            "[JobModel] GGUF path does not exist: {}",
+            ggufPath.string());
+
+        return false;
+    }
+
+    if (!config.isValid()) {
+        JOB_LOG_ERROR("[JobModel] Provided ModelConfig failed validation");
+        return false;
+    }
+
+    m_config = std::move(config);
+
+    if (!loadWeights(ggufPath)) {
+        reset();
+        return false;
+    }
+
+    if (!createKvCache(maxContextLength)) {
+        reset();
+        return false;
+    }
+
+    if (!createComputeContext()) {
+        reset();
+        return false;
+    }
+
+    if (!createGraphBuilder()) {
+        reset();
+        return false;
+    }
+
+    JOB_LOG_INFO(
+        "[JobModel] Loaded '{}' (architecture={}, layers={}, ctx={})",
+        m_config.archConfig().modelName(),
+        m_config.architectureName(),
+        m_config.transformerConfig().blockCount(),
+        m_kvCache->maxContextLength());
+
+    return true;
+}
+
+bool JobModel::loadConfigFromGguf(const std::filesystem::path &ggufPath)
+{
+    if (!std::filesystem::exists(ggufPath)) {
+        JOB_LOG_ERROR(
+            "[JobModel] GGUF path does not exist: {}",
+            ggufPath.string());
+
+        return false;
+    }
+
+    GgufModelConfigReader reader;
+
+    if (!reader.read(ggufPath, m_config)) {
+        JOB_LOG_ERROR(
+            "[JobModel] Failed to read model configuration from GGUF: {}",
+            ggufPath.string());
+
+        return false;
+    }
+
+    if (!m_config.isValid()) {
+        JOB_LOG_ERROR("[JobModel] GGUF produced an invalid ModelConfig");
+
+        return false;
+    }
+
+    return true;
+}
+
+bool JobModel::loadWeights(const std::filesystem::path &ggufPath)
+{
+    ggml::JobGgmlContext::UPtr weightCtx;
+
+    ggml::JobGguf gguf{&weightCtx};
+
+    //
+    // DeviceConfig::noAlloc() describes the GGUF tensor-data allocation
+    // preference. mmap/mlock have no direct JobGguf wrapper hook yet, so
+    // they are intentionally not faked here.
+    //
+    if (auto *params = gguf.initParams()) {
+        params->setNoAlloc(m_deviceConfig.noAlloc());
+        params->setCreateContext(true);
+        params->setContextOutput(&weightCtx);
+    }
+
+    if (!gguf.open(ggufPath)) {
+        JOB_LOG_ERROR(
+            "[JobModel] Failed to open GGUF '{}': {}",
+            ggufPath.string(),
+            gguf.errorString());
+
+        return false;
+    }
+
+    if (!weightCtx || !weightCtx->isValid()) {
+        JOB_LOG_ERROR("[JobModel] GGUF failed to produce a valid weight context");
+
+        return false;
+    }
+
+    //
+    // If noAlloc is requested, this model layer currently has no general
+    // weight-placement loader capable of materializing GGUF tensor bytes
+    // into the resolved backend buffer. Refuse to pretend the metadata-only
+    // tensors are loaded weights.
+    //
+    if (m_deviceConfig.noAlloc()) {
+        JOB_LOG_ERROR(
+            "[JobModel] DeviceConfig::noAlloc() requires backend-directed "
+            "weight materialization, which is not implemented yet"
+            );
+
+        return false;
+    }
+
+    if (!m_weights.loadFromContext(*weightCtx, m_config)) {
+        JOB_LOG_ERROR(
+            "[JobModel] Failed to bind {} model layers from GGUF context",
+            m_config.transformerConfig().blockCount());
+
+        return false;
+    }
+
+    m_weightCtx = std::move(weightCtx);
+
+    return true;
+}
+
+bool JobModel::createKvCache(uint32_t maxContextLength)
+{
+    const auto *bufferType = m_device.bufferType();
+
+    if (!bufferType || !bufferType->isValid()) {
+        JOB_LOG_ERROR (
+            "[JobModel] Resolved device does not expose a valid buffer type"
+            );
+
+        return false;
+    }
+
+    const uint32_t contextLength = maxContextLength > 0 ? maxContextLength : m_config.transformerConfig().contextLength();
+
+    if (contextLength == 0) {
+        JOB_LOG_ERROR("[JobModel] Cannot create KV cache with zero context length");
+        return false;
+    }
+
+    try {
+        m_kvCache = KvCache::createUniq(
+            m_config,
+            *bufferType,
+            contextLength,
+            ggml::JobGgmlType::F16);
+    }
+    catch (const std::exception &error) {
+        JOB_LOG_ERROR(
+            "[JobModel] Failed to create KV cache: {}",
+            error.what());
+
+        return false;
+    }
+
+    return m_kvCache != nullptr;
+}
+
+bool JobModel::createComputeContext()
+{
+    //
+    // Compute tensors are graph metadata. Their backing storage is allocated
+    // through the scheduler / explicit backend buffers, not by ggml_context.
+    //
+    // The scheduler's graph size is already the runtime's configured graph
+    // capacity, so use that as the initial metadata sizing signal instead of
+    // the old:
+    //
+    //   4,000,000 tensors + GGML_DEFAULT_GRAPH_SIZE + 1 GiB padding
+    //
+    // If this eventually needs a separately configurable metadata budget,
+    // that becomes an explicit DeviceConfig field.
+    //
+    const std::size_t graphSize =
+        std::max<std::size_t>(m_scheduler.graphSize(), 1);
+
+    const std::size_t tensorCount =
+        graphSize * 4;
+
+    auto initParams = ggml::JobGgmlInitParams::createUniqMetadataFor(tensorCount,
+                                                                     graphSize,
+                                                                     false);
+
+    if (!initParams) {
+        JOB_LOG_ERROR("[JobModel] Failed to create compute context init parameters");
+
+        return false;
+    }
+
+    m_computeCtx = ggml::JobGgmlContext::createUniq(*initParams);
+
+    if (!m_computeCtx || !m_computeCtx->isValid()) {
+        JOB_LOG_ERROR("[JobModel] Failed to create compute metadata context");
+        m_computeCtx.reset();
+        return false;
+    }
+
+    return true;
+}
+
+bool JobModel::createGraphBuilder()
+{
+    if (!m_kvCache) {
+        JOB_LOG_ERROR("[JobModel] Cannot create graph builder without a KV cache");
+        return false;
+    }
+
+    try {
+        switch (m_config.archConfig().arch()) {
+        case ModelArchitecture::Qwen3:
+            m_graphBuilder = QwenGraphBuilder::createUniq(m_config, m_weights, *m_kvCache);
+            break;
+
+        default:
+            JOB_LOG_ERROR("[JobModel] Unsupported graph architecture '{}'",
+                modelArchitectureToString(m_config.archConfig().arch()));
+
+            return false;
+        }
+    }
+    catch (const std::exception &error) {
+        JOB_LOG_ERROR(
+            "[JobModel] Failed to create architecture graph builder: {}",
+            error.what());
+
+        m_graphBuilder.reset();
+        return false;
+    }
+
+    return m_graphBuilder != nullptr;
+}
+
+ggml::JobGgmlTensor::UPtr JobModel::createInputTensor(
+    std::span<const int32_t> tokens,
+    ggml::JobGgmlBackendBuffer::Ptr &buffer)
+{
+    if (!m_computeCtx || !m_computeCtx->isValid())
+        throw std::runtime_error{"JobModel requires a valid compute context"};
+
+    if (tokens.empty())
+        throw std::invalid_argument{"JobModel input token span cannot be empty"};
+
+    auto *bufferType = m_device.bufferType();
+
+    if (!bufferType || !bufferType->isValid())
+        throw std::runtime_error{"JobModel device does not expose a valid buffer type"};
+
+    auto tensor =
+        m_computeCtx->newTensor1d(
+            ggml::JobGgmlType::I32,
+            static_cast<int64_t>(tokens.size()));
+
+    if (!tensor || !tensor->isValid())
+        throw std::runtime_error{"JobModel failed to create input token tensor"};
+
+    const std::size_t allocationSize = ggml::JobGgmlTensorAllocator::requiredBufferSize(*bufferType, *tensor);
+    auto uniqueBuffer = bufferType->allocateBuffer(allocationSize);
+    if (!uniqueBuffer || !uniqueBuffer->isValid())
+        throw std::runtime_error{"JobModel failed to allocate input token buffer"};
+
+    buffer = ggml::JobGgmlBackendBuffer::Ptr{
+        std::move(uniqueBuffer)
+    };
+
+    ggml::JobGgmlTensorAllocator allocator{buffer};
+
+    if (!allocator.isValid())
+        throw std::runtime_error{"JobModel failed to create input tensor allocator"};
+
+    if (allocator.allocate(*tensor) != ggml::JobGgmlStatus::Success)
+        throw std::runtime_error{"JobModel failed to allocate input token tensor"};
+
+    ggml::JobGgmlTensorData data{tensor->tensor()};
+
+    //
+    // Direct element writes are only valid for host-accessible buffers.
+    // Device-local token input needs the backend tensor-set/copy abstraction,
+    // which should live in job_ggml rather than being recreated here.
+    //
+    if (!data.isHostAccessible()) {
+        throw std::runtime_error{
+            "JobModel input token buffer is not host accessible; "
+            "backend tensor upload is not implemented yet"
+        };
+    }
+
+    for (std::size_t i = 0; i < tokens.size(); ++i) {
+        data.setValueI32(
+            static_cast<int64_t>(i),
+            tokens[i]);
+    }
+
+    return tensor;
+}
+
+int32_t JobModel::sampleLastToken(ggml::JobGgmlCGraph &graph,
+                                  Sampler &sampler,
+                                  std::span<const int32_t> contextTokens)
+{
+    auto logits = graph.tensor("logits");
+
+    if (!logits || !logits->isValid()) {
+        JOB_LOG_ERROR("[JobModel] Graph does not contain valid logits");
+
+        return -1;
+    }
+
+    const int64_t vocabSize = logits->extent(0);
+    const int64_t sequenceLength = logits->extent(1);
+
+    if (vocabSize <= 0 || sequenceLength <= 0) {
+        JOB_LOG_ERROR("[JobModel] Logits tensor has invalid dimensions");
+
+        return -1;
+    }
+
+    //
+    // Sampler currently requires host-accessible logits. Do not hide a
+    // device->host transfer inside JobModel; that belongs in the ggml/runtime
+    // transfer layer once the abstraction exists.
+    //
+    ggml::JobGgmlTensorData logitsData{logits->tensor()};
+
+    if (!logitsData.isHostAccessible()) {
+        JOB_LOG_ERROR(
+            "[JobModel] Sampler requires host-accessible logits; "
+            "device-to-host logits transfer is not implemented yet"
+            );
+
+        return -1;
+    }
+
+    const std::size_t rowBytes = logitsData.rowSize();
+
+    const std::size_t offset = static_cast<std::size_t>(sequenceLength - 1) * rowBytes;
+
+    auto lastLogits =
+        ggml::JobGgmlTensorOp::createUniq(
+            const_cast<struct ggml_tensor *>(logits->tensor()),
+            m_computeCtx.get())
+            ->view1d(vocabSize, offset);
+
+    if (!lastLogits || !lastLogits->isValid()) {
+        JOB_LOG_ERROR("[JobModel] Failed to create final-token logits view");
+
+        return -1;
+    }
+
+    return sampler.sample(*lastLogits, contextTokens);
 }
 
 std::vector<int32_t> JobModel::generate(
     std::span<const int32_t> promptTokens,
     int32_t maxNewTokens,
-    const SamplerConfig& samplerConfig)
+    const SamplerConfig &samplerConfig)
 {
-    if (!isLoaded() || promptTokens.empty()) {
-        JOB_LOG_ERROR("[JobModel] Cannot generate: model not loaded or empty prompt");
+    if (!isLoaded()) {
+        JOB_LOG_ERROR("[JobModel] Cannot generate: model is not loaded");
+
         return {};
     }
 
-    std::vector<int32_t> outputTokens;
-    outputTokens.reserve(promptTokens.size() + static_cast<size_t>(maxNewTokens));
-    outputTokens.assign(promptTokens.begin(), promptTokens.end());
+    if (promptTokens.empty()) {
+        JOB_LOG_ERROR("[JobModel] Cannot generate from an empty prompt");
 
-    Sampler sampler(samplerConfig);
-    uint32_t nPast = 0;
+        return {};
+    }
 
-    // Pass backend and scheduler pointers into the graph builder
-    ComputeGraphBuilder builder(m_config, m_weights, m_kvCache, m_backend.get(), m_scheduler.get());
+    if (maxNewTokens <= 0)
+        return std::vector<int32_t>{promptTokens.begin(), promptTokens.end()};
 
-    auto bindOutputBackend = [this]() {
-        auto outputHead = m_weights.output();
-        if (!outputHead || !outputHead->isValid()) {
-            outputHead = m_weights.tokenEmbd();
-        }
-        if (outputHead && outputHead->isValid() && m_backend) {
-            ggml_tensor* rawTensor = const_cast<ggml_tensor*>(outputHead->tensor());
-            if (rawTensor) {
-                ggml::JobGgmlTensor nonConstTensor(rawTensor);
-                m_scheduler->setTensorBackend(nonConstTensor, *m_backend);
-            }
-        }
+    m_kvCache->resetPosition();
+
+    std::vector<int32_t> outputTokens{
+        promptTokens.begin(),
+        promptTokens.end()
     };
 
-    // ----------------------------------------------------
-    // 1. Prefill Phase
-    // ----------------------------------------------------
+    outputTokens.reserve(
+        promptTokens.size() +
+        static_cast<std::size_t>(maxNewTokens));
+
+    Sampler sampler{samplerConfig};
+
+    uint32_t nPast = 0;
+
+    //
+    // ------------------------------------------------------------
+    // Prefill
+    // ------------------------------------------------------------
+    //
     m_computeCtx->reset();
 
-    auto inputTensor = m_computeCtx->newTensor1d(ggml::JobGgmlType::I32, static_cast<int64_t>(promptTokens.size()));
-    ggml::JobGgmlTensorData tokenData(inputTensor->tensor());
-    for (size_t i = 0; i < promptTokens.size(); ++i) {
-        tokenData.setValueI32(static_cast<int64_t>(i), promptTokens[i]);
+    ggml::JobGgmlBackendBuffer::Ptr inputBuffer;
+
+    ggml::JobGgmlTensor::UPtr inputTensor;
+
+    try {
+        inputTensor =
+            createInputTensor(
+                promptTokens,
+                inputBuffer);
+    }
+    catch (const std::exception &error) {
+        JOB_LOG_ERROR(
+            "[JobModel] Failed to create prefill input: {}",
+            error.what());
+
+        return {};
     }
 
-    if (m_backend) {
-        m_scheduler->setTensorBackend(*inputTensor, *m_backend);
-    }
+    auto graph = m_graphBuilder->buildForward(
+            *m_computeCtx,
+            *inputTensor,
+            nPast);
 
-    auto graph = builder.buildForwardGraph(*m_computeCtx, *inputTensor, nPast);
     if (!graph || !graph->isValid()) {
-        JOB_LOG_ERROR("[JobModel] Prefill graph build failed");
+        JOB_LOG_ERROR("[JobModel] Failed to build prefill graph");
+
         return {};
     }
 
-    // Explicitly register the final logits output tensor node with the scheduler backend
-    if (m_backend) {
-        ggml_tensor* logitsNative = ggml_graph_get_tensor(graph->graph(), "logits");
-        if (logitsNative) {
-            ggml::JobGgmlTensor logitsTensor(logitsNative);
-            m_scheduler->setTensorBackend(logitsTensor, *m_backend);
-        }
+    JOB_LOG_WARN("[JobModel LOOK] scheduler graph size: {}", m_scheduler.graphSize());
+    JOB_LOG_WARN("[JobModel LOOK] actual graph nodes: {}", graph->nodeCount());
+    JOB_LOG_WARN("[JobModel LOOK] graph capacity: {}", graph->size());
+
+    m_scheduler.splitGraph(*graph);
+
+    if (!m_scheduler.allocateGraph(*graph)) {
+        JOB_LOG_ERROR("[JobModel] Failed to allocate prefill graph");
+
+        return {};
     }
 
-    bindOutputBackend();
-    m_scheduler->splitGraph(*graph);
-    if (!m_scheduler->allocateGraph(*graph) || m_scheduler->computeGraph(*graph) != ggml::JobGgmlStatus::Success) {
+    if (m_scheduler.computeGraph(*graph) !=
+        ggml::JobGgmlStatus::Success) {
+
         JOB_LOG_ERROR("[JobModel] Prefill graph execution failed");
+
         return {};
     }
 
-    auto logitsTensor = graph->tensor("logits");
-    if (!logitsTensor || !logitsTensor->isValid()) return {};
+    m_scheduler.synchronize();
 
-    const int64_t vocabSize = logitsTensor->extent(0);
-    const int64_t seqLen = logitsTensor->extent(1);
-    const size_t typeSize = ggml_type_size(logitsTensor->ggmlType());
-    const size_t rowStride = static_cast<size_t>(vocabSize) * typeSize;
-    const size_t offset = (seqLen - 1) * rowStride;
+    int32_t nextToken =
+        sampleLastToken(
+            *graph,
+            sampler,
+            outputTokens);
 
-    auto lastTokenLogits = ggml::JobGgmlTensorOp::createUniq(
-                               const_cast<struct ggml_tensor*>(logitsTensor->tensor()), m_computeCtx.get())->view1d(vocabSize, offset);
+    if (nextToken < 0)
+        return {};
 
-    int32_t nextToken = sampler.sample(*lastTokenLogits, outputTokens);
     outputTokens.push_back(nextToken);
-    nPast += static_cast<uint32_t>(promptTokens.size());
-    m_kvCache.advance(static_cast<uint32_t>(promptTokens.size()));
 
-    // ----------------------------------------------------
-    // 2. Decoding / Generation Loop
-    // ----------------------------------------------------
+    nPast =
+        static_cast<uint32_t>(promptTokens.size());
+
+    m_kvCache->advance(
+        static_cast<uint32_t>(promptTokens.size()));
+
+    //
+    // ------------------------------------------------------------
+    // Decode
+    // ------------------------------------------------------------
+    //
     for (int32_t step = 1; step < maxNewTokens; ++step) {
         m_computeCtx->reset();
+        m_scheduler.reset();
 
-        auto stepInput = m_computeCtx->newTensor1d(ggml::JobGgmlType::I32, 1);
-        ggml::JobGgmlTensorData stepData(stepInput->tensor());
-        stepData.setValueI32(0, nextToken);
+        const int32_t token = nextToken;
 
-        if (m_backend) {
-            m_scheduler->setTensorBackend(*stepInput, *m_backend);
+        ggml::JobGgmlBackendBuffer::Ptr stepInputBuffer;
+        ggml::JobGgmlTensor::UPtr stepInput;
+
+        try {
+            stepInput =
+                createInputTensor(
+                    std::span<const int32_t>{&token, 1},
+                    stepInputBuffer);
+        }
+        catch (const std::exception &error) {
+            JOB_LOG_ERROR(
+                "[JobModel] Failed to create decode input at step {}: {}",
+                step,
+                error.what());
+
+            break;
         }
 
-        auto stepGraph = builder.buildForwardGraph(*m_computeCtx, *stepInput, nPast);
+        auto stepGraph =
+            m_graphBuilder->buildForward(
+                *m_computeCtx,
+                *stepInput,
+                nPast);
+
         if (!stepGraph || !stepGraph->isValid()) {
-            JOB_LOG_ERROR("[JobModel] Decoding step {} graph build failed", step);
+            JOB_LOG_ERROR(
+                "[JobModel] Failed to build decode graph at step {}",
+                step);
+
             break;
         }
 
-        // Explicitly register decoding step logits tensor with the scheduler backend
-        if (m_backend) {
-            ggml_tensor* stepLogitsNative = ggml_graph_get_tensor(stepGraph->graph(), "logits");
-            if (stepLogitsNative) {
-                ggml::JobGgmlTensor stepLogitsTensor(stepLogitsNative);
-                m_scheduler->setTensorBackend(stepLogitsTensor, *m_backend);
-            }
-        }
+        m_scheduler.splitGraph(*stepGraph);
 
-        bindOutputBackend();
-        m_scheduler->splitGraph(*stepGraph);
-        if (!m_scheduler->allocateGraph(*stepGraph) || m_scheduler->computeGraph(*stepGraph) != ggml::JobGgmlStatus::Success) {
-            JOB_LOG_ERROR("[JobModel] Decoding step {} execution failed", step);
+        if (!m_scheduler.allocateGraph(*stepGraph)) {
+            JOB_LOG_ERROR(
+                "[JobModel] Failed to allocate decode graph at step {}",
+                step);
+
             break;
         }
 
-        auto stepLogits = stepGraph->tensor("logits");
-        if (!stepLogits || !stepLogits->isValid()) break;
+        if (m_scheduler.computeGraph(*stepGraph) !=
+            ggml::JobGgmlStatus::Success) {
 
-        nextToken = sampler.sample(*stepLogits, outputTokens);
+            JOB_LOG_ERROR(
+                "[JobModel] Decode graph execution failed at step {}",
+                step);
+
+            break;
+        }
+
+        m_scheduler.synchronize();
+
+        nextToken =
+            sampleLastToken(
+                *stepGraph,
+                sampler,
+                outputTokens);
+
+        if (nextToken < 0)
+            break;
+
         outputTokens.push_back(nextToken);
-        nPast += 1;
-        m_kvCache.advance(1);
+
+        ++nPast;
+        m_kvCache->advance();
     }
 
     return outputTokens;

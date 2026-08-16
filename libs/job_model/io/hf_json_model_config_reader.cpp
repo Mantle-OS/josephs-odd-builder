@@ -46,10 +46,12 @@ bool HfJsonModelConfigReader::read(const std::filesystem::path &modelPath, Model
     if (!finalizeAndValidate(config, "HfJsonModelConfigReader"))
         return false;
 
-    JOB_LOG_INFO("[HfJsonModelConfigReader] Successfully parsed JSON config for '{}' (Arch: {}, Layers: {}, Ctx: {})",
-                 config.archConfig().modelName(), config.archConfig().archName(),
-                 config.transformerConfig().blockCount(),
-                 config.transformerConfig().contextLength());
+
+    // SHUT UP
+    // JOB_LOG_INFO("[HfJsonModelConfigReader] Successfully parsed JSON config for '{}' (Arch: {}, Layers: {}, Ctx: {})",
+    //              config.archConfig().modelName(), config.archConfig().archName(),
+    //              config.transformerConfig().blockCount(),
+    //              config.transformerConfig().contextLength());
 
     return true;
 }

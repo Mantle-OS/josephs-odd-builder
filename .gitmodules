@@ -4,3 +4,6 @@
 [submodule "3rdparty/stable-diffusion.cpp"]
 	path = 3rdparty/stable-diffusion.cpp
 	url = https://github.com/leejet/stable-diffusion.cpp.git
+[submodule "3rdparty/tiny-stories-19M"]
+	path = 3rdparty/tiny-stories-19M
+	url = https://huggingface.co/SauravP97/tiny-stories-19M

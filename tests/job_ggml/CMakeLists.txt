@@ -23,6 +23,7 @@ add_executable(test_job_ggml
     test_ggml_device_manager.cpp        # 3) discovers devices and constructs schedulers
     test_ggml_backend_sched.cpp         # 4) assigns, allocates, and executes tensor graphs
     test_ggml_context_tensor.cpp        # 5) context ownership and tensor inspection/access
+    test_ggml_tensor_allocator.cpp
     test_gguf.cpp                       # 6) test the whole gguf framework
     test_gguf_context.cpp               # 7) context inspection and mutation
     test_gguf_kv.cpp                    # 8) every scalar/array type and invalid access
