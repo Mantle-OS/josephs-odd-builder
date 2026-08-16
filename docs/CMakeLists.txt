@@ -17,6 +17,7 @@ add_custom_target(JOB_Documentation SOURCES
     job/uart_overview.md
     job/zstd_overview.md
     job/sound_overview.md
+    job/job_token.md
 )
 
 add_custom_target(JOB_AI_Documentation SOURCES

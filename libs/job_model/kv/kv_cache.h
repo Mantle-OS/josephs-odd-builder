@@ -7,9 +7,12 @@
 #include <job_ggml_context.h>
 #include <job_ggml_enums.h>
 #include <job_ggml_tensor.h>
+#include <job_ggml_backend.h>
+#include <job_ggml_backend_buffer.h>
 
 #include "config/model_config.h"
 #include "jobmodel_export.h"
+
 namespace job::model {
 
 struct JOBMODEL_EXPORT LayerKvEntry {
@@ -41,9 +44,10 @@ public:
         return std::make_unique<KvCache>();
     }
 
-    // Allocate KV storage tensors inside a dedicated JobGgmlContext
+    // Allocate KV storage tensors natively inside a borrowed backend buffer using Option A
     [[nodiscard]] bool init(
         const ModelConfig& config,
+        ggml::JobGgmlBackend* backend,
         uint32_t maxContextLength = 0,
         ggml::JobGgmlType kvType = ggml::JobGgmlType::F16);
 
@@ -62,26 +66,30 @@ public:
     [[nodiscard]] uint32_t headDimensionKv() const noexcept { return m_headDimKv; }
     [[nodiscard]] ggml::JobGgmlType type() const noexcept { return m_kvType; }
     [[nodiscard]] size_t totalSizeBytes() const noexcept { return m_totalSizeBytes; }
-    [[nodiscard]] bool isAllocated() const noexcept { return !m_layers.empty() && m_ctx != nullptr; }
+    [[nodiscard]] bool isAllocated() const noexcept {
+        return !m_layers.empty() && m_ctx != nullptr && m_buffer != nullptr && m_buffer->isValid();
+    }
 
     // Per-layer tensor accessors
     [[nodiscard]] const LayerKvEntry& layer(uint32_t layerIdx) const;
     [[nodiscard]] LayerKvEntry& layer(uint32_t layerIdx);
 
-    // Owning Context
+    // Owning Context & Buffer
     [[nodiscard]] ggml::JobGgmlContext* context() noexcept { return m_ctx.get(); }
     [[nodiscard]] const ggml::JobGgmlContext* context() const noexcept { return m_ctx.get(); }
+    [[nodiscard]] ggml::JobGgmlBackendBuffer* buffer() noexcept { return m_buffer.get(); }
 
 private:
-    ggml::JobGgmlContext::UPtr m_ctx;
-    std::vector<LayerKvEntry>  m_layers;
+    ggml::JobGgmlContext::UPtr       m_ctx;
+    ggml::JobGgmlBackendBuffer::UPtr m_buffer; // Explicit owner of the device VRAM buffer
+    std::vector<LayerKvEntry>        m_layers;
 
-    uint32_t           m_currentPos{0};
-    uint32_t           m_maxCtx{0};
-    uint32_t           m_nHeadKv{0};
-    uint32_t           m_headDimKv{0};
-    ggml::JobGgmlType  m_kvType{ggml::JobGgmlType::F16};
-    size_t             m_totalSizeBytes{0};
+    uint32_t          m_currentPos{0};
+    uint32_t          m_maxCtx{0};
+    uint32_t          m_nHeadKv{0};
+    uint32_t          m_headDimKv{0};
+    ggml::JobGgmlType m_kvType{ggml::JobGgmlType::F16};
+    size_t            m_totalSizeBytes{0};
 };
 
 } // namespace job::model

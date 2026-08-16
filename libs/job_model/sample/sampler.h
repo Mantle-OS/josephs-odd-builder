@@ -53,7 +53,7 @@ public:
 
     void seed(uint64_t seedValue) noexcept
     {
-        m_config.m_seed = seedValue;
+        m_config.setSeed(seedValue);
         m_rngState = seedValue;
     }
 

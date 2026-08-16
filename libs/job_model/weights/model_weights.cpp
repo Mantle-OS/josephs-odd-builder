@@ -76,8 +76,8 @@ bool ModelWeights::loadFromContext(ggml::JobGgmlContext& context, const ModelCon
     m_positionEmbd = findTensor(context, "position_embd.weight", {"model.embed_positions.weight"});
     m_typeEmbd     = findTensor(context, "token_types.weight");
 
-    // 2. Transformer Layer Blocks
-    const uint32_t numLayers = config.m_transformerConfig.m_blockCount;
+    // Transformer Layer Blocks
+    const uint32_t numLayers = config.transformerConfig().blockCount();
     m_layers.resize(numLayers);
 
     for (uint32_t i = 0; i < numLayers; ++i) {
@@ -131,8 +131,10 @@ bool ModelWeights::loadFromContext(ggml::JobGgmlContext& context, const ModelCon
         // Post-FFN Norm (Gemma 2)
         lw.postFfnNorm = findTensor(context, prefix + "post_ffw_norm.weight", {std::format("model.layers.{}.post_feedforward_layernorm.weight", i)});
 
-        // Mixture of Experts (MoE)
-        if (config.m_archConfig.m_expertCount > 0) {
+        // Mixture of Experts (MoE). Presence of a MoeConfig is the signal
+        // now, not a flat expertCount field on ArchConfig -- see
+        // ModelConfig::hasMoeConfig().
+        if (config.hasMoeConfig()) {
             lw.ffnGateInp  = findTensor(context, prefix + "ffn_gate_inp.weight",  {std::format("model.layers.{}.block_sparse_moe.gate.weight", i)});
             lw.ffnGateExps = findTensor(context, prefix + "ffn_gate_exps.weight", {std::format("model.layers.{}.block_sparse_moe.experts.gate.weight", i)});
             lw.ffnUpExps   = findTensor(context, prefix + "ffn_up_exps.weight",   {std::format("model.layers.{}.block_sparse_moe.experts.up.weight", i)});

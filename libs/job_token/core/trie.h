@@ -4,9 +4,7 @@
 #include <string_view>
 #include <vector>
 #include <limits>
-#include <utility>
 #include <algorithm>
-#include <span>
 
 #include "job_tokenizer_types.h"
 #include "jobtoken_export.h"

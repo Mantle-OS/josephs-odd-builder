@@ -3,9 +3,7 @@
 #include <cstdint>
 #include <string>
 #include <string_view>
-#include <array>
 
-#include "job_tokenizer_types.h"
 #include "jobtoken_export.h"
 
 namespace job::token {

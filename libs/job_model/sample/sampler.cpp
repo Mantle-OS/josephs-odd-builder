@@ -11,7 +11,7 @@ namespace job::model {
 
 Sampler::Sampler(const SamplerConfig& config)
     : m_config(config)
-    , m_rngState(config.m_seed)
+    , m_rngState(config.seed())
 {
 }
 
@@ -61,7 +61,7 @@ int32_t Sampler::sample(
     }
 
     // Greedy argmax selection shortcut
-    if (m_config.m_greedy || m_config.m_temperature <= 0.0f) {
+    if (m_config.greedy() || m_config.temperature() <= 0.0f) {
         auto best = std::max_element(candidates.begin(), candidates.end(),
             [](const TokenCandidate& a, const TokenCandidate& b) {
                 return a.logit < b.logit;
@@ -106,18 +106,18 @@ void Sampler::applyPenalties(
         if (token >= 0 && static_cast<size_t>(token) < candidates.size()) {
             auto& cand = candidates[static_cast<size_t>(token)];
             // Repetition penalty (multiplicative on positive logits, divisive on negative)
-            if (m_config.m_repeatPenalty != 1.0f) {
+            if (m_config.repeatPenalty() != 1.0f) {
                 if (cand.logit < 0.0f) {
-                    cand.logit *= m_config.m_repeatPenalty;
+                    cand.logit *= m_config.repeatPenalty();
                 } else {
-                    cand.logit /= m_config.m_repeatPenalty;
+                    cand.logit /= m_config.repeatPenalty();
                 }
             }
         }
     }
 
     // Frequency and presence penalties
-    if (m_config.m_frequencyPenalty != 0.0f || m_config.m_presencePenalty != 0.0f) {
+    if (m_config.frequencyPenalty() != 0.0f || m_config.presencePenalty() != 0.0f) {
         std::vector<int> counts(candidates.size(), 0);
         for (int32_t token : contextTokens) {
             if (token >= 0 && static_cast<size_t>(token) < counts.size()) {
@@ -128,8 +128,8 @@ void Sampler::applyPenalties(
         for (size_t i = 0; i < candidates.size(); ++i) {
             int count = counts[i];
             if (count > 0) {
-                candidates[i].logit -= static_cast<float>(count) * m_config.m_frequencyPenalty;
-                candidates[i].logit -= m_config.m_presencePenalty;
+                candidates[i].logit -= static_cast<float>(count) * m_config.frequencyPenalty();
+                candidates[i].logit -= m_config.presencePenalty();
             }
         }
     }
@@ -137,9 +137,9 @@ void Sampler::applyPenalties(
 
 void Sampler::applyTemperature(std::vector<TokenCandidate>& candidates) const
 {
-    if (m_config.m_temperature == 1.0f) return;
+    if (m_config.temperature() == 1.0f) return;
 
-    float invTemp = 1.0f / m_config.m_temperature;
+    float invTemp = 1.0f / m_config.temperature();
     for (auto& cand : candidates) {
         cand.logit *= invTemp;
     }
@@ -170,7 +170,7 @@ void Sampler::computeSoftmax(std::vector<TokenCandidate>& candidates) const
 
 void Sampler::filterTopK(std::vector<TokenCandidate>& candidates) const
 {
-    if (m_config.m_topK <= 0 || static_cast<size_t>(m_config.m_topK) >= candidates.size()) {
+    if (m_config.topK() <= 0 || static_cast<size_t>(m_config.topK()) >= candidates.size()) {
         return;
     }
 
@@ -180,12 +180,12 @@ void Sampler::filterTopK(std::vector<TokenCandidate>& candidates) const
             return a.logit > b.logit;
         });
 
-    candidates.resize(static_cast<size_t>(m_config.m_topK));
+    candidates.resize(static_cast<size_t>(m_config.topK()));
 }
 
 void Sampler::filterTopP(std::vector<TokenCandidate>& candidates) const
 {
-    if (m_config.m_topP >= 1.0f || candidates.empty()) return;
+    if (m_config.topP() >= 1.0f || candidates.empty()) return;
 
     // Ensure sorted descending
     std::sort(candidates.begin(), candidates.end(),
@@ -198,7 +198,7 @@ void Sampler::filterTopP(std::vector<TokenCandidate>& candidates) const
 
     for (size_t i = 0; i < candidates.size(); ++i) {
         cumulativeProb += candidates[i].probability;
-        if (cumulativeProb > m_config.m_topP) {
+        if (cumulativeProb > m_config.topP()) {
             cutoffIndex = i + 1; // Keep at least one token exceeding threshold
             break;
         }
@@ -209,7 +209,7 @@ void Sampler::filterTopP(std::vector<TokenCandidate>& candidates) const
 
 void Sampler::filterMinP(std::vector<TokenCandidate>& candidates) const
 {
-    if (m_config.m_minP <= 0.0f || candidates.empty()) return;
+    if (m_config.minP() <= 0.0f || candidates.empty()) return;
 
     // Find highest probability
     auto maxIt = std::max_element(candidates.begin(), candidates.end(),
@@ -219,7 +219,7 @@ void Sampler::filterMinP(std::vector<TokenCandidate>& candidates) const
 
     if (maxIt == candidates.end()) return;
     float maxProb = maxIt->probability;
-    float threshold = maxProb * m_config.m_minP;
+    float threshold = maxProb * m_config.minP();
 
     candidates.erase(
         std::remove_if(candidates.begin(), candidates.end(),

@@ -12,23 +12,55 @@ set(JOBMODEL_SOURCES
 )
 # our first target is
 set(JOBMODEL_CONFIG_HEADERS
-    config/model_architecture.h         # enums and string
-    config/model_config_concept.h       # base conert
-    config/arch_config.h                # base archedcture config
-    config/sampler_config.h             # the samplers config if needed
-    config/transformer_config.h         # transformer configurations
-    config/model_config_reader.h        # read config from json or gguf if possible
-    # config/model_config_writer.h        # write config from json or gguf if possible
+    config/model_architecture.h
+    config/model_config_concept.h
+    config/arch_config.h
+    config/sampler_config.h
+    config/transformer_config.h
+    config/moe_config.h
+    config/attention_config.h
+    config/output_head_config.h
+    config/norm_config.h
+    config/rope_config.h
+    config/feed_forward_config.h
+    config/device_config.h
 
-    config/model_config.h               # the top level config that own the sampler and friends.
-    config/arch/qwen/qwen3_instruct_2507.h   # the 1st target
+    config/model_config.h
+    config/arch/qwen/qwen3_instruct_2507.h   # garbage for now.
 )
 
 set(JOBMODEL_CONFIG_SOURCES
-    # config/transformer_config.cpp
-    config/model_config_reader.cpp
+    config/arch_config.cpp
+    config/sampler_config.cpp
+    config/moe_config.cpp
+    config/attention_config.h
+    config/output_head_config.cpp
+    config/norm_config.cpp
+    config/rope_config.cpp
+    config/feed_forward_config.cpp
+    config/device_config.cpp
+
+    config/model_config.cpp
+    config/transformer_config.cpp
+)
+
+set(JOBMODEL_IO_HEADERS
+    io/model_config_reader_utils.h
+    io/imodel_config_reader.h
+    io/gguf_model_config_reader.h
+    io/hf_json_model_config_reader.h
+    io/safetensors_model_config_reader.h
 
 )
+
+set(JOBMODEL_IO_SOURCES
+    io/model_config_reader_utils.cpp
+    io/imodel_config_reader.cpp
+    io/gguf_model_config_reader.cpp
+    io/hf_json_model_config_reader.cpp
+    io/safetensors_model_config_reader.cpp
+)
+
 
 set(JOBMODEL_WEIGHTS_HEADERS
     weights/model_weights.h
@@ -61,6 +93,7 @@ set(JOBMODEL_SAMPLE_SOURCES
 set(JOBMODEL_COMPILE_THIS
     ${JOBMODEL_HEADERS}            ${JOBMODEL_SOURCES}
     ${JOBMODEL_CONFIG_HEADERS}     ${JOBMODEL_CONFIG_SOURCES}
+    ${JOBMODEL_IO_HEADERS}         ${JOBMODEL_IO_SOURCES}
     ${JOBMODEL_WEIGHTS_HEADERS}    ${JOBMODEL_WEIGHTS_SOURCES}
     ${JOBMODEL_KV_HEADERS}         ${JOBMODEL_KV_SOURCES}
     ${JOBMODEL_GRAPH_HEADERS}      ${JOBMODEL_GRAPH_SOURCES}
@@ -95,6 +128,9 @@ target_include_directories(JosephsOddBuilder_Model PUBLIC
 
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/config>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobmodel/config>
+
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/io>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobmodel/io>
 
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/weights>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobmodel/weights>
@@ -140,6 +176,7 @@ install(TARGETS JosephsOddBuilder_Model
 install(FILES ${JOBMODEL_HEADERS}              DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobmodel)
 install(FILES ${JOBMODEL_EXPORT_HEADER}        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobmodel)
 install(FILES ${JOBMODEL_CONFIG_HEADERS}       DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobmodel/config)
+install(FILES ${JOBMODEL_IO_HEADERS}            DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobmodel/io)
 install(FILES ${JOBMODEL_WEIGHTS_HEADERS}      DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobmodel/weights)
 install(FILES ${JOBMODEL_KV_HEADERS}           DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobmodel/kv)
 install(FILES ${JOBMODEL_GRAPH_HEADERS}        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobmodel/graph)

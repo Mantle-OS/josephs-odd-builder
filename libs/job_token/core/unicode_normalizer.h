@@ -3,10 +3,7 @@
 #include <cstdint>
 #include <string>
 #include <string_view>
-#include <span>
-#include <vector>
 
-#include "job_tokenizer_types.h"
 #include "jobtoken_export.h"
 
 namespace job::token {

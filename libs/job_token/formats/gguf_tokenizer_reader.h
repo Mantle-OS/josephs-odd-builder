@@ -10,8 +10,9 @@
 #include <utility>
 #include <vector>
 
+#include <job_gguf.h>
+
 #include "formats/hf_tokenizer_reader.h"
-#include "job_gguf.h"
 #include "jobtoken_export.h"
 
 namespace job::token {

@@ -1,7 +1,9 @@
 #pragma once
 
 #include <cstdint>
+#include <memory>
 #include <string>
+#include <string_view>
 
 #include "model_architecture.h"
 #include "jobmodel_export.h"
@@ -10,48 +12,47 @@ namespace job::model {
 
 // Architecture-specific quirks and specialized knobs.
 // Because every model family thinks standard transformer math is just a suggestion.
-struct JOBMODEL_EXPORT ArchConfig {
+class JOBMODEL_EXPORT ArchConfig
+{
+public:
+    using Ptr  = std::shared_ptr<ArchConfig>;
+    using WPtr = std::weak_ptr<ArchConfig>;
+    using UPtr = std::unique_ptr<ArchConfig>;
 
-    ModelArchitecture m_arch{ModelArchitecture::Unknown};
-    std::string       m_archName{"unknown"};
-    std::string       m_modelName{"unknown"};
-    [[nodiscard]] std::string_view architectureName() const noexcept
-    {
-        return m_archName;
-    }
+    ArchConfig();
+    ~ArchConfig() = default;
 
+    [[nodiscard]] static Ptr createShared() { return std::make_shared<ArchConfig>(); }
+    [[nodiscard]] static UPtr createUniq()  { return std::make_unique<ArchConfig>(); }
 
-    // Mixture of Experts (MoE) parameters - for when regular dense networks
-    // just aren't expensive enough to train or run.
-    uint32_t    m_expertCount{0};
-    uint32_t    m_expertUsedCount{0};
+    ArchConfig(const ArchConfig &) = default;
+    ArchConfig &operator=(const ArchConfig &) = default;
+    ArchConfig(ArchConfig &&) noexcept = default;
+    ArchConfig &operator=(ArchConfig &&) noexcept = default;
+
+    [[nodiscard]] ModelArchitecture arch() const noexcept { return m_arch; }
+    void setArch(ModelArchitecture arch) noexcept { m_arch = arch; }
+
+    [[nodiscard]] const std::string &archName() const noexcept { return m_archName; }
+    void setArchName(std::string archName) { m_archName = std::move(archName); }
+
+    [[nodiscard]] const std::string &modelName() const noexcept { return m_modelName; }
+    void setModelName(std::string modelName) { m_modelName = std::move(modelName); }
+
+    // Kept for ModelConfigConcept: string_view-returning name, independent of storage.
+    [[nodiscard]] std::string_view architectureName() const noexcept { return m_archName; }
 
     // Activation function flavor (e.g., "silu", "gelu", "relu")
-    std::string m_hiddenActivation{"silu"};
+    [[nodiscard]] const std::string &hiddenActivation() const noexcept { return m_hiddenActivation; }
+    void setHiddenActivation(std::string activation) { m_hiddenActivation = std::move(activation); }
 
-    // Soft-capping and windowing (Gemma 2 / Qwen style controls)
-    float       m_finalLogitSoftCapping{0.0f};
-    float       m_attnLogitSoftCapping{0.0f};
-    uint32_t    m_slidingWindowSize{0};
+    [[nodiscard]] bool isValid() const noexcept;
 
-    // Architectural flags
-    bool        m_attentionBias{false};
-    bool        m_tieWordEmbeddings{false};
-
-    [[nodiscard]] constexpr bool isValid() const noexcept
-    {
-        // If it's a Mixture of Experts model, make sure the routing numbers
-        // actually make sense before unleashing it on the scheduler.
-        if (m_expertCount > 0 &&
-            m_arch != ModelArchitecture::Unknown &&
-            !m_archName.empty() && m_archName != "unknown" &&
-            !m_modelName.empty() &&  m_modelName != "unknown")
-        {
-            return m_expertUsedCount > 0 && m_expertUsedCount <= m_expertCount;
-        }
-
-        return true;
-    }
+private:
+    ModelArchitecture   m_arch{ModelArchitecture::Unknown};
+    std::string         m_archName{"unknown"};
+    std::string         m_modelName{"unknown"};    
+    std::string         m_hiddenActivation{"silu"};
 };
 
 } // namespace job::model

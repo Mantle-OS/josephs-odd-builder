@@ -20,10 +20,10 @@ concept ModelConfigConcept = requires(const T &config) {
 // you aren't building a transformer—you're just building an expensive random number generator.
 template<typename T>
 concept TransformerConfigConcept = ModelConfigConcept<T> && requires(const T &config) {
-    { config.m_blockCount }       -> std::convertible_to<uint32_t>;
-    { config.m_embeddingLength }  -> std::convertible_to<uint32_t>;
-    { config.m_vocabSize }        -> std::convertible_to<uint32_t>;
-    { config.m_contextLength }    -> std::convertible_to<uint32_t>;
+    { config.blockCount() }       -> std::convertible_to<uint32_t>;
+    { config.embeddingLength() }  -> std::convertible_to<uint32_t>;
+    { config.vocabSize() }        -> std::convertible_to<uint32_t>;
+    { config.contextLength() }    -> std::convertible_to<uint32_t>;
 };
 
 } // namespace job::model

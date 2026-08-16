@@ -252,6 +252,8 @@ bool GgufTokenizerReader::loadFromGguf(const ggml::JobGguf& gguf)
         m_data.padToken = m_data.vocab[static_cast<size_t>(m_data.padId)].text;
     }
 
+
+    // SHUT UP !!! :P
     // JOB_LOG_INFO("Loaded GGUF tokenizer (Model: '{}', Vocab: {}, Merges: {}, ChatTemplate: {})",
     //              m_data.modelName,
     //              m_data.vocab.size(),
