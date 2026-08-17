@@ -22,8 +22,6 @@ public:
     using WPtr = std::weak_ptr<HfToken>;
     using UPtr = std::unique_ptr<HfToken>;
 
-    using Merges = std::vector<std::pair<std::string, std::string>>;
-
     HfToken()
     {
         setProvider(Provider::HuggingFace);
@@ -52,10 +50,6 @@ public:
     [[nodiscard]] bool loadConfig(const std::filesystem::path &config);
     [[nodiscard]] bool loadConfigJson(std::string_view json);
 
-    [[nodiscard]] const Merges &merges() const noexcept
-    {
-        return m_merges;
-    }
 
     [[nodiscard]] bool cleanUpTokenizationSpaces() const noexcept
     {
@@ -72,6 +66,7 @@ protected:
     void extraClear() noexcept override;
 
 private:
+    void parsePreTokenizer(const nlohmann::json &preTokenizer);
     struct HfAddedToken
     {
         TokenId id{kInvalidToken};
@@ -85,10 +80,8 @@ private:
     };
 
 private:
-    Merges m_merges;
-    std::vector<HfAddedToken> m_addedTokens;
-
-    bool m_cleanUpTokenizationSpaces{true};
+    std::vector<HfAddedToken>   m_addedTokens;
+    bool                        m_cleanUpTokenizationSpaces{true};
 };
 
 } // namespace job::token

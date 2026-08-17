@@ -8,6 +8,10 @@
 
 namespace job::token {
 
+using ByteSymbols = std::vector<std::string>;
+using TokenMerge  = std::pair<std::string, std::string>;
+using TokenMerges = std::vector<TokenMerge>;
+
 // Standard discrete token identifier
 using TokenId = int32_t;
 inline constexpr TokenId kInvalidToken = -1;

@@ -165,13 +165,8 @@ public:
     void registerFilter(std::string name, FilterFn function);
     void registerFunction(std::string name, FunctionFn function);
 
-    [[nodiscard]] std::string execute(
-        const Node &root,
-        const ValueMap &context);
-
-    [[nodiscard]] Value evaluate(
-        const ExprNode &expression,
-        const ValueMap &context);
+    [[nodiscard]] std::string execute(const Node &root, const ValueMap &context);
+    [[nodiscard]] Value evaluate(const ExprNode &expression, const ValueMap &context);
 
     // Visitor implementation
     void visit(const TextNode &node) override;
@@ -208,11 +203,10 @@ private:
     [[nodiscard]] Value eval(const ExprNode &expression);
 
     // Dispatches <object>.<member>(...) calls such as map.items().
-    [[nodiscard]] Value callMember(
-        const Value &object,
-        const std::string &member,
-        const std::vector<Value> &args,
-        const ValueMap &kwArgs);
+    [[nodiscard]] Value callMember(const Value &object,
+                                   const std::string &member,
+                                   const std::vector<Value> &args,
+                                   const ValueMap &kwArgs);
 
 private:
     std::string m_outputBuffer;

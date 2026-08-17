@@ -62,12 +62,16 @@ public:
     void clearRules() noexcept;
 
     std::size_t encode(std::string_view chunk, std::span<TokenId> outTokens) const override;
+    [[nodiscard]] std::vector<TokenId> encode(std::span<const std::string> symbols) const override;
     std::size_t decode(std::span<const TokenId> tokens, std::span<char> outBuffer) const override;
+    // [[nodiscard]] virtual ByteSymbols decodeSymbols(std::span<const TokenId> tokens) const override;
 
     [[nodiscard]] std::span<const MergeRule> rules() const noexcept
     {
         return m_rules;
     }
+
+
 
 private:
     struct Symbol
@@ -100,10 +104,11 @@ private:
                static_cast<std::uint64_t>(static_cast<std::uint32_t>(right));
     }
 
+    [[nodiscard]] std::vector<TokenId> applyMerges(std::span<const TokenId> initialIds) const;
+
     void rebuildAccelerators();
 
-    [[nodiscard]] TokenId findInitialByteToken(
-        std::uint8_t byte) const noexcept;
+    [[nodiscard]] TokenId findInitialByteToken(std::uint8_t byte) const noexcept;
 
 private:
     std::vector<MergeRule> m_rules;

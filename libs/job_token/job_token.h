@@ -14,6 +14,8 @@
 #include "core/regex_splitter.h"
 #include "core/unicode_normalizer.h"
 
+#include "encoder/ibyte_encoder.h"
+
 #include "token/itoken.h"
 
 
@@ -25,7 +27,6 @@
 #include "jobtoken_export.h"
 
 namespace job::token {
-
 class JOBTOKEN_EXPORT JobToken
 {
 public:
@@ -93,6 +94,7 @@ private:
     RegexSplitter::UPtr     m_splitter;
     ITokenAlgo::UPtr        m_algorithm;
     ChatEngine::UPtr        m_chatEngine;
+    IByteEncoder::UPtr      m_byteEncoder;
 };
 
 } // namespace job::token

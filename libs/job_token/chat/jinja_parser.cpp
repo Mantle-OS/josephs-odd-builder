@@ -320,17 +320,28 @@ std::unique_ptr<ExprNode> JinjaParser::parsePrimary()
 
         if (value.find('.') != std::string_view::npos) {
             try {
-                return std::make_unique<LiteralNode>(std::stod(std::string{value}), line, column);
+                const std::string text{value};
+                std::size_t consumed = 0;
+                const double number = std::stod(text, &consumed);
+
+                if (consumed != text.size())
+                    throw ParseError{ "Invalid floating-point literal", line, column };
+
+                return std::make_unique<LiteralNode>(number, line, column);
+            } catch (const ParseError &) {
+                throw;
             } catch (const std::exception &) {
-                throw ParseError{"Invalid floating-point literal", line, column};
+                throw ParseError{ "Invalid floating-point literal", line, column };
             }
         }
 
         std::int64_t number = 0;
-        const auto result = std::from_chars(value.data(), value.data() + value.size(), number);
+        const auto result = std::from_chars(value.data(),
+                                            value.data() + value.size(),
+                                            number);
 
         if (result.ec != std::errc{} || result.ptr != value.data() + value.size())
-            throw ParseError{"Invalid integer literal", line, column};
+            throw ParseError{ "Invalid integer literal", line, column };
 
         return std::make_unique<LiteralNode>(number, line, column);
     }

@@ -65,6 +65,11 @@ public:
 
     std::size_t encode(std::string_view chunk, std::span<TokenId> outTokens) const override;
     std::size_t decode(std::span<const TokenId> tokens, std::span<char> outBuffer) const override;
+    void setVocab(const Vocab *vocab)
+    {
+        ITokenAlgo::setVocab(vocab);
+        rebuildTries();
+    }
 
 private:
     std::string m_prefix{"##"};

@@ -60,6 +60,14 @@ public:
         return m_trie;
     }
 
+    //  because un.... .
+    void setVocab(const Vocab *vocab)
+    {
+        ITokenAlgo::setVocab(vocab);
+        rebuildTrie();
+    }
+
+
 private:
     struct DpNode
     {

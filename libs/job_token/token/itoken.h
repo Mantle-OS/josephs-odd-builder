@@ -135,6 +135,8 @@ public:
 
     // Pre-tokenization configuration ----------------------------------------
 
+    // Pre-tokenization configuration ----------------------------------------
+
     [[nodiscard]] SplitPattern splitPattern() const noexcept
     {
         return m_splitPattern;
@@ -164,6 +166,16 @@ public:
     void setAddPrefixSpace(bool enabled) noexcept
     {
         m_addPrefixSpace = enabled;
+    }
+
+    [[nodiscard]] ByteEncoding byteEncoding() const noexcept
+    {
+        return m_byteEncoding;
+    }
+
+    void setByteEncoding(ByteEncoding encoding) noexcept
+    {
+        m_byteEncoding = encoding;
     }
 
     [[nodiscard]] bool byteFallback() const noexcept
@@ -219,8 +231,12 @@ public:
 
         m_splitPattern = SplitPattern::None;
         m_customSplitPattern.clear();
+
+        m_byteEncoding = ByteEncoding::Raw;
+        m_merges.clear();
+
         m_addPrefixSpace = false;
-        m_byteFallback = false;
+        m_byteFallback = false;        
 
         m_addBosToken = false;
         m_addEosToken = false;
@@ -231,6 +247,22 @@ public:
             m_vocab->clear();
 
         extraClear();
+    }
+
+    // BPE merge description --------------------------------------------------
+    [[nodiscard]] const TokenMerges &merges() const noexcept
+    {
+        return m_merges;
+    }
+
+    [[nodiscard]] TokenMerges &merges() noexcept
+    {
+        return m_merges;
+    }
+
+    void setMerges(TokenMerges merges)
+    {
+        m_merges = std::move(merges);
     }
 
 protected:
@@ -262,6 +294,8 @@ private:
     SplitPattern    m_splitPattern{SplitPattern::None};
     std::string     m_customSplitPattern;
     bool            m_addPrefixSpace{false};
+    ByteEncoding    m_byteEncoding{ByteEncoding::Raw};
+    TokenMerges     m_merges;
     bool            m_byteFallback{false};
 
     // Sequence behavior applied around encoded token streams.

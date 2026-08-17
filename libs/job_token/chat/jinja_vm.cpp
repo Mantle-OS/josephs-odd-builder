@@ -27,13 +27,20 @@ Value::Value(ValueMap value) : m_data{std::make_shared<ValueMap>(std::move(value
 ValueType Value::type() const noexcept
 {
     switch (m_data.index()) {
-    case 0: return ValueType::None;
-    case 1: return ValueType::Bool;
-    case 2: return ValueType::Int;
-    case 3: return ValueType::Float;
-    case 4: return ValueType::String;
-    case 5: return ValueType::List;
-    case 6: return ValueType::Map;
+    case 0:
+        return ValueType::None;
+    case 1:
+        return ValueType::Bool;
+    case 2:
+        return ValueType::Int;
+    case 3:
+        return ValueType::Float;
+    case 4:
+        return ValueType::String;
+    case 5:
+        return ValueType::List;
+    case 6:
+        return ValueType::Map;
     default: return ValueType::None;
     }
 }
@@ -49,25 +56,34 @@ bool Value::isMap() const noexcept    { return std::holds_alternative<std::share
 
 bool Value::asBool() const noexcept
 {
-    if (isBool())  return std::get<bool>(m_data);
-    if (isInt())   return std::get<std::int64_t>(m_data) != 0;
-    if (isFloat()) return std::get<double>(m_data) != 0.0;
+    if (isBool())
+        return std::get<bool>(m_data);
+    if (isInt())
+        return std::get<std::int64_t>(m_data) != 0;
+    if (isFloat())
+        return std::get<double>(m_data) != 0.0;
     return false;
 }
 
 std::int64_t Value::asInt() const noexcept
 {
-    if (isInt())   return std::get<std::int64_t>(m_data);
-    if (isFloat()) return static_cast<std::int64_t>(std::get<double>(m_data));
-    if (isBool())  return std::get<bool>(m_data) ? 1 : 0;
+    if (isInt())
+        return std::get<std::int64_t>(m_data);
+    if (isFloat())
+        return static_cast<std::int64_t>(std::get<double>(m_data));
+    if (isBool())
+        return std::get<bool>(m_data) ? 1 : 0;
     return 0;
 }
 
 double Value::asFloat() const noexcept
 {
-    if (isFloat()) return std::get<double>(m_data);
-    if (isInt())   return static_cast<double>(std::get<std::int64_t>(m_data));
-    if (isBool())  return std::get<bool>(m_data) ? 1.0 : 0.0;
+    if (isFloat())
+        return std::get<double>(m_data);
+    if (isInt())
+        return static_cast<double>(std::get<std::int64_t>(m_data));
+    if (isBool())
+        return std::get<bool>(m_data) ? 1.0 : 0.0;
     return 0.0;
 }
 
@@ -105,31 +121,46 @@ ValueMap &Value::asMap()
 
 bool Value::isTruthy() const noexcept
 {
-    if (isNone())   return false;
-    if (isBool())   return asBool();
-    if (isInt())    return asInt() != 0;
-    if (isFloat())  return asFloat() != 0.0;
-    if (isString()) return !asString().empty();
-    if (isList())   return !asList().empty();
-    if (isMap())    return !asMap().empty();
+    if (isNone())
+        return false;
+    if (isBool())
+        return asBool();
+    if (isInt())
+        return asInt() != 0;
+    if (isFloat())
+        return asFloat() != 0.0;
+    if (isString())
+        return !asString().empty();
+    if (isList())
+        return !asList().empty();
+    if (isMap())
+        return !asMap().empty();
     return false;
 }
 
 std::string Value::toString() const
 {
-    if (isNone()) return {};
-    if (isBool()) return asBool() ? "True" : "False";
-    if (isInt())  return std::to_string(asInt());
+    if (isNone())
+        return {};
+    if (isBool())
+        return asBool() ? "True" : "False";
+    if (isInt())
+        return std::to_string(asInt());
 
     if (isFloat()) {
         std::string value = std::to_string(asFloat());
         const std::size_t end = value.find_last_not_of('0');
-        if (end != std::string::npos) value.erase(end + 1);
-        if (!value.empty() && value.back() == '.') value.pop_back();
+
+        if (end != std::string::npos)
+            value.erase(end + 1);
+
+        if (!value.empty() && value.back() == '.')
+            value.pop_back();
         return value;
     }
 
-    if (isString()) return asString();
+    if (isString())
+        return asString();
 
     if (isList()) {
         std::string output{"["};
@@ -158,9 +189,12 @@ std::string Value::toString() const
 
 std::size_t Value::length() const
 {
-    if (isString()) return asString().size();
-    if (isList())   return asList().size();
-    if (isMap())    return asMap().size();
+    if (isString())
+        return asString().size();
+    if (isList())
+        return asList().size();
+    if (isMap())
+        return asMap().size();
     return 0;
 }
 
@@ -175,7 +209,9 @@ Value Value::getItem(const Value &key) const
     if (isList()) {
         const ValueList &list = asList();
         std::int64_t index = key.asInt();
-        if (index < 0) index += static_cast<std::int64_t>(list.size());
+        if (index < 0)
+            index += static_cast<std::int64_t>(list.size());
+
         if (index >= 0 && static_cast<std::size_t>(index) < list.size())
             return list[static_cast<std::size_t>(index)];
         return {};
@@ -184,9 +220,11 @@ Value Value::getItem(const Value &key) const
     if (isString()) {
         const std::string &string = asString();
         std::int64_t index = key.asInt();
-        if (index < 0) index += static_cast<std::int64_t>(string.size());
+        if (index < 0)
+            index += static_cast<std::int64_t>(string.size());
+
         if (index >= 0 && static_cast<std::size_t>(index) < string.size())
-            return Value{std::string{1, string[static_cast<std::size_t>(index)]}};
+            return Value{std::string(1, string[static_cast<std::size_t>(index)])};
         return {};
     }
 
@@ -205,7 +243,9 @@ void Value::setItem(const Value &key, Value value)
 
     ValueList &list = asList();
     std::int64_t index = key.asInt();
-    if (index < 0) index += static_cast<std::int64_t>(list.size());
+    if (index < 0)
+        index += static_cast<std::int64_t>(list.size());
+
     if (index >= 0 && static_cast<std::size_t>(index) < list.size())
         list[static_cast<std::size_t>(index)] = std::move(value);
 }
@@ -218,13 +258,20 @@ bool Value::operator==(const Value &other) const
         return false;
     }
 
-    if (isNone())   return true;
-    if (isBool())   return asBool() == other.asBool();
-    if (isInt())    return asInt() == other.asInt();
-    if (isFloat())  return std::abs(asFloat() - other.asFloat()) < 1e-9;
-    if (isString()) return asString() == other.asString();
-    if (isList())   return asList() == other.asList();
-    if (isMap())    return asMap() == other.asMap();
+    if (isNone())
+        return true;
+    if (isBool())
+        return asBool() == other.asBool();
+    if (isInt())
+        return asInt() == other.asInt();
+    if (isFloat())
+        return std::abs(asFloat() - other.asFloat()) < 1e-9;
+    if (isString())
+        return asString() == other.asString();
+    if (isList())
+        return asList() == other.asList();
+    if (isMap())
+        return asMap() == other.asMap();
     return false;
 }
 
@@ -290,18 +337,28 @@ void JinjaVM::registerDefaultBuiltins()
 
     registerFilter("count", m_filters["length"]);
 
-    registerFilter("first", [](const Value &target, const std::vector<Value> &, const ValueMap &) -> Value {
-        if (target.isList() && !target.asList().empty())     return target.asList().front();
-        if (target.isString() && !target.asString().empty()) return Value{std::string{1, target.asString().front()}};
+    registerFilter( "first", [](const Value &target, const std::vector<Value> &, const ValueMap &) -> Value {
+        if (target.isList() &&
+            !target.asList().empty())
+            return target.asList().front();
+
+        if (target.isString() &&
+            !target.asString().empty())
+            return Value{ std::string( 1, target.asString().front()) };
+
         return {};
     });
 
     registerFilter("last", [](const Value &target, const std::vector<Value> &, const ValueMap &) -> Value {
-        if (target.isList() && !target.asList().empty())     return target.asList().back();
-        if (target.isString() && !target.asString().empty()) return Value{std::string{1, target.asString().back()}};
+
+        if (target.isList() && !target.asList().empty())
+            return target.asList().back();
+
+        if (target.isString() && !target.asString().empty())
+            return Value{ std::string( 1, target.asString().back()) };
+
         return {};
     });
-
     registerFilter("default", [](const Value &target, const std::vector<Value> &args, const ValueMap &) -> Value {
         if (target.isNone() || !target.isTruthy())
             return args.empty() ? Value{""} : args.front();
@@ -539,9 +596,12 @@ void JinjaVM::visit(const BinaryOpNode &node)
 
     switch (node.op) {
     case BinaryOp::Add:
-        if (left.isString() || right.isString())    m_lastExpressionValue = Value{left.toString() + right.toString()};
-        else if (left.isFloat() || right.isFloat())  m_lastExpressionValue = Value{left.asFloat() + right.asFloat()};
-        else                                          m_lastExpressionValue = Value{left.asInt() + right.asInt()};
+        if (left.isString() || right.isString())
+            m_lastExpressionValue = Value{left.toString() + right.toString()};
+        else if (left.isFloat() || right.isFloat())
+            m_lastExpressionValue = Value{left.asFloat() + right.asFloat()};
+        else
+            m_lastExpressionValue = Value{left.asInt() + right.asInt()};
         break;
 
     case BinaryOp::Sub:
@@ -643,10 +703,6 @@ void JinjaVM::visit(const SubscriptNode &node)
 Value JinjaVM::callMember(const Value &object, const std::string &member,
                           const std::vector<Value> &, const ValueMap &)
 {
-    // One branch per supported method -- add more here (e.g. .keys(),
-    // .values()) the same way. Args are unused today (items() takes
-    // none) but kept in the signature so adding an arg-taking method
-    // later doesn't change the call site in visit(CallNode&).
     if (member == "items" && object.isMap()) {
         ValueList pairs;
         pairs.reserve(object.asMap().size());
@@ -654,9 +710,6 @@ Value JinjaVM::callMember(const Value &object, const std::string &member,
             pairs.emplace_back(ValueList{Value{key}, value});
         return Value{std::move(pairs)};
     }
-
-    // Unrecognized member call -- degrades the same way an unrecognized
-    // free function or filter already does (see below / visit(FilterNode)).
     return {};
 }
 
@@ -671,10 +724,6 @@ void JinjaVM::visit(const CallNode &node)
     for (const auto &[name, expression] : node.kwArgs)
         kwArgs[name] = eval(*expression);
 
-    // Member call: <object>.<method>(...), e.g. map.items(). The parser
-    // already produces MemberAccessNode -> CallNode for this; this was
-    // the missing dispatch -- only a bare Identifier callee (free
-    // functions like range(...)) was ever recognized before.
     if (node.callee && node.callee->type == NodeType::MemberAccess) {
         const auto *memberAccess = static_cast<const MemberAccessNode *>(node.callee.get());
         Value object = memberAccess->object ? eval(*memberAccess->object) : Value{};

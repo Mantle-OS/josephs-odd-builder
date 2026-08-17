@@ -79,30 +79,29 @@ TokenId Bpe::findInitialByteToken(std::uint8_t byte) const noexcept
         ByteFallback::byteToStringView(byte));
 }
 
-std::size_t Bpe::encode(std::string_view chunk, std::span<TokenId> outTokens) const
+
+std::vector<TokenId> Bpe::applyMerges(std::span<const TokenId> initialIds) const
 {
-    if (chunk.empty() || outTokens.empty())
-        return 0;
+    if (initialIds.empty())
+        return {};
 
-    // Fast path: no merge rules, map directly to initial byte tokens.
     if (m_rules.empty() || m_pairToRank.empty()) {
-        const std::size_t count = std::min(chunk.size(), outTokens.size());
-
-        for (std::size_t i = 0; i < count; ++i)
-            outTokens[i] = findInitialByteToken(static_cast<std::uint8_t>(chunk[i]));
-
-        return count;
+        return std::vector<TokenId>{
+            initialIds.begin(),
+            initialIds.end()
+        };
     }
 
-    const std::size_t count = chunk.size();
+    const std::size_t count = initialIds.size();
     std::vector<Symbol> symbols(count);
     for (std::size_t i = 0; i < count; ++i) {
         symbols[i].prev = i == 0 ? kInvalidId : i - 1;
         symbols[i].next = i + 1 == count ? kInvalidId : i + 1;
-        symbols[i].id = findInitialByteToken(static_cast<std::uint8_t>(chunk[i]));
+        symbols[i].id = initialIds[i];
     }
 
     std::priority_queue<QueueElement, std::vector<QueueElement>, std::greater<>> queue;
+
     const auto pushPair = [&](std::size_t position) {
         if (position == kInvalidId || position >= symbols.size())
             return;
@@ -113,27 +112,13 @@ std::size_t Bpe::encode(std::string_view chunk, std::span<TokenId> outTokens) co
 
         const TokenId leftId = symbols[position].id;
         const TokenId rightId = symbols[next].id;
+        const std::uint64_t key = makePairKey(leftId, rightId);
 
-        std::uint32_t rank = kInvalidRank;
+        const auto it = m_pairToRank.find(key);
+        if (it == m_pairToRank.end())
+            return;
 
-        if (leftId >= 0 && leftId < 256 &&
-            rightId >= 0 && rightId < 256) {
-            rank = m_bytePairRank[ static_cast<std::size_t>(leftId * 256 + rightId) ];
-        } else {
-            const std::uint64_t key = makePairKey(leftId, rightId);
-            const auto it = m_pairToRank.find(key);
-            if (it != m_pairToRank.end())
-                rank = it->second;
-        }
-
-        if (rank != kInvalidRank) {
-            queue.push( QueueElement{
-                position,
-                rank,
-                leftId,
-                rightId
-            });
-        }
+        queue.push(QueueElement{ position, it->second, leftId, rightId });
     };
 
     for (std::size_t i = 0; i + 1 < count; ++i)
@@ -141,12 +126,12 @@ std::size_t Bpe::encode(std::string_view chunk, std::span<TokenId> outTokens) co
 
     while (!queue.empty()) {
         const QueueElement top = queue.top();
+
         queue.pop();
 
         if (top.pos >= symbols.size())
             continue;
 
-        // Stale queue element.
         if (symbols[top.pos].id != top.leftId)
             continue;
 
@@ -158,29 +143,73 @@ std::size_t Bpe::encode(std::string_view chunk, std::span<TokenId> outTokens) co
         if (top.rank >= m_rules.size())
             continue;
 
-        // Merge the right symbol into the left symbol.
         symbols[top.pos].id = m_rules[top.rank].newId;
 
         const std::size_t nextNext = symbols[next].next;
+
         symbols[top.pos].next = nextNext;
 
         if (nextNext != kInvalidId)
             symbols[nextNext].prev = top.pos;
 
-        // The merge can create a new pair on either side.
         pushPair(symbols[top.pos].prev);
         pushPair(top.pos);
     }
 
-    std::size_t written = 0;
+    std::vector<TokenId> result;
+    result.reserve(initialIds.size());
+
     std::size_t current = 0;
 
-    while (current != kInvalidId && current < symbols.size() && written < outTokens.size()) {
-        outTokens[written++] = symbols[current].id;
+    while (current != kInvalidId && current < symbols.size()) {
+        result.push_back(symbols[current].id);
         current = symbols[current].next;
     }
 
-    return written;
+    return result;
+}
+
+std::size_t Bpe::encode(std::string_view chunk, std::span<TokenId> outTokens) const
+{
+    if (chunk.empty() || outTokens.empty())
+        return 0;
+
+    std::vector<TokenId> initialIds;
+    initialIds.reserve(chunk.size());
+
+    for (const char character : chunk) {
+        initialIds.push_back(
+            findInitialByteToken(
+                static_cast<std::uint8_t>(character)));
+    }
+
+    const std::vector<TokenId> merged =
+        applyMerges(initialIds);
+
+    const std::size_t count =
+        std::min(
+            merged.size(),
+            outTokens.size());
+
+    std::copy_n(merged.begin(), count, outTokens.begin());
+    return count;
+}
+
+
+
+
+std::vector<TokenId> Bpe::encode(std::span<const std::string> symbols) const
+{
+    if (symbols.empty() || !m_vocab)
+        return {};
+
+    std::vector<TokenId> initialIds;
+    initialIds.reserve(symbols.size());
+
+    for (const std::string &symbol : symbols)
+        initialIds.push_back(m_vocab->findId(symbol));
+
+    return applyMerges(initialIds);
 }
 
 std::size_t Bpe::decode(std::span<const TokenId> tokens, std::span<char> outBuffer) const

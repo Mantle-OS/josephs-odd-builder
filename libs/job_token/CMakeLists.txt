@@ -29,6 +29,18 @@ set(JOBTOKEN_ALGO_SOURCES
     algo/token_algo_factory.cpp
 )
 
+set(JOBTOKEN_ENCODER_HEADERS
+    encoder/ibyte_encoder.h
+    encoder/raw_byte_encoder.h
+    encoder/gpt2_byte_encoder.h
+    encoder/byte_encoder_factory.h
+)
+
+set(JOBTOKEN_ENCODER_SOURCES
+    encoder/gpt2_byte_encoder.cpp
+    encoder/byte_encoder_factory.cpp
+)
+
 set(JOBTOKEN_CORE_HEADERS
     core/trie.h
     core/unicode_normalizer.h
@@ -103,6 +115,7 @@ set(JOBTOKEN_COMPILE_THIS
     ${JOBTOKEN_IPC_HEADERS}        ${JOBTOKEN_IPC_SOURCES}
     ${JOBTOKEN_CHAT_HEADERS}       ${JOBTOKEN_CHAT_SOURCES}
     ${JOBTOKEN_VOCAB_HEADERS}      ${JOBTOKEN_VOCAB_SOURCES}
+    ${JOBTOKEN_ENCODER_HEADERS}    ${JOBTOKEN_ENCODER_SOURCES}
 )
 
 if(BUILD_SHARED_LIBS)
@@ -150,6 +163,9 @@ target_include_directories(JosephsOddBuilder_Token PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/vocab>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobtoken/vocab>
 
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/encoder>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobtoken/encoder>
+
     ## export file
     $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
 )
@@ -187,6 +203,7 @@ install(FILES ${JOBTOKEN_TOKEN_HEADERS}     DESTINATION ${CMAKE_INSTALL_INCLUDED
 install(FILES ${JOBTOKEN_IPC_HEADERS}       DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobtoken/ipc)
 install(FILES ${JOBTOKEN_CHAT_HEADERS}      DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobtoken/chat)
 install(FILES ${JOBTOKEN_VOCAB_HEADERS}     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobtoken/vocab)
+install(FILES ${JOBTOKEN_ENCODER_HEADERS}   DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobtoken/encoder)
 
 if(JOB_LINUX)
     set(PKGCONFIG_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/pkgconfig")

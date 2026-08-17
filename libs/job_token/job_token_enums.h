@@ -4,6 +4,8 @@
 #include <cstdint>
 
 #include "jobtoken_export.h"
+namespace job::token {
+
 
 enum class GgufTokenType : uint8_t {
     Normal      = 1,
@@ -211,4 +213,12 @@ enum class ChatType : uint8_t {
     Mistral,    // [INST] prompt [/INST] response</s>
     Custom
 };
+// =======================================================
 
+enum class ByteEncoding : std::uint8_t
+{
+    Raw = 0,
+    Gpt2
+};
+
+} // namespace

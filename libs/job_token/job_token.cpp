@@ -2,14 +2,15 @@
 
 #include <utility>
 
+#include "encoder/byte_encoder_factory.h"
+#include "bpe.h"
 #include <job_logger.h>
 
 namespace job::token {
 
 bool JobToken::load(IToken::Provider provider, const std::filesystem::path &modelPath)
 {
-    IToken::UPtr token =
-        TokenFactory::create(
+    IToken::UPtr token = TokenFactory::create(
             provider,
             modelPath);
 
@@ -22,13 +23,11 @@ bool JobToken::load(IToken::Provider provider, const std::filesystem::path &mode
         std::move(token));
 }
 
-bool JobToken::load(
-    IToken::Provider provider,
-    const std::filesystem::path &modelPath,
-    const std::filesystem::path &tokenizerPath)
+bool JobToken::load(IToken::Provider provider,
+                    const std::filesystem::path &modelPath,
+                    const std::filesystem::path &tokenizerPath)
 {
-    IToken::UPtr token =
-        TokenFactory::create(
+    IToken::UPtr token = TokenFactory::create(
             provider,
             modelPath,
             tokenizerPath);
@@ -54,18 +53,15 @@ bool JobToken::setToken(
     m_token.reset();
 
     if (!token) {
-        JOB_LOG_ERROR(
-            "Cannot configure JobToken with a null IToken");
+        JOB_LOG_ERROR("Cannot configure JobToken with a null IToken");
 
         return false;
     }
 
-    m_token =
-        std::move(token);
+    m_token = std::move(token);
 
     if (!configure()) {
-        JOB_LOG_ERROR(
-            "Failed to configure JobToken runtime");
+        JOB_LOG_ERROR("Failed to configure JobToken runtime");
 
         clearRuntime();
         m_token.reset();
@@ -81,9 +77,7 @@ bool JobToken::configure()
     clearRuntime();
 
     if (!m_token) {
-        JOB_LOG_ERROR(
-            "Cannot configure JobToken without token data");
-
+        JOB_LOG_ERROR("Cannot configure JobToken without token data");
         return false;
     }
 
@@ -91,9 +85,7 @@ bool JobToken::configure()
     // Normalizer
     // ------------------------------------------------------------------------
 
-    m_normalizer =
-        UnicodeNormalizer::createUniq();
-
+    m_normalizer = UnicodeNormalizer::createUniq();
     if (!m_normalizer) {
         JOB_LOG_ERROR(
             "Failed to create UnicodeNormalizer");
@@ -104,45 +96,77 @@ bool JobToken::configure()
     // ------------------------------------------------------------------------
     // Pre-tokenizer
     // ------------------------------------------------------------------------
-
-    m_splitter =
-        RegexSplitter::createUniq(
-            m_token->splitPattern());
-
+    m_splitter = RegexSplitter::createUniq(m_token->splitPattern());
     if (!m_splitter) {
-        JOB_LOG_ERROR(
-            "Failed to create RegexSplitter");
+        JOB_LOG_ERROR("Failed to create RegexSplitter");
 
         return false;
     }
 
     if (m_token->splitPattern() == SplitPattern::Custom) {
         if (m_token->customSplitPattern().empty()) {
-            JOB_LOG_ERROR(
-                "Tokenizer requests a custom split pattern "
-                "but no pattern was provided");
-
+            JOB_LOG_ERROR("Tokenizer requests a custom split pattern but no pattern was provided");
             return false;
         }
 
-        m_splitter->setCustomPattern(
-            m_token->customSplitPattern());
+        m_splitter->setCustomPattern(m_token->customSplitPattern());
     }
+
+    m_byteEncoder = ByteEncoderFactory::create(m_token->byteEncoding());
+    if (!m_byteEncoder)
+        return false;
 
     // ------------------------------------------------------------------------
     // Token algorithm
     // ------------------------------------------------------------------------
     m_algorithm = TokenAlgoFactory::create(m_token->tokenType(), m_token->vocab());
-
     if (!m_algorithm) {
         JOB_LOG_ERROR("Failed to create token algorithm for type {}", static_cast<std::uint32_t>(m_token->tokenType()));
         return false;
     }
 
     // ------------------------------------------------------------------------
+    // BPE Merges
+    // ------------------------------------------------------------------------
+    if (m_token->tokenType() == TokenType::BPE) {
+        auto *bpe = dynamic_cast<Bpe *>(m_algorithm.get());
+
+        if (!bpe) {
+            JOB_LOG_ERROR("Token algorithm reports BPE but runtime is not Bpe");
+            return false;
+        }
+
+        std::vector<Bpe::MergeRule> rules;
+        rules.reserve(m_token->merges().size());
+        for (const auto &[leftText, rightText] : m_token->merges()) {
+
+            const TokenId left = m_token->vocab()->findId(leftText);
+            const TokenId right = m_token->vocab()->findId(rightText);
+
+            if (left == kInvalidToken || right == kInvalidToken) {
+                continue;
+            }
+
+            std::string mergedText;
+            mergedText.reserve(leftText.size() + rightText.size());
+
+            mergedText += leftText;
+            mergedText += rightText;
+
+            const TokenId merged = m_token->vocab()->findId(mergedText);
+
+            if (merged == kInvalidToken)
+                continue;
+
+            rules.push_back({left, right,merged});
+        }
+
+        bpe->setMergeRules(std::move(rules));
+    }
+
+    // ------------------------------------------------------------------------
     // Chat runtime
     // ------------------------------------------------------------------------
-
     m_chatEngine =
         ChatEngine::createUniq();
 
@@ -177,19 +201,16 @@ bool JobToken::configure()
     return true;
 }
 
-std::vector<TokenId> JobToken::encode(
-    std::string_view text) const
+std::vector<TokenId> JobToken::encode(std::string_view text) const
 {
     if (!isReady()) {
         JOB_LOG_ERROR(
             "Cannot encode: JobToken is not configured");
-
         return {};
     }
 
     if (text.empty()) {
         std::vector<TokenId> result;
-
         if (m_token->addBosToken()) {
             const TokenId bos =
                 m_token->specialTokens()->bosId();
@@ -199,20 +220,16 @@ std::vector<TokenId> JobToken::encode(
         }
 
         if (m_token->addEosToken()) {
-            const TokenId eos =
-                m_token->specialTokens()->eosId();
-
+            const TokenId eos = m_token->specialTokens()->eosId();
             if (eos != kInvalidToken)
                 result.push_back(eos);
         }
-
         return result;
     }
 
     // ------------------------------------------------------------------------
     // Normalize
     // ------------------------------------------------------------------------
-
     UnicodeNormalizer::Options options;
 
     options.addDummyPrefixSpace =
@@ -232,17 +249,12 @@ std::vector<TokenId> JobToken::encode(
     // ------------------------------------------------------------------------
     // Pre-tokenize
     // ------------------------------------------------------------------------
-
-    const std::vector<std::string_view> chunks =
-        m_splitter->split(
-            normalized);
-
+    const std::vector<std::string_view> chunks = m_splitter->split(normalized);
     std::vector<TokenId> result;
 
     // ------------------------------------------------------------------------
     // Sequence prefix
     // ------------------------------------------------------------------------
-
     if (m_token->addBosToken()) {
         const TokenId bos =
             m_token->specialTokens()->bosId();
@@ -252,13 +264,19 @@ std::vector<TokenId> JobToken::encode(
     }
 
     // ------------------------------------------------------------------------
-    // Algorithm
+    // Byte encode + algorithm
     // ------------------------------------------------------------------------
-
+    // ------------------------------------------------------------------------
+    // Byte encode + algorithm
+    // ------------------------------------------------------------------------
     if (chunks.empty()) {
+        const ByteSymbols symbols =
+            m_byteEncoder->encode(
+                normalized);
+
         std::vector<TokenId> encoded =
             m_algorithm->encode(
-                normalized);
+                symbols);
 
         result.insert(
             result.end(),
@@ -270,9 +288,13 @@ std::vector<TokenId> JobToken::encode(
             if (chunk.empty())
                 continue;
 
+            const ByteSymbols symbols =
+                m_byteEncoder->encode(
+                    chunk);
+
             std::vector<TokenId> encoded =
                 m_algorithm->encode(
-                    chunk);
+                    symbols);
 
             result.insert(
                 result.end(),
@@ -284,7 +306,6 @@ std::vector<TokenId> JobToken::encode(
     // ------------------------------------------------------------------------
     // Sequence suffix
     // ------------------------------------------------------------------------
-
     if (m_token->addEosToken()) {
         const TokenId eos =
             m_token->specialTokens()->eosId();
@@ -296,8 +317,7 @@ std::vector<TokenId> JobToken::encode(
     return result;
 }
 
-std::string JobToken::decode(
-    std::span<const TokenId> tokens) const
+std::string JobToken::decode(std::span<const TokenId> tokens) const
 {
     if (!isReady()) {
         JOB_LOG_ERROR("Cannot decode: JobToken is not configured");
@@ -307,8 +327,12 @@ std::string JobToken::decode(
     if (tokens.empty())
         return {};
 
-    return m_algorithm->decode(
-        tokens);
+    const ByteSymbols symbols = m_algorithm->decodeSymbols(tokens);
+
+    if (symbols.empty())
+        return {};
+
+    return m_byteEncoder->decode(symbols);
 }
 
 } // namespace job::token

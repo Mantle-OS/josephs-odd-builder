@@ -9,9 +9,7 @@
 
 namespace job::token {
 
-bool HfToken::load(
-    const std::filesystem::path &jsonPath,
-    const std::filesystem::path &configPath)
+bool HfToken::load(const std::filesystem::path &jsonPath, const std::filesystem::path &configPath)
 {
     clear();
 
@@ -122,18 +120,10 @@ bool HfToken::loadJson(std::string_view json)
     }
 
     // Pre-tokenizer configuration -------------------------------------------
-
-    if (root.contains("pre_tokenizer") && root["pre_tokenizer"].is_object()) {
-        const auto &preTokenizer = root["pre_tokenizer"];
-        if (preTokenizer.contains("byte_fallback") && preTokenizer["byte_fallback"].is_boolean())
-            setByteFallback( preTokenizer["byte_fallback"].get<bool>());
-
-        if (preTokenizer.contains("add_prefix_space") && preTokenizer["add_prefix_space"].is_boolean())
-            setAddPrefixSpace(preTokenizer["add_prefix_space"].get<bool>());
-    }
+    if (root.contains("pre_tokenizer"))
+        parsePreTokenizer(root["pre_tokenizer"]);
 
     // Model ------------------------------------------------------------------
-
     if (!root.contains("model") || !root["model"].is_object())
         return false;
 
@@ -145,7 +135,6 @@ bool HfToken::loadJson(std::string_view json)
         setByteFallback(model["byte_fallback"].get<bool>());
 
     // Vocabulary -------------------------------------------------------------
-
     if (model.contains("vocab")) {
         const auto &modelVocab = model["vocab"];
         if (modelVocab.is_object()) {
@@ -180,14 +169,10 @@ bool HfToken::loadJson(std::string_view json)
     }
 
     // BPE merges -------------------------------------------------------------
-
     if (model.contains("merges") && model["merges"].is_array()) {
         for (const auto &item : model["merges"]) {
             if (item.is_array() && item.size() == 2 && item[0].is_string() && item[1].is_string()) {
-                m_merges.emplace_back(item[0].get<std::string>(),
-                                      item[1].get<std::string>()
-                                      );
-
+                merges().emplace_back(item[0].get<std::string>(), item[1].get<std::string>());
                 continue;
             }
 
@@ -199,7 +184,7 @@ bool HfToken::loadJson(std::string_view json)
             if (separator == std::string::npos)
                 continue;
 
-            m_merges.emplace_back(rule.substr(0, separator), rule.substr(separator + 1));
+            merges().emplace_back(rule.substr(0, separator), rule.substr(separator + 1));
         }
     }
 
@@ -304,7 +289,6 @@ bool HfToken::loadConfigJson(std::string_view json)
 void HfToken::extraClear() noexcept
 {
     setProvider(Provider::HuggingFace);
-    m_merges.clear();
     m_addedTokens.clear();
     m_cleanUpTokenizationSpaces = true;
 }
@@ -324,5 +308,34 @@ std::string HfToken::tokenString(const nlohmann::json &value)
 
     return it->get<std::string>();
 }
+
+void HfToken::parsePreTokenizer(const nlohmann::json &preTokenizer)
+{
+    if (!preTokenizer.is_object())
+        return;
+
+    if (preTokenizer.contains("type") && preTokenizer["type"].is_string()) {
+        const std::string type = preTokenizer["type"].get<std::string>();
+        if (type == "ByteLevel")
+            setByteEncoding(ByteEncoding::Gpt2);
+    }
+
+    if (preTokenizer.contains("byte_fallback") && preTokenizer["byte_fallback"].is_boolean()) {
+        setByteFallback(
+            preTokenizer["byte_fallback"].get<bool>());
+    }
+
+    if (preTokenizer.contains("add_prefix_space") &&
+        preTokenizer["add_prefix_space"].is_boolean()) {
+        setAddPrefixSpace(preTokenizer["add_prefix_space"].get<bool>());
+    }
+
+    if (preTokenizer.contains("pretokenizers") && preTokenizer["pretokenizers"].is_array()){
+        for (const auto &child : preTokenizer["pretokenizers"]){
+            parsePreTokenizer(child);
+        }
+    }
+}
+
 
 } // namespace job::token

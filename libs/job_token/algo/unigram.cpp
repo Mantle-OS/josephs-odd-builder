@@ -17,20 +17,19 @@ Unigram::Unigram(const Vocab *vocab) noexcept :
 void Unigram::rebuildTrie()
 {
     m_trie.clear();
+
     if (!m_vocab)
         return;
 
-    for (const auto &record : m_vocab->records())
-        if (!record.text().empty() && record.id() != kInvalidToken)
-            m_trie.insert(record.text(), record.id());
+    for (const TokenRecord &record : m_vocab->records()) {
+        if (!record.isValid())
+            continue;
 
-    const TokenId unkId =
-        m_vocab->specialTokens().unkId();
+        if (record.text().empty())
+            continue;
 
-    if (unkId != kInvalidToken)
-        m_unkScore = m_vocab->tokenScore(unkId);
-    else
-        m_unkScore = -10.0f;
+        m_trie.insert(record.text(), record.id());
+    }
 }
 
 // UNRESOLVED:
