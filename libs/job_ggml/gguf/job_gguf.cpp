@@ -13,11 +13,8 @@ JobGguf::JobGguf(JobGgmlContext::UPtr *contextOutput) :
     m_reader{JobGgufReader::createUniq(m_context.get())},
     m_writer{JobGgufWriter::createUniq(m_context.get())}
 {
-    if (!isValid()) {
-        throw std::runtime_error{
-            "Failed to construct the JobGguf subsystem"
-        };
-    }
+    if (!isValid())
+        throw std::runtime_error{ "Failed to construct the JobGguf subsystem" };
 }
 
 bool JobGguf::isValid() const noexcept
@@ -98,7 +95,6 @@ bool JobGguf::open(const std::filesystem::path &filePath)
 
     if (!m_reader || !m_initParams) {
         setError("JobGguf does not have a valid reader or initialization parameters");
-
         return false;
     }
 
@@ -117,14 +113,10 @@ bool JobGguf::open(std::FILE *file)
 
     if (!m_reader || !m_initParams) {
         setError("JobGguf does not have a valid reader or initialization parameters");
-
         return false;
     }
 
-    if (!m_reader->read(
-            file,
-            *m_initParams
-            )) {
+    if (!m_reader->read( file, *m_initParams)) {
         adoptReaderError();
         return false;
     }
@@ -139,7 +131,6 @@ bool JobGguf::open(const void *data, std::size_t size)
 
     if (!m_reader || !m_initParams) {
         setError("JobGguf does not have a valid reader or initialization parameters");
-
         return false;
     }
 
@@ -158,7 +149,6 @@ bool JobGguf::open(std::span<const std::byte> data)
 
     if (!m_reader || !m_initParams) {
         setError("JobGguf does not have a valid reader or initialization parameters");
-
         return false;
     }
 
@@ -177,16 +167,14 @@ bool JobGguf::open(JobGgufReader::ReadCallback callback, std::size_t maxChunkRea
 
     if (!m_reader || !m_initParams) {
         setError("JobGguf does not have a valid reader or initialization parameters");
-
         return false;
     }
 
-    if (!m_reader->read(
-            std::move(callback),
-            maxChunkRead,
-            maxExpectedSize,
-            *m_initParams
-            )) {
+    if (!m_reader->read(std::move(callback),
+                        maxChunkRead,
+                        maxExpectedSize,
+                        *m_initParams
+                        )) {
         adoptReaderError();
         return false;
     }
@@ -328,9 +316,7 @@ bool JobGguf::hasTensor(const std::string &name) const noexcept
 JobGgufKv::UPtr JobGguf::keyValue(const std::string &key) const
 {
     if (!m_context) {
-        throw std::runtime_error{
-            "JobGguf does not have a valid context"
-        };
+        throw std::runtime_error{ "JobGguf does not have a valid context"};
     }
 
     return m_context->keyValue(key);
@@ -338,121 +324,86 @@ JobGgufKv::UPtr JobGguf::keyValue(const std::string &key) const
 
 JobGgufKv::UPtr JobGguf::keyValue(std::int64_t index) const
 {
-    if (!m_context) {
-        throw std::runtime_error{
-            "JobGguf does not have a valid context"
-        };
-    }
+    if (!m_context)
+        throw std::runtime_error{"JobGguf does not have a valid context"};
 
     return m_context->keyValue(index);
 }
 
 std::vector<JobGgufKv::UPtr> JobGguf::keyValues() const
 {
-    if (!m_context) {
-        throw std::runtime_error{
-            "JobGguf does not have a valid context"
-        };
-    }
+    if (!m_context)
+        throw std::runtime_error{"JobGguf does not have a valid context"};
 
     return m_context->keyValues();
 }
 
 // Common context mutation
-void JobGguf::setKeyValue(
-    const JobGgufKv &keyValue
-    )
+void JobGguf::setKeyValue(const JobGgufKv &keyValue)
 {
-    if (!m_context) {
-        throw std::runtime_error{
-            "JobGguf does not have a valid context"
-        };
-    }
+    if (!m_context)
+        throw std::runtime_error{ "JobGguf does not have a valid context" };
 
     m_context->setKeyValue(keyValue);
 }
 
 void JobGguf::setKeyValues(const JobGgufContext &source)
 {
-    if (!m_context) {
-        throw std::runtime_error{
-            "JobGguf does not have a valid context"
-        };
-    }
+    if (!m_context)
+        throw std::runtime_error{ "JobGguf does not have a valid context" };
 
     m_context->setKeyValues(source);
 }
 
 std::int64_t JobGguf::removeKey(const std::string &key)
 {
-    if (!m_context) {
-        throw std::runtime_error{
-            "JobGguf does not have a valid context"
-        };
-    }
+    if (!m_context)
+        throw std::runtime_error{ "JobGguf does not have a valid context" };
 
     return m_context->removeKey(key);
 }
 
 void JobGguf::addTensor(const JobGgmlTensor &tensor)
 {
-    if (!m_context) {
-        throw std::runtime_error{
-            "JobGguf does not have a valid context"
-        };
-    }
+    if (!m_context)
+        throw std::runtime_error{ "JobGguf does not have a valid context" };
 
     m_context->addTensor(tensor);
 }
 
 void JobGguf::setTensorType(const std::string &name, JobGgmlType type)
 {
-    if (!m_context) {
-        throw std::runtime_error{
-            "JobGguf does not have a valid context"
-        };
-    }
+    if (!m_context)
+        throw std::runtime_error{ "JobGguf does not have a valid context" };
 
     m_context->setTensorType(name, type);
 }
 
 void JobGguf::setTensorData(const std::string &name, const void *data)
 {
-    if (!m_context) {
-        throw std::runtime_error{
-            "JobGguf does not have a valid context"
-        };
-    }
+    if (!m_context)
+        throw std::runtime_error{ "JobGguf does not have a valid context" };
 
     m_context->setTensorData(name, data);
 }
 
 void JobGguf::setTensorData(const std::string &name, const std::vector<std::byte> &data)
 {
-    if (!m_context) {
-        throw std::runtime_error{
-            "JobGguf does not have a valid context"
-        };
-    }
+    if (!m_context)
+        throw std::runtime_error{ "JobGguf does not have a valid context" };
 
     m_context->setTensorData(name, data);
 }
 
 void JobGguf::reset()
 {
-    if (!m_context) {
-        throw std::runtime_error{
-            "JobGguf does not have a valid context wrapper"
-        };
-    }
+    if (!m_context)
+        throw std::runtime_error{ "JobGguf does not have a valid context wrapper" };
 
     struct gguf_context *nativeContext = gguf_init_empty();
 
-    if (!nativeContext) {
-        throw std::runtime_error{
-            "Failed to create an empty native GGUF context"
-        };
-    }
+    if (!nativeContext)
+        throw std::runtime_error{ "Failed to create an empty native GGUF context" };
 
     /*
      * Preserve the JobGgufContext wrapper address borrowed by m_reader and

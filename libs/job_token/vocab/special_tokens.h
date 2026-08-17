@@ -1,27 +1,45 @@
 #pragma once
 
+#include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
-#include <unordered_map>
 #include <unordered_set>
-#include <optional>
 
-#include "job_tokenizer_types.h"
+#include <job_hash_container.h>
+#include <job_logger.h>
+
+#include "job_token_enums.h"
+#include "job_token_types.h"
 #include "jobtoken_export.h"
 
 namespace job::token {
 
-class JOBTOKEN_EXPORT SpecialTokens {
+class JOBTOKEN_EXPORT SpecialTokens
+{
 public:
+    using Ptr  = std::shared_ptr<SpecialTokens>;
+    using WPtr = std::weak_ptr<SpecialTokens>;
+    using UPtr = std::unique_ptr<SpecialTokens>;
+
     SpecialTokens() = default;
     ~SpecialTokens() = default;
 
-    SpecialTokens(const SpecialTokens&) = default;
-    SpecialTokens& operator=(const SpecialTokens&) = default;
-    SpecialTokens(SpecialTokens&&) noexcept = default;
-    SpecialTokens& operator=(SpecialTokens&&) noexcept = default;
+    [[nodiscard]] static Ptr createShared()
+    {
+        return std::make_shared<SpecialTokens>();
+    }
 
-    // --- Standard Canonical Accessors ---
+    [[nodiscard]] static UPtr createUniq()
+    {
+        return std::make_unique<SpecialTokens>();
+    }
+
+    SpecialTokens(const SpecialTokens &) = default;
+    SpecialTokens &operator=(const SpecialTokens &) = default;
+    SpecialTokens(SpecialTokens &&) noexcept = default;
+    SpecialTokens &operator=(SpecialTokens &&) noexcept = default;
+
     [[nodiscard]] TokenId bosId() const noexcept { return m_bosId; }
     [[nodiscard]] TokenId eosId() const noexcept { return m_eosId; }
     [[nodiscard]] TokenId eotId() const noexcept { return m_eotId; }
@@ -31,38 +49,98 @@ public:
     [[nodiscard]] TokenId prefixId() const noexcept { return m_prefixId; }
     [[nodiscard]] TokenId suffixId() const noexcept { return m_suffixId; }
     [[nodiscard]] TokenId middleId() const noexcept { return m_middleId; }
+    [[nodiscard]] TokenId clsId() const noexcept { return m_clsId; }
+    [[nodiscard]] TokenId sepId() const noexcept { return m_sepId; }
 
-    void setBosId(TokenId id) noexcept { m_bosId = id; registerSpecialId(id); }
-    void setEosId(TokenId id) noexcept { m_eosId = id; registerSpecialId(id); }
-    void setEotId(TokenId id) noexcept { m_eotId = id; registerSpecialId(id); }
-    void setPadId(TokenId id) noexcept { m_padId = id; registerSpecialId(id); }
-    void setUnkId(TokenId id) noexcept { m_unkId = id; registerSpecialId(id); }
-    void setMaskId(TokenId id) noexcept { m_maskId = id; registerSpecialId(id); }
-    void setPrefixId(TokenId id) noexcept { m_prefixId = id; registerSpecialId(id); }
-    void setSuffixId(TokenId id) noexcept { m_suffixId = id; registerSpecialId(id); }
-    void setMiddleId(TokenId id) noexcept { m_middleId = id; registerSpecialId(id); }
+    void setBosId(TokenId id) noexcept { setCanonicalId(m_bosId, id); }
+    void setEosId(TokenId id) noexcept { setCanonicalId(m_eosId, id); }
+    void setEotId(TokenId id) noexcept { setCanonicalId(m_eotId, id); }
+    void setPadId(TokenId id) noexcept { setCanonicalId(m_padId, id); }
+    void setUnkId(TokenId id) noexcept { setCanonicalId(m_unkId, id); }
+    void setMaskId(TokenId id) noexcept { setCanonicalId(m_maskId, id); }
+    void setPrefixId(TokenId id) noexcept { setCanonicalId(m_prefixId, id); }
+    void setSuffixId(TokenId id) noexcept { setCanonicalId(m_suffixId, id); }
+    void setMiddleId(TokenId id) noexcept { setCanonicalId(m_middleId, id); }  
+    void setClsId(TokenId id) noexcept { setCanonicalId(m_clsId, id); }
+    void setSepId(TokenId id) noexcept { setCanonicalId(m_sepId, id); }
 
-    // --- Custom / Named Special Tokens Registration ---
+
     void registerSpecial(std::string name, TokenId id, SpecialTokenType type = SpecialTokenType::None)
     {
         if (id == kInvalidToken || name.empty())
             return;
 
+        auto nameIt = m_nameToId.find(name);
+        if (nameIt != m_nameToId.end() && nameIt->second != id) {
+            const TokenId oldId = nameIt->second;
+
+            if (!m_idToName.remove(oldId)) {
+                JOB_LOG_ASSERT(
+                    "SpecialTokens invariant failure: name '{}' maps to token {}, "
+                    "but reverse token-to-name mapping does not exist",
+                    name,
+                    oldId);
+                return;
+            }
+
+            if (!isCanonicalId(oldId))
+                m_specialIds.erase(oldId);
+        }
+
+        auto idIt = m_idToName.find(id);
+        if (idIt != m_idToName.end() && idIt->second != name) {
+            const std::string oldName = idIt->second;
+
+            if (!m_nameToId.remove(oldName)) {
+                JOB_LOG_ASSERT(
+                    "SpecialTokens invariant failure: token {} maps to name '{}', "
+                    "but reverse name-to-token mapping does not exist",
+                    id,
+                    oldName);
+                return;
+            }
+        }
+
         m_nameToId[name] = id;
-        m_idToName[id] = name;
-        registerSpecialId(id);
+        m_idToName[id] = std::move(name);
+        m_specialIds.insert(id);
 
         switch (type) {
-        case SpecialTokenType::Bos:    m_bosId = id;    break;
-        case SpecialTokenType::Eos:    m_eosId = id;    break;
-        case SpecialTokenType::Eot:    m_eotId = id;    break;
-        case SpecialTokenType::Pad:    m_padId = id;    break;
-        case SpecialTokenType::Unk:    m_unkId = id;    break;
-        case SpecialTokenType::Mask:   m_maskId = id;   break;
-        case SpecialTokenType::Prefix: m_prefixId = id; break;
-        case SpecialTokenType::Suffix: m_suffixId = id; break;
-        case SpecialTokenType::Middle: m_middleId = id; break;
-        case SpecialTokenType::None:   break;
+        case SpecialTokenType::Bos:
+            setBosId(id);
+            break;
+        case SpecialTokenType::Eos:
+            setEosId(id);
+            break;
+        case SpecialTokenType::Eot:
+            setEotId(id);
+            break;
+        case SpecialTokenType::Pad:
+            setPadId(id);
+            break;
+        case SpecialTokenType::Unk:
+            setUnkId(id);
+            break;
+        case SpecialTokenType::Mask:
+            setMaskId(id);
+            break;
+        case SpecialTokenType::Prefix:
+            setPrefixId(id);
+            break;
+        case SpecialTokenType::Suffix:
+            setSuffixId(id);
+            break;
+        case SpecialTokenType::Middle:
+            setMiddleId(id);
+            break;
+        case SpecialTokenType::None:
+            break;
+        case SpecialTokenType::Cls:
+            setClsId(id);
+            break;
+        case SpecialTokenType::Sep:
+            setSepId(id);
+            break;
         }
     }
 
@@ -70,6 +148,7 @@ public:
     {
         if (id == kInvalidToken)
             return false;
+
         return m_specialIds.contains(id);
     }
 
@@ -78,6 +157,7 @@ public:
         auto it = m_nameToId.find(std::string(name));
         if (it != m_nameToId.end())
             return it->second;
+
         return std::nullopt;
     }
 
@@ -86,45 +166,74 @@ public:
         auto it = m_idToName.find(id);
         if (it != m_idToName.end())
             return it->second;
+
         return {};
     }
 
     void reset() noexcept
     {
-        m_bosId = kInvalidToken;
-        m_eosId = kInvalidToken;
-        m_eotId = kInvalidToken;
-        m_padId = kInvalidToken;
-        m_unkId = kInvalidToken;
-        m_maskId = kInvalidToken;
-        m_prefixId = kInvalidToken;
-        m_suffixId = kInvalidToken;
-        m_middleId = kInvalidToken;
+        m_bosId     = kInvalidToken;
+        m_eosId     = kInvalidToken;
+        m_eotId     = kInvalidToken;
+        m_padId     = kInvalidToken;
+        m_unkId     = kInvalidToken;
+        m_maskId    = kInvalidToken;
+        m_prefixId  = kInvalidToken;
+        m_suffixId  = kInvalidToken;
+        m_middleId  = kInvalidToken;
+        m_clsId     = kInvalidToken;
+        m_sepId     = kInvalidToken;
+
         m_nameToId.clear();
         m_idToName.clear();
         m_specialIds.clear();
     }
 
 private:
-    void registerSpecialId(TokenId id) noexcept
+    [[nodiscard]] bool isCanonicalId(TokenId id) const noexcept
     {
-        if (id != kInvalidToken)
-            m_specialIds.insert(id);
+        return m_bosId      == id ||
+               m_eosId      == id ||
+               m_eotId      == id ||
+               m_padId      == id ||
+               m_unkId      == id ||
+               m_maskId     == id ||
+               m_prefixId   == id ||
+               m_suffixId   == id ||
+               m_middleId   == id ||
+               m_clsId      == id ||
+               m_sepId      == id;
     }
 
-    TokenId m_bosId{kInvalidToken};
-    TokenId m_eosId{kInvalidToken};
-    TokenId m_eotId{kInvalidToken};
-    TokenId m_padId{kInvalidToken};
-    TokenId m_unkId{kInvalidToken};
-    TokenId m_maskId{kInvalidToken};
-    TokenId m_prefixId{kInvalidToken};
-    TokenId m_suffixId{kInvalidToken};
-    TokenId m_middleId{kInvalidToken};
+    void setCanonicalId(TokenId &target, TokenId id) noexcept
+    {
+        const TokenId oldId = target;
+        target = id;
 
-    std::unordered_map<std::string, TokenId> m_nameToId;
-    std::unordered_map<TokenId, std::string> m_idToName;
-    std::unordered_set<TokenId>              m_specialIds;
+        if (id != kInvalidToken)
+            m_specialIds.insert(id);
+
+        if (oldId != kInvalidToken &&
+            !isCanonicalId(oldId) &&
+            !m_idToName.contains(oldId)) {
+            m_specialIds.erase(oldId);
+        }
+    }
+
+    TokenId                             m_bosId{kInvalidToken};
+    TokenId                             m_eosId{kInvalidToken};
+    TokenId                             m_eotId{kInvalidToken};
+    TokenId                             m_padId{kInvalidToken};
+    TokenId                             m_unkId{kInvalidToken};
+    TokenId                             m_maskId{kInvalidToken};
+    TokenId                             m_prefixId{kInvalidToken};
+    TokenId                             m_suffixId{kInvalidToken};
+    TokenId                             m_middleId{kInvalidToken};
+    TokenId                             m_clsId{kInvalidToken};
+    TokenId                             m_sepId{kInvalidToken};
+    core::JobHash<std::string, TokenId> m_nameToId;
+    core::JobHash<TokenId, std::string> m_idToName;
+    std::unordered_set<TokenId>         m_specialIds;
 };
 
 } // namespace job::token

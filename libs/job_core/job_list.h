@@ -264,6 +264,12 @@ public:
         m_items.erase(m_items.begin() + static_cast<typename std::vector<T>::difference_type>(index));
     }
 
+    void resize(size_type sz)
+    {
+        m_items.resize(sz);
+    }
+
+
 private:
     std::vector<T> m_items;
 };

@@ -87,60 +87,17 @@ static_assert(RejectedGgufValue<std::vector<std::uint32_t>>);
 static_assert(RejectedGgufValue<std::vector<std::string>>);
 
 static_assert(JobGgufTypeTraits::typeFor<std::uint8_t>() == JobGgufType::UInt8);
-static_assert(
-    JobGgufTypeTraits::typeFor<std::int8_t>() ==
-    JobGgufType::Int8
-    );
-
-static_assert(
-    JobGgufTypeTraits::typeFor<std::uint16_t>() ==
-    JobGgufType::UInt16
-    );
-
-static_assert(
-    JobGgufTypeTraits::typeFor<std::int16_t>() ==
-    JobGgufType::Int16
-    );
-
-static_assert(
-    JobGgufTypeTraits::typeFor<std::uint32_t>() ==
-    JobGgufType::UInt32
-    );
-
-static_assert(
-    JobGgufTypeTraits::typeFor<std::int32_t>() ==
-    JobGgufType::Int32
-    );
-
-static_assert(
-    JobGgufTypeTraits::typeFor<float>() ==
-    JobGgufType::Float32
-    );
-
-static_assert(
-    JobGgufTypeTraits::typeFor<bool>() ==
-    JobGgufType::Bool
-    );
-
-static_assert(
-    JobGgufTypeTraits::typeFor<std::string>() ==
-    JobGgufType::String
-    );
-
-static_assert(
-    JobGgufTypeTraits::typeFor<std::uint64_t>() ==
-    JobGgufType::UInt64
-    );
-
-static_assert(
-    JobGgufTypeTraits::typeFor<std::int64_t>() ==
-    JobGgufType::Int64
-    );
-
-static_assert(
-    JobGgufTypeTraits::typeFor<double>() ==
-    JobGgufType::Float64
-    );
+static_assert(JobGgufTypeTraits::typeFor<std::int8_t>() == JobGgufType::Int8);
+static_assert(JobGgufTypeTraits::typeFor<std::uint16_t>() == JobGgufType::UInt16);
+static_assert(JobGgufTypeTraits::typeFor<std::int16_t>() == JobGgufType::Int16);
+static_assert(JobGgufTypeTraits::typeFor<std::uint32_t>() == JobGgufType::UInt32);
+static_assert(JobGgufTypeTraits::typeFor<std::int32_t>() == JobGgufType::Int32);
+static_assert(JobGgufTypeTraits::typeFor<float>() == JobGgufType::Float32);
+static_assert(JobGgufTypeTraits::typeFor<bool>() == JobGgufType::Bool);
+static_assert(JobGgufTypeTraits::typeFor<std::string>() == JobGgufType::String);
+static_assert(JobGgufTypeTraits::typeFor<std::uint64_t>() == JobGgufType::UInt64);
+static_assert(JobGgufTypeTraits::typeFor<std::int64_t>() == JobGgufType::Int64);
+static_assert(JobGgufTypeTraits::typeFor<double>() == JobGgufType::Float64);
 
 
 // Block one: usage / examples

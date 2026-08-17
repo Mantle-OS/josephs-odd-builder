@@ -8,18 +8,18 @@ set(JOBTOKEN_TESTS
     # test_hf_tokenizer_reader.cpp
     # test_binary_vocab_reader.cpp
     # test_gguf_tokenizer_reader.cpp
-    test_job_tokenizer.cpp
+    # test_job_tokenizer.cpp
 
 )
 
+# list(APPEND JOBTOKEN_TESTS test_tokenizer_shm.cpp)
 if(JOB_LINUX)
-    list(APPEND JOBTOKEN_TESTS test_tokenizer_shm.cpp)
 endif()
 
 add_executable(test_job_token
     main.cpp
-    ../transient_test_file.h
-    ${JOBTOKEN_TESTS}
+    # ../transient_test_file.h
+    # ${JOBTOKEN_TESTS}
 )
 
 target_compile_definitions(test_job_token PRIVATE

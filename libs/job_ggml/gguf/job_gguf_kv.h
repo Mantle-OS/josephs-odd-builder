@@ -14,6 +14,8 @@
 
 #include <gguf.h>
 
+#include <real_type.h>
+
 #include "job_ggml_enums.h"
 #include "job_gguf_type_traits.h"
 #include "jobggml_export.h"
@@ -89,10 +91,86 @@ public:
 
     [[nodiscard]] std::string_view typeName() const noexcept;
 
+
+    [[nodiscard]] int64_t readScalarInt(int64_t def = -1) const noexcept
+    {
+        if (isScalar())
+            return def;
+
+        switch (type()) {
+        case ggml::JobGgufType::UInt8:
+            return static_cast<int64_t>(value<uint8_t>());
+        case ggml::JobGgufType::Int8:
+            return static_cast<int64_t>(value<int8_t>());
+        case ggml::JobGgufType::UInt16:
+            return static_cast<int64_t>(value<uint16_t>());
+        case ggml::JobGgufType::Int16:
+            return static_cast<int64_t>(value<int16_t>());
+        case ggml::JobGgufType::UInt32:
+            return static_cast<int64_t>(value<uint32_t>());
+        case ggml::JobGgufType::Int32:
+            return static_cast<int64_t>(value<int32_t>());
+        case ggml::JobGgufType::UInt64:
+            return static_cast<int64_t>(value<uint64_t>());
+        case ggml::JobGgufType::Int64:
+            return value<int64_t>();
+        default:
+            return def;
+        }
+    }
+
     [[nodiscard]] bool isString() const noexcept;
+    [[nodiscard]] std::string readString(const std::string &def = {}) const
+    {
+        if (isScalar() && isString())
+            return value<std::string>();
+
+        return def;
+    }
+
     [[nodiscard]] bool isBoolean() const noexcept;
+    [[nodiscard]] bool readBool(bool def = false) const noexcept
+    {
+        if (!isScalar())
+            return def;
+
+        if (isBoolean())
+            return value<bool>();
+
+        if (isInteger())
+            return readScalarInt(def ? 1 : 0) != 0;
+
+        return def;
+    }
+
     [[nodiscard]] bool isInteger() const noexcept;
+    [[nodiscard]] std::int64_t readInt(std::int64_t def = -1) const noexcept
+    {
+        if (!isScalar() || !isInteger())
+            return def;
+
+        return readScalarInt(def);
+    }
+
+
     [[nodiscard]] bool isFloatingPoint() const noexcept;
+    [[nodiscard]] float readFloat(float def = core::safeInfinity()) const noexcept
+    {
+        if (!isScalar() || !isFloatingPoint())
+            return def;
+
+        switch (type()) {
+        case ggml::JobGgufType::Float32:
+            return value<float>();
+
+        case ggml::JobGgufType::Float64:
+            return static_cast<float>(value<double>());
+
+        default:
+            return def;
+        }
+    }
+
 
     [[nodiscard]] std::size_t elementCount() const noexcept;
     [[nodiscard]] bool isEmpty() const noexcept;
@@ -111,12 +189,8 @@ public:
     [[nodiscard]] std::remove_cvref_t<T> value() const
     {
         using Value = std::remove_cvref_t<T>;
-
-        if (!isScalar()) {
-            throw std::invalid_argument{
-                "JobGgufKv::value requires a scalar value"
-            };
-        }
+        if (!isScalar())
+            throw std::invalid_argument{ "JobGgufKv::value requires a scalar value"};
 
         return value<Value>(0);
     }
@@ -134,13 +208,7 @@ public:
             return m_data[index] != std::byte{0};
         } else {
             Value ret{};
-
-            std::memcpy(
-                &ret,
-                m_data.data() + index * sizeof(Value),
-                sizeof(Value)
-                );
-
+            std::memcpy(&ret, m_data.data() + index * sizeof(Value), sizeof(Value));
             return ret;
         }
     }
@@ -150,17 +218,11 @@ public:
     {
         using Value = std::remove_cvref_t<T>;
 
-        if (!isArray()) {
-            throw std::invalid_argument{
-                "JobGgufKv::values requires an array value"
-            };
-        }
+        if (!isArray())
+            throw std::invalid_argument{"JobGgufKv::values requires an array value"};
 
-        if (!isType<Value>()) {
-            throw std::invalid_argument{
-                "JobGgufKv requested value type does not match the stored GGUF type"
-            };
-        }
+        if (!isType<Value>())
+            throw std::invalid_argument{ "JobGgufKv requested value type does not match the stored GGUF type" };
 
         std::vector<Value> ret;
         ret.reserve(elementCount());

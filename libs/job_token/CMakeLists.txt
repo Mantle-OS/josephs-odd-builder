@@ -3,83 +3,86 @@ project(JosephsOddBuilder_Token
     LANGUAGES CXX
 )
 
-
 set(JOBTOKEN_HEADERS
-    job_tokenizer_types.h
-    job_tokenizer_error.h
-    job_tokenizer.h
-    byte_level.h
+    job_token_enums.h
+    job_token_types.h # see needs enum file / class's
+    # job_tokenizer_error.h # see needs enum file / class's DELETE
+    job_token.h  # the factory manager and other facade deals to make the library code not leak
 )
 
 set(JOBTOKEN_SOURCES
-    job_tokenizer.cpp
-    byte_level.cpp
+    job_token.cpp
 )
 
 set(JOBTOKEN_ALGO_HEADERS
     algo/itoken_algo.h
-    algo/bpe_algo.h
-    algo/unigram_algo.h
-    algo/wordpiece_algo.h
-    # algo/motif_algo.h
+    algo/bpe.h
+    algo/unigram.h
+    algo/wordpiece.h
+    algo/token_algo_factory.h
 )
 
 set(JOBTOKEN_ALGO_SOURCES
-    algo/bpe_algo.cpp
-    algo/unigram_algo.cpp
-    algo/wordpiece_algo.cpp
+    algo/bpe.cpp
+    algo/unigram.cpp
+    algo/wordpiece.cpp
+    algo/token_algo_factory.cpp
 )
 
 set(JOBTOKEN_CORE_HEADERS
-    core/byte_lattice.h
-    core/byte_lattice_kernel.h
     core/trie.h
     core/unicode_normalizer.h
     core/regex_splitter.h
     core/byte_fallback.h
+    # core/byte_level.h
 )
 
 set(JOBTOKEN_CORE_SOURCES
     core/regex_splitter.cpp
     core/unicode_normalizer.cpp
+    # core/byte_level.cpp
 )
 
-set(JOBTOKEN_FORMATS_HEADERS
-    formats/format_utils.h
-    formats/gguf_tokenizer_reader.h
-    formats/hf_tokenizer_reader.h
-    formats/binary_vocab_reader.h
+set(JOBTOKEN_TOKEN_HEADERS
+    token/itoken.h
+    token/gguf_token.h
+    token/hf_token.h
+    token/binary_token.h
+    token/token_factory.h
 )
 
-set(JOBTOKEN_FORMATS_SOURCES
-    formats/hf_tokenizer_reader.cpp
-    formats/binary_vocab_reader.cpp
-    formats/gguf_tokenizer_reader.cpp
+set(JOBTOKEN_TOKEN_SOURCES
+    token/hf_token.cpp
+    token/binary_token.cpp
+    token/gguf_token.cpp
+    token/token_factory.cpp
 )
 
+## the first transport layer could live in a differnt folder but there are enough folders at moment
+## install section and JOBTOKEN_COMPILE_THIS proves this
 if(JOB_LINUX)
-    list(APPEND JOBTOKEN_FORMATS_HEADERS formats/tokenizer_shm.h)
-    list(APPEND JOBTOKEN_FORMATS_SOURCES formats/tokenizer_shm.cpp)
+    list(APPEND JOBTOKEN_IPC_HEADERS ipc/token_shm.h)
+    list(APPEND JOBTOKEN_IPC_SOURCES ipc/token_shm.cpp)
 endif()
 
 
-
-set(JOBTOKEN_TEMPLATE_HEADERS
-    template/chat_template_engine.h
-    template/chat_message.h
-    template/jinja_utils.h
-    template/jinja_token.h
-    template/jinja_lexer.h
-    template/jinja_ast.h
-    template/jinja_parser.h
-    template/jinja_vm.h
+## optinal chat templete so we dont have to pass in |imuser| or whatever...
+set(JOBTOKEN_CHAT_HEADERS
+    chat/chat_engine.h
+    chat/chat_message.h
+    # chat/jinja_utils.h
+    chat/jinja_token.h
+    chat/jinja_lexer.h
+    chat/jinja_ast.h
+    chat/jinja_parser.h
+    chat/jinja_vm.h
 )
 
-set(JOBTOKEN_TEMPLATE_SOURCES
-    template/chat_template_engine.cpp
-    template/jinja_lexer.cpp
-    template/jinja_parser.cpp
-    template/jinja_vm.cpp
+set(JOBTOKEN_CHAT_SOURCES
+    chat/chat_engine.cpp
+    chat/jinja_lexer.cpp
+    chat/jinja_parser.cpp
+    chat/jinja_vm.cpp
 )
 
 set(JOBTOKEN_VOCAB_HEADERS
@@ -96,8 +99,9 @@ set(JOBTOKEN_COMPILE_THIS
     ${JOBTOKEN_HEADERS}            ${JOBTOKEN_SOURCES}
     ${JOBTOKEN_ALGO_HEADERS}       ${JOBTOKEN_ALGO_SOURCES}
     ${JOBTOKEN_CORE_HEADERS}       ${JOBTOKEN_CORE_SOURCES}
-    ${JOBTOKEN_FORMATS_HEADERS}    ${JOBTOKEN_FORMATS_SOURCES}
-    ${JOBTOKEN_TEMPLATE_HEADERS}   ${JOBTOKEN_TEMPLATE_SOURCES}
+    ${JOBTOKEN_TOKEN_HEADERS}      ${JOBTOKEN_TOKEN_SOURCES}
+    ${JOBTOKEN_IPC_HEADERS}        ${JOBTOKEN_IPC_SOURCES}
+    ${JOBTOKEN_CHAT_HEADERS}       ${JOBTOKEN_CHAT_SOURCES}
     ${JOBTOKEN_VOCAB_HEADERS}      ${JOBTOKEN_VOCAB_SOURCES}
 )
 
@@ -134,11 +138,14 @@ target_include_directories(JosephsOddBuilder_Token PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/core>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobtoken/core>
 
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/formats>
-    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobtoken/formats>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/token>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobtoken/token>
 
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/template>
-    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobtoken/template>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/ipc>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobtoken/ipc>
+
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/chat>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobtoken/chat>
 
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/vocab>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobtoken/vocab>
@@ -172,13 +179,14 @@ install(TARGETS JosephsOddBuilder_Token
     INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobtoken
 )
 
-install(FILES ${JOBTOKEN_HEADERS}               DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobtoken)
-install(FILES ${JOBTOKEN_EXPORT_HEADER}        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobtoken)
-install(FILES ${JOBTOKEN_ALGO_HEADERS}         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobtoken/algo)
-install(FILES ${JOBTOKEN_CORE_HEADERS}         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobtoken/core)
-install(FILES ${JOBTOKEN_FORMATS_HEADERS}      DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobtoken/formats)
-install(FILES ${JOBTOKEN_TEMPLATE_HEADERS}     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobtoken/template)
-install(FILES ${JOBTOKEN_VOCAB_HEADERS}        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobtoken/vocab)
+install(FILES ${JOBTOKEN_HEADERS}           DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobtoken)
+install(FILES ${JOBTOKEN_EXPORT_HEADER}     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobtoken)
+install(FILES ${JOBTOKEN_ALGO_HEADERS}      DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobtoken/algo)
+install(FILES ${JOBTOKEN_CORE_HEADERS}      DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobtoken/core)
+install(FILES ${JOBTOKEN_TOKEN_HEADERS}     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobtoken/token)
+install(FILES ${JOBTOKEN_IPC_HEADERS}       DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobtoken/ipc)
+install(FILES ${JOBTOKEN_CHAT_HEADERS}      DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobtoken/chat)
+install(FILES ${JOBTOKEN_VOCAB_HEADERS}     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobtoken/vocab)
 
 if(JOB_LINUX)
     set(PKGCONFIG_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/pkgconfig")

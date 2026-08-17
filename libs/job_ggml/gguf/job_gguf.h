@@ -84,6 +84,43 @@ public:
     [[nodiscard]] bool writeMetadata(std::span<std::byte> destination);
 
 
+    [[nodiscard]] std::int64_t readInt(const std::string &key, std::int64_t def = -1) const noexcept
+    {
+        auto kv = keyValue(key);
+        if (!kv)
+            return -1;
+
+        return kv->readInt(def);
+    }
+
+    [[nodiscard]] std::string readString(const std::string &key, const std::string &def = {}) const
+    {
+        auto kv = keyValue(key);
+        if (!kv)
+            return {};
+
+        return kv->readString(def);
+    }
+
+    [[nodiscard]] bool readBool(const std::string &key, bool def = false) const noexcept
+    {
+        auto kv = keyValue(key);
+        if (!kv)
+            return false;
+
+        return kv->readBool(def);
+    }
+
+    [[nodiscard]] float readFloat(const std::string &key, float def = core::safeInfinity()) const noexcept
+    {
+        auto kv = keyValue(key);
+        if (!kv)
+            return false;
+
+        return kv->readFloat(def);
+    }
+
+
     // Common context inspection
     [[nodiscard]] std::uint32_t version() const noexcept;
     [[nodiscard]] std::size_t alignment() const noexcept;

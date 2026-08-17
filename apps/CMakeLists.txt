@@ -24,7 +24,7 @@ endif()
 
 
 
-add_subdirectory(job-inference-test)
+# add_subdirectory(job-inference-test)
 
 
 

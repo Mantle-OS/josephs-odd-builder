@@ -1,65 +1,102 @@
 #pragma once
 
-#include <vector>
+#include <memory>
+#include <span>
 #include <string>
 #include <string_view>
 #include <unordered_map>
-#include <span>
-#include <memory>
+#include <vector>
 
-#include "job_tokenizer_types.h"
+#include "job_token_types.h"
 #include "token_record.h"
 #include "special_tokens.h"
 #include "jobtoken_export.h"
 
 namespace job::token {
 
-// Transparent string hash helper for C++20 heterogeneous string_view lookups
-struct StringHash {
-    using is_transparent = void;
-
-    [[nodiscard]] size_t operator()(std::string_view sv) const noexcept
-    {
-        return std::hash<std::string_view>{}(sv);
-    }
-};
-
-class JOBTOKEN_EXPORT Vocab {
+class JOBTOKEN_EXPORT Vocab
+{
 public:
     using Ptr  = std::shared_ptr<Vocab>;
+    using WPtr = std::weak_ptr<Vocab>;
     using UPtr = std::unique_ptr<Vocab>;
 
     Vocab() = default;
     ~Vocab() = default;
 
-    Vocab(const Vocab&) = default;
-    Vocab& operator=(const Vocab&) = default;
-    Vocab(Vocab&&) noexcept = default;
-    Vocab& operator=(Vocab&&) noexcept = default;
-
-    [[nodiscard]] static Ptr  createShared() { return std::make_shared<Vocab>(); }
-    [[nodiscard]] static UPtr createUniq()   { return std::make_unique<Vocab>(); }
-
-    // --- Insertion & Construction ---
-
-    TokenId addToken(std::string text, float score = 0.0f, TokenType type = TokenType::Normal)
+    [[nodiscard]] static Ptr createShared()
     {
+        return std::make_shared<Vocab>();
+    }
+
+    [[nodiscard]] static UPtr createUniq()
+    {
+        return std::make_unique<Vocab>();
+    }
+
+    Vocab(const Vocab &) = default;
+    Vocab &operator=(const Vocab &) = default;
+    Vocab(Vocab &&) noexcept = default;
+    Vocab &operator=(Vocab &&) noexcept = default;
+
+    TokenId addToken(std::string text, float score = 0.0f, StructuralType type = StructuralType::Normal)
+    {
+        if (text.empty())
+            return kInvalidToken;
+
         const TokenId id = static_cast<TokenId>(m_records.size());
-        m_records.push_back({text, id, score, type});
-        m_textToId[m_records.back().text] = id;
+
+        TokenRecord record;
+        record.setId(id);
+        record.setText(std::move(text));
+        record.setScore(score);
+        record.setType(type);
+
+        m_textToId[record.text()] = id;
+        m_records.push_back(std::move(record));
+
         return id;
     }
 
-    void setToken(TokenId id, std::string text, float score = 0.0f, TokenType type = TokenType::Normal)
+    void setToken(TokenId id, std::string text, float score = 0.0f, StructuralType type = StructuralType::Normal)
     {
-        if (id < 0)
+        if (id < 0 || text.empty())
             return;
-        const size_t idx = static_cast<size_t>(id);
-        if (idx >= m_records.size())
-            m_records.resize(idx + 1);
 
-        m_records[idx] = {text, id, score, type};
-        m_textToId[m_records[idx].text] = id;
+        const size_t index = static_cast<size_t>(id);
+
+        if (index >= m_records.size())
+            m_records.resize(index + 1);
+
+        TokenRecord &record = m_records[index];
+
+        if (record.isValid() && record.text() != text) {
+            auto oldIt = m_textToId.find(record.text());
+
+            if (oldIt != m_textToId.end() && oldIt->second == id)
+                m_textToId.erase(oldIt);
+        }
+
+        record.setId(id);
+        record.setText(std::move(text));
+        record.setScore(score);
+        record.setType(type);
+
+        m_textToId[record.text()] = id;
+    }
+
+    void setTokenScore(TokenId id, float score) noexcept
+    {
+        TokenRecord *token = record(id);
+        if (token)
+            token->setScore(score);
+    }
+
+    void setTokenType(TokenId id, StructuralType type) noexcept
+    {
+        TokenRecord *token = record(id);
+        if (token)
+            token->setType(type);
     }
 
     void reserve(size_t capacity)
@@ -75,51 +112,102 @@ public:
         m_special.reset();
     }
 
-    // --- Fast Queries ---
-
     [[nodiscard]] TokenId findId(std::string_view text) const noexcept
     {
         auto it = m_textToId.find(text);
+
         if (it != m_textToId.end())
             return it->second;
+
         return kInvalidToken;
     }
 
     [[nodiscard]] std::string_view tokenText(TokenId id) const noexcept
     {
-        if (id < 0 || static_cast<size_t>(id) >= m_records.size())
+        const TokenRecord *token = record(id);
+
+        if (!token)
             return {};
-        return m_records[static_cast<size_t>(id)].text;
+
+        return token->text();
     }
 
     [[nodiscard]] float tokenScore(TokenId id) const noexcept
     {
-        if (id < 0 || static_cast<size_t>(id) >= m_records.size())
+        const TokenRecord *token = record(id);
+
+        if (!token)
             return 0.0f;
-        return m_records[static_cast<size_t>(id)].score;
+
+        return token->score();
     }
 
-    [[nodiscard]] TokenType tokenType(TokenId id) const noexcept
+    [[nodiscard]] StructuralType tokenType(TokenId id) const noexcept
     {
-        if (id < 0 || static_cast<size_t>(id) >= m_records.size())
-            return TokenType::Unknown;
-        return m_records[static_cast<size_t>(id)].type;
+        const TokenRecord *token = record(id);
+
+        if (!token)
+            return StructuralType::Unknown;
+
+        return token->type();
     }
 
-    [[nodiscard]] const TokenRecord* record(TokenId id) const noexcept
+    [[nodiscard]] TokenRecord *record(TokenId id) noexcept
     {
-        if (id < 0 || static_cast<size_t>(id) >= m_records.size())
+        if (id < 0)
             return nullptr;
-        return &m_records[static_cast<size_t>(id)];
+
+        const size_t index = static_cast<size_t>(id);
+
+        if (index >= m_records.size())
+            return nullptr;
+
+        if (!m_records[index].isValid())
+            return nullptr;
+
+        return &m_records[index];
     }
 
-    // --- Vocabulary State & Special Tokens ---
+    [[nodiscard]] const TokenRecord *record(TokenId id) const noexcept
+    {
+        if (id < 0)
+            return nullptr;
 
-    [[nodiscard]] size_t size() const noexcept { return m_records.size(); }
-    [[nodiscard]] bool empty() const noexcept { return m_records.empty(); }
+        const size_t index = static_cast<size_t>(id);
 
-    [[nodiscard]] SpecialTokens& specialTokens() noexcept { return m_special; }
-    [[nodiscard]] const SpecialTokens& specialTokens() const noexcept { return m_special; }
+        if (index >= m_records.size())
+            return nullptr;
+
+        if (!m_records[index].isValid())
+            return nullptr;
+
+        return &m_records[index];
+    }
+
+    [[nodiscard]] size_t size() const noexcept
+    {
+        return m_records.size();
+    }
+
+    [[nodiscard]] bool empty() const noexcept
+    {
+        return m_records.empty();
+    }
+
+    [[nodiscard]] SpecialTokens &specialTokens() noexcept
+    {
+        return m_special;
+    }
+
+    [[nodiscard]] const SpecialTokens &specialTokens() const noexcept
+    {
+        return m_special;
+    }
+
+    [[nodiscard]] std::span<TokenRecord> records() noexcept
+    {
+        return m_records;
+    }
 
     [[nodiscard]] std::span<const TokenRecord> records() const noexcept
     {

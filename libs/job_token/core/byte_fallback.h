@@ -4,69 +4,47 @@
 #include <string>
 #include <string_view>
 
+#include "job_token_types.h"
 #include "jobtoken_export.h"
 
 namespace job::token {
 
-namespace detail {
-struct ByteStringTable {
-    char storage[256][7]{};
-
-    constexpr ByteStringTable() noexcept {
-        constexpr char hexDigits[] = "0123456789ABCDEF";
-        for (size_t i = 0; i < 256; ++i) {
-            storage[i][0] = '<';
-            storage[i][1] = '0';
-            storage[i][2] = 'x';
-            storage[i][3] = hexDigits[(i >> 4) & 0x0F];
-            storage[i][4] = hexDigits[i & 0x0F];
-            storage[i][5] = '>';
-            storage[i][6] = '\0';
-        }
-    }
-};
-inline constexpr ByteStringTable kByteHexStorage{};
-} // namespace detail
-
-class JOBTOKEN_EXPORT ByteFallback {
+class JOBTOKEN_EXPORT ByteFallback
+{
 public:
-    // Returns true if text matches "<0xNN>" with valid hexadecimal characters
     [[nodiscard]] static constexpr bool isByteToken(std::string_view text) noexcept
     {
-        if (text.size() != 6)
-            return false;
-
-        if (text[0] != '<' || text[1] != '0' || text[2] != 'x' || text[5] != '>')
-            return false;
-
-        return isHexChar(text[3]) && isHexChar(text[4]);
+        return text.size() == 6 &&
+               text[0] == '<' &&
+               text[1] == '0' &&
+               text[2] == 'x' &&
+               isHexChar(text[3]) &&
+               isHexChar(text[4]) &&
+               text[5] == '>';
     }
 
-    // Parses "<0xNN>" into raw byte value (0..255). Returns false on format mismatch.
-    [[nodiscard]] static constexpr bool parseByteToken(std::string_view text, uint8_t& outByte) noexcept
+    [[nodiscard]] static constexpr bool parseByteToken(std::string_view text, std::uint8_t &outByte) noexcept
     {
         if (!isByteToken(text))
             return false;
 
-        const int hi = hexToNibble(text[3]);
-        const int lo = hexToNibble(text[4]);
-        if (hi < 0 || lo < 0)
-            return false;
-
-        outByte = static_cast<uint8_t>((hi << 4) | lo);
+        const std::uint8_t high = static_cast<std::uint8_t>(hexToNibble(text[3]));
+        const std::uint8_t low = static_cast<std::uint8_t>(hexToNibble(text[4]));
+        outByte = static_cast<std::uint8_t>((high << 4) | low);
         return true;
     }
 
-    // Returns static zero-allocation string_view for any byte (e.g. 0x0A -> "<0x0A>")
-    [[nodiscard]] static constexpr std::string_view byteToStringView(uint8_t byteValue) noexcept
+    [[nodiscard]] static constexpr std::string_view byteToStringView(std::uint8_t byte) noexcept
     {
-        return std::string_view(detail::kByteHexStorage.storage[byteValue], 6);
+        return std::string_view{
+            kByteHexStorage.storage[byte],
+            6
+        };
     }
 
-    // Formats raw byte into "<0xNN>" std::string
-    [[nodiscard]] static std::string formatByte(uint8_t byteValue)
+    [[nodiscard]] static std::string formatByte(std::uint8_t byte)
     {
-        return std::string(byteToStringView(byteValue));
+        return std::string{byteToStringView(byte)};
     }
 
 private:

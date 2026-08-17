@@ -1,155 +1,174 @@
 #pragma once
 
+#include <algorithm>
+#include <cstddef>
 #include <cstdint>
+#include <limits>
+#include <memory>
 #include <string_view>
 #include <vector>
-#include <limits>
-#include <algorithm>
 
-#include "job_tokenizer_types.h"
+#include "job_token_types.h"
 #include "jobtoken_export.h"
 
 namespace job::token {
 
-class JOBTOKEN_EXPORT Trie {
+class JOBTOKEN_EXPORT Trie
+{
 public:
+    using Ptr  = std::shared_ptr<Trie>;
+    using WPtr = std::weak_ptr<Trie>;
+    using UPtr = std::unique_ptr<Trie>;
+
     struct Match
     {
         TokenId id{kInvalidToken};
-        size_t  length{0};
+        std::size_t length{0};
     };
 
     Trie()
     {
-        // Reserve root node at index 0
         m_nodes.emplace_back();
     }
 
     ~Trie() = default;
 
-    Trie(const Trie&) = default;
-    Trie& operator=(const Trie&) = default;
-    Trie(Trie&&) noexcept = default;
-    Trie& operator=(Trie&&) noexcept = default;
+    Trie(const Trie &) = default;
+    Trie &operator=(const Trie &) = default;
+    Trie(Trie &&) noexcept = default;
+    Trie &operator=(Trie &&) noexcept = default;
 
-    // --- Mutation ---
+    [[nodiscard]] static Ptr createShared()
+    {
+        return std::make_shared<Trie>();
+    }
+
+    [[nodiscard]] static UPtr createUniq()
+    {
+        return std::make_unique<Trie>();
+    }
+
     void insert(std::string_view key, TokenId id)
     {
         if (key.empty() || id == kInvalidToken)
             return;
 
-        uint32_t currIndex = 0;
+        std::uint32_t current = 0;
         for (const char c : key) {
-            const uint8_t byteVal = static_cast<uint8_t>(c);
-            uint32_t nextIndex = findChild(currIndex, byteVal);
+            const std::uint8_t byte = static_cast<std::uint8_t>(c);
+            std::uint32_t next = findChild(current, byte);
 
-            if (nextIndex == kInvalidNode) {
-                nextIndex = static_cast<uint32_t>(m_nodes.size());
+            if (next == kInvalidNode) {
+                next = static_cast<std::uint32_t>(m_nodes.size());
                 m_nodes.emplace_back();
 
-                // Keep children sorted by byte for O(log K) binary search
-                auto& children = m_nodes[currIndex].children;
-                auto it = std::lower_bound(children.begin(), children.end(), byteVal,[](const Child& edge, uint8_t val) {
-                    return edge.byteVal < val;
+                auto &children = m_nodes[current].children;
+                auto it = std::lower_bound(children.begin(), children.end(), byte, [](const Child &edge, std::uint8_t value) {
+                    return edge.byte < value;
                 });
-                children.insert(it, Child{byteVal, nextIndex});
+
+                children.insert(it, Child{byte, next});
             }
 
-            currIndex = nextIndex;
+            current = next;
         }
 
-        m_nodes[currIndex].tokenId = id;
+        m_nodes[current].tokenId = id;
     }
 
     void clear()
     {
         m_nodes.clear();
-        m_nodes.emplace_back(); // Re-create root node
+        m_nodes.emplace_back();
     }
 
-    // --- Search Queries (Zero-Allocation) ---
-
-    // Exact key lookup
     [[nodiscard]] TokenId find(std::string_view key) const noexcept
     {
-        uint32_t currIndex = 0;
+        std::uint32_t current = 0;
+
         for (const char c : key) {
-            currIndex = findChild(currIndex, static_cast<uint8_t>(c));
-            if (currIndex == kInvalidNode)
+            current = findChild(current, static_cast<std::uint8_t>(c));
+
+            if (current == kInvalidNode)
                 return kInvalidToken;
         }
-        return m_nodes[currIndex].tokenId;
+
+        return m_nodes[current].tokenId;
     }
 
-    // Finds the longest matching prefix starting at the beginning of text
     [[nodiscard]] Match longestPrefix(std::string_view text) const noexcept
     {
-        Match bestMatch{};
-        uint32_t currIndex = 0;
+        Match best{};
+        std::uint32_t current = 0;
 
-        for (size_t i = 0; i < text.size(); ++i) {
-            currIndex = findChild(currIndex, static_cast<uint8_t>(text[i]));
-            if (currIndex == kInvalidNode)
+        for (std::size_t i = 0; i < text.size(); ++i) {
+            current = findChild(current, static_cast<std::uint8_t>(text[i]));
+
+            if (current == kInvalidNode)
                 break;
 
-            if (m_nodes[currIndex].tokenId != kInvalidToken) {
-                bestMatch.id = m_nodes[currIndex].tokenId;
-                bestMatch.length = i + 1;
-            }
+            if (m_nodes[current].tokenId != kInvalidToken)
+                best = Match{m_nodes[current].tokenId, i + 1};
         }
 
-        return bestMatch;
+        return best;
     }
 
-    // Finds all matching prefixes starting at the beginning of text (used in Viterbi lattices)
-    void findAllPrefixes(std::string_view text, std::vector<Match>& outMatches) const
+    // Appends all matching prefixes to the caller-owned buffer.
+    void findAllPrefixes(std::string_view text, std::vector<Match> &outMatches) const
     {
-        uint32_t currIndex = 0;
+        std::uint32_t current = 0;
 
-        for (size_t i = 0; i < text.size(); ++i) {
-            currIndex = findChild(currIndex, static_cast<uint8_t>(text[i]));
-            if (currIndex == kInvalidNode)
+        for (std::size_t i = 0; i < text.size(); ++i) {
+            current = findChild(current, static_cast<std::uint8_t>(text[i]));
+
+            if (current == kInvalidNode)
                 break;
 
-            if (m_nodes[currIndex].tokenId != kInvalidToken)
-                outMatches.push_back(Match{m_nodes[currIndex].tokenId, i + 1});
+            if (m_nodes[current].tokenId != kInvalidToken)
+                outMatches.push_back(Match{m_nodes[current].tokenId, i + 1});
         }
     }
 
-    [[nodiscard]] size_t nodeCount() const noexcept { return m_nodes.size(); }
+    [[nodiscard]] std::size_t nodeCount() const noexcept { return m_nodes.size(); }
     [[nodiscard]] bool empty() const noexcept { return m_nodes.size() <= 1; }
 
 private:
-    static constexpr uint32_t kInvalidNode = std::numeric_limits<uint32_t>::max();
+    static constexpr std::uint32_t kInvalidNode =
+        std::numeric_limits<std::uint32_t>::max();
 
     struct Child
     {
-        uint8_t  byteVal{0};
-        uint32_t nodeIndex{kInvalidNode};
+        std::uint8_t byte{0};
+        std::uint32_t nodeIndex{kInvalidNode};
     };
 
     struct Node
     {
-        TokenId            tokenId{kInvalidToken};
+        TokenId tokenId{kInvalidToken};
         std::vector<Child> children;
     };
 
-    [[nodiscard]] uint32_t findChild(uint32_t nodeIndex, uint8_t byteVal) const noexcept
+    [[nodiscard]] std::uint32_t findChild(
+        std::uint32_t nodeIndex,
+        std::uint8_t byte) const noexcept
     {
         if (nodeIndex >= m_nodes.size())
             return kInvalidNode;
 
-        const auto& children = m_nodes[nodeIndex].children;
-        auto it = std::lower_bound(children.begin(), children.end(), byteVal, [](const Child& edge, uint8_t val) {
-            return edge.byteVal < val;
+        const auto &children = m_nodes[nodeIndex].children;
+
+        auto it = std::lower_bound( children.begin(), children.end(), byte, [](const Child &edge, std::uint8_t value) {
+            return edge.byte < value;
         });
 
-        if (it != children.end() && it->byteVal == byteVal)
+        if (it != children.end() && it->byte == byte)
             return it->nodeIndex;
 
         return kInvalidNode;
     }
 
+private:
     std::vector<Node> m_nodes;
 };
 

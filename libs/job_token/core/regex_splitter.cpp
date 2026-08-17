@@ -1,27 +1,18 @@
 #include "core/regex_splitter.h"
-
-#include <stdexcept>
 #include <utility>
 
 namespace job::token {
 
-RegexSplitter::RegexSplitter() :
-    m_patternType{SplitPattern::None},
-      m_valid{true}
-{
-}
+RegexSplitter::RegexSplitter() = default;
 
-RegexSplitter::RegexSplitter(SplitPattern pattern) :
-    m_patternType{pattern}
+RegexSplitter::RegexSplitter(SplitPattern pattern)
 {
     setPattern(pattern);
 }
 
-RegexSplitter::RegexSplitter(std::string customRegexPattern) :
-    m_patternType{SplitPattern::Custom},
-    m_patternStr{std::move(customRegexPattern)}
+RegexSplitter::RegexSplitter(std::string customRegexPattern)
 {
-    compileRegex();
+    setCustomPattern(std::move(customRegexPattern));
 }
 
 void RegexSplitter::setPattern(SplitPattern pattern)
@@ -29,18 +20,17 @@ void RegexSplitter::setPattern(SplitPattern pattern)
     m_patternType = pattern;
 
     switch (pattern) {
-    case SplitPattern::GPT2:
-        m_patternStr = std::string(kPatternGPT2);
-        break;
-    case SplitPattern::GPT4:
-        m_patternStr = std::string(kPatternGPT4);
-        break;
-    case SplitPattern::LLaMA3:
-        m_patternStr = std::string(kPatternLLaMA3);
-        break;
-    case SplitPattern::Qwen2:
-        m_patternStr = std::string(kPatternQwen2);
-        break;
+    case SplitPattern::GPT2:        m_patternStr = kPatternGPT2;        break;
+    case SplitPattern::R50K:        m_patternStr = kPatternR50K;        break;
+    case SplitPattern::P50K:        m_patternStr = kPatternP50K;        break;
+    case SplitPattern::P50KEdit:    m_patternStr = kPatternP50KEdit;    break;
+    case SplitPattern::CL100K:      m_patternStr = kPatternCL100K;      break;
+    case SplitPattern::O200K:       m_patternStr = kPatternO200K;       break;
+    case SplitPattern::O200KHarmony:m_patternStr = kPatternO200KHarmony;break;
+    case SplitPattern::GPT4:        m_patternStr = kPatternGPT4;        break;
+    case SplitPattern::LLaMA3:      m_patternStr = kPatternLLaMA3;      break;
+    case SplitPattern::Qwen2:       m_patternStr = kPatternQwen2;       break;
+
     case SplitPattern::None:
     case SplitPattern::Custom:
     default:
@@ -54,59 +44,73 @@ void RegexSplitter::setPattern(SplitPattern pattern)
 void RegexSplitter::setCustomPattern(std::string customRegexPattern)
 {
     m_patternType = SplitPattern::Custom;
-    m_patternStr  = std::move(customRegexPattern);
+    m_patternStr = std::move(customRegexPattern);
     compileRegex();
 }
 
 void RegexSplitter::compileRegex()
 {
-    if (m_patternStr.empty() || m_patternType == SplitPattern::None) {
-        m_valid = true;
+    m_valid = false;
+
+    if (m_patternType == SplitPattern::None || m_patternStr.empty())
         return;
-    }
 
     try {
-        m_regex = std::regex(m_patternStr, std::regex::ECMAScript | std::regex::optimize);
+        m_regex = std::regex{
+                             m_patternStr,
+                             std::regex::ECMAScript | std::regex::optimize};
+
         m_valid = true;
-    } catch (...) {
+    } catch (const std::regex_error &) {
         m_valid = false;
     }
 }
 
-void RegexSplitter::split(std::string_view text, std::vector<std::string_view>& outChunks) const
+void RegexSplitter::split(
+    std::string_view text,
+    std::vector<std::string_view> &outChunks) const
 {
     if (text.empty())
         return;
 
-    // Fast path: if no pattern configured or compilation failed, treat full text as one chunk
+    // Unsupported/invalid patterns degrade to one unmodified chunk.
     if (!m_valid || m_patternType == SplitPattern::None || m_patternStr.empty()) {
         outChunks.push_back(text);
         return;
     }
 
-    const char* start = text.data();
-    const char* const end = text.data() + text.size();
+    const char *current = text.data();
+    const char *const end = text.data() + text.size();
+
     std::cmatch match;
 
-    while (start < end && std::regex_search(start, end, match, m_regex)) {
-        // Zero-length match guard to prevent infinite loops
+    while (current < end && std::regex_search(current, end, match, m_regex)) {
+        // Guard against zero-length regex matches.
         if (match.length() == 0) {
-            outChunks.emplace_back(start, 1);
-            start += 1;
+            outChunks.emplace_back(current, 1);
+            ++current;
             continue;
         }
 
-        // If there is leading non-matching text between matches, preserve it
-        if (match[0].first > start)
-            outChunks.emplace_back(start, static_cast<size_t>(match[0].first - start));
+        // Preserve text not consumed by the regex.
+        if (match[0].first > current) {
+            outChunks.emplace_back(
+                current,
+                static_cast<std::size_t>(match[0].first - current));
+        }
 
-        outChunks.emplace_back(match[0].first, static_cast<size_t>(match.length()));
-        start = match[0].second;
+        outChunks.emplace_back(
+            match[0].first,
+            static_cast<std::size_t>(match.length()));
+
+        current = match[0].second;
     }
 
-    // Trailing non-matched chunk
-    if (start < end)
-        outChunks.emplace_back(start, static_cast<size_t>(end - start));
+    if (current < end) {
+        outChunks.emplace_back(
+            current,
+            static_cast<std::size_t>(end - current));
+    }
 }
 
 } // namespace job::token

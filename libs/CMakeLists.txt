@@ -24,12 +24,6 @@ add_subdirectory(job_model)
 add_subdirectory(job_sound)
 
 
-# add_subdirectory(job_video)
-# add_subdirectory(job_media)
-
-# add_subdirectory(job_gui)
-# add_subdirectory(job_wm)
-
 
 
 
