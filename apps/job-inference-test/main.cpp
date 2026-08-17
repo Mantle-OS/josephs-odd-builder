@@ -62,6 +62,25 @@ int main(int argc, char *argv[])
         return 1;
     }
 
+
+    std::cout
+        << "[JobInferenceTest] Tokenizer loaded. Vocab size: "
+        << tokenizer.vocabSize()
+        << '\n';
+
+    const std::string tokenizerRoundTrip =
+        "The quick brown fox jumps over the lazy dog.";
+
+    const auto tokenizerRoundTripTokens =
+        tokenizer.encode(tokenizerRoundTrip, false, false);
+
+    std::cout
+        << "[JobInferenceTest] Tokenizer round trip: "
+        << tokenizer.decode(tokenizerRoundTripTokens, false)
+        << '\n';
+
+
+
     std::cout
         << "[JobInferenceTest] Tokenizer loaded. Vocab size: "
         << tokenizer.vocabSize()
@@ -243,14 +262,48 @@ int main(int argc, char *argv[])
     //
     // JobModel returns prompt + generated continuation.
     //
-    const auto responseBegin =
-        generatedTokens.begin() +
-        static_cast<std::ptrdiff_t>(promptTokens.size());
+    const auto responseBegin = generatedTokens.begin() + static_cast<std::ptrdiff_t>(promptTokens.size());
 
     const std::vector<int32_t> responseTokens{
         responseBegin,
         generatedTokens.end()
     };
+
+
+    //
+    // ------------------------------------------------------------------------
+    // Inspect the generated token stream before decoding.
+    // ------------------------------------------------------------------------
+    //
+
+    std::cout
+        << "\n[JobInferenceTest] Generated response token IDs:\n";
+
+    for (const int32_t token : responseTokens)
+        std::cout << token << ' ';
+
+    std::cout << "\n";
+
+
+    const std::string input = "hello world";
+
+    const auto encoded =
+        tokenizer.encode(input, false, false);
+
+    std::cout << "\nINPUT: [" << input << "]\n";
+
+    for (const int32_t id : encoded) {
+        const auto token = tokenizer.idToToken(id);
+
+        std::cout
+            << id
+            << " -> ["
+            << (token ? *token : "<missing>")
+            << "]\n";
+    }
+
+
+
 
     //
     // ------------------------------------------------------------------------
@@ -258,10 +311,7 @@ int main(int argc, char *argv[])
     // ------------------------------------------------------------------------
     //
 
-    const std::string responseText =
-        tokenizer.decode(
-            responseTokens,
-            true);
+    const std::string responseText = tokenizer.decode(responseTokens, true);
 
     std::cout
         << "\n"

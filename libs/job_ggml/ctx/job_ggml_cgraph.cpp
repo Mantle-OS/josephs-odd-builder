@@ -53,10 +53,7 @@ std::vector<JobGgmlTensor::UPtr> JobGgmlCGraph::nodes() const
     if (count <= 0)
         return ret;
 
-    ret.reserve(
-        static_cast<std::size_t>(count)
-        );
-
+    ret.reserve(static_cast<std::size_t>(count));
     ggml_tensor **nativeNodes = ggml_graph_nodes(m_graph);
 
     if (!nativeNodes)

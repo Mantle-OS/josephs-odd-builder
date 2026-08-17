@@ -112,14 +112,34 @@ JobGgmlStatus JobGgmlTensorAllocator::allocate(struct ggml_tensor *tensor) noexc
     return fromGgmlStatus(status);
 }
 
-std::size_t JobGgmlTensorAllocator::requiredBufferSize(const JobGgmlBackendBufferType &bufferType, const JobGgmlTensor &tensor) noexcept
+// std::size_t JobGgmlTensorAllocator::requiredBufferSize(const JobGgmlBackendBufferType &bufferType, const JobGgmlTensor &tensor) noexcept
+// {
+//     if (!bufferType.isValid() || !tensor.isValid())
+//         return 0;
+
+//     return std::max(
+//         bufferType.allocationSize(tensor),
+//         tensor.paddedByteCount());
+// }
+
+std::size_t JobGgmlTensorAllocator::requiredBufferSize(
+    const JobGgmlBackendBufferType &bufferType,
+    const JobGgmlTensor &tensor) noexcept
 {
     if (!bufferType.isValid() || !tensor.isValid())
         return 0;
 
-    return std::max(
-        bufferType.allocationSize(tensor),
-        tensor.paddedByteCount());
+    const std::size_t allocationSize = bufferType.allocationSize(tensor);
+    const std::size_t paddedSize = tensor.paddedByteCount();
+    const std::size_t alignment = bufferType.alignment();
+
+    const std::size_t requiredSize =
+        std::max(allocationSize, paddedSize);
+
+    if (alignment == 0)
+        return requiredSize;
+
+    return ((requiredSize + alignment - 1) / alignment) * alignment;
 }
 
 void JobGgmlTensorAllocator::setTensorAllocator(const struct ggml_tallocr &other) noexcept

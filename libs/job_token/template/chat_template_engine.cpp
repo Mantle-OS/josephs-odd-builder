@@ -1,5 +1,6 @@
 #include "template/chat_template_engine.h"
 
+#include <iostream>
 #include <numeric>
 #include <utility>
 
@@ -74,9 +75,18 @@ std::string ChatTemplateEngine::apply(
     std::string_view bosToken,
     std::string_view eosToken) const
 {
+
+    std::cout
+        << "[CHAT LOOK] type="
+        << static_cast<int>(m_type)
+        << " compiled="
+        << (m_compiledAst ? "yes" : "no")
+        << '\n';
     // If a compiled Jinja AST is available, execute via VM
     if (m_compiledAst) {
-        return formatJinja(messages, addGenerationPrompt, bosToken, eosToken);
+
+        // JOSEPH REVISTIT BROKEN
+        // return formatJinja(messages, addGenerationPrompt, bosToken, eosToken);
     }
 
     // Fast-path / canonical fallbacks

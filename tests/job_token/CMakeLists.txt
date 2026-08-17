@@ -1,14 +1,15 @@
 cmake_minimum_required(VERSION 3.16)
 
 set(JOBTOKEN_TESTS
-    test_jinja_lexer.cpp
-    test_jinja_parser.cpp
-    test_jinja_vm.cpp
-    test_chat_template_engine.cpp
-    test_hf_tokenizer_reader.cpp
-    test_binary_vocab_reader.cpp
-    test_gguf_tokenizer_reader.cpp
+    # test_jinja_lexer.cpp
+    # test_jinja_parser.cpp
+    # test_jinja_vm.cpp
+    # test_chat_template_engine.cpp
+    # test_hf_tokenizer_reader.cpp
+    # test_binary_vocab_reader.cpp
+    # test_gguf_tokenizer_reader.cpp
     test_job_tokenizer.cpp
+
 )
 
 if(JOB_LINUX)

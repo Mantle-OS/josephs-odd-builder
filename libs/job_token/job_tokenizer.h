@@ -105,12 +105,8 @@ public:
     // ========================================================================
     // Loading APIs
     // ========================================================================
-    [[nodiscard]] bool loadHf(
-        const std::filesystem::path& tokenizerJsonPath,
-        const std::filesystem::path& tokenizerConfigJsonPath = {});
-    [[nodiscard]] bool loadHfFromMemory(
-        std::string_view tokenizerJson,
-        std::string_view tokenizerConfigJson = {});
+    [[nodiscard]] bool loadHf(const std::filesystem::path& tokenizerJsonPath, const std::filesystem::path& tokenizerConfigJsonPath = {});
+    [[nodiscard]] bool loadHfFromMemory(std::string_view tokenizerJson, std::string_view tokenizerConfigJson = {});
     [[nodiscard]] bool loadHf(const HfTokenizerReader& reader);
 
     [[nodiscard]] bool loadGguf(const std::filesystem::path& ggufPath);
@@ -128,18 +124,10 @@ public:
     // ========================================================================
     // Encode & Decode
     // ========================================================================
-    [[nodiscard]] std::vector<int32_t> encode(
-        std::string_view text,
-        bool addBos = false,
-        bool addEos = false) const;
+    [[nodiscard]] std::vector<int32_t> encode(std::string_view text, bool addBos = false, bool addEos = false) const;
 
-    [[nodiscard]] std::string decode(
-        std::span<const int32_t> tokens,
-        bool stripSpecialTokens = false) const;
-
-    [[nodiscard]] std::string decode(
-        int32_t tokenId,
-        bool stripSpecialTokens = false) const;
+    [[nodiscard]] std::string decode(std::span<const int32_t> tokens, bool stripSpecialTokens = false) const;
+    [[nodiscard]] std::string decode(int32_t tokenId, bool stripSpecialTokens = false) const;
 
     // ========================================================================
     // Chat Template Formatting & Tokenization

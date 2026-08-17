@@ -3,8 +3,11 @@
 #include <algorithm>
 #include <charconv>
 #include <cstdio>
+#include <iostream>
 #include <queue>
 #include <job_logger.h>
+
+#include "byte_level.h"
 
 namespace job::token {
 
@@ -427,10 +430,7 @@ std::vector<int32_t> JobTokenizer::encodeChat(
     return encode(prompt, false, false);
 }
 
-std::vector<int32_t> JobTokenizer::encode(
-    std::string_view text,
-    bool addBos,
-    bool addEos) const
+std::vector<int32_t> JobTokenizer::encode(std::string_view text, bool addBos, bool addEos) const
 {
     std::vector<int32_t> result;
     if (!isLoaded()) {
@@ -467,21 +467,49 @@ std::vector<int32_t> JobTokenizer::encode(
     return result;
 }
 
+
 void JobTokenizer::tokenizeSegment(std::string_view segment, std::vector<int32_t>& out) const
 {
-    if (segment.empty()) return;
+    if (segment.empty())
+        return;
 
     size_t start = 0;
-    while (start < segment.size()) {
-        detail::CharClass cls = detail::classifyChar(static_cast<unsigned char>(segment[start]));
-        size_t end = start + 1;
 
-        while (end < segment.size() &&
-               detail::classifyChar(static_cast<unsigned char>(segment[end])) == cls) {
+    while (start < segment.size()) {
+        size_t end = start;
+
+        if (segment[start] == ' ' &&
+            start + 1 < segment.size() &&
+            detail::classifyChar(static_cast<unsigned char>(segment[start + 1])) == detail::CharClass::Letter) {
+
             ++end;
+
+            while (end < segment.size() &&
+                   detail::classifyChar(static_cast<unsigned char>(segment[end])) == detail::CharClass::Letter) {
+                ++end;
+            }
+        } else {
+            const detail::CharClass cls =
+                detail::classifyChar(static_cast<unsigned char>(segment[start]));
+
+            end = start + 1;
+
+            while (end < segment.size() &&
+                   detail::classifyChar(static_cast<unsigned char>(segment[end])) == cls) {
+                ++end;
+            }
         }
 
-        bpeTokenizeChunk(segment.substr(start, end - start), out);
+        const std::string_view chunk =
+            segment.substr(start, end - start);
+
+        std::cout
+            << "[TOKEN LOOK] chunk=["
+            << chunk
+            << "]\n";
+
+        bpeTokenizeChunk(chunk, out);
+
         start = end;
     }
 }
@@ -504,113 +532,166 @@ void JobTokenizer::emitToken(std::string_view piece, std::vector<int32_t>& out) 
     }
 }
 
+
+
 void JobTokenizer::bpeTokenizeChunk(std::string_view chunk, std::vector<int32_t>& out) const
 {
-    if (chunk.empty()) return;
+    if (chunk.empty())
+        return;
 
-    // Fast-path: whole chunk matches a vocab token
-    if (auto id = tokenToId(chunk)) {
+    const std::string byteEncoded = ByteLevel::encode(chunk);
+    const std::string_view source = byteEncoded;
+
+    // Fast-path: whole ByteLevel chunk matches a vocab token
+    if (auto id = tokenToId(source)) {
         out.push_back(*id);
         return;
     }
 
-    // Split chunk into UTF-8 codepoints / bytes
+    // Split ByteLevel chunk into UTF-8 codepoints.
     std::vector<detail::BpeSymbol> symbols;
-    symbols.reserve(chunk.size());
+    symbols.reserve(source.size());
 
-    for (size_t i = 0; i < chunk.size(); ) {
-        unsigned char c = static_cast<unsigned char>(chunk[i]);
+    for (size_t i = 0; i < source.size();) {
+        const unsigned char c = static_cast<unsigned char>(source[i]);
+
         size_t charLen = 1;
-        if ((c & 0x80) == 0x00) charLen = 1;
-        else if ((c & 0xE0) == 0xC0) charLen = 2;
-        else if ((c & 0xF0) == 0xE0) charLen = 3;
-        else if ((c & 0xF8) == 0xF0) charLen = 4;
 
-        if (i + charLen > chunk.size()) charLen = chunk.size() - i;
+        if ((c & 0x80) == 0x00)
+            charLen = 1;
+        else if ((c & 0xE0) == 0xC0)
+            charLen = 2;
+        else if ((c & 0xF0) == 0xE0)
+            charLen = 3;
+        else if ((c & 0xF8) == 0xF0)
+            charLen = 4;
 
-        int32_t idx = static_cast<int32_t>(symbols.size());
-        int32_t prev_idx = idx - 1;
+        if (i + charLen > source.size())
+            charLen = source.size() - i;
+
+        const int32_t idx = static_cast<int32_t>(symbols.size());
+        const int32_t prevIdx = idx - 1;
+
         symbols.push_back(detail::BpeSymbol{
             static_cast<uint32_t>(i),
             static_cast<uint32_t>(charLen),
-            prev_idx,
+            prevIdx,
             -1
         });
-        if (prev_idx >= 0) {
-            symbols[prev_idx].next = idx;
-        }
+
+        if (prevIdx >= 0)
+            symbols[prevIdx].next = idx;
+
         i += charLen;
     }
 
-    if (symbols.empty()) return;
+    if (symbols.empty())
+        return;
+
     if (symbols.size() == 1) {
-        emitToken(chunk.substr(symbols[0].start, symbols[0].len), out);
+        emitToken(
+            source.substr(
+                symbols[0].start,
+                symbols[0].len),
+            out);
+
         return;
     }
 
-    // Min-heap tracking of lowest rank adjacent pairs
-    std::priority_queue<detail::BpeMergePair, std::vector<detail::BpeMergePair>, std::greater<detail::BpeMergePair>> pq;
+    std::priority_queue<
+        detail::BpeMergePair,
+        std::vector<detail::BpeMergePair>,
+        std::greater<detail::BpeMergePair>> pq;
 
-    auto checkAndPushPair = [&](int32_t left_idx) {
-        if (left_idx < 0 || left_idx >= static_cast<int32_t>(symbols.size())) return;
-        int32_t right_idx = symbols[left_idx].next;
-        if (right_idx < 0 || right_idx >= static_cast<int32_t>(symbols.size())) return;
+    auto checkAndPushPair = [&](int32_t leftIdx) {
+        if (leftIdx < 0 ||
+            leftIdx >= static_cast<int32_t>(symbols.size()))
+            return;
 
-        std::string_view l_sv = chunk.substr(symbols[left_idx].start, symbols[left_idx].len);
-        std::string_view r_sv = chunk.substr(symbols[right_idx].start, symbols[right_idx].len);
+        const int32_t rightIdx =
+            symbols[leftIdx].next;
 
-        auto it = m_mergeRanks.find(std::pair{l_sv, r_sv});
+        if (rightIdx < 0 ||
+            rightIdx >= static_cast<int32_t>(symbols.size()))
+            return;
+
+        const std::string_view left =
+            source.substr(
+                symbols[leftIdx].start,
+                symbols[leftIdx].len);
+
+        const std::string_view right =
+            source.substr(
+                symbols[rightIdx].start,
+                symbols[rightIdx].len);
+
+        const auto it =
+            m_mergeRanks.find(
+                std::pair{left, right});
+
         if (it != m_mergeRanks.end()) {
             pq.push(detail::BpeMergePair{
                 it->second,
-                left_idx,
-                symbols[left_idx].len,
-                symbols[right_idx].len
+                leftIdx,
+                symbols[leftIdx].len,
+                symbols[rightIdx].len
             });
         }
     };
 
-    for (size_t i = 0; i < symbols.size() - 1; ++i) {
+    for (size_t i = 0; i < symbols.size() - 1; ++i)
         checkAndPushPair(static_cast<int32_t>(i));
-    }
 
     while (!pq.empty()) {
-        auto top = pq.top();
+        const auto top = pq.top();
         pq.pop();
 
-        int32_t left_idx = top.left_idx;
-        if (left_idx < 0 || left_idx >= static_cast<int32_t>(symbols.size())) continue;
-        auto& left = symbols[left_idx];
+        const int32_t leftIdx = top.left_idx;
 
-        if (left.len != top.left_len) continue;
-        int32_t right_idx = left.next;
-        if (right_idx < 0 || right_idx >= static_cast<int32_t>(symbols.size())) continue;
-        auto& right = symbols[right_idx];
-        if (right.len != top.right_len) continue;
+        if (leftIdx < 0 ||
+            leftIdx >= static_cast<int32_t>(symbols.size()))
+            continue;
 
-        // Perform in-place merge
+        auto& left = symbols[leftIdx];
+
+        if (left.len != top.left_len)
+            continue;
+
+        const int32_t rightIdx = left.next;
+
+        if (rightIdx < 0 ||
+            rightIdx >= static_cast<int32_t>(symbols.size()))
+            continue;
+
+        auto& right = symbols[rightIdx];
+
+        if (right.len != top.right_len)
+            continue;
+
         left.len += right.len;
         left.next = right.next;
-        if (right.next >= 0) {
-            symbols[right.next].prev = left_idx;
-        }
 
-        if (left.prev >= 0) {
+        if (right.next >= 0)
+            symbols[right.next].prev = leftIdx;
+
+        if (left.prev >= 0)
             checkAndPushPair(left.prev);
-        }
-        if (left.next >= 0) {
-            checkAndPushPair(left_idx);
-        }
+
+        if (left.next >= 0)
+            checkAndPushPair(leftIdx);
     }
 
-    // Traverse result nodes
     int32_t curr = 0;
-    while (curr >= 0 && symbols[curr].prev >= 0) {
+
+    while (curr >= 0 && symbols[curr].prev >= 0)
         curr = symbols[curr].prev;
-    }
 
     while (curr >= 0) {
-        std::string_view piece = chunk.substr(symbols[curr].start, symbols[curr].len);
+        const std::string_view piece =
+            source.substr(
+                symbols[curr].start,
+                symbols[curr].len);
+
         emitToken(piece, out);
         curr = symbols[curr].next;
     }
@@ -620,52 +701,94 @@ std::string JobTokenizer::decode(int32_t tokenId, bool stripSpecialTokens) const
 {
     return decode(std::span<const int32_t>(&tokenId, 1), stripSpecialTokens);
 }
-
 std::string JobTokenizer::decode(std::span<const int32_t> tokens, bool stripSpecialTokens) const
 {
-    if (!isLoaded() || tokens.empty()) {
-        return "";
-    }
+    if (!isLoaded() || tokens.empty())
+        return {};
 
     std::string result;
-    result.reserve(tokens.size() * 4);
+    std::string byteLevelRun;
 
-    for (int32_t id : tokens) {
-        if (stripSpecialTokens && isSpecialToken(id)) {
+    result.reserve(tokens.size() * 4);
+    byteLevelRun.reserve(tokens.size() * 4);
+
+    auto flushByteLevel = [&]() {
+        if (byteLevelRun.empty())
+            return;
+
+        result += ByteLevel::decode(byteLevelRun);
+        byteLevelRun.clear();
+    };
+
+    for (const int32_t id : tokens) {
+        if (stripSpecialTokens && isSpecialToken(id))
+            continue;
+
+        const auto token = idToToken(id);
+        if (!token)
+            continue;
+
+        if (token->starts_with("<0x") && token->ends_with('>')) {
+            if (const auto byte = detail::parseByteToken(*token)) {
+                flushByteLevel();
+                result.push_back(static_cast<char>(*byte));
+            }
+
             continue;
         }
 
-        auto tokenStr = idToToken(id);
-        if (!tokenStr) continue;
-
-        if (tokenStr->starts_with("<0x") && tokenStr->ends_with('>')) {
-            if (auto byteVal = detail::parseByteToken(*tokenStr)) {
-                result.push_back(static_cast<char>(*byteVal));
-                continue;
-            }
-        }
-
-        for (size_t i = 0; i < tokenStr->size();) {
-            if (i + 1 < tokenStr->size() &&
-                static_cast<unsigned char>((*tokenStr)[i]) == 0xC4 &&
-                static_cast<unsigned char>((*tokenStr)[i + 1]) == 0xA0) {
-                result.push_back(' ');
-                i += 2;
-            } else if (i + 2 < tokenStr->size() &&
-                       static_cast<unsigned char>((*tokenStr)[i]) == 0xE2 &&
-                       static_cast<unsigned char>((*tokenStr)[i + 1]) == 0x96 &&
-                       static_cast<unsigned char>((*tokenStr)[i + 2]) == 0x81) {
-                result.push_back(' ');
-                i += 3;
-            } else {
-                result.push_back((*tokenStr)[i]);
-                i += 1;
-            }
-        }
+        byteLevelRun.append(*token);
     }
+
+    flushByteLevel();
 
     return result;
 }
+// std::string JobTokenizer::decode(std::span<const int32_t> tokens, bool stripSpecialTokens) const
+// {
+//     if (!isLoaded() || tokens.empty()) {
+//         return "";
+//     }
+
+//     std::string result;
+//     result.reserve(tokens.size() * 4);
+
+//     for (int32_t id : tokens) {
+//         if (stripSpecialTokens && isSpecialToken(id)) {
+//             continue;
+//         }
+
+//         auto tokenStr = idToToken(id);
+//         if (!tokenStr) continue;
+
+//         if (tokenStr->starts_with("<0x") && tokenStr->ends_with('>')) {
+//             if (auto byteVal = detail::parseByteToken(*tokenStr)) {
+//                 result.push_back(static_cast<char>(*byteVal));
+//                 continue;
+//             }
+//         }
+
+//         for (size_t i = 0; i < tokenStr->size();) {
+//             if (i + 1 < tokenStr->size() &&
+//                 static_cast<unsigned char>((*tokenStr)[i]) == 0xC4 &&
+//                 static_cast<unsigned char>((*tokenStr)[i + 1]) == 0xA0) {
+//                 result.push_back(' ');
+//                 i += 2;
+//             } else if (i + 2 < tokenStr->size() &&
+//                        static_cast<unsigned char>((*tokenStr)[i]) == 0xE2 &&
+//                        static_cast<unsigned char>((*tokenStr)[i + 1]) == 0x96 &&
+//                        static_cast<unsigned char>((*tokenStr)[i + 2]) == 0x81) {
+//                 result.push_back(' ');
+//                 i += 3;
+//             } else {
+//                 result.push_back((*tokenStr)[i]);
+//                 i += 1;
+//             }
+//         }
+//     }
+
+//     return result;
+// }
 
 std::optional<int32_t> JobTokenizer::tokenToId(std::string_view token) const noexcept
 {

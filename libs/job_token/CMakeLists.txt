@@ -8,10 +8,12 @@ set(JOBTOKEN_HEADERS
     job_tokenizer_types.h
     job_tokenizer_error.h
     job_tokenizer.h
+    byte_level.h
 )
 
 set(JOBTOKEN_SOURCES
     job_tokenizer.cpp
+    byte_level.cpp
 )
 
 set(JOBTOKEN_ALGO_HEADERS

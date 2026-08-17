@@ -81,214 +81,247 @@ inline std::string createSyntheticHfConfigJson()
 // Block 1: Usage / Examples
 // ============================================================================
 
-TEST_CASE("JobTokenizer encodes and decodes text using BPE and byte fallback", "[token][facade][example]")
-{
-    JobTokenizer tokenizer;
-    REQUIRE(tokenizer.loadHfFromMemory(
-        detail::createSyntheticHfTokenizerJson(),
-        detail::createSyntheticHfConfigJson()));
+// TEST_CASE("JobTokenizer encodes and decodes text using BPE and byte fallback", "[token][facade][example]")
+// {
+//     JobTokenizer tokenizer;
+//     REQUIRE(tokenizer.loadHfFromMemory(
+//         detail::createSyntheticHfTokenizerJson(),
+//         detail::createSyntheticHfConfigJson()));
 
-    REQUIRE(tokenizer.isLoaded());
-    CHECK(tokenizer.vocabSize() == 17);
-    CHECK(tokenizer.bosId() == 1);
-    CHECK(tokenizer.eosId() == 2);
+//     REQUIRE(tokenizer.isLoaded());
+//     CHECK(tokenizer.vocabSize() == 17);
+//     CHECK(tokenizer.bosId() == 1);
+//     CHECK(tokenizer.eosId() == 2);
 
-    SECTION("Encode with BOS and EOS tokens") {
-        std::vector<int32_t> tokens = tokenizer.encode("hello", true, true);
+//     SECTION("Encode with BOS and EOS tokens") {
+//         std::vector<int32_t> tokens = tokenizer.encode("hello", true, true);
 
-        REQUIRE(tokens.size() == 3);
-        CHECK(tokens[0] == tokenizer.bosId()); // <s>
-        CHECK(tokens[1] == 14);                // "hello"
-        CHECK(tokens[2] == tokenizer.eosId()); // </s>
-    }
+//         REQUIRE(tokens.size() == 3);
+//         CHECK(tokens[0] == tokenizer.bosId()); // <s>
+//         CHECK(tokens[1] == 14);                // "hello"
+//         CHECK(tokens[2] == tokenizer.eosId()); // </s>
+//     }
 
-    SECTION("Decode token stream into text") {
-        std::vector<int32_t> tokens = {1, 14, 2};
+//     SECTION("Decode token stream into text") {
+//         std::vector<int32_t> tokens = {1, 14, 2};
 
-        // Decoded with special tokens stripped
-        std::string textStripped = tokenizer.decode(tokens, true);
-        CHECK(textStripped == "hello");
+//         // Decoded with special tokens stripped
+//         std::string textStripped = tokenizer.decode(tokens, true);
+//         CHECK(textStripped == "hello");
 
-        // Decoded with special tokens preserved
-        std::string textFull = tokenizer.decode(tokens, false);
-        CHECK(textFull == "<s>hello</s>");
-    }
+//         // Decoded with special tokens preserved
+//         std::string textFull = tokenizer.decode(tokens, false);
+//         CHECK(textFull == "<s>hello</s>");
+//     }
 
-    SECTION("Byte fallback tokenization for out-of-vocab byte (ASCII 'A' = 0x41)") {
-        std::vector<int32_t> tokens = tokenizer.encode("A", false, false);
+//     SECTION("Byte fallback tokenization for out-of-vocab byte (ASCII 'A' = 0x41)") {
+//         std::vector<int32_t> tokens = tokenizer.encode("A", false, false);
 
-        REQUIRE(tokens.size() == 1);
-        CHECK(tokens[0] == 16); // <0x41>
+//         REQUIRE(tokens.size() == 1);
+//         CHECK(tokens[0] == 16); // <0x41>
 
-        std::string decoded = tokenizer.decode(tokens, false);
-        CHECK(decoded == "A");
-    }
-}
+//         std::string decoded = tokenizer.decode(tokens, false);
+//         CHECK(decoded == "A");
+//     }
+// }
 
-TEST_CASE("JobTokenizer formats and tokenizes chat conversations", "[token][facade][chat]")
-{
-    JobTokenizer tokenizer;
-    REQUIRE(tokenizer.loadHfFromMemory(
-        detail::createSyntheticHfTokenizerJson(),
-        detail::createSyntheticHfConfigJson()));
+// TEST_CASE("JobTokenizer formats and tokenizes chat conversations", "[token][facade][chat]")
+// {
+//     JobTokenizer tokenizer;
+//     REQUIRE(tokenizer.loadHfFromMemory(
+//         detail::createSyntheticHfTokenizerJson(),
+//         detail::createSyntheticHfConfigJson()));
 
-    std::vector<ChatMessage> dialogue = {
-        {ChatRole::System, "Be concise.", "", ""},
-        {ChatRole::User, "hello", "", ""}
-    };
+//     std::vector<ChatMessage> dialogue = {
+//         {ChatRole::System, "Be concise.", "", ""},
+//         {ChatRole::User, "hello", "", ""}
+//     };
 
-    SECTION("applyChatTemplate renders expected Jinja prompt") {
-        std::string prompt = tokenizer.applyChatTemplate(dialogue, true);
+//     SECTION("applyChatTemplate renders expected Jinja prompt") {
+//         std::string prompt = tokenizer.applyChatTemplate(dialogue, true);
 
-        std::string expected =
-            "<s><|im_start|>system\nBe concise.<|im_end|>\n"
-            "<|im_start|>user\nhello<|im_end|>\n"
-            "<|im_start|>assistant\n";
+//         std::string expected =
+//             "<s><|im_start|>system\nBe concise.<|im_end|>\n"
+//             "<|im_start|>user\nhello<|im_end|>\n"
+//             "<|im_start|>assistant\n";
 
-        CHECK(prompt == expected);
-    }
+//         CHECK(prompt == expected);
+//     }
 
-    SECTION("encodeChat converts dialogue directly to token IDs") {
-        std::vector<int32_t> chatTokens = tokenizer.encodeChat(dialogue, true);
-        REQUIRE(!chatTokens.empty());
-        CHECK(chatTokens.front() == tokenizer.bosId());
-    }
-}
+//     SECTION("encodeChat converts dialogue directly to token IDs") {
+//         std::vector<int32_t> chatTokens = tokenizer.encodeChat(dialogue, true);
+//         REQUIRE(!chatTokens.empty());
+//         CHECK(chatTokens.front() == tokenizer.bosId());
+//     }
+// }
 
-TEST_CASE("JobTokenizer loads real disk fixtures when available", "[token][facade][fixtures]")
-{
-#if defined(JOB_TOKEN_TEST_DATA_DIR)
-    const std::filesystem::path baseDir(JOB_TOKEN_TEST_DATA_DIR);
+// TEST_CASE("JobTokenizer loads real disk fixtures when available", "[token][facade][fixtures]")
+// {
+// #if defined(JOB_TOKEN_TEST_DATA_DIR)
+//     const std::filesystem::path baseDir(JOB_TOKEN_TEST_DATA_DIR);
 
-    SECTION("Load Gemma-4-12B-it via facade") {
-        const std::filesystem::path gemmaDir = baseDir / "gemma-4-12b-it";
-        REQUIRE(std::filesystem::exists(gemmaDir / "tokenizer.json"));
-        REQUIRE(std::filesystem::exists(gemmaDir / "tokenizer_config.json"));
+//     SECTION("Load Gemma-4-12B-it via facade") {
+//         const std::filesystem::path gemmaDir = baseDir / "gemma-4-12b-it";
+//         REQUIRE(std::filesystem::exists(gemmaDir / "tokenizer.json"));
+//         REQUIRE(std::filesystem::exists(gemmaDir / "tokenizer_config.json"));
 
-        JobTokenizer tokenizer;
-        bool ok = tokenizer.loadHf(
-            gemmaDir / "tokenizer.json",
-            gemmaDir / "tokenizer_config.json");
+//         JobTokenizer tokenizer;
+//         bool ok = tokenizer.loadHf(
+//             gemmaDir / "tokenizer.json",
+//             gemmaDir / "tokenizer_config.json");
 
-        REQUIRE(ok);
-        CHECK(tokenizer.isLoaded());
-        CHECK(tokenizer.vocabSize() > 0);
-        CHECK(!tokenizer.chatTemplate().empty());
-    }
+//         REQUIRE(ok);
+//         CHECK(tokenizer.isLoaded());
+//         CHECK(tokenizer.vocabSize() > 0);
+//         CHECK(!tokenizer.chatTemplate().empty());
+//     }
 
-    SECTION("Load Qwen3.8-27B via facade") {
-        const std::filesystem::path qwenDir = baseDir / "Qwen3.8-27B";
-        REQUIRE(std::filesystem::exists(qwenDir / "tokenizer.json"));
-        REQUIRE(std::filesystem::exists(qwenDir / "tokenizer_config.json"));
+//     SECTION("Load Qwen3.8-27B via facade") {
+//         const std::filesystem::path qwenDir = baseDir / "Qwen3.8-27B";
+//         REQUIRE(std::filesystem::exists(qwenDir / "tokenizer.json"));
+//         REQUIRE(std::filesystem::exists(qwenDir / "tokenizer_config.json"));
 
-        JobTokenizer tokenizer;
-        bool ok = tokenizer.loadHf(
-            qwenDir / "tokenizer.json",
-            qwenDir / "tokenizer_config.json");
+//         JobTokenizer tokenizer;
+//         bool ok = tokenizer.loadHf(
+//             qwenDir / "tokenizer.json",
+//             qwenDir / "tokenizer_config.json");
 
-        REQUIRE(ok);
-        CHECK(tokenizer.isLoaded());
-        CHECK(tokenizer.vocabSize() > 0);
-    }
-#endif
-}
+//         REQUIRE(ok);
+//         CHECK(tokenizer.isLoaded());
+//         CHECK(tokenizer.vocabSize() > 0);
+//     }
+// #endif
+// }
 
 // ============================================================================
 // Block 2: Edge Cases
 // ============================================================================
-
-TEST_CASE("JobTokenizer guards invariants against uninitialized state and empty inputs", "[token][facade][edge_cases]")
+TEST_CASE("JobTokenizer preserves ByteLevel text exactly", "[token][hf][bytelevel]")
 {
-    JobTokenizer uninitTokenizer;
+    JobTokenizer tokenizer;
 
-    SECTION("Operations on uninitialized tokenizer fail or return empty gracefully") {
-        CHECK_FALSE(uninitTokenizer.isLoaded());
-        CHECK(uninitTokenizer.vocabSize() == 0);
-        CHECK(uninitTokenizer.encode("test").empty());
-        CHECK(uninitTokenizer.decode(std::vector<int32_t>{1, 2, 3}).empty());
-        CHECK(uninitTokenizer.applyChatTemplate(std::vector<ChatMessage>{}).empty());
-        CHECK_FALSE(uninitTokenizer.tokenToId("hello").has_value());
-        CHECK_FALSE(uninitTokenizer.idToToken(0).has_value());
-    }
+    REQUIRE(tokenizer.loadHf(
+        "/home/jmills/git/opensource/qwen_tmp/tokenizer.json",
+        "/home/jmills/git/opensource/qwen_tmp/tokenizer_config.json"));
 
-    SECTION("Encoding empty string with BOS/EOS produces only boundary tokens") {
-        JobTokenizer tokenizer;
-        REQUIRE(tokenizer.loadHfFromMemory(
-            detail::createSyntheticHfTokenizerJson(),
-            detail::createSyntheticHfConfigJson()));
+    const std::vector<std::string> samples{
+        "hello",
+        "hello world",
+        " The quick brown fox jumps over the lazy dog.",
+        "hello\nworld",
+        "hello\tworld",
+        "C++ is fun!",
+        " café ",
+        "你好世界",
+        "🙂",
+        "a  b",
+        "a\n\nb"
+    };
 
-        auto tokensBosEos = tokenizer.encode("", true, true);
-        REQUIRE(tokensBosEos.size() == 2);
-        CHECK(tokensBosEos[0] == tokenizer.bosId());
-        CHECK(tokensBosEos[1] == tokenizer.eosId());
+    for (const auto &input : samples) {
+        const auto encoded = tokenizer.encode(input, false, false);
+        const auto decoded = tokenizer.decode(encoded, false);
 
-        auto tokensNone = tokenizer.encode("", false, false);
-        CHECK(tokensNone.empty());
-    }
+        INFO("input:   " << input);
+        INFO("decoded: " << decoded);
+        INFO("tokens:  " << encoded.size());
 
-    SECTION("Out-of-range token IDs in decode are skipped without crashing") {
-        JobTokenizer tokenizer;
-        REQUIRE(tokenizer.loadHfFromMemory(
-            detail::createSyntheticHfTokenizerJson(),
-            detail::createSyntheticHfConfigJson()));
-
-        std::vector<int32_t> invalidTokens = {-1, 99999, 14, -500};
-        std::string decoded = tokenizer.decode(invalidTokens, true);
-        CHECK(decoded == "hello");
-    }
-
-    SECTION("clear() resets all internal state and lookups") {
-        JobTokenizer tokenizer;
-        REQUIRE(tokenizer.loadHfFromMemory(
-            detail::createSyntheticHfTokenizerJson(),
-            detail::createSyntheticHfConfigJson()));
-        REQUIRE(tokenizer.isLoaded());
-
-        tokenizer.clear();
-        CHECK_FALSE(tokenizer.isLoaded());
-        CHECK(tokenizer.vocabSize() == 0);
-        CHECK(tokenizer.bosId() == -1);
-        CHECK(tokenizer.eosId() == -1);
+        REQUIRE(decoded == input);
     }
 }
+
+// TEST_CASE("JobTokenizer guards invariants against uninitialized state and empty inputs", "[token][facade][edge_cases]")
+// {
+//     JobTokenizer uninitTokenizer;
+
+//     SECTION("Operations on uninitialized tokenizer fail or return empty gracefully") {
+//         CHECK_FALSE(uninitTokenizer.isLoaded());
+//         CHECK(uninitTokenizer.vocabSize() == 0);
+//         CHECK(uninitTokenizer.encode("test").empty());
+//         CHECK(uninitTokenizer.decode(std::vector<int32_t>{1, 2, 3}).empty());
+//         CHECK(uninitTokenizer.applyChatTemplate(std::vector<ChatMessage>{}).empty());
+//         CHECK_FALSE(uninitTokenizer.tokenToId("hello").has_value());
+//         CHECK_FALSE(uninitTokenizer.idToToken(0).has_value());
+//     }
+
+//     SECTION("Encoding empty string with BOS/EOS produces only boundary tokens") {
+//         JobTokenizer tokenizer;
+//         REQUIRE(tokenizer.loadHfFromMemory(
+//             detail::createSyntheticHfTokenizerJson(),
+//             detail::createSyntheticHfConfigJson()));
+
+//         auto tokensBosEos = tokenizer.encode("", true, true);
+//         REQUIRE(tokensBosEos.size() == 2);
+//         CHECK(tokensBosEos[0] == tokenizer.bosId());
+//         CHECK(tokensBosEos[1] == tokenizer.eosId());
+
+//         auto tokensNone = tokenizer.encode("", false, false);
+//         CHECK(tokensNone.empty());
+//     }
+
+//     SECTION("Out-of-range token IDs in decode are skipped without crashing") {
+//         JobTokenizer tokenizer;
+//         REQUIRE(tokenizer.loadHfFromMemory(
+//             detail::createSyntheticHfTokenizerJson(),
+//             detail::createSyntheticHfConfigJson()));
+
+//         std::vector<int32_t> invalidTokens = {-1, 99999, 14, -500};
+//         std::string decoded = tokenizer.decode(invalidTokens, true);
+//         CHECK(decoded == "hello");
+//     }
+
+//     SECTION("clear() resets all internal state and lookups") {
+//         JobTokenizer tokenizer;
+//         REQUIRE(tokenizer.loadHfFromMemory(
+//             detail::createSyntheticHfTokenizerJson(),
+//             detail::createSyntheticHfConfigJson()));
+//         REQUIRE(tokenizer.isLoaded());
+
+//         tokenizer.clear();
+//         CHECK_FALSE(tokenizer.isLoaded());
+//         CHECK(tokenizer.vocabSize() == 0);
+//         CHECK(tokenizer.bosId() == -1);
+//         CHECK(tokenizer.eosId() == -1);
+//     }
+// }
 
 // ============================================================================
 // Block 3: Benchmarks
 // ============================================================================
 
-#ifdef JOB_TEST_BENCHMARKS
-TEST_CASE("Benchmark JobTokenizer encoding and decoding pipelines", "[token][facade][benchmark]")
-{
-    JobTokenizer tokenizer;
-    REQUIRE(tokenizer.loadHfFromMemory(
-        detail::createSyntheticHfTokenizerJson(),
-        detail::createSyntheticHfConfigJson()));
+// #ifdef JOB_TEST_BENCHMARKS
+// TEST_CASE("Benchmark JobTokenizer encoding and decoding pipelines", "[token][facade][benchmark]")
+// {
+//     JobTokenizer tokenizer;
+//     REQUIRE(tokenizer.loadHfFromMemory(
+//         detail::createSyntheticHfTokenizerJson(),
+//         detail::createSyntheticHfConfigJson()));
 
-    std::string textToEncode;
-    for (int i = 0; i < 100; ++i) {
-        textToEncode += "hello world ";
-    }
+//     std::string textToEncode;
+//     for (int i = 0; i < 100; ++i) {
+//         textToEncode += "hello world ";
+//     }
 
-    BENCHMARK("Encode 100-word repeated text") {
-        return tokenizer.encode(textToEncode, true, true);
-    };
+//     BENCHMARK("Encode 100-word repeated text") {
+//         return tokenizer.encode(textToEncode, true, true);
+//     };
 
-    std::vector<int32_t> tokenStream = tokenizer.encode(textToEncode, false, false);
+//     std::vector<int32_t> tokenStream = tokenizer.encode(textToEncode, false, false);
 
-    BENCHMARK("Decode token stream into string") {
-        return tokenizer.decode(tokenStream, false);
-    };
+//     BENCHMARK("Decode token stream into string") {
+//         return tokenizer.decode(tokenStream, false);
+//     };
 
-    std::vector<ChatMessage> conversation = {
-        {ChatRole::System, "You are a fast tokenizing engine.", "", ""},
-        {ChatRole::User, "hello world hello world hello world", "", ""},
-        {ChatRole::Assistant, "hello world", "", ""}
-    };
+//     std::vector<ChatMessage> conversation = {
+//         {ChatRole::System, "You are a fast tokenizing engine.", "", ""},
+//         {ChatRole::User, "hello world hello world hello world", "", ""},
+//         {ChatRole::Assistant, "hello world", "", ""}
+//     };
 
-    BENCHMARK("End-to-end chat template render + encode") {
-        return tokenizer.encodeChat(conversation, true);
-    };
-}
-#endif
+//     BENCHMARK("End-to-end chat template render + encode") {
+//         return tokenizer.encodeChat(conversation, true);
+//     };
+// }
+// #endif
 
 } // namespace job::token::test

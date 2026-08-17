@@ -530,7 +530,6 @@ std::vector<int32_t> JobModel::generate(
     m_computeCtx->reset();
 
     ggml::JobGgmlBackendBuffer::Ptr inputBuffer;
-
     ggml::JobGgmlTensor::UPtr inputTensor;
 
     try {
@@ -548,19 +547,45 @@ std::vector<int32_t> JobModel::generate(
     }
 
     auto graph = m_graphBuilder->buildForward(
-            *m_computeCtx,
-            *inputTensor,
-            nPast);
+        *m_computeCtx,
+        *inputTensor,
+        nPast,
+        ggml::JobGgmlType::F32);
 
     if (!graph || !graph->isValid()) {
         JOB_LOG_ERROR("[JobModel] Failed to build prefill graph");
-
         return {};
     }
 
     JOB_LOG_WARN("[JobModel LOOK] scheduler graph size: {}", m_scheduler.graphSize());
     JOB_LOG_WARN("[JobModel LOOK] actual graph nodes: {}", graph->nodeCount());
     JOB_LOG_WARN("[JobModel LOOK] graph capacity: {}", graph->size());
+
+    {
+        const auto graphNodes = graph->nodes();
+
+        for (std::size_t index = 0; index < graphNodes.size(); ++index) {
+            const auto &node = graphNodes[index];
+
+            if (!node || !node->isValid())
+                continue;
+
+            if (!m_device.deviceInterface()->supportsOp(*node)) {
+                const auto *operation = node->operation();
+
+                JOB_LOG_WARN(
+                    "[JobModel LOOK] unsupported prefill node {}: name='{}', op='{}', type='{}', shape=[{}, {}, {}, {}]",
+                    index,
+                    node->name(),
+                    operation ? operation->operationName() : "unknown",
+                    node->typeName(),
+                    node->extent(0),
+                    node->extent(1),
+                    node->extent(2),
+                    node->extent(3));
+            }
+        }
+    }
 
     m_scheduler.splitGraph(*graph);
 
@@ -630,7 +655,8 @@ std::vector<int32_t> JobModel::generate(
             m_graphBuilder->buildForward(
                 *m_computeCtx,
                 *stepInput,
-                nPast);
+                nPast,
+                ggml::JobGgmlType::F32);
 
         if (!stepGraph || !stepGraph->isValid()) {
             JOB_LOG_ERROR(
@@ -638,6 +664,25 @@ std::vector<int32_t> JobModel::generate(
                 step);
 
             break;
+        }
+
+        {
+            const auto graphNodes = stepGraph->nodes();
+
+            for (std::size_t index = 0; index < graphNodes.size(); ++index) {
+                const auto &node = graphNodes[index];
+
+                if (!node || !node->isValid())
+                    continue;
+
+                if (!m_device.deviceInterface()->supportsOp(*node)) {
+                    JOB_LOG_WARN(
+                        "[JobModel LOOK] device does not support decode graph node {} at step {}: name='{}'",
+                        index,
+                        step,
+                        node->name());
+                }
+            }
         }
 
         m_scheduler.splitGraph(*stepGraph);

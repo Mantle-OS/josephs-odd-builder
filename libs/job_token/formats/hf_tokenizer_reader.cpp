@@ -182,6 +182,7 @@ bool HfTokenizerReader::loadTokenizerJson(std::string_view jsonContent)
     }
 
     // Parse BPE Merges
+    /*
     if (model.contains("merges") && model["merges"].is_array()) {
         for (const auto& item : model["merges"]) {
             if (!item.is_string()) continue;
@@ -194,6 +195,39 @@ bool HfTokenizerReader::loadTokenizerJson(std::string_view jsonContent)
             }
         }
     }
+    */
+
+    // Parse BPE Merges
+    if (model.contains("merges") && model["merges"].is_array()) {
+        for (const auto &item : model["merges"]) {
+            if (item.is_array() &&
+                item.size() == 2 &&
+                item[0].is_string() &&
+                item[1].is_string()) {
+
+                m_data.merges.emplace_back(
+                    item[0].get<std::string>(),
+                    item[1].get<std::string>());
+
+                continue;
+            }
+
+            if (item.is_string()) {
+                const std::string rule = item.get<std::string>();
+                const std::size_t spacePos = rule.find(' ');
+
+                if (spacePos != std::string::npos) {
+                    m_data.merges.emplace_back(
+                        rule.substr(0, spacePos),
+                        rule.substr(spacePos + 1));
+                }
+            }
+        }
+    }
+
+
+
+
 
     // Reconcile added tokens into vocab mapping if missing
     for (const auto& tok : m_data.addedTokens) {
