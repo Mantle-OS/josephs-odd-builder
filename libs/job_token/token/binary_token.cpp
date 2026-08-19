@@ -244,7 +244,7 @@ bool BinaryToken::load(std::span<const std::uint8_t> buffer)
         static_cast<std::uint32_t>(tokenType),
         vocabSize(),
         m_merges.size(),
-        !chatTemplate().empty()
+        !chatTemplate.empty()
             ? "yes"
             : "no");
 #endif

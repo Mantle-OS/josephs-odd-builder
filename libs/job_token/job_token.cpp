@@ -200,7 +200,7 @@ bool JobToken::configure()
 
     return true;
 }
-
+#if 0
 std::vector<TokenId> JobToken::encode(std::string_view text) const
 {
     if (!isReady()) {
@@ -316,6 +316,80 @@ std::vector<TokenId> JobToken::encode(std::string_view text) const
 
     return result;
 }
+#endif
+
+
+std::vector<TokenId> JobToken::encode(std::string_view text) const
+{
+    if (!isReady()) {
+        JOB_LOG_ERROR("Cannot encode: JobToken is not configured");
+        return {};
+    }
+
+    std::vector<TokenId> output;
+
+    const SpecialTokens *specialTokens =
+        m_token->specialTokens();
+
+    std::size_t position = 0;
+
+    while (position < text.size()) {
+        const std::optional<SpecialTokens::Match> match =
+            specialTokens
+                ? specialTokens->findNext(text, position)
+                : std::nullopt;
+
+        if (!match) {
+            encodeNormalText(
+                text.substr(position),
+                output);
+
+            break;
+        }
+
+        if (match->position > position) {
+            encodeNormalText(
+                text.substr(
+                    position,
+                    match->position - position),
+                output);
+        }
+
+        output.push_back(
+            match->id);
+
+        position =
+            match->position +
+            match->length;
+    }
+
+    if (m_token->addBosToken() &&
+        specialTokens) {
+
+        const TokenId bosId =
+            specialTokens->bosId();
+
+        if (bosId != kInvalidToken) {
+            output.insert(
+                output.begin(),
+                bosId);
+        }
+    }
+
+    if (m_token->addEosToken() &&
+        specialTokens) {
+
+        const TokenId eosId =
+            specialTokens->eosId();
+
+        if (eosId != kInvalidToken)
+            output.push_back(eosId);
+    }
+
+    return output;
+}
+
+
 
 std::string JobToken::decode(std::span<const TokenId> tokens) const
 {
@@ -333,6 +407,59 @@ std::string JobToken::decode(std::span<const TokenId> tokens) const
         return {};
 
     return m_byteEncoder->decode(symbols);
+}
+
+void JobToken::encodeNormalText(
+    std::string_view text,
+    std::vector<TokenId> &output) const
+{
+    if (text.empty())
+        return;
+
+    UnicodeNormalizer::Options options;
+    options.addDummyPrefixSpace =
+        m_token->addPrefixSpace();
+
+    const std::string normalized =
+        m_normalizer->normalize(
+            text,
+            options);
+
+    const std::vector<std::string_view> chunks =
+        m_splitter->split(
+            normalized);
+
+    if (chunks.empty()) {
+        const ByteSymbols symbols =
+            m_byteEncoder->encode(
+                normalized);
+
+        const std::vector<TokenId> encoded =
+            m_algorithm->encode(
+                symbols);
+
+        output.insert(
+            output.end(),
+            encoded.begin(),
+            encoded.end());
+
+        return;
+    }
+
+    for (const std::string_view chunk : chunks) {
+        const ByteSymbols symbols =
+            m_byteEncoder->encode(
+                chunk);
+
+        const std::vector<TokenId> encoded =
+            m_algorithm->encode(
+                symbols);
+
+        output.insert(
+            output.end(),
+            encoded.begin(),
+            encoded.end());
+    }
 }
 
 } // namespace job::token

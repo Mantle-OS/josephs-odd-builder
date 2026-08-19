@@ -1,5 +1,5 @@
 include(CheckCXXCompilerFlag)
-set(CMAKE_CXX_STANDARD 20) # thanks nvidia .....
+set(CMAKE_CXX_STANDARD 23) # thanks nvidia ..... So what we are going to do here later on and cheat ...... we will be turning this global off
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -45,8 +45,9 @@ endif()
 ##############################
 # Gate Keepers
 ##############################
-option(JOB_CUDA "Add nvidia cuda support " ON)
-option(JOB_QT   "Build the Qt6 applications that are supported" ON)
+option(JOB_CUDA   "Add nvidia cuda support " ON)
+option(JOB_QT     "Build the Qt6 applications that are supported" ON)
+option(JOB_APPS   "Build the Example applications that are supported" ON)
 
 
 ##############################
@@ -68,44 +69,44 @@ else()
 endif()
 
 
-
-## These(options below) are not yet intergrated but will be later on
-
 ##############################
 # Core Libraries
 ##############################
 
+option(JOB_BUILD_SIMD "Build the job_simd library" ON)
 option(JOB_BUILD_CORE "Build the job_core library" ON)
 option(JOB_BUILD_THREADS "Build the job_threads library" ON)
 option(JOB_BUILD_CRYPTO "Build the job_crypto library" ON)
 option(JOB_BUILD_ZSTD "Build the job_zstd library" ON)
-option(JOB_BUILD_SIMD "Build the job_simd library" ON)
-option(JOB_BUILD_CUDA "Build the job_cuda library" ON)
-option(JOB_BUILD_IO "Build the job_io library" ON)
-option(JOB_BUILD_UART "Build the job_uart library" ON)
+    # depends on JOB_LINUX
+    option(JOB_BUILD_IO "Build the job_io library" ON)
+    option(JOB_BUILD_UART "Build the job_uart library" ON)
 option(JOB_BUILD_NET "Build the job_net library" ON)
-option(JOB_GGML "Build JobGgml " ON)
-    option(JOB_BUILD_SERIALIZER "Build the job_serializer library" ON)
-    option(JOB_BUILD_SERIALIZER_MSGPACK "Enable MsgPack backend for Job Serlizer" ON)
-    option(JOB_BUILD_SERIALIZER_FLATBUFFERS "Enable FlatBuffers backend" OFF)
 option(JOB_BUILD_SCIENCE "Build the job_science library" ON)
 option(JOB_BUILD_AI "Build the job_ai library" ON)
 option(JOB_BUILD_ANSI "Build the job_ansi library" ON)
 option(JOB_BUILD_TUI "Build the job_tui library" ON)
 option(JOB_BUILD_SOUND "Build the job_sound pipeline alsa stack library" ON)
 
+option(JOB_BUILD_GGML "Build JobGgml " ON)
+option(JOB_BUILD_TOKEN "Build the job_token library" ON)
+option(JOB_BUILD_MODEL "Build the job_model library" OFF)
 
+
+option(JOB_BUILD_SERIALIZER "Build the job_serializer library" ON)
+    option(JOB_BUILD_SERIALIZER_MSGPACK "Enable MsgPack backend for Job Serlizer" ON)
+        option(JOB_BUILD_AIPKG_SCHEMA "Build the generated AiPkg schema library" ${JOB_BUILD_SERIALIZER_MSGPACK})
+        option(JOB_BUILD_AIPKG "Build the job_aipkg package library" ${JOB_BUILD_SERIALIZER_MSGPACK})
+    option(JOB_BUILD_SERIALIZER_FLATBUFFERS "Enable FlatBuffers backend" OFF)
 ##############################
 # Qt Adapter Libraries
 ##############################
 
 option(JOB_BUILD_QTAI "Build the Qt AI adapter libraries" ON)
-option(JOB_BUILD_AIPKG_SCHEMA "Build the generated AiPkg schema library" ON)
-option(JOB_BUILD_AIPKG "Build the job_aipkg package library" ON)
 option(JOB_BUILD_QAIUTILS "Build the qaiutils Qt adapter library" ON)
 option(JOB_BUILD_QSODIUM "Build the qsodium Qt adapter library" ON)
 option(JOB_BUILD_QZSTD "Build the qzstd Qt adapter library" ON)
-option(JOB_BUILD_QSD "Build the qsd diffusion adapter library" OFF)
+option(JOB_BUILD_QSD "Build the qsd diffusion adapter library" ON)
 option(JOB_BUILD_QLLAMA "Build the qllama inference adapter library" OFF)
 option(JOB_BUILD_QHF "Build the qhf Hugging Face adapter library" OFF)
 option(JOB_BUILD_QSESSIONMANAGER "Build the Qt session manager" OFF)

@@ -393,28 +393,18 @@ JobGgmlCGraph::UPtr JobGgmlContext::newGraph()
 
 JobGgmlCGraph::UPtr JobGgmlContext::newGraphCustom(std::size_t size, bool gradients)
 {
-    if (!m_context) {
-        throw std::runtime_error{
-            "Cannot create a graph from an invalid GGML context"
-        };
-    }
+    if (!m_context)
+        throw std::runtime_error{ "Cannot create a graph from an invalid GGML context" };
 
-    if (size == 0) {
-        throw std::invalid_argument{
-            "newGraphCustom requires a graph size greater than zero"
-        };
-    }
+    if (size == 0)
+        throw std::invalid_argument{ "newGraphCustom requires a graph size greater than zero" };
 
-    ggml_cgraph *nativeGraph = ggml_new_graph_custom(
-        m_context.get(),
-        size,
-        gradients
-        );
+    ggml_cgraph *nativeGraph = ggml_new_graph_custom(m_context.get(),
+                                                     size,
+                                                     gradients);
 
     if (!nativeGraph) {
-        throw std::runtime_error{
-            "Failed to create a custom GGML computation graph"
-        };
+        throw std::runtime_error{ "Failed to create a custom GGML computation graph" };
     }
 
     return JobGgmlCGraph::createUniq(nativeGraph);
@@ -422,29 +412,18 @@ JobGgmlCGraph::UPtr JobGgmlContext::newGraphCustom(std::size_t size, bool gradie
 
 JobGgmlCGraph::UPtr JobGgmlContext::duplicateGraph(JobGgmlCGraph &graph, bool forceGradients)
 {
-    if (!m_context) {
-        throw std::runtime_error{
-            "Cannot duplicate a graph with an invalid GGML context"
-        };
-    }
+    if (!m_context)
+        throw std::runtime_error{ "Cannot duplicate a graph with an invalid GGML context" };
 
-    if (!graph.isValid()) {
-        throw std::invalid_argument{
-            "duplicateGraph requires a valid JobGgmlCGraph"
-        };
-    }
+    if (!graph.isValid())
+        throw std::invalid_argument{ "duplicateGraph requires a valid JobGgmlCGraph" };
 
-    ggml_cgraph *nativeGraph = ggml_graph_dup(
-        m_context.get(),
-        graph.graph(),
-        forceGradients
-        );
+    ggml_cgraph *nativeGraph = ggml_graph_dup(m_context.get(),
+                                              graph.graph(),
+                                              forceGradients);
 
-    if (!nativeGraph) {
-        throw std::runtime_error{
-            "Failed to duplicate the GGML computation graph"
-        };
-    }
+    if (!nativeGraph)
+        throw std::runtime_error{ "Failed to duplicate the GGML computation graph" };
 
     return JobGgmlCGraph::createUniq( nativeGraph );
 }

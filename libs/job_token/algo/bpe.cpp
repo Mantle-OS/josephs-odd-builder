@@ -125,7 +125,8 @@ std::vector<TokenId> Bpe::applyMerges(std::span<const TokenId> initialIds) const
         pushPair(i);
 
     while (!queue.empty()) {
-        const QueueElement top = queue.top();
+        const QueueElement top =
+            queue.top();
 
         queue.pop();
 
@@ -135,27 +136,56 @@ std::vector<TokenId> Bpe::applyMerges(std::span<const TokenId> initialIds) const
         if (symbols[top.pos].id != top.leftId)
             continue;
 
-        const std::size_t next = symbols[top.pos].next;
+        const std::size_t next =
+            symbols[top.pos].next;
 
-        if (next == kInvalidId || next >= symbols.size() || symbols[next].id != top.rightId)
+        if (next == kInvalidId ||
+            next >= symbols.size() ||
+            symbols[next].id != top.rightId) {
             continue;
+        }
 
         if (top.rank >= m_rules.size())
             continue;
 
-        symbols[top.pos].id = m_rules[top.rank].newId;
+        symbols[top.pos].id =
+            m_rules[top.rank].newId;
 
-        const std::size_t nextNext = symbols[next].next;
+        const std::size_t nextNext =
+            symbols[next].next;
 
-        symbols[top.pos].next = nextNext;
+        symbols[top.pos].next =
+            nextNext;
 
         if (nextNext != kInvalidId)
             symbols[nextNext].prev = top.pos;
 
-        pushPair(symbols[top.pos].prev);
-        pushPair(top.pos);
-    }
+        //
+        // The right-hand symbol has now been consumed.
+        // Kill it so stale priority-queue entries cannot
+        // operate on a detached node.
+        //
+        symbols[next].id =
+            kInvalidToken;
 
+        symbols[next].prev =
+            kInvalidId;
+
+        symbols[next].next =
+            kInvalidId;
+
+        //
+        // The two boundaries affected by this merge are:
+        //
+        //     previous + merged
+        //     merged   + next
+        //
+        pushPair(
+            symbols[top.pos].prev);
+
+        pushPair(
+            top.pos);
+    }
     std::vector<TokenId> result;
     result.reserve(initialIds.size());
 

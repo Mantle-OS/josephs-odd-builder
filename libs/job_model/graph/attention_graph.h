@@ -16,6 +16,9 @@ namespace job::model {
 class JOBMODEL_EXPORT AttentionGraph final
 {
 public:
+
+    using GqaExpander = ggml::JobGgmlTensorOp::UPtr (*)(ggml::JobGgmlTensorOp::UPtr,uint32_t);
+
     AttentionGraph() = delete;
     ~AttentionGraph() = delete;
 
@@ -34,10 +37,14 @@ public:
                                                            float rmsNormEps,
                                                            uint32_t ropeDimensions,
                                                            int ropeMode = 2,
-                                                           ggml::JobGgmlType inputType = ggml::JobGgmlType::F16);
+                                                           ggml::JobGgmlType inputType = ggml::JobGgmlType::F16,
+                                                           const RopeConfig *ropeConfig = nullptr,
+                                                           GqaExpander gqaExpander = nullptr);
 private:
     [[nodiscard]] static ggml::JobGgmlTensorOp::UPtr tensorOp(const ggml::JobGgmlTensor &tensor,
                                                               ggml::JobGgmlContext *ctx);
+
+    GqaExpander gqaExpander = nullptr;
 };
 
 } // namespace job::model

@@ -53,6 +53,18 @@ public:
         return graph;
     }
 
+    [[nodiscard]] JobGgmlCGraph::UPtr buildGraph(std::size_t size)
+    {
+        if (!isValid())
+            throw std::runtime_error{ "JobGgmlTensorOpGraph requires a valid operation" };
+
+        auto graph = context()->newGraphCustom(size, false);
+        graph->buildForwardExpand(*this);
+
+        return graph;
+    }
+
+
     [[nodiscard]] static UPtr wrap(JobGgmlTensorOp::UPtr tensorOp)
     {
         if (!tensorOp || !tensorOp->isValid() || !tensorOp->context())

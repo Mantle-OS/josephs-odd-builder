@@ -10,7 +10,7 @@ include(cmake/build_options.cmake)
 ## Hardware checker and some compiler flags
 include(cmake/check_hardware.cmake)
 
-## cuda crap
+## cuda crap :P
 include(cmake/check_nvidia.cmake)
 
 ## build time deps
@@ -20,6 +20,12 @@ include(cmake/build_deps.cmake)
 if(JOB_BUILD_SERIALIZER_MSGPACK)
     include(cmake/job_msgpack_gen_lib.cmake)
 endif()
+
+
+
+
+
+
 
 if(JOB_QT)
     ## Order matters here. stable diffusion cpp MUST come before Llama as stable diffusion cpp builds GGML which llama depends on

@@ -940,6 +940,22 @@ TEST_CASE("JinjaVM renders realistic ChatML template", "[token][jinja][vm][usage
 //
 // Block 2: edge cases / invariants
 //
+TEST_CASE("Jinja parser decodes escaped characters in string literals", "[token][jinja][parser][string]")
+{
+    static constexpr std::string_view Source =
+        R"({{ 'hello\nworld\t!' }})";
+
+    JinjaLexer lexer{Source};
+    const std::vector<JinjaToken> tokens = lexer.tokenizeAll();
+    JinjaParser parser{tokens};
+    const std::unique_ptr<BodyNode> ast = parser.parse();
+
+    REQUIRE(ast != nullptr);
+
+    JinjaVM vm;
+
+    REQUIRE(vm.execute(*ast, ValueMap{}) == "hello\nworld\t!");
+}
 
 TEST_CASE("JinjaVM undefined variable renders empty string", "[token][jinja][vm][edge][undefined]")
 {

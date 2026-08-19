@@ -38,6 +38,7 @@ ggml::JobGgmlTensorOp::UPtr GqaGraph::expand(ggml::JobGgmlTensorOp::UPtr input,
     if (static_cast<int64_t>(queryHeadCount) % kvHeadCount != 0)
         throw std::invalid_argument{"GqaGraph query head count must be divisible by KV head count"};
 
+
     const int64_t repeatCount = static_cast<int64_t>(queryHeadCount) / kvHeadCount;
 
     return input

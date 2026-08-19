@@ -355,7 +355,7 @@ std::unique_ptr<ExprNode> JinjaParser::parsePrimary()
     // ------------------------------------------------------------
     //
     if (match(JinjaType::StringLiteral))
-        return std::make_unique<LiteralNode>(std::string{previous().text}, line, column);
+        return std::make_unique<LiteralNode>(decodeStringLiteral( previous().text), line, column);
 
     if (match(JinjaType::KwTrue))
         return std::make_unique<LiteralNode>(true, line, column);
@@ -682,6 +682,60 @@ const JinjaToken &JinjaParser::consume(JinjaType type, std::string_view errorMes
     if (check(type))
         return advance();
     throw ParseError{errorMessage, peek().line, peek().column};
+}
+
+
+std::string JinjaParser::decodeStringLiteral(std::string_view value)
+{
+    std::string result;
+    result.reserve(value.size());
+
+    for (std::size_t i = 0; i < value.size(); ++i) {
+        const char character = value[i];
+
+        if (character != '\\' ||
+            i + 1 >= value.size()) {
+            result.push_back(character);
+            continue;
+        }
+
+        const char escaped =
+            value[++i];
+
+        switch (escaped) {
+        case 'n':
+            result.push_back('\n');
+            break;
+
+        case 'r':
+            result.push_back('\r');
+            break;
+
+        case 't':
+            result.push_back('\t');
+            break;
+
+        case '\\':
+            result.push_back('\\');
+            break;
+
+        case '\'':
+            result.push_back('\'');
+            break;
+
+        case '"':
+            result.push_back('"');
+            break;
+
+        default:
+            // Preserve unknown escapes rather than silently destroying them.
+            result.push_back('\\');
+            result.push_back(escaped);
+            break;
+        }
+    }
+
+    return result;
 }
 
 } // namespace job::token

@@ -54,7 +54,6 @@ target_include_directories(JosephsOddBuilder_AiPkg PUBLIC
     $<BUILD_INTERFACE:${PKG_LIB_INCLUDES}>
 )
 
-
 target_link_libraries(JosephsOddBuilder_AiPkg
     PUBLIC
         ${YAMLCpp_LIBRARIES}

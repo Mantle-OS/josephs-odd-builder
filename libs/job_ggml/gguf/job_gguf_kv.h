@@ -94,7 +94,7 @@ public:
 
     [[nodiscard]] int64_t readScalarInt(int64_t def = -1) const noexcept
     {
-        if (isScalar())
+        if (!isScalar())
             return def;
 
         switch (type()) {
@@ -151,7 +151,6 @@ public:
 
         return readScalarInt(def);
     }
-
 
     [[nodiscard]] bool isFloatingPoint() const noexcept;
     [[nodiscard]] float readFloat(float def = core::safeInfinity()) const noexcept

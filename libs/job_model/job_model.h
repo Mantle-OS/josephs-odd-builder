@@ -67,10 +67,7 @@ public:
                             ModelConfig config,
                             uint32_t maxContextLength = 0);
 
-    [[nodiscard]] std::vector<int32_t> generate(
-        std::span<const int32_t> promptTokens,
-        int32_t maxNewTokens,
-        const SamplerConfig &samplerConfig = {});
+    [[nodiscard]] std::vector<int32_t> generate(std::span<const int32_t> promptTokens, int32_t maxNewTokens, const SamplerConfig &samplerConfig = {});
 
     [[nodiscard]] bool isLoaded() const noexcept;
 

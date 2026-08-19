@@ -9,6 +9,7 @@
 #include <thread>
 #include <atomic>
 #include <mutex>
+#include <iomanip>
 
 #include "job_io_async_thread.h"
 #include "job_tui_event.h"

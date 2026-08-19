@@ -17,6 +17,7 @@
 #include <job_token.h>
 #include <job_token_enums.h>
 #include <job_token_types.h>
+#include <bpe.h>
 
 #include <token/hf_token.h>
 #include <token/itoken.h>
@@ -40,6 +41,7 @@ using job::token::TokenType;
 using job::token::Vocab;
 using job::token::kInvalidToken;
 using job::token::TokenMerges;
+using job::token::Bpe;
 
 static constexpr std::string_view Text = "Hello from Joseph's Odd Builder.";
 
@@ -608,6 +610,237 @@ TEST_CASE("JobToken BPE runtime applies configured merge rules",
 //
 
 #ifdef JOB_TOKEN_TEST_DATA_DIR
+
+TEST_CASE("Bpe fully merges Qwen assistant from byte symbols",
+          "[token][bpe][integration][hf][qwen]")
+{
+    const std::filesystem::path root{JOB_TOKEN_TEST_DATA_DIR};
+    const std::filesystem::path tokenizerPath =
+        root / "Qwen3.8-27B" / "tokenizer.json";
+    const std::filesystem::path configPath =
+        root / "Qwen3.8-27B" / "tokenizer_config.json";
+
+    HfToken token;
+
+    REQUIRE(
+        token.load(
+            tokenizerPath,
+            configPath));
+
+    Bpe bpe{
+        token.vocab()
+    };
+
+    std::vector<Bpe::MergeRule> rules;
+    rules.reserve(
+        token.merges().size());
+
+    for (const auto &[leftText, rightText] :
+         token.merges()) {
+
+        const TokenId left =
+            token.vocab()->findId(
+                leftText);
+
+        const TokenId right =
+            token.vocab()->findId(
+                rightText);
+
+        if (left == kInvalidToken ||
+            right == kInvalidToken) {
+            continue;
+        }
+
+        std::string mergedText;
+        mergedText.reserve(
+            leftText.size() +
+            rightText.size());
+
+        mergedText += leftText;
+        mergedText += rightText;
+
+        const TokenId merged =
+            token.vocab()->findId(
+                mergedText);
+
+        if (merged == kInvalidToken)
+            continue;
+
+        rules.push_back({
+            left,
+            right,
+            merged
+        });
+    }
+
+    bpe.setMergeRules(
+        std::move(rules));
+
+    Gpt2ByteEncoder encoder;
+
+    const ByteSymbols symbols =
+        encoder.encode(
+            "assistant");
+
+    const std::vector<TokenId> encoded =
+        bpe.encode(
+            symbols);
+
+    const TokenId assistantId =
+        token.vocab()->findId(
+            "assistant");
+
+    REQUIRE(assistantId != kInvalidToken);
+
+    REQUIRE(encoded.size() == 1);
+    REQUIRE(encoded[0] == assistantId);
+}
+
+
+TEST_CASE("Bpe applies Qwen assistant merge",
+          "[token][bpe][merge][qwen]")
+{
+    Vocab vocab;
+
+    vocab.setToken(395, "ass", 0.0f);
+    vocab.setToken(11202, "istant", 0.0f);
+    vocab.setToken(77091, "assistant", 0.0f);
+
+    Bpe bpe{&vocab};
+
+    const std::vector<Bpe::MergeRule> rules{
+        {
+            395,
+            11202,
+            77091
+        }
+    };
+
+    bpe.setMergeRules(rules);
+
+    const ByteSymbols symbols{
+        "ass",
+        "istant"
+    };
+
+    const std::vector<TokenId> output =
+        bpe.encode(symbols);
+
+    REQUIRE(output.size() == 1);
+    REQUIRE(output[0] == 77091);
+}
+
+
+TEST_CASE("HuggingFace Qwen contains assistant BPE merge",
+          "[token][hf][bpe][merge]")
+{
+    const std::filesystem::path root{JOB_TOKEN_TEST_DATA_DIR};
+    const std::filesystem::path tokenizerPath =
+        root / "Qwen3.8-27B" / "tokenizer.json";
+    const std::filesystem::path configPath =
+        root / "Qwen3.8-27B" / "tokenizer_config.json";
+
+    JobToken tokenizer;
+
+    REQUIRE(
+        tokenizer.load(
+            IToken::Provider::HuggingFace,
+            configPath,
+            tokenizerPath));
+
+    const auto assId =
+        tokenizer.token()->findTokenId("ass");
+
+    const auto istantId =
+        tokenizer.token()->findTokenId("istant");
+
+    const auto assistantId =
+        tokenizer.token()->findTokenId("assistant");
+
+    REQUIRE(assId.has_value());
+    REQUIRE(istantId.has_value());
+    REQUIRE(assistantId.has_value());
+
+    bool foundMerge = false;
+
+    for (const auto &[left, right] :
+         tokenizer.token()->merges()) {
+
+        if (left == "ass" &&
+            right == "istant") {
+            foundMerge = true;
+            break;
+        }
+    }
+
+    REQUIRE(foundMerge);
+}
+
+
+TEST_CASE("JobToken HuggingFace Qwen merges assistant",
+          "[token][job-token][integration][hf][bpe]")
+{
+    const std::filesystem::path root{JOB_TOKEN_TEST_DATA_DIR};
+    const std::filesystem::path tokenizerPath =
+        root / "Qwen3.8-27B" / "tokenizer.json";
+    const std::filesystem::path configPath =
+        root / "Qwen3.8-27B" / "tokenizer_config.json";
+
+    JobToken tokenizer;
+
+    REQUIRE(
+        tokenizer.load(
+            IToken::Provider::HuggingFace,
+            configPath,
+            tokenizerPath));
+
+    const auto assistantId =
+        tokenizer.token()->findTokenId(
+            "assistant");
+
+    REQUIRE(assistantId.has_value());
+
+    const std::vector<TokenId> encoded =
+        tokenizer.encode(
+            "assistant");
+
+    REQUIRE(encoded.size() == 1);
+    REQUIRE(encoded[0] == *assistantId);
+}
+
+
+TEST_CASE("JobToken encodes Qwen chat special tokens atomically",
+          "[token][job-token][integration][hf][special]")
+{
+    const std::filesystem::path root{JOB_TOKEN_TEST_DATA_DIR};
+    const std::filesystem::path tokenizerPath = root / "Qwen3.8-27B" / "tokenizer.json";
+    const std::filesystem::path configPath = root / "Qwen3.8-27B" / "tokenizer_config.json";
+
+    JobToken tokenizer;
+
+    REQUIRE(tokenizer.load(IToken::Provider::HuggingFace, configPath, tokenizerPath));
+
+    const auto imStartId = tokenizer.token()->findTokenId("<|im_start|>");
+    const auto imEndId = tokenizer.token()->findTokenId("<|im_end|>");
+
+    REQUIRE(imStartId.has_value());
+    REQUIRE(imEndId.has_value());
+
+    const auto *record = tokenizer.token()->vocab()->record(*imStartId);
+
+    REQUIRE(record != nullptr);
+    REQUIRE(record->isSpecial());
+    REQUIRE(tokenizer.token()->specialTokens()->isSpecial(*imStartId));
+
+    const std::vector<TokenId> startEncoded = tokenizer.encode("<|im_start|>");
+    const std::vector<TokenId> endEncoded =tokenizer.encode("<|im_end|>");
+
+    REQUIRE(startEncoded.size() == 1);
+    REQUIRE(endEncoded.size() == 1);
+
+    REQUIRE(startEncoded[0] == *imStartId);
+    REQUIRE(endEncoded[0] == *imEndId);
+}
 
 TEST_CASE("JobToken HuggingFace Qwen produces expected token ids", "[token][job-token][integration][hf][bpe]")
 {

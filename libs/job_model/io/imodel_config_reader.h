@@ -30,7 +30,7 @@ public:
 
     // modelPath is whatever the format calls a "model root": a single
     // GGUF file, a HuggingFace directory containing config.json, a
-    // SafeTensors index -- the derived reader decides what it expects.
+    // SafeTensors index the derived reader decides what it expects.
     [[nodiscard]] virtual bool read(const std::filesystem::path &modelPath, ModelConfig &config) = 0;
 
 protected:

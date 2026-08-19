@@ -6,6 +6,7 @@
 #include <job_ggml_tensor_op.h>
 
 #include "jobmodel_export.h"
+#include "rope_config.h"
 
 namespace job::model {
 
@@ -24,6 +25,14 @@ public:
                                                            const ggml::JobGgmlTensor &positions,
                                                            uint32_t ropeDimensions,
                                                            int mode = 2);
+
+
+    [[nodiscard]] static ggml::JobGgmlTensorOp::UPtr build(ggml::JobGgmlTensorOp::UPtr input,
+                                                           const ggml::JobGgmlTensor &positions,
+                                                           const RopeConfig *config,
+                                                           uint32_t fallbackDimensions,
+                                                           int mode = 2);
+
 };
 
 } // namespace job::model

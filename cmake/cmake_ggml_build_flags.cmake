@@ -25,8 +25,6 @@ set(GGML_OPENCL_USE_ADRENO_KERNELS OFF)
 
 ## Upstream describes this as "CUDA graphs (llama.cpp only)".
 
-## Compiles FlashAttention support for all quant types.
-set(GGML_CUDA_FA_ALL_QUANTS ON)
 
 ###############################################################################
 # DANGER ZONE
@@ -38,5 +36,9 @@ set(GGML_CUDA_FA_ALL_QUANTS ON)
 #
 # One wrong move and the cat gets it.
 ###############################################################################
-## Forces cuBLAS instead of allowing GGML to select its normal MMQ/cuBLAS path.
+## This one kills the cat. Forces cuBLAS instead of allowing GGML to select its normal MMQ/cuBLAS path.
 # set(GGML_CUDA_FORCE_CUBLAS ON)
+
+
+## This "works" but I want to test things .Compiles FlashAttention support for all quant types.
+# set(GGML_CUDA_FA_ALL_QUANTS ON)

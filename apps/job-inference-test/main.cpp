@@ -1,17 +1,19 @@
+#include <array>
 #include <cstdint>
 #include <filesystem>
 #include <iostream>
 #include <string>
 #include <vector>
 
+#include <job_ggml.h>
 #include <job_ggml_backend_sched.h>
 #include <job_ggml_device_manager.h>
 
 #include <job_model.h>
-#include <job_tokenizer.h>
+#include <job_token.h>
 
+#include <chat/chat_message.h>
 #include <config/arch/qwen/qwen3_instruct_2507.h>
-#include <template/chat_message.h>
 
 int main(int argc, char *argv[])
 {
@@ -35,7 +37,7 @@ int main(int argc, char *argv[])
 
     //
     // ------------------------------------------------------------------------
-    // Tokenizer
+    // Tokenizer.
     // ------------------------------------------------------------------------
     //
 
@@ -48,42 +50,49 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    job::token::JobTokenizer tokenizer;
+    job::token::JobToken tokenizer;
 
     std::cout
         << "[JobInferenceTest] Loading tokenizer from "
         << tokenizerDir
         << "...\n";
 
-    if (!tokenizer.loadHf(tokenizerJson, tokenizerConfig)) {
+    if (!tokenizer.load(
+            job::token::IToken::Provider::HuggingFace,
+            tokenizerConfig,
+            tokenizerJson)) {
+
         std::cerr
             << "[JobInferenceTest] Failed to load tokenizer\n";
 
         return 1;
     }
 
+    if (!tokenizer.isReady() ||
+        !tokenizer.token()) {
+
+        std::cerr
+            << "[JobInferenceTest] Tokenizer runtime is not ready\n";
+
+        return 1;
+    }
 
     std::cout
         << "[JobInferenceTest] Tokenizer loaded. Vocab size: "
-        << tokenizer.vocabSize()
+        << tokenizer.token()->vocabSize()
         << '\n';
 
     const std::string tokenizerRoundTrip =
         "The quick brown fox jumps over the lazy dog.";
 
-    const auto tokenizerRoundTripTokens =
-        tokenizer.encode(tokenizerRoundTrip, false, false);
+    const std::vector<job::token::TokenId> tokenizerRoundTripTokens =
+        tokenizer.encode(
+            tokenizerRoundTrip);
 
     std::cout
         << "[JobInferenceTest] Tokenizer round trip: "
-        << tokenizer.decode(tokenizerRoundTripTokens, false)
-        << '\n';
-
-
-
-    std::cout
-        << "[JobInferenceTest] Tokenizer loaded. Vocab size: "
-        << tokenizer.vocabSize()
+        << tokenizer.decode(
+               tokenizerRoundTripTokens)
         << '\n';
 
     //
@@ -92,19 +101,329 @@ int main(int argc, char *argv[])
     // ------------------------------------------------------------------------
     //
 
-    job::ggml::JobGgmlDeviceManager manager;
+    job::ggml::JobGgml interface;
+    job::ggml::JobGguf *gguf = interface.gguf();
+    job::ggml::JobGgmlDeviceManager *manager = interface.deviceManager();
 
-    if (!manager.isValid()) {
+    if (!gguf) {
+        std::cerr
+            << "[JobInferenceTest] GGUF interface is unavailable\n";
+
+        return 1;
+    }
+
+    if (!manager) {
+        std::cerr
+            << "[JobInferenceTest] Device manager is unavailable\n";
+
+        return 1;
+    }
+
+    if (!manager->isValid()) {
         std::cerr
             << "[JobInferenceTest] Device manager failed: "
-            << manager.errorString()
+            << manager->errorString()
             << '\n';
 
         return 1;
     }
 
+    //
+    // ------------------------------------------------------------------------
+    // Inspect the exact GGUF used for inference.
+    // ------------------------------------------------------------------------
+    //
+
+    gguf->initParams()->setNoAlloc(true);
+    gguf->initParams()->setCreateContext(false);
+
+    if (!gguf->open(modelPath)) {
+        std::cerr
+            << "[JobInferenceTest] Failed to inspect GGUF model: "
+            << modelPath
+            << '\n';
+
+        return 1;
+    }
+
+    if (!gguf->isValid() ||
+        !gguf->hasContent()) {
+
+        std::cerr
+            << "[JobInferenceTest] GGUF metadata is invalid\n";
+
+        return 1;
+    }
+
+    std::cout
+        << "\n[JobInferenceTest] GGUF model metadata\n"
+        << "  architecture:       "
+        << gguf->readString(
+               "general.architecture")
+        << '\n'
+        << "  name:               "
+        << gguf->readString(
+               "general.name")
+        << '\n'
+        << "  block count:        "
+        << gguf->readInt(
+               "qwen3.block_count")
+        << '\n'
+        << "  context length:     "
+        << gguf->readInt(
+               "qwen3.context_length")
+        << '\n'
+        << "  embedding length:   "
+        << gguf->readInt(
+               "qwen3.embedding_length")
+        << '\n'
+        << "  FFN length:         "
+        << gguf->readInt(
+               "qwen3.feed_forward_length")
+        << '\n'
+        << "  attention heads:    "
+        << gguf->readInt(
+               "qwen3.attention.head_count")
+        << '\n'
+        << "  KV heads:           "
+        << gguf->readInt(
+               "qwen3.attention.head_count_kv")
+        << '\n'
+        << "  key length:         "
+        << gguf->readInt(
+               "qwen3.attention.key_length")
+        << '\n'
+        << "  value length:       "
+        << gguf->readInt(
+               "qwen3.attention.value_length")
+        << '\n'
+        << "  RoPE dimension:     "
+        << gguf->readInt(
+               "qwen3.rope.dimension_count")
+        << '\n'
+        << "  RoPE base:          "
+        << gguf->readFloat(
+               "qwen3.rope.freq_base")
+        << '\n'
+        << "  RMS epsilon:        "
+        << gguf->readFloat(
+               "qwen3.attention.layer_norm_rms_epsilon")
+        << '\n'
+        << "  GGUF version:       "
+        << gguf->version()
+        << '\n'
+        << "  alignment:          "
+        << gguf->alignment()
+        << '\n'
+        << "  data offset:        "
+        << gguf->dataOffset()
+        << '\n'
+        << "  key/value count:    "
+        << gguf->keyValueCount()
+        << '\n'
+        << "  tensor count:       "
+        << gguf->tensorCount()
+        << '\n';
+
+    //
+    // ------------------------------------------------------------------------
+    // Important tensor inventory.
+    // ------------------------------------------------------------------------
+    //
+
+    const job::ggml::JobGgufContext *ggufContext =
+        gguf->context();
+
+    if (!ggufContext) {
+        std::cerr
+            << "[JobInferenceTest] GGUF context is unavailable\n";
+
+        return 1;
+    }
+
+    static constexpr std::array RequiredTensors{
+        "token_embd.weight",
+
+        "blk.0.attn_norm.weight",
+        "blk.0.attn_q.weight",
+        "blk.0.attn_k.weight",
+        "blk.0.attn_v.weight",
+        "blk.0.attn_output.weight",
+        "blk.0.attn_q_norm.weight",
+        "blk.0.attn_k_norm.weight",
+
+        "blk.0.ffn_norm.weight",
+        "blk.0.ffn_gate.weight",
+        "blk.0.ffn_up.weight",
+        "blk.0.ffn_down.weight",
+
+        "output_norm.weight"
+    };
+
+    std::cout
+        << "\n[JobInferenceTest] Important GGUF tensors\n";
+
+    for (const char *name : RequiredTensors) {
+        if (!gguf->hasTensor(name)) {
+            std::cerr
+                << "  [MISSING] "
+                << name
+                << '\n';
+
+            return 1;
+        }
+
+        const std::int64_t index =
+            ggufContext->tensorIndex(
+                name);
+
+        if (index < 0) {
+            std::cerr
+                << "  [INVALID INDEX] "
+                << name
+                << '\n';
+
+            return 1;
+        }
+
+        std::cout
+            << "  "
+            << ggufContext->tensorName(
+                   index)
+            << '\n'
+            << "    index:  "
+            << index
+            << '\n'
+            << "    type:   "
+            << static_cast<std::uint32_t>(
+                   ggufContext->tensorType(
+                       index))
+            << '\n'
+            << "    bytes:  "
+            << ggufContext->tensorSize(
+                   index)
+            << '\n'
+            << "    offset: "
+            << ggufContext->tensorOffset(
+                   index)
+            << '\n';
+    }
+
+    //
+    // Qwen3-4B-Instruct-2507 ties the LM output projection to the token
+    // embedding weights, so output.weight may legitimately be absent.
+    //
+    if (gguf->hasTensor(
+            "output.weight")) {
+
+        const std::int64_t index =
+            ggufContext->tensorIndex(
+                "output.weight");
+
+        if (index < 0) {
+            std::cerr
+                << "[JobInferenceTest] output.weight has invalid index\n";
+
+            return 1;
+        }
+
+        std::cout
+            << "  output.weight\n"
+            << "    index:  "
+            << index
+            << '\n'
+            << "    type:   "
+            << static_cast<std::uint32_t>(
+                   ggufContext->tensorType(
+                       index))
+            << '\n'
+            << "    bytes:  "
+            << ggufContext->tensorSize(
+                   index)
+            << '\n'
+            << "    offset: "
+            << ggufContext->tensorOffset(
+                   index)
+            << '\n';
+    } else {
+        std::cout
+            << "  output.weight: absent "
+               "(tied token embeddings)\n";
+    }
+
+    //
+    // ------------------------------------------------------------------------
+    // Spot-check layer structure across the model.
+    // ------------------------------------------------------------------------
+    //
+
+    static constexpr std::array LayerIndexes{
+        0U,
+        17U,
+        35U
+    };
+
+    static constexpr std::array LayerTensorSuffixes{
+        "attn_norm.weight",
+        "attn_q.weight",
+        "attn_k.weight",
+        "attn_v.weight",
+        "attn_output.weight",
+        "attn_q_norm.weight",
+        "attn_k_norm.weight",
+
+        "ffn_norm.weight",
+        "ffn_gate.weight",
+        "ffn_up.weight",
+        "ffn_down.weight"
+    };
+
+    std::cout
+        << "\n[JobInferenceTest] GGUF layer structure\n";
+
+    for (const std::uint32_t layerIndex :
+         LayerIndexes) {
+
+        std::cout
+            << "  layer "
+            << layerIndex
+            << '\n';
+
+        for (const char *suffix :
+             LayerTensorSuffixes) {
+
+            const std::string name =
+                "blk." +
+                std::to_string(
+                    layerIndex) +
+                "." +
+                suffix;
+
+            const bool present =
+                gguf->hasTensor(
+                    name);
+
+            std::cout
+                << "    "
+                << (present
+                        ? "[OK]      "
+                        : "[MISSING] ")
+                << name
+                << '\n';
+
+            if (!present)
+                return 1;
+        }
+    }
+
+    //
+    // ------------------------------------------------------------------------
+    // CPU runtime.
+    // ------------------------------------------------------------------------
+    //
+
     job::ggml::JobGgmlCpu *cpu =
-        manager.cpu();
+        manager->cpu();
 
     if (!cpu) {
         std::cerr
@@ -113,14 +432,16 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    auto scheduler = manager.buildScheduler(cpu, 4096);
+    auto scheduler = manager->buildScheduler(cpu,4096);
+
     if (!scheduler || !scheduler->isValid()) {
         std::cerr << "[JobInferenceTest] Failed to create CPU scheduler\n";
+
         return 1;
     }
 
     std::cout
-        << "[JobInferenceTest] Runtime resolved: "
+        << "\n[JobInferenceTest] Runtime resolved: "
         << cpu->uid()
         << '\n';
 
@@ -139,7 +460,39 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    constexpr uint32_t InferenceContext = 4096;
+    job::model::SamplerConfig samplerConfig = presetConfig.samplerConfig();
+    // samplerConfig.setGreedy(true);
+    std::cout
+        << "\n[JobInferenceTest] Effective sampler configuration\n"
+        << "  temperature:      "
+        << samplerConfig.temperature()
+        << '\n'
+        << "  topK:             "
+        << samplerConfig.topK()
+        << '\n'
+        << "  topP:             "
+        << samplerConfig.topP()
+        << '\n'
+        << "  minP:             "
+        << samplerConfig.minP()
+        << '\n'
+        << "  repeatPenalty:    "
+        << samplerConfig.repeatPenalty()
+        << '\n'
+        << "  frequencyPenalty: "
+        << samplerConfig.frequencyPenalty()
+        << '\n'
+        << "  presencePenalty:  "
+        << samplerConfig.presencePenalty()
+        << '\n'
+        << "  seed:             "
+        << samplerConfig.seed()
+        << '\n'
+        << "  greedy:           "
+        << samplerConfig.greedy()
+        << '\n';
+
+    constexpr std::uint32_t InferenceContext = 4096;
 
     //
     // ------------------------------------------------------------------------
@@ -186,38 +539,49 @@ int main(int argc, char *argv[])
     // ------------------------------------------------------------------------
     //
 
-    std::vector<job::token::ChatMessage> dialogue{
-        {
-            job::token::ChatRole::System,
-            "You are an expert C++ systems programmer. "
-            "Provide high-performance, clean code without unnecessary explanations.",
-            "",
-            ""
-        },
-        {
-            job::token::ChatRole::User,
-            "Write a high-performance C++ function that computes "
-            "the inverse square root of a float.",
-            "",
-            ""
-        }
+    job::token::ChatMessage systemMessage;
+
+    systemMessage.setRole(
+        job::token::ChatRole::System);
+
+    systemMessage.setContent(
+        "You are an expert C++ systems programmer. "
+        "Provide high-performance, clean code without unnecessary explanations.");
+
+    job::token::ChatMessage userMessage;
+
+    userMessage.setRole(
+        job::token::ChatRole::User);
+
+    userMessage.setContent(
+        "Write a high-performance C++ function that computes "
+        "the inverse square root of a float.");
+
+    const std::vector<job::token::ChatMessage> dialogue{
+        systemMessage,
+        userMessage
     };
 
     const std::string formattedPrompt =
-        tokenizer.applyChatTemplate(
+        tokenizer.applyChatMessages(
             dialogue,
             true);
+
+    if (formattedPrompt.empty()) {
+        std::cerr
+            << "[JobInferenceTest] Failed to apply chat messages\n";
+
+        return 1;
+    }
 
     std::cout
         << "\n[JobInferenceTest] Formatted prompt:\n"
         << formattedPrompt
         << "\n\n";
 
-    const std::vector<int32_t> promptTokens =
+    const std::vector<job::token::TokenId> promptTokens =
         tokenizer.encode(
-            formattedPrompt,
-            false,
-            false);
+            formattedPrompt);
 
     if (promptTokens.empty()) {
         std::cerr
@@ -231,19 +595,50 @@ int main(int argc, char *argv[])
         << promptTokens.size()
         << " prompt tokens\n";
 
+    std::cout
+        << "\n[JobInferenceTest] Prompt token IDs:\n";
+
+    for (const job::token::TokenId token :
+         promptTokens) {
+
+        std::cout
+            << token
+            << ' ';
+    }
+
+    std::cout
+        << "\n\n[JobInferenceTest] Prompt token pieces:\n";
+
+    for (const job::token::TokenId id :
+         promptTokens) {
+
+        const auto token =
+            tokenizer.token()->findTokenString(
+                id);
+
+        std::cout
+            << id
+            << " -> ["
+            << (token
+                    ? *token
+                    : std::string_view{"<missing>"})
+            << "]\n";
+    }
+
     //
     // ------------------------------------------------------------------------
     // THIS IS THE KISS.
     // ------------------------------------------------------------------------
     //
 
-    constexpr int32_t MaxNewTokens = 64;
+    constexpr std::int32_t MaxNewTokens =
+        64;
 
-    const std::vector<int32_t> generatedTokens =
+    const std::vector<job::token::TokenId> generatedTokens =
         model.generate(
             promptTokens,
             MaxNewTokens,
-            presetConfig.samplerConfig());
+            samplerConfig);
 
     if (generatedTokens.empty()) {
         std::cerr
@@ -252,7 +647,9 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    if (generatedTokens.size() <= promptTokens.size()) {
+    if (generatedTokens.size() <=
+        promptTokens.size()) {
+
         std::cerr
             << "[JobInferenceTest] Model produced no response tokens\n";
 
@@ -262,13 +659,15 @@ int main(int argc, char *argv[])
     //
     // JobModel returns prompt + generated continuation.
     //
-    const auto responseBegin = generatedTokens.begin() + static_cast<std::ptrdiff_t>(promptTokens.size());
+    const auto responseBegin =
+        generatedTokens.begin() +
+        static_cast<std::ptrdiff_t>(
+            promptTokens.size());
 
-    const std::vector<int32_t> responseTokens{
+    const std::vector<job::token::TokenId> responseTokens{
         responseBegin,
         generatedTokens.end()
     };
-
 
     //
     // ------------------------------------------------------------------------
@@ -279,31 +678,40 @@ int main(int argc, char *argv[])
     std::cout
         << "\n[JobInferenceTest] Generated response token IDs:\n";
 
-    for (const int32_t token : responseTokens)
+    for (const job::token::TokenId token : responseTokens) {
         std::cout << token << ' ';
-
-    std::cout << "\n";
-
-
-    const std::string input = "hello world";
-
-    const auto encoded =
-        tokenizer.encode(input, false, false);
-
-    std::cout << "\nINPUT: [" << input << "]\n";
-
-    for (const int32_t id : encoded) {
-        const auto token = tokenizer.idToToken(id);
-
-        std::cout
-            << id
-            << " -> ["
-            << (token ? *token : "<missing>")
-            << "]\n";
     }
 
+    std::cout
+        << '\n';
 
+    //
+    // ------------------------------------------------------------------------
+    // Quick vocabulary inspection.
+    // ------------------------------------------------------------------------
+    //
 
+    // const std::string input = "hello world";
+    // const std::vector<job::token::TokenId> encoded = tokenizer.encode(input);
+
+    // std::cout
+    //     << "\nINPUT: ["
+    //     << input
+    //     << "]\n";
+
+    // for (const job::token::TokenId id :
+    //      encoded) {
+
+    //     const auto token = tokenizer.token()->findTokenString(id);
+
+    //     std::cout
+    //         << id
+    //         << " -> ["
+    //         << (token
+    //                 ? *token
+    //                 : std::string_view{"<missing>"})
+    //         << "]\n";
+    // }
 
     //
     // ------------------------------------------------------------------------
@@ -311,7 +719,7 @@ int main(int argc, char *argv[])
     // ------------------------------------------------------------------------
     //
 
-    const std::string responseText = tokenizer.decode(responseTokens, true);
+    const std::string responseText = tokenizer.decode(responseTokens);
 
     std::cout
         << "\n"

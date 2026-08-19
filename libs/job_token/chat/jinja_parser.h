@@ -75,6 +75,8 @@ private:
     [[nodiscard]] int binaryPrecedence(JinjaType type) const noexcept;
     [[nodiscard]] BinaryOp binaryOp(JinjaType type) const;
 private:
+    [[nodiscard]] static std::string decodeStringLiteral(std::string_view value);
+
     std::span<const JinjaToken> m_tokens;
     std::size_t m_current{0};
     inline static const JinjaToken m_eof {

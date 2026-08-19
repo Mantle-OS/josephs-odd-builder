@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <array>
+#include <catch2/catch_approx.hpp>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
@@ -458,16 +459,36 @@ TEST_CASE("JobGguf writes and reopens tensor metadata and payload", "[gguf][usag
         REQUIRE(destinationTensor->data()->valueF32(index) == static_cast<float>(index) + 0.5f);
 }
 
-TEST_CASE("JobGguf inspects a real GGUF model without loading tensor payloads", "[gguf][usage][integration][external]")
+
+TEST_CASE("JobGgufKv reads scalar integer values",
+          "[gguf][kv][integer]")
+{
+    const std::uint32_t value = 36;
+
+    JobGgufKv kv{
+        "qwen3.block_count",
+        value
+    };
+
+    REQUIRE(kv.isValid());
+    REQUIRE(kv.isScalar());
+    REQUIRE_FALSE(kv.isArray());
+    REQUIRE(kv.isInteger());
+    REQUIRE(kv.readInt() == 36);
+}
+
+TEST_CASE("JobGguf inspects Qwen model metadata without loading tensor payloads",
+          "[gguf][usage][integration][external][qwen]")
 {
     const std::filesystem::path filePath{
         JOB_TEST_GGUF_FILE
     };
+
     REQUIRE_FALSE(filePath.empty());
     REQUIRE(std::filesystem::is_regular_file(filePath));
 
     JobGgmlContext::UPtr ggmlContext;
-    JobGguf gguf{ &ggmlContext };
+    JobGguf gguf{&ggmlContext};
 
     gguf.initParams()->setNoAlloc(true);
     gguf.initParams()->setCreateContext(false);
@@ -475,24 +496,199 @@ TEST_CASE("JobGguf inspects a real GGUF model without loading tensor payloads", 
     REQUIRE(gguf.open(filePath));
     REQUIRE(gguf.isValid());
     REQUIRE(gguf.hasContent());
+
+    REQUIRE(ggmlContext == nullptr);
+
+    //
+    // ------------------------------------------------------------------------
+    // General model identity.
+    // ------------------------------------------------------------------------
+    //
+
+    const std::string architecture =
+        gguf.readString(
+            "general.architecture");
+
+    const std::string name =
+        gguf.readString(
+            "general.name");
+
+    WARN("REAL MODEL: architecture = "
+         << architecture);
+
+    WARN("REAL MODEL: name = "
+         << name);
+
+    REQUIRE(architecture == "qwen3");
+    REQUIRE(name == "Qwen3-4B-Instruct-2507");
+
+    //
+    // ------------------------------------------------------------------------
+    // Transformer architecture.
+    // ------------------------------------------------------------------------
+    //
+
+    const std::int64_t blockCount =
+        gguf.readInt(
+            "qwen3.block_count");
+
+    const std::int64_t contextLength =
+        gguf.readInt(
+            "qwen3.context_length");
+
+    const std::int64_t embeddingLength =
+        gguf.readInt(
+            "qwen3.embedding_length");
+
+    const std::int64_t feedForwardLength =
+        gguf.readInt(
+            "qwen3.feed_forward_length");
+
+    WARN("REAL MODEL: block_count = "
+         << blockCount);
+
+    WARN("REAL MODEL: context_length = "
+         << contextLength);
+
+    WARN("REAL MODEL: embedding_length = "
+         << embeddingLength);
+
+    WARN("REAL MODEL: feed_forward_length = "
+         << feedForwardLength);
+
+    REQUIRE(blockCount == 36);
+    REQUIRE(contextLength == 262144);
+    REQUIRE(embeddingLength == 2560);
+    REQUIRE(feedForwardLength == 9728);
+
+    //
+    // ------------------------------------------------------------------------
+    // Attention geometry.
+    // ------------------------------------------------------------------------
+    //
+
+    const std::int64_t headCount =
+        gguf.readInt(
+            "qwen3.attention.head_count");
+
+    const std::int64_t headCountKv =
+        gguf.readInt(
+            "qwen3.attention.head_count_kv");
+
+    const std::int64_t keyLength =
+        gguf.readInt(
+            "qwen3.attention.key_length");
+
+    const std::int64_t valueLength =
+        gguf.readInt(
+            "qwen3.attention.value_length");
+
+    WARN("REAL MODEL: attention.head_count = "
+         << headCount);
+
+    WARN("REAL MODEL: attention.head_count_kv = "
+         << headCountKv);
+
+    WARN("REAL MODEL: attention.key_length = "
+         << keyLength);
+
+    WARN("REAL MODEL: attention.value_length = "
+         << valueLength);
+
+    REQUIRE(headCount == 32);
+    REQUIRE(headCountKv == 8);
+    REQUIRE(keyLength == 128);
+    REQUIRE(valueLength == 128);
+
+    //
+    // These are derived from the GGUF metadata and are especially important
+    // for Qwen3 because the attention projection width is not the same as
+    // the transformer embedding width.
+    //
+    const std::int64_t queryProjectionLength =
+        headCount * keyLength;
+
+    const std::int64_t keyProjectionLength =
+        headCountKv * keyLength;
+
+    const std::int64_t valueProjectionLength =
+        headCountKv * valueLength;
+
+    WARN("REAL MODEL: derived Q projection length = "
+         << queryProjectionLength);
+
+    WARN("REAL MODEL: derived K projection length = "
+         << keyProjectionLength);
+
+    WARN("REAL MODEL: derived V projection length = "
+         << valueProjectionLength);
+
+    REQUIRE(queryProjectionLength == 4096);
+    REQUIRE(keyProjectionLength == 1024);
+    REQUIRE(valueProjectionLength == 1024);
+
+    //
+    // ------------------------------------------------------------------------
+    // RoPE and normalization.
+    // ------------------------------------------------------------------------
+    //
+
+    const std::int64_t ropeDimensionCount =
+        gguf.readInt(
+            "qwen3.rope.dimension_count");
+
+    const float ropeFreqBase =
+        gguf.readFloat(
+            "qwen3.rope.freq_base");
+
+    const float rmsNormEps =
+        gguf.readFloat(
+            "qwen3.attention.layer_norm_rms_epsilon");
+
+    WARN("REAL MODEL: rope.dimension_count = "
+         << ropeDimensionCount);
+
+    WARN("REAL MODEL: rope.freq_base = "
+         << ropeFreqBase);
+
+    WARN("REAL MODEL: attention.layer_norm_rms_epsilon = "
+         << rmsNormEps);
+
+    //
+    // This GGUF does not currently expose qwen3.rope.dimension_count.
+    // Qwen resolves this from the attention head dimension instead.
+    //
+    REQUIRE(ropeDimensionCount == -1);
+
+    REQUIRE(ropeFreqBase == Catch::Approx(5000000.0f));
+    REQUIRE(rmsNormEps == Catch::Approx(1.0e-6f));
+
+    //
+    // ------------------------------------------------------------------------
+    // GGUF structure.
+    // ------------------------------------------------------------------------
+    //
+
     REQUIRE(gguf.version() > 0);
     REQUIRE(gguf.alignment() > 0);
     REQUIRE(gguf.dataOffset() > 0);
     REQUIRE(gguf.keyValueCount() > 0);
     REQUIRE(gguf.tensorCount() > 0);
-    REQUIRE(ggmlContext == nullptr);
-    REQUIRE(gguf.hasKey("general.architecture"));
 
-    auto architecture = gguf.keyValue( "general.architecture");
+    WARN("REAL MODEL: GGUF version = "
+         << gguf.version());
 
-    REQUIRE(architecture != nullptr);
-    REQUIRE(architecture->isString());
+    WARN("REAL MODEL: alignment = "
+         << gguf.alignment());
 
-    WARN("REAL MODEL:  architecture = "         << architecture->value<std::string>());
-    WARN("REAL MODEL:  version = "              << gguf.version());
-    WARN("REAL MODEL:  alignment = "            << gguf.alignment());
-    WARN("REAL MODEL:  key/value count = "      << gguf.keyValueCount());
-    WARN("REAL MODEL:  GGUF tensor count = "    << gguf.tensorCount());
+    WARN("REAL MODEL: data offset = "
+         << gguf.dataOffset());
+
+    WARN("REAL MODEL: key/value count = "
+         << gguf.keyValueCount());
+
+    WARN("REAL MODEL: tensor count = "
+         << gguf.tensorCount());
 }
 
 

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <memory>
 #include <optional>
 #include <string>
@@ -161,6 +162,56 @@ public:
         return std::nullopt;
     }
 
+    struct Match
+    {
+        TokenId     id{kInvalidToken};
+        std::size_t position{std::string_view::npos};
+        std::size_t length{0};
+    };
+
+
+    [[nodiscard]] std::optional<Match> findNext(
+        std::string_view text,
+        std::size_t offset = 0) const noexcept
+    {
+        Match best;
+
+        for (const TokenId id : m_specialIds) {
+            const std::string_view name =
+                nameById(id);
+
+            if (name.empty())
+                continue;
+
+            const std::size_t position =
+                text.find(
+                    name,
+                    offset);
+
+            if (position == std::string_view::npos)
+                continue;
+
+            if (best.id == kInvalidToken ||
+                position < best.position ||
+                (position == best.position &&
+                 name.size() > best.length)) {
+
+                best.id =
+                    id;
+
+                best.position =
+                    position;
+
+                best.length =
+                    name.size();
+            }
+        }
+
+        if (best.id == kInvalidToken)
+            return std::nullopt;
+
+        return best;
+    }
     [[nodiscard]] std::string_view nameById(TokenId id) const noexcept
     {
         auto it = m_idToName.find(id);
@@ -190,6 +241,8 @@ public:
     }
 
 private:
+
+
     [[nodiscard]] bool isCanonicalId(TokenId id) const noexcept
     {
         return m_bosId      == id ||

@@ -5,12 +5,6 @@ project(job-inference-test
     LANGUAGES CXX
 )
 
-# Hard code these
-# jmills@mantle-os:~/git/opensource/qwen_tmp$ ls
-# config.json  generation_config.json  tokenizer_config.json  tokenizer.json  vocab.json
-# /srv/ai/ComfyUI/models/text_encoders/ZImage_Turbo/Qwen3-4B-Instruct-2507-Q4_K_M.gguf
-
-
 add_executable(job-inference-test
     main.cpp
 )

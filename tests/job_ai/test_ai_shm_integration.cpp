@@ -5,6 +5,7 @@
 #include <thread>
 #include <vector>
 #include <span>
+#include <semaphore.h>
 
 #include <job_shared_memory.h>
 

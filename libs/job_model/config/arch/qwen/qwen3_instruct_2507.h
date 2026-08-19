@@ -26,6 +26,10 @@ public:
     static constexpr float kDefaultRmsNormEps = 1e-6f;
     static constexpr float kDefaultRopeTheta  = 5000000.0f;
 
+    static constexpr float   kDefaultTemperature = 0.7f;
+    static constexpr int32_t kDefaultTopK        = 20;
+    static constexpr float   kDefaultTopP        = 0.8f;
+
     Qwen3Instruct2507Config()
     {
         auto &arch = archConfig();
@@ -64,6 +68,16 @@ public:
         output.setFinalLogitSoftCapping(0.0f);
         output.setTieWordEmbeddings(true);
 
+        auto &sampler = samplerConfig();
+        sampler.setTemperature(kDefaultTemperature);
+        sampler.setTopK(kDefaultTopK);
+        sampler.setTopP(kDefaultTopP);
+        sampler.setMinP(0.0f);
+        sampler.setRepeatPenalty(1.0f);
+        sampler.setFrequencyPenalty(0.0f);
+        sampler.setPresencePenalty(0.0f);
+        sampler.setGreedy(false);
+
         clearMoeConfig();
     }
 
@@ -78,6 +92,7 @@ public:
         const auto &norm        = normConfig();
         const auto &rope        = ropeConfig();
         const auto &ffn         = feedForwardConfig();
+        const auto &sampler     = samplerConfig();
 
         return
             arch.arch() == ModelArchitecture::Qwen3 &&
@@ -92,6 +107,10 @@ public:
             norm.rmsNormEps() == kDefaultRmsNormEps &&
             rope.ropeFreqBase() == kDefaultRopeTheta &&
             ffn.feedForwardLength() == kDefaultIntermediate &&
+            sampler.temperature() == kDefaultTemperature &&
+            sampler.topK() == kDefaultTopK &&
+            sampler.topP() == kDefaultTopP &&
+            !sampler.greedy() &&
             !hasMoeConfig();
     }
 };

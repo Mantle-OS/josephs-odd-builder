@@ -78,6 +78,16 @@ public:
 
     [[nodiscard]] std::string decode(std::span<const TokenId> tokens) const;
 
+
+    std::string applyChatMessages(std::span<const ChatMessage> messages, bool addGenerationPrompt = true) const
+    {
+        if (!isReady() || !m_chatEngine)
+            return {};
+
+        return m_chatEngine->apply(messages, addGenerationPrompt);
+    }
+
+
 private:
     [[nodiscard]] bool configure();
 
@@ -88,6 +98,8 @@ private:
         m_splitter.reset();
         m_normalizer.reset();
     }
+
+    void encodeNormalText(std::string_view text, std::vector<TokenId> &output) const;
 
     IToken::UPtr            m_token;
     UnicodeNormalizer::UPtr m_normalizer;

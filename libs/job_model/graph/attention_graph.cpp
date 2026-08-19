@@ -10,6 +10,7 @@
 #include "graph/linear_graph.h"
 #include "graph/norm_graph.h"
 #include "graph/rope_graph.h"
+#include "graph/gated_ffn_graph.h"
 
 namespace job::model {
 
@@ -19,17 +20,32 @@ ggml::JobGgmlTensorOp::UPtr AttentionGraph::tensorOp(const ggml::JobGgmlTensor &
     return ggml::JobGgmlTensorOp::createUniq(const_cast<struct ggml_tensor *>(tensor.tensor()), ctx);
 }
 
-ggml::JobGgmlTensorOp::UPtr AttentionGraph::build(ggml::JobGgmlTensorOp::UPtr input,
-                                                  const LayerWeights &weights,
-                                                  const AttentionConfig &config,
-                                                  KvCache &kvCache,
-                                                  const ggml::JobGgmlTensor &positions,
-                                                  uint32_t layerIndex,
-                                                  uint32_t nPast,
-                                                  float rmsNormEps,
-                                                  uint32_t ropeDimensions,
-                                                  int ropeMode,
-                                                  ggml::JobGgmlType inputType)
+// ggml::JobGgmlTensorOp::UPtr AttentionGraph::build(ggml::JobGgmlTensorOp::UPtr input,
+//                                                   const LayerWeights &weights,
+//                                                   const AttentionConfig &config,
+//                                                   KvCache &kvCache,
+//                                                   const ggml::JobGgmlTensor &positions,
+//                                                   uint32_t layerIndex,
+//                                                   uint32_t nPast,
+//                                                   float rmsNormEps,
+//                                                   uint32_t ropeDimensions,
+//                                                   int ropeMode,
+//                                                   ggml::JobGgmlType inputType,
+//                                                   const RopeConfig *ropeConfig)
+ggml::JobGgmlTensorOp::UPtr AttentionGraph::build(
+    ggml::JobGgmlTensorOp::UPtr input,
+    const LayerWeights &weights,
+    const AttentionConfig &config,
+    KvCache &kvCache,
+    const ggml::JobGgmlTensor &positions,
+    uint32_t layerIndex,
+    uint32_t nPast,
+    float rmsNormEps,
+    uint32_t ropeDimensions,
+    int ropeMode,
+    ggml::JobGgmlType inputType,
+    const RopeConfig *ropeConfig,
+    GqaExpander gqaExpander)
 {
     if (!input || !input->isValid())
         throw std::invalid_argument{"AttentionGraph requires a valid input tensor"};
@@ -151,24 +167,37 @@ ggml::JobGgmlTensorOp::UPtr AttentionGraph::build(ggml::JobGgmlTensorOp::UPtr in
     //
     // Rotary positional embedding.
     //
-    q = RopeGraph::build(std::move(q),
-                         positions,
-                         ropeDimensions,
-                         ropeMode);
+    if (ropeConfig) {
+        q = RopeGraph::build(std::move(q),
+                             positions,
+                             ropeConfig,
+                             ropeDimensions,
+                             ropeMode);
 
-    k = RopeGraph::build(std::move(k),
-                         positions,
-                         ropeDimensions,
-                         ropeMode);
+        k = RopeGraph::build(std::move(k),
+                             positions,
+                             ropeConfig,
+                             ropeDimensions,
+                             ropeMode);
+    } else {
+        q = RopeGraph::build(std::move(q),
+                             positions,
+                             ropeDimensions,
+                             ropeMode);
+
+        k = RopeGraph::build(std::move(k),
+                             positions,
+                             ropeDimensions,
+                             ropeMode);
+    }
 
     //
     // Append this token range to the layer KV cache.
     //
     LayerKvEntry &kvEntry = kvCache.layer(layerIndex);
 
-    if (!kvEntry.k || !kvEntry.k->isValid() || !kvEntry.v || !kvEntry.v->isValid()) {
+    if (!kvEntry.k || !kvEntry.k->isValid() || !kvEntry.v || !kvEntry.v->isValid())
         throw std::runtime_error{"AttentionGraph requires valid layer KV tensors"};
-    }
 
     const int64_t kvRowSize = static_cast<int64_t>(headCountKv) * static_cast<int64_t>(headDimensionKv);
 
@@ -183,9 +212,7 @@ ggml::JobGgmlTensorOp::UPtr AttentionGraph::build(ggml::JobGgmlTensorOp::UPtr in
     const std::size_t kRowBytes = static_cast<std::size_t>(kvRowSize) * kTypeSize;
 
     const std::size_t vRowBytes = static_cast<std::size_t>(kvRowSize) * vTypeSize;
-
     const std::size_t kCacheOffset = static_cast<std::size_t>(nPast) * kRowBytes;
-
     const std::size_t vCacheOffset = static_cast<std::size_t>(nPast) * vRowBytes;
 
     auto kCacheView = tensorOp(*kvEntry.k, ctx)->view2d(kvRowSize,
@@ -198,16 +225,28 @@ ggml::JobGgmlTensorOp::UPtr AttentionGraph::build(ggml::JobGgmlTensorOp::UPtr in
                                                         vRowBytes,
                                                         vCacheOffset);
 
-    (void)kFlat->cpy(*kCacheView);
-    (void)vFlat->cpy(*vCacheView);
+    auto kCacheWrite = kFlat->cpy(*kCacheView);
+
+    auto vCacheWrite =
+        vFlat->cpy(*vCacheView);
+
+    if (!kCacheWrite || !kCacheWrite->isValid())
+        throw std::runtime_error{"AttentionGraph failed to create K cache write"};
+
+    if (!vCacheWrite || !vCacheWrite->isValid())
+        throw std::runtime_error{"AttentionGraph failed to create V cache write"};
 
     //
     // Read the complete active cache range.
     //
-    const int64_t totalCtx = static_cast<int64_t>(totalContext);
+    // Continue the graph from the cache-write operations so that the writes
+    // remain part of the expression tree consumed by attention.
+    //
+    const int64_t totalCtx =
+        static_cast<int64_t>(totalContext);
 
     auto kAll =
-        tensorOp(*kvEntry.k, ctx)->view3d(
+        kCacheWrite->view3d(
             headDimensionKv,
             headCountKv,
             totalCtx,
@@ -216,7 +255,7 @@ ggml::JobGgmlTensorOp::UPtr AttentionGraph::build(ggml::JobGgmlTensorOp::UPtr in
             0);
 
     auto vAll =
-        tensorOp(*kvEntry.v, ctx)->view3d(
+        vCacheWrite->view3d(
             headDimensionKv,
             headCountKv,
             totalCtx,
@@ -227,8 +266,13 @@ ggml::JobGgmlTensorOp::UPtr AttentionGraph::build(ggml::JobGgmlTensorOp::UPtr in
     //
     // MHA is a no-op here; GQA/MQA expand KV heads to query-head geometry.
     //
-    kAll = GqaGraph::expand(std::move(kAll), headCount);
-    vAll = GqaGraph::expand(std::move(vAll), headCount);
+    if (gqaExpander) {
+        kAll = gqaExpander(std::move(kAll), headCount);
+        vAll = gqaExpander(std::move(vAll), headCount);
+    } else {
+        kAll = GqaGraph::expand(std::move(kAll), headCount);
+        vAll = GqaGraph::expand(std::move(vAll), headCount);
+    }
 
     //
     // Scaled dot-product attention.

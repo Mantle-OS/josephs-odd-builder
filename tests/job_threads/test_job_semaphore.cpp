@@ -3,6 +3,7 @@
 #include <catch2/benchmark/catch_benchmark.hpp>
 #endif
 
+#include <unistd.h>
 #include <atomic>
 #include <chrono>
 #include <functional>

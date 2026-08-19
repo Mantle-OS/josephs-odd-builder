@@ -48,9 +48,7 @@ ggml::JobGgmlCGraph::UPtr QwenGraphBuilder::buildForward(ggml::JobGgmlContext &c
     const NormConfig &normConfig               = m_config.normConfig();
     const RopeConfig &ropeConfig               = m_config.ropeConfig();
     const OutputHeadConfig &outputConfig       = m_config.outputHeadConfig();
-
-    const uint32_t nTokens =
-        static_cast<uint32_t>(inputTokens.extent(0));
+    const uint32_t nTokens = static_cast<uint32_t>(inputTokens.extent(0));
 
     if (nTokens == 0)
         throw std::invalid_argument{"QwenGraphBuilder requires at least one input token"};
@@ -75,23 +73,18 @@ ggml::JobGgmlCGraph::UPtr QwenGraphBuilder::buildForward(ggml::JobGgmlContext &c
     //
     // Token embedding.
     //
-    auto cur = EmbeddingGraph::build(ctx,
-                                     inputTokens,
-                                     *m_weights.tokenEmbd());
+    auto cur = EmbeddingGraph::build(ctx, inputTokens, *m_weights.tokenEmbd());
 
     //
     // Positions are graph-produced data rather than host-filled tensors.
     // This keeps position storage under normal graph allocation/scheduling
     // instead of recreating the old setTensorBackend() placement hack.
     //
-    auto positions =
-        cur->arange(static_cast<float>(nPast),
-                    static_cast<float>(nPast + nTokens),
-                    1.0f)
-            ->cast(ggml::JobGgmlType::I32);
+    auto positions = cur->arange(static_cast<float>(nPast),
+                                static_cast<float>(nPast + nTokens),
+                                 1.0f)->cast(ggml::JobGgmlType::I32);
 
-    const GatedFfnGraph::Activation hiddenActivation =
-        activation(m_config.archConfig().hiddenActivation());
+    const GatedFfnGraph::Activation hiddenActivation = activation(m_config.archConfig().hiddenActivation());
 
     //
     // Qwen transformer blocks:
@@ -99,9 +92,7 @@ ggml::JobGgmlCGraph::UPtr QwenGraphBuilder::buildForward(ggml::JobGgmlContext &c
     //   x = x + Attention(RMSNorm(x))
     //   x = x + FFN(RMSNorm(x))
     //
-    for (uint32_t layerIndex = 0;
-         layerIndex < transformerConfig.blockCount();
-         ++layerIndex) {
+    for (uint32_t layerIndex = 0; layerIndex < transformerConfig.blockCount(); ++layerIndex) {
 
         const LayerWeights &weights = m_weights.layer(layerIndex);
 
@@ -111,36 +102,36 @@ ggml::JobGgmlCGraph::UPtr QwenGraphBuilder::buildForward(ggml::JobGgmlContext &c
         if (!weights.ffnNorm || !weights.ffnNorm->isValid())
             throw std::runtime_error{"QwenGraphBuilder requires feed-forward normalization weights"};
 
-        auto attentionInput =
-            NormGraph::rms(cur->dup(),
-                           *weights.attnNorm,
-                           normConfig.rmsNormEps(),
-                           weights.attnNormBias.get());
+        auto attentionInput = NormGraph::rms(cur->dup(),
+                                             *weights.attnNorm,
+                                             normConfig.rmsNormEps(),
+                                             weights.attnNormBias.get());
 
-        auto attention =
-            AttentionGraph::build(std::move(attentionInput),
-                                  weights,
-                                  attentionConfig,
-                                  m_kvCache,
-                                  *positions,
-                                  layerIndex,
-                                  nPast,
-                                  normConfig.rmsNormEps(),
-                                  ropeDimensions,
-                                  2,
-                                  inputType);
+        auto attention = AttentionGraph::build(std::move(attentionInput),
+                                               weights,
+                                               attentionConfig,
+                                               m_kvCache,
+                                               *positions,
+                                               layerIndex,
+                                               nPast,
+                                               normConfig.rmsNormEps(),
+                                               ropeDimensions,
+                                               2,
+                                               inputType,
+                                               &ropeConfig,
+                                               &QwenGraphBuilder::expandGqa);
 
         cur = ResidualGraph::build(std::move(cur),
                                    std::move(attention));
 
-        auto ffnInput =
-            NormGraph::rms(cur->dup(),
+        auto ffnInput = NormGraph::rms(cur->dup(),
                            *weights.ffnNorm,
                            normConfig.rmsNormEps(),
                            weights.ffnNormBias.get());
 
-        auto ffn =
-            GatedFfnGraph::build(std::move(ffnInput),
+
+        // replace here ?
+        auto ffn = GatedFfnGraph::build(std::move(ffnInput),
                                  weights,
                                  hiddenActivation,
                                  inputType);
@@ -175,18 +166,82 @@ ggml::JobGgmlCGraph::UPtr QwenGraphBuilder::buildForward(ggml::JobGgmlContext &c
         outputConfig.finalLogitSoftCapping();
 
     if (softCap > 0.0f) {
-        logits = logits
-                     ->scale(1.0f / softCap)
-                     ->tanh()
-                     ->scale(softCap);
+        logits = logits->scale(1.0f / softCap)->tanh()->scale(softCap);
     }
 
     logits->setName("logits");
+    auto graphOp = ggml::JobGgmlTensorOpGraph::wrap(std::move(logits));
 
-    auto graphOp =
-        ggml::JobGgmlTensorOpGraph::wrap(std::move(logits));
 
-    return graphOp->buildGraph();
+    return graphOp->buildGraph(8192);
+    // return graphOp->buildGraph();
+}
+
+ggml::JobGgmlTensorOp::UPtr QwenGraphBuilder::expandGqa(
+    ggml::JobGgmlTensorOp::UPtr input,
+    uint32_t queryHeadCount)
+{
+    if (!input || !input->isValid())
+        throw std::invalid_argument{"QwenGraphBuilder GQA requires a valid input tensor"};
+
+    if (!input->isThreeDimensional())
+        throw std::invalid_argument{"QwenGraphBuilder GQA requires a three-dimensional input tensor"};
+
+    if (queryHeadCount == 0)
+        throw std::invalid_argument{"QwenGraphBuilder GQA requires at least one query head"};
+
+    const int64_t headDimension = input->extent(0);
+    const int64_t kvHeadCount   = input->extent(1);
+    const int64_t contextLength = input->extent(2);
+
+    if (headDimension <= 0)
+        throw std::invalid_argument{"QwenGraphBuilder GQA requires a positive head dimension"};
+
+    if (kvHeadCount <= 0)
+        throw std::invalid_argument{"QwenGraphBuilder GQA requires at least one KV head"};
+
+    if (contextLength <= 0)
+        throw std::invalid_argument{"QwenGraphBuilder GQA requires a positive context length"};
+
+    if (static_cast<int64_t>(queryHeadCount) < kvHeadCount)
+        throw std::invalid_argument{"QwenGraphBuilder GQA query head count cannot be less than KV head count"};
+
+    if (static_cast<int64_t>(queryHeadCount) == kvHeadCount)
+        return input;
+
+    if (static_cast<int64_t>(queryHeadCount) % kvHeadCount != 0)
+        throw std::invalid_argument{"QwenGraphBuilder GQA query head count must be divisible by KV head count"};
+
+    const int64_t repeatCount = static_cast<int64_t>(queryHeadCount) / kvHeadCount;
+
+
+    auto reshaped = input->reshape4d(headDimension,
+                                     1,
+                                     kvHeadCount,
+                                     contextLength);
+
+    auto repeated = reshaped->repeat4d(headDimension,
+                                       repeatCount,
+                                       kvHeadCount,
+                                       contextLength);
+
+    auto flattened = repeated->reshape3d(headDimension,
+                                         static_cast<int64_t>(queryHeadCount),
+                                         contextLength);
+
+    return flattened->cont();
+    // return input ->reshape4d(headDimension,
+    //                 1,
+    //                 kvHeadCount,
+    //                 contextLength)
+    //     ->repeat4d(headDimension,
+    //                repeatCount,
+    //                kvHeadCount,
+    //                contextLength)
+    //     ->reshape3d(headDimension,
+    //                 static_cast<int64_t>(queryHeadCount),
+    //                 contextLength)
+    //     ->cont();
 }
 
 GatedFfnGraph::Activation QwenGraphBuilder::activation(std::string_view name)
