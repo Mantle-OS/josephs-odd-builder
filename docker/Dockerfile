@@ -20,7 +20,6 @@ RUN apt-get update && \
         gcc-16 \
         g++-16 build-essential chrpath \
         wget git wget ca-certificates git cmake \
-        libcublas-dev-13-3 && \
         libssl-dev libzstd-dev pkgconf libpkgconf-dev zlib1g-dev \
         libsodium-dev libflatbuffers-dev nlohmann-json3-dev \
         libyaml-cpp-dev libmsgpack-cxx-dev libcatch2-dev \
@@ -44,6 +43,7 @@ RUN wget https://developer.download.nvidia.com/compute/cuda/repos/debian12/x86_6
         cuda-nvcc-13-3 \
         cuda-cudart-dev-13-3 \
         cuda-libraries-dev-13-3 \
+        libcublas-dev-13-3 \
         libcusparse-13-3 libcusparse-dev-13-3  cublas13 libcublas13-dev-cuda-13 \
         cuda-cudart-13-3 cuda-cudart-dev-13-3 libcurand-13-3 libcurand-dev-13-3 \
         cuda-libraries-13-3  cuda-runtime-13-3 cuda-opencl-13-3 && \
