@@ -19,7 +19,7 @@ RUN apt-get update && \
     apt-get install --no-install-recommends -y \
         gcc-16 \
         g++-16 build-essential chrpath \
-        wget git wget ca-certificates git cmake \
+        wget git wget ca-certificates git cmake ninja-build pkg-config \
         libssl-dev libzstd-dev pkgconf libpkgconf-dev zlib1g-dev \
         libsodium-dev libflatbuffers-dev nlohmann-json3-dev \
         libyaml-cpp-dev libmsgpack-cxx-dev libcatch2-dev \
@@ -29,7 +29,7 @@ RUN apt-get update && \
         libwireplumber-0.5-dev libspa-0.2-dev pipewire-alsa libpipewire-0.3-dev \
         libspa-0.2-jack libspa-0.2-bluetooth libspa-0.2-modules libasound2-dev \
         libopus-dev libflac-dev libogg-dev libvorbis-dev  libwavpack-dev \
-        libgl1 libglib2.0-0 libudev-dev && \
+        libgl1 libglib2.0-0 libudev-dev libopenblas-dev && \
     rm -rf /var/lib/apt/lists/*
 
 RUN update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-16 100 --slave /usr/bin/g++ g++ /usr/bin/g++-16 && \
