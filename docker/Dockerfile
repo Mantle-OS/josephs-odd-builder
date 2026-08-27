@@ -17,7 +17,7 @@ ENV LD_LIBRARY_PATH=${CUDA_HOME}/lib64:${LD_LIBRARY_PATH}
 
 RUN apt-get update && \
     apt-get install --no-install-recommends -y \
-        gcc-16 linux-headers-$(uname -r)
+        gcc-16 linux-headers-$(uname -r) \
         g++-16 build-essential chrpath \
         wget git wget ca-certificates \
         libcublas-dev-13-3 && \
@@ -32,8 +32,6 @@ RUN apt-get update && \
         libopus-dev libflac-dev libogg-dev libvorbis-dev  libwavpack-dev \
         libgl1 libglib2.0-0 && \
     rm -rf /var/lib/apt/lists/*
-
-RUN ln -s /usr/bin/python3 /usr/bin/python
 
 RUN update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-16 100 --slave /usr/bin/g++ g++ /usr/bin/g++-16 && \
     update-alternatives --set gcc /usr/bin/gcc-16
