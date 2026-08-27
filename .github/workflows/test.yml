@@ -10,10 +10,11 @@ env:
 
 jobs:
   build:
-    runs-on: debian-sid
+    runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
-
+      with:
+        submodules: recursive
     - name: Install Dependencies
       run: |
         lsb_release -a
