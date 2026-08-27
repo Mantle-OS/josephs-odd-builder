@@ -11,31 +11,12 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/${{ github.repository }}:latest
     steps:
     - uses: actions/checkout@v4
       with:
         submodules: recursive
-    - name: Install Dependencies
-      run: |
-        lsb_release -a
-        sudo apt-get update
-        sudo apt install gcc-16 linux-headers-$(uname -r)
-        wget https://developer.download.nvidia.com/compute/cuda/repos/debian-13/x86_64/cuda-keyring_1.1-1_all.deb
-        sudo dpkg -i cuda-keyring_1.1-1_all.deb
-        sudo apt-get update
-        sudo apt -V install libnvidia-compute nvidia-dkms-open
-        sudo apt install libssl-dev libzstd-dev pkgconf libpkgconf-dev zlib1g-dev \
-            libsodium-dev libflatbuffers-dev nlohmann-json3-dev \
-            libyaml-cpp-dev libmsgpack-cxx-dev libcatch2-dev \
-            libcusparse-13-3 libcusparse-dev-13-3  cublas13 libcublas13-dev-cuda-13 \
-            cuda-cudart-13-3 cuda-cudart-dev-13-3 libcurand-13-3 libcurand-dev-13-3 \
-            cuda-libraries-13-3  cuda-runtime-13-3 cuda-opencl-13-3 \
-            qt6-base-dev libqt6gui6 qt6-declarative-dev qt6-3d-dev qt6-quick3d-dev qt6-graphs-dev \
-            qml6-module-qtquick3d qml6-module-qtquick-layouts qml6-module-qtquick-controls \
-            qml6-module-qtgraphs qml6-module-qtcore qml6-module-qtqml \
-            libwireplumber-0.5-dev libspa-0.2-dev pipewire-alsa libpipewire-0.3-dev \
-            libspa-0.2-jack libspa-0.2-bluetooth libspa-0.2-modules libasound2-dev \
-            libopus-dev libflac-dev libogg-dev libvorbis-dev  libwavpack-dev
 
     - name: Configure CMake
       run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DJOB_CI_BUILD=ON

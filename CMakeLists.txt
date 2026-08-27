@@ -35,6 +35,13 @@ add_subdirectory(tests)
 
 add_subdirectory(docs)
 
+
+add_custom_target(github_docker_ci SOURCES
+    docker/Dockerfile
+    docker/entry_point.sh
+)
+
+
 add_custom_target(github_ci SOURCES .github/workflows/test.yml )
 
 include(cmake/cmake_print_status.cmake)

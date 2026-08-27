@@ -1,0 +1,22 @@
+name: JOB CI
+on:
+  push:
+    branches: [ "main" ]
+    tags: [ "v*.*.*" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  publish-builder:
+    uses: ./.github/workflows/publish_builder.yml
+    permissions:
+      contents: read
+      packages: write
+
+  test:
+    needs: publish-builder
+    uses: ./.github/workflows/test.yml
+    permissions:
+      contents: read
+      packages: read
