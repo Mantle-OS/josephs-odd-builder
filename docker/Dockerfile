@@ -20,6 +20,7 @@ RUN apt-get update && \
         gcc-16 \
         g++-16 build-essential chrpath \
         wget git wget ca-certificates git cmake ninja-build pkg-config \
+        glslc libvulkan-dev libvulkan1 libwebp-dev \
         libssl-dev libzstd-dev pkgconf libpkgconf-dev zlib1g-dev \
         libsodium-dev libflatbuffers-dev nlohmann-json3-dev \
         libyaml-cpp-dev libmsgpack-cxx-dev libcatch2-dev \
