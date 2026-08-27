@@ -42,14 +42,14 @@ pkg_check_modules(Flatbuffers  REQUIRED flatbuffers)
 pkg_check_modules(NlohmannJson REQUIRED nlohmann_json)
 pkg_check_modules(YAMLCpp      REQUIRED yaml-cpp)
 
-## Sound land (extras for fun libspa-0.2-jack libspa-0.2-bluetooth libspa-0.2-modules )
+## Sound land
 # sudo apt-get install libwireplumber-0.5-dev libspa-0.2-dev pipewire-alsa libpipewire-0.3-dev libspa-0.2-jack libspa-0.2-bluetooth libspa-0.2-modules libasound2-dev
 pkg_check_modules(LibAlsa           REQUIRED alsa)
 pkg_check_modules(LibSPA            REQUIRED libspa-0.2)
 pkg_check_modules(LibPipewire       REQUIRED libpipewire-0.3)
 pkg_check_modules(LibWirePlumber    REQUIRED wireplumber-0.5)
 
-## Sound land Codec madness
+## Sound land Codecs
 # sudo apt-get install -y libopus-dev libflac-dev libogg-dev libvorbis-dev  libwavpack-dev
 pkg_check_modules(LibOpus        REQUIRED opus)
 pkg_check_modules(LibFLAC        REQUIRED flac)
@@ -59,8 +59,9 @@ pkg_check_modules(LibWavPack     wavpack)
 if(LibWavPack_FOUND)
     add_compile_definitions(JOB_HAS_WAVPACK=1)
 endif()
-
 ## End Sound
+
+
 
 
 ## more ai

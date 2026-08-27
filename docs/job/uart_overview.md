@@ -4,7 +4,7 @@ serial of job.
 
 jobuart links against `job_core`, `job_threads`, and `libudev`.
 
-- `job::core` defines `job::core::IODevice`
+- `job::core` defines `job::io::IODevice`
 - `job::threads` defines `job::threads::JobIoAsyncThread` (epoll loop used for async FD callbacks)
 - `job::uart` is serial port discovery + settings + an `IODevice` implementation
 
@@ -25,7 +25,7 @@ Includes:
 
 ## SerialIO
 
-`job::core::IODevice` implementation for a serial port.
+`job::io::IODevice` implementation for a serial port.
 - opens a `/dev/tty*` path
 - applies `SerialSettings` to termios (baud, bits, parity, stop, flow)
 - uses nonblocking fd reads

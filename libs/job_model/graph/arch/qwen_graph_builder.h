@@ -52,7 +52,6 @@ public:
                                                          ggml::JobGgmlType inputType = ggml::JobGgmlType::F16) override;
 
 private:
-    [[nodiscard]] static ggml::JobGgmlTensorOp::UPtr expandGqa(ggml::JobGgmlTensorOp::UPtr input, uint32_t queryHeadCount);
     [[nodiscard]] static GatedFfnGraph::Activation activation(std::string_view name);
 
     const ModelConfig  &m_config;

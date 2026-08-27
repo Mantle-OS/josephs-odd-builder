@@ -220,57 +220,6 @@ bool SslSocket::processSslError(int result)
     }
 }
 
-
-// bool SslSocket::processSslError(int result)
-// {
-//     if (!m_impl || !m_impl->ssl) {
-//         recordSslError(JobSslError::SslErrNo::InvalidState, "SSL session is not initialized");
-//         return false;
-//     }
-
-//     const int nativeError = ::SSL_get_error(m_impl->ssl, result);
-
-//     switch (nativeError) {
-//     case SSL_ERROR_WANT_READ:
-//         m_errors.recordNativeError(nativeError);
-//         return updateEvents(JobSslError::SslErrNo::WantRead);
-
-//     case SSL_ERROR_WANT_WRITE:
-//         m_errors.recordNativeError(nativeError);
-//         return updateEvents(JobSslError::SslErrNo::WantWrite);
-
-//     case SSL_ERROR_WANT_CONNECT:
-//         m_errors.recordNativeError(nativeError);
-//         return updateEvents(JobSslError::SslErrNo::WantConnect);
-
-//     case SSL_ERROR_WANT_ACCEPT:
-//         m_errors.recordNativeError(nativeError);
-//         return updateEvents(JobSslError::SslErrNo::WantAccept);
-
-//     case SSL_ERROR_ZERO_RETURN:
-//         m_errors.recordNativeError(nativeError);
-
-//         if (tryBeginShutdown())
-//             shutdownSsl();
-
-//         return false;
-
-//     case SSL_ERROR_SYSCALL:
-//         m_errors.recordNativeError(nativeError);
-//         m_state.store(State::Error);
-
-//         if (onSocketError)
-//             onSocketError(errno);
-
-//         return false;
-
-//     default:
-//         m_errors.recordNativeError(nativeError);
-//         m_state.store(State::Error);
-//         return false;
-//     }
-// }
-
 bool SslSocket::verifyPeer()
 {
     if (!m_impl || !m_impl->ssl || !m_context)

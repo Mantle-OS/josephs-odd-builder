@@ -29,7 +29,7 @@ static void collectFocusableItems(const job::tui::JobTuiItem::Ptr &node, std::ve
 
 namespace job::tui {
 
-JobTuiCoreApplication::JobTuiCoreApplication(core::IODevice::Ptr device) :
+JobTuiCoreApplication::JobTuiCoreApplication(io::IODevice::Ptr device) :
     m_device(std::move(device))
 {
 }

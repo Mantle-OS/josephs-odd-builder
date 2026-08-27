@@ -75,13 +75,8 @@ bool BinaryToken::load(std::span<const std::uint8_t> buffer)
         return false;
     }
 
-    // ------------------------------------------------------------------------
     // Parse into temporary state.
-    //
-    // Nothing is committed to IToken/Vocab until the entire binary payload
-    // has been successfully consumed.
-    // ------------------------------------------------------------------------
-
+    // Nothing is committed to IToken/Vocab until the entire binary payload has been successfully consumed.
     struct ParsedToken
     {
         std::string text;
@@ -172,9 +167,7 @@ bool BinaryToken::load(std::span<const std::uint8_t> buffer)
         parsedMerges.emplace_back(std::move(left), std::move(right));
     }
 
-    // ------------------------------------------------------------------------
     // Header configuration
-    // ------------------------------------------------------------------------
     const TokenType tokenType = static_cast<TokenType>(header.modelType);
     const SplitPattern splitPattern = static_cast<SplitPattern>(header.splitPattern);
 
@@ -188,9 +181,8 @@ bool BinaryToken::load(std::span<const std::uint8_t> buffer)
     const bool addBosToken      = (header.flags & kAddBosTokenFlag) != 0;
     const bool addEosToken      = (header.flags & kAddEosTokenFlag) != 0;
 
-    // ------------------------------------------------------------------------
+
     // Commit canonical tokenizer state
-    // ------------------------------------------------------------------------
     m_version = header.version;
     m_merges = std::move(parsedMerges);
 
@@ -207,9 +199,7 @@ bool BinaryToken::load(std::span<const std::uint8_t> buffer)
         records()[i].setType(token.type);
     }
 
-    // ------------------------------------------------------------------------
     // Canonical special-token identities
-    // ------------------------------------------------------------------------
     const auto tokenId = [this](std::int32_t id) noexcept -> TokenId {
         if (id < 0)
             return kInvalidToken;

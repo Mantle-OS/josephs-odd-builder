@@ -23,7 +23,6 @@ ggml::JobGgmlTensorOp::UPtr NormGraph::rms(ggml::JobGgmlTensorOp::UPtr input,
         throw std::invalid_argument{"NormGraph requires epsilon to be finite and greater than zero"};
 
     auto result = input->rmsNorm(eps)->mul(weight);
-
     if (bias)
         result = result->add(*bias);
 

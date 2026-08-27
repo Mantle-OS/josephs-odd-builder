@@ -1,28 +1,36 @@
 #pragma once
 
+#include <array>
+#include <cstddef>
 #include <cstdint>
 #include <string>
-#include <cstdio>
+#include <string_view>
 #include <sys/stat.h>
 
-namespace job::core {
+namespace job::io {
 
 using PermissionBits = mode_t;
 
-enum class IOPermissions : PermissionBits {
-    None = 0,
+enum class IOPermissions : PermissionBits
+{
+    None                = 0,
+
     OwnerRead           = S_IRUSR,
     OwnerWrite          = S_IWUSR,
     OwnerExec           = S_IXUSR,
+
     GroupRead           = S_IRGRP,
     GroupWrite          = S_IWGRP,
     GroupExec           = S_IXGRP,
+
     OtherRead           = S_IROTH,
     OtherWrite          = S_IWOTH,
     OtherExec           = S_IXOTH,
+
     SetUserId           = S_ISUID,
     SetGroupId          = S_ISGID,
     StickyBit           = S_ISVTX,
+
     ReadUser            = S_IRUSR,                                                      // 0400
     ReadWriteUser       = S_IRUSR | S_IWUSR,                                            // 0600
     ReadWriteAll        = S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH,    // 0666
@@ -37,113 +45,180 @@ enum class IOPermissions : PermissionBits {
     return static_cast<PermissionBits>(perms);
 }
 
-enum class PermissionStringType : uint8_t {
+enum class PermissionStringType : uint8_t
+{
     Both = 0,
     OctalOnly,
     NoOctal
 };
 
+namespace permissions {
 
-// OctalOnly: "0755" | NoOctal:  "rwxr-xr-x" | Both :  "0755 rwxr-xr-x"
-[[nodiscard]] inline std::string toString(IOPermissions perms, PermissionStringType octal = PermissionStringType::OctalOnly)
+inline constexpr std::size_t kPermissionValueCount = 4096;
+inline constexpr PermissionBits kPermissionMask = 07777;
+
+struct PermissionString final
 {
-    PermissionBits m = static_cast<PermissionBits>(perms);
-    std::string ret;
+    std::array<char, 5> octal{};
+    std::array<char, 10> symbolic{};
+    std::array<char, 15> both{};
+};
 
-    char sym[10];
-    for (char &c : sym)
-        c = '-';
-    sym[9] = '\0';
+[[nodiscard]] consteval PermissionString makePermissionString(std::size_t value)
+{
+    PermissionString result{};
 
-    // User
-    if (m & S_IRUSR)
-        sym[0] = 'r';
+    const PermissionBits mode = static_cast<PermissionBits>(value);
 
-    if (m & S_IWUSR)
-        sym[1] = 'w';
+    result.octal[0] = static_cast<char>('0' + ((value >> 9) & 07));
+    result.octal[1] = static_cast<char>('0' + ((value >> 6) & 07));
+    result.octal[2] = static_cast<char>('0' + ((value >> 3) & 07));
+    result.octal[3] = static_cast<char>('0' + (value & 07));
+    result.octal[4] = '\0';
 
-    {
-        char c = (m & S_IXUSR) ? 'x' : '-';
-        if (m & S_ISUID)
-            c = (c == 'x') ? 's' : 'S';
-        sym[2] = c;
-    }
+    result.symbolic = {
+        '-',
+        '-',
+        '-',
+        '-',
+        '-',
+        '-',
+        '-',
+        '-',
+        '-',
+        '\0'
+    };
 
-    if (m & S_IRGRP)
-        sym[3] = 'r';
+    if (mode & S_IRUSR)
+        result.symbolic[0] = 'r';
 
-    if (m & S_IWGRP)
-        sym[4] = 'w';
+    if (mode & S_IWUSR)
+        result.symbolic[1] = 'w';
 
-    {
-        char c = (m & S_IXGRP) ? 'x' : '-';
-        if (m & S_ISGID) {
-            // setgid modifies group exec position
-            c = (c == 'x') ? 's' : 'S';
-        }
-        sym[5] = c;
-    }
+    if (mode & S_IXUSR)
+        result.symbolic[2] = 'x';
 
-    if (m & S_IROTH)
-        sym[6] = 'r';
+    if (mode & S_ISUID)
+        result.symbolic[2] = (mode & S_IXUSR) ? 's' : 'S';
 
-    if (m & S_IWOTH)
-        sym[7] = 'w';
+    if (mode & S_IRGRP)
+        result.symbolic[3] = 'r';
 
-    {
-        char c = (m & S_IXOTH) ? 'x' : '-';
-        if (m & S_ISVTX) {
-            // sticky bit modifies other exec position
-            c = (c == 'x') ? 't' : 'T';
-        }
-        sym[8] = c;
-    }
+    if (mode & S_IWGRP)
+        result.symbolic[4] = 'w';
 
-    ret.clear();
+    if (mode & S_IXGRP)
+        result.symbolic[5] = 'x';
 
-    if(octal == PermissionStringType::NoOctal){
-        ret.reserve(10);
-        ret.append(sym);
-    }else{
-        char oct[7];
-        auto masked = static_cast<unsigned>(m & 07777u);
-        std::snprintf(oct, sizeof(oct), "%04o", masked);
-        if(octal == PermissionStringType::Both){
-            ret.reserve(14);
-            ret.append(oct);
-            ret.push_back(' ');
-            ret.append(sym);
-        }else{
-            ret.reserve(4);
-            ret.append(oct);
-        }
-    }
+    if (mode & S_ISGID)
+        result.symbolic[5] = (mode & S_IXGRP) ? 's' : 'S';
 
-    return ret;
+    if (mode & S_IROTH)
+        result.symbolic[6] = 'r';
+
+    if (mode & S_IWOTH)
+        result.symbolic[7] = 'w';
+
+    if (mode & S_IXOTH)
+        result.symbolic[8] = 'x';
+
+    if (mode & S_ISVTX)
+        result.symbolic[8] = (mode & S_IXOTH) ? 't' : 'T';
+
+    result.both[0] = result.octal[0];
+    result.both[1] = result.octal[1];
+    result.both[2] = result.octal[2];
+    result.both[3] = result.octal[3];
+    result.both[4] = ' ';
+
+    for (std::size_t i = 0; i < 9; ++i)
+        result.both[i + 5] = result.symbolic[i];
+
+    result.both[14] = '\0';
+
+    return result;
 }
 
-// maybe add more later
-[[nodiscard]] inline const char *toName(IOPermissions perms)
+[[nodiscard]] consteval auto makePermissionStringTable()
+{
+    std::array<PermissionString, kPermissionValueCount> table{};
+
+    for (std::size_t i = 0; i < table.size(); ++i)
+        table[i] = makePermissionString(i);
+
+    return table;
+}
+
+inline constexpr auto kPermissionStrings = makePermissionStringTable();
+
+[[nodiscard]] constexpr std::size_t index(IOPermissions perms) noexcept
+{
+    return static_cast<std::size_t>(toMode(perms) & kPermissionMask);
+}
+
+} // namespace permissions
+
+// No allocation. No snprintf. No formatting work.
+//
+// OctalOnly: "0755"
+// NoOctal:   "rwxr-xr-x"
+// Both:      "0755 rwxr-xr-x"
+[[nodiscard]] constexpr std::string_view toStringView(
+    IOPermissions perms,
+    PermissionStringType type = PermissionStringType::OctalOnly) noexcept
+{
+    const auto &entry = permissions::kPermissionStrings[permissions::index(perms)];
+
+    switch (type) {
+    case PermissionStringType::Both:
+        return std::string_view(entry.both.data(), 14);
+
+    case PermissionStringType::NoOctal:
+        return std::string_view(entry.symbolic.data(), 9);
+
+    case PermissionStringType::OctalOnly:
+    default:
+        return std::string_view(entry.octal.data(), 4);
+    }
+}
+
+// Compatibility API.
+// std::string will generally use SSO for all three representations,
+// so this should still be dramatically cheaper than formatting them.
+[[nodiscard]] inline std::string toString(
+    IOPermissions perms,
+    PermissionStringType type = PermissionStringType::OctalOnly)
+{
+    return std::string(toStringView(perms, type));
+}
+
+[[nodiscard]] constexpr std::string_view toName(IOPermissions perms) noexcept
 {
     switch (perms) {
     case IOPermissions::None:
         return "None";
+
     case IOPermissions::ReadUser:
         return "ReadUser";
+
     case IOPermissions::ReadWriteUser:
         return "ReadWriteUser";
+
     case IOPermissions::ReadWriteAll:
         return "ReadWriteAll";
+
     case IOPermissions::DefaultFile:
         return "DefaultFile";
+
     case IOPermissions::DefaultDirectory:
         return "DefaultDirectory";
+
     case IOPermissions::BadIdeas:
         return "WhyAreYouDoingThis";
+
     default:
         return "Custom";
     }
 }
 
-} // namespace job::core
-
+} // namespace job::io

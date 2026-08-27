@@ -1,5 +1,6 @@
 #include "job_ansi_cursor.h"
 #include <algorithm>
+#include <optional>
 namespace job::ansi {
 Cursor::Cursor(int maxRows, int maxCols) :
     m_maxRows(maxRows),

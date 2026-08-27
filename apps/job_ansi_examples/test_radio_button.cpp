@@ -14,7 +14,7 @@ using namespace job::tui;
 using namespace job::tui::gui;
 
 int main() {
-    auto dev = IOFactory::createFromType(FactoryType::FILE_STD_OUT, "");
+    auto dev = IOFactory::createFromType(FactoryType::FileStdOut, "");
     if (!dev || !dev->openDevice()) {
         std::cerr << "Failed to open IODevice\n";
         return 1;

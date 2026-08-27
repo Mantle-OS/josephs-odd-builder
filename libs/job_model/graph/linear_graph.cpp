@@ -27,7 +27,6 @@ ggml::JobGgmlTensorOp::UPtr LinearGraph::build(ggml::JobGgmlTensorOp::UPtr input
                                                       ctx);
 
     auto result = weightOp->mulMat(*input->cast(inputType));
-
     if (bias)
         result = result->add(*bias);
 

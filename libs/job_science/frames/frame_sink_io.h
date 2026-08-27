@@ -11,7 +11,7 @@
 #include "frame_header.h"
 
 namespace job::science::frames {
-using job::core::IODevice;
+using job::io::IODevice;
 
 class FrameSinkIO final : public IFrameSink {
 public:

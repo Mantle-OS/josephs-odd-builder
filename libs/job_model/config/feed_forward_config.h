@@ -3,16 +3,14 @@
 #include <cstdint>
 #include <memory>
 
+#include <job_base_obj.h>
+
 #include "jobmodel_export.h"
 
 namespace job::model {
 
 // Feed-forward block dimensions.
-// Starts with just feedForwardLength -- moved out of TransformerConfig
-// now rather than parked, but genuinely unused until this class grows
-// to also hold activation flavor + gating (currently ArchConfig::
-// hiddenActivation, staying put until gating itself gets designed).
-class JOBMODEL_EXPORT FeedForwardConfig
+class JOBMODEL_EXPORT FeedForwardConfig : public job::core::BaseObject
 {
 public:
     using Ptr  = std::shared_ptr<FeedForwardConfig>;

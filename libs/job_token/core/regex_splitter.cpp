@@ -57,8 +57,9 @@ void RegexSplitter::compileRegex()
 
     try {
         m_regex = std::regex{
-                             m_patternStr,
-                             std::regex::ECMAScript | std::regex::optimize};
+            m_patternStr,
+            std::regex::ECMAScript | std::regex::optimize
+        };
 
         m_valid = true;
     } catch (const std::regex_error &) {
@@ -66,9 +67,7 @@ void RegexSplitter::compileRegex()
     }
 }
 
-void RegexSplitter::split(
-    std::string_view text,
-    std::vector<std::string_view> &outChunks) const
+void RegexSplitter::split(std::string_view text, std::vector<std::string_view> &outChunks) const
 {
     if (text.empty())
         return;
@@ -81,9 +80,7 @@ void RegexSplitter::split(
 
     const char *current = text.data();
     const char *const end = text.data() + text.size();
-
     std::cmatch match;
-
     while (current < end && std::regex_search(current, end, match, m_regex)) {
         // Guard against zero-length regex matches.
         if (match.length() == 0) {

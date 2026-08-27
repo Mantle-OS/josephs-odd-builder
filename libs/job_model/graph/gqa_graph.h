@@ -8,6 +8,7 @@
 
 namespace job::model {
 
+// we already(or should) a have a config for this why in the heck is this inherit of the config itsself
 class JOBMODEL_EXPORT GqaGraph final
 {
 public:

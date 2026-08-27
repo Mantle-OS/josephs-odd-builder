@@ -11,7 +11,7 @@
 #include "frames/frame_header.h"
 
 namespace job::science::frames {
-using job::core::IODevice;
+using job::io::IODevice;
 
 class FrameSourceIO : public IFrameSource {
 public:

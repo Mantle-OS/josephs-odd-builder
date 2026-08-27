@@ -57,30 +57,22 @@ bool GgufToken::load()
         return false;
     }
 
-    // ------------------------------------------------------------------------
     // Arch
-    // ------------------------------------------------------------------------
     m_modelName = m_gguf->readString("tokenizer.ggml.model", "unknown");
     setTokenType(mapGgufModelToType(m_modelName));
     m_preTokenizer = m_gguf->readString("tokenizer.ggml.pre");
     setSplitPattern(mapPreTokenizer(m_preTokenizer));
 
-    // ------------------------------------------------------------------------
     // Chat description
-    // ------------------------------------------------------------------------
     setChatTemplate(m_gguf->readString("tokenizer.chat_template"));
 
-    // ------------------------------------------------------------------------
     // Sequence / tokenizer configuration
-    // ------------------------------------------------------------------------
     setAddBosToken(m_gguf->readBool("tokenizer.ggml.add_bos_token", true));
     setAddEosToken(m_gguf->readBool("tokenizer.ggml.add_eos_token", false));
     setAddPrefixSpace(m_gguf->readBool("tokenizer.ggml.add_space_prefix", false));
     setByteFallback(m_gguf->readBool( "tokenizer.ggml.byte_fallback", false));
 
-    // ------------------------------------------------------------------------
     // Vocabulary
-    // ------------------------------------------------------------------------
     const auto tokensKv = m_gguf->keyValue("tokenizer.ggml.tokens");
     if (!tokensKv) {
         JOB_LOG_ERROR("GGUF model is missing required 'tokenizer.ggml.tokens' array");
@@ -103,9 +95,7 @@ bool GgufToken::load()
         vocab()->setToken(static_cast<TokenId>(i), std::move(tokenStrings[i]), score);
     }
 
-    // ------------------------------------------------------------------------
     // GGUF token structural types
-    // ------------------------------------------------------------------------
     const auto typeKv = m_gguf->keyValue("tokenizer.ggml.token_type");
     if (typeKv && typeKv->isArray()) {
         const auto applyTypes = [this](const auto &types) {
@@ -141,9 +131,7 @@ bool GgufToken::load()
         }
     }
 
-    // ------------------------------------------------------------------------
     // BPE merge description
-    // ------------------------------------------------------------------------
     const auto mergesKv = m_gguf->keyValue("tokenizer.ggml.merges");
     if (mergesKv && mergesKv->isArray() && mergesKv->isString()) {
         const std::vector<std::string> rawMerges = mergesKv->values<std::string>();
@@ -158,9 +146,7 @@ bool GgufToken::load()
         }
     }
 
-    // ------------------------------------------------------------------------
     // Special token identities
-    // ------------------------------------------------------------------------
     const auto readSpecialId = [this](std::string_view key) -> TokenId {
         const std::int64_t id = m_gguf->readInt(std::string{key});
         if (id < 0)

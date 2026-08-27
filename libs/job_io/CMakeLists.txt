@@ -9,7 +9,16 @@ set(JOBIO_SOURCES
     file_io.cpp
     mock_io.cpp
     io_factory.cpp
+
     job_shared_memory.cpp
+    job_file.cpp
+    job_mem_lock.cpp
+    job_mmap.cpp
+    job_range_pool.cpp
+    job_page_pool.cpp
+    job_size_pool.cpp
+    job_arena_pool.cpp
+
 )
 set(JOBIO_HEADERS
     io_base.h
@@ -17,9 +26,28 @@ set(JOBIO_HEADERS
     pty_io.h
     file_io.h
     mock_io.h
-    io_factory.h
     job_shared_memory_header.h
     job_shared_memory.h
+    io_factory.h
+
+    job_file.h
+    job_tmp_file.h
+
+    job_mem_range.h
+    job_mem_extent.h
+    job_mem_region_concept.h
+    job_mem_page.h
+    job_mem_span.h
+    job_mem_size.h
+
+    job_mem_lock.h
+    job_mmap.h
+
+    job_mem_pool.h
+    job_range_pool.h
+    job_page_pool.h
+    job_size_pool.h
+    job_arena_pool.h
 )
 
 add_library(JosephsOddBuilder_IO SHARED
@@ -27,10 +55,22 @@ add_library(JosephsOddBuilder_IO SHARED
     ${JOBIO_SOURCES}
 )
 
+# bring in things that need c++23 as a test and also just some randoms
+target_compile_options(JosephsOddBuilder_IO PRIVATE
+    -freflection
+    -fcontracts)
+
+target_link_options(JosephsOddBuilder_IO PRIVATE
+    -fcontracts
+)
+
 set_target_properties(JosephsOddBuilder_IO PROPERTIES
     VERSION ${PROJECT_VERSION}
     SOVERSION ${PROJECT_VERSION_MAJOR}
     OUTPUT_NAME "jobio"
+    CXX_STANDARD 26
+    CXX_STANDARD_REQUIRED ON
+    CXX_EXTENSIONS OFF
 )
 
 target_include_directories(JosephsOddBuilder_IO PUBLIC

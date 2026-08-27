@@ -5,7 +5,7 @@
 
 namespace job::science::frames {
 
-using job::core::IODevice;
+using job::io::IODevice;
 
 FrameSinkIO::FrameSinkIO(IODevice::Ptr device) noexcept :
     m_device(std::move(device))

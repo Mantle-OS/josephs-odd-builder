@@ -431,39 +431,6 @@ public:
         return totalBytes;
     }
 
-
-    // [[nodiscard]] size_t scratchSize(const cords::ViewR::Extent &extent) const override
-    // {
-    //     const uint32_t batch = extent.rank() >= 1 ? extent[0] : 0;
-    //     const uint32_t dim   = extent.rank() >= 2 ? extent[1] : 0;
-
-    //     const size_t logitsBytes = size_t(batch) * m_cfg.numExperts * sizeof(float);
-
-    //     // Clamp K (Matches forward logic)
-    //     const int kCap = (m_routerCfg.type == router::RouterType::TopK) ?
-    //                          std::min<int>(m_routerCfg.topK, 16) : int(m_routerCfg.topK);
-
-    //     const size_t tokensBytes = size_t(batch) * kCap * sizeof(router::RouterToken);
-
-    //     size_t bytes = logitsBytes + tokensBytes;
-    //     bytes = (bytes + 63) & ~size_t(63);
-
-    //     // OPTIMIZATION: Only reserve space for active tokens (TopK), not all Experts
-    //     // Need Input + Output buffers for the active tokens
-    //     const size_t ioBytes = size_t(batch) * kCap * dim * 2 * sizeof(float);
-
-    //     // I think I am lost .........
-    //     // also need scratch windows for the experts ?
-    //     // I can't easily know maxExpertScratch here without iterating experts, .....
-    //     // so a safe overestimate is (Batch * TopK * D) * Experts? No..... too big ?
-    //     // stick to tjhe safe logic or just add a margin ?
-
-    //     // const size_t privateBytes = size_t(batch) * dim * m_cfg.numExperts * sizeof(float);
-
-    //     // Tighter logic matching forward(): Heuristic margin
-    //     return bytes + ioBytes + (ioBytes / 2);
-    // }
-
     // Reset any internal state (KV cache, running stats, RNG state, etc.). when I get here ....
     void resetState() noexcept override
     {
@@ -474,7 +441,7 @@ public:
 private:
     router::RouterConfig                                        m_routerCfg;
     [[maybe_unused]]uint32_t                                    m_inputDim{0}; // asserts only
-    std::vector<float, core::AlignedAllocator<float, 64>>      m_gateWeights;
+    std::vector<float, core::AlignedAllocator<float, 64>>       m_gateWeights;
     float                                                       *m_gateWeightsPtr{nullptr};
     std::vector<AbstractLayer::Ptr>                             m_experts;
 };

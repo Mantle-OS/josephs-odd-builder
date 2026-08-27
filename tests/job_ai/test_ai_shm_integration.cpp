@@ -89,9 +89,7 @@ public:
         m_size(size),
         m_offset(0)
     {
-
     }
-
     bool read(Genome &outG)
     {
         if (!readPOD(outG.header))

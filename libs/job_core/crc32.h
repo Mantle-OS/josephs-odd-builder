@@ -29,7 +29,6 @@ struct Crc32 {
     [[nodiscard]] inline static uint32_t compute(const uint8_t* data, std::size_t len) noexcept
     {
         uint32_t crc = 0xFFFFFFFFu; // 1s
-
         for (std::size_t i = 0; i < len; i++) {
             uint8_t index = (crc ^ data[i]) & 0xFF;
             crc = kCrc32Table[index] ^ (crc >> 8);

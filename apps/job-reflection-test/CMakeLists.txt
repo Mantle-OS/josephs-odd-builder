@@ -9,22 +9,23 @@ add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-std=c++26>)
 add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-freflection>)
 
 add_executable(job-reflection-test
-    obj_concept.h
-    signal.h
-    obj.h
-    ping.h
-    pong.h
-
+    ping.h         # Ping : public Object
+    pong.h         # Pong : public Object
 
     ser_obj_concept.h
     ser_obj.h
     ser_nested_obj.h
+
     tmp_file.h
+    test_loop.h
 
-
-
-
-
+    packed.h
+    ipc_mmap.h
+    ipc_shm.h
+    ipc_tcp.h
+    ipc_unix.h #trash for now
+    ipc_ssl.h
+    ipc_udp.h
     main.cpp
 )
 # rec.h
@@ -50,10 +51,14 @@ target_link_libraries(job-reflection-test
         JosephsOddBuilder_Core
         JosephsOddBuilder_Threads
 
+        ${YAMLCpp_LIBRARIES}
         $<BUILD_INTERFACE:ggml>
         JosephsOddBuilder_Ggml
 
         JosephsOddBuilder_Token
+        JosephsOddBuilder_IO
+        JosephsOddBuilder_Net
+        JosephsOddBuilder_Crypto
 )
 
 install(TARGETS job-reflection-test

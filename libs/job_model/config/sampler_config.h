@@ -3,6 +3,8 @@
 #include <cstdint>
 #include <memory>
 
+#include <job_base_obj.h>
+
 #include "jobmodel_export.h"
 
 namespace job::model {
@@ -10,7 +12,7 @@ namespace job::model {
 // The control panel for token generation.
 // Because without these knobs, your model either loops the same phrase
 // into infinity or hallucinates poetry about toaster manuals.
-class JOBMODEL_EXPORT SamplerConfig
+class JOBMODEL_EXPORT SamplerConfig : public job::core::BaseObject
 {
 public:
     using Ptr  = std::shared_ptr<SamplerConfig>;

@@ -9,7 +9,7 @@
 
 #include "job_permissions.h"
 
-namespace job::core {
+namespace job::io {
 
 class IODevice {
 

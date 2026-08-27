@@ -11,6 +11,7 @@
 
 namespace job::model {
 
+// This should be a concept
 class JOBMODEL_EXPORT GraphBuilder
 {
 public:
@@ -30,6 +31,9 @@ public:
                                                                  ggml::JobGgmlTensor &inputTokens,
                                                                  uint32_t nPast,
                                                                  ggml::JobGgmlType inputType = ggml::JobGgmlType::F16) = 0;
+
+
+    // TODO buildBackwards().....
 };
 
 } // namespace job::model

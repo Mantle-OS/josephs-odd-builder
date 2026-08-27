@@ -56,6 +56,8 @@ public:
         auto &norm = normConfig();
         norm.setRmsNormEps(kDefaultRmsNormEps);
 
+        // okay so this vendor turns out needs more than just rope but really needs
+        // ropeExt
         auto &rope = ropeConfig();
         rope.setRopeDimensionCount(kDefaultHeadDimension);
         rope.setRopeFreqBase(kDefaultRopeTheta);

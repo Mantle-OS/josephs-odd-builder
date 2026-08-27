@@ -4,6 +4,8 @@
 #include <optional>
 #include <string_view>
 
+#include <job_base_obj.h>
+
 #include "arch_config.h"
 #include "attention_config.h"
 #include "feed_forward_config.h"
@@ -13,14 +15,12 @@
 #include "rope_config.h"
 #include "transformer_config.h"
 #include "sampler_config.h"
+#include "config/device_config.h"
 #include "jobmodel_export.h"
 
 namespace job::model {
 
-// The top-level composition node.
-// It doesn't do the heavy math itself; it just introduces the transformer
-// to the sampler so they can work together without a messy global state.
-class JOBMODEL_EXPORT ModelConfig
+class JOBMODEL_EXPORT ModelConfig : public job::core::BaseObject
 {
 public:
     using Ptr  = std::shared_ptr<ModelConfig>;
@@ -76,13 +76,13 @@ public:
     [[nodiscard]] const SamplerConfig &samplerConfig() const noexcept { return m_samplerConfig; }
     void setSamplerConfig(SamplerConfig config) noexcept { m_samplerConfig = std::move(config); }
 
-    // Mixture of Experts (MoE) routing parameters. Lives at the ModelConfig
-    // level, not on ArchConfig: it's a property of this particular model
-    // instance ("does this model have experts"), not a trait of the
-    // architecture family itself. Absent means "not a MoE model", not
-    // "MoE with zero experts" -- see MoeConfig.
-    [[nodiscard]] bool hasMoeConfig() const noexcept { return m_moeConfig.has_value(); }
+    [[nodiscard]] DeviceConfig &deviceConfig() noexcept { return m_deviceConfig; }
+    [[nodiscard]] const DeviceConfig &deviceConfig() const noexcept { return m_deviceConfig; }
+    void setDeviceConfig(DeviceConfig config) noexcept { m_deviceConfig = std::move(config); }
 
+
+    // Mixture of Experts (MoE) routing parameters. Lives at the ModelConfig
+    [[nodiscard]] bool hasMoeConfig() const noexcept { return m_moeConfig.has_value(); }
     [[nodiscard]] MoeConfig &moeConfig()
     {
         if (!m_moeConfig.has_value())
@@ -101,16 +101,16 @@ public:
     [[nodiscard]] std::string_view architectureName() const noexcept;
 
 private:
-    ArchConfig        m_archConfig;
-    TransformerConfig m_transformerConfig;
-    AttentionConfig   m_attentionConfig;
-    NormConfig        m_normConfig;
-    RopeConfig        m_ropeConfig;
-    FeedForwardConfig m_feedForwardConfig;
-    OutputHeadConfig  m_outputHeadConfig;
-    SamplerConfig     m_samplerConfig;
-
-    std::optional<MoeConfig> m_moeConfig;
+    ArchConfig                  m_archConfig;
+    TransformerConfig           m_transformerConfig;
+    AttentionConfig             m_attentionConfig;
+    NormConfig                  m_normConfig;
+    RopeConfig                  m_ropeConfig;
+    FeedForwardConfig           m_feedForwardConfig;
+    OutputHeadConfig            m_outputHeadConfig;
+    SamplerConfig               m_samplerConfig;
+    DeviceConfig                m_deviceConfig;
+    std::optional<MoeConfig>    m_moeConfig;
 };
 
 } // namespace job::model

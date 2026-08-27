@@ -7,7 +7,7 @@
 #include "model_config.h"
 #include "jobmodel_export.h"
 
-namespace job::model::io_util {
+namespace job::model  {
 
 template <typename T>
 [[nodiscard]] T jsonValueOr(const nlohmann::json &j, const std::string &key, T defaultValue)
@@ -30,4 +30,4 @@ JOBMODEL_EXPORT void populateModelConfigFromHfJson(const nlohmann::json &configJ
 JOBMODEL_EXPORT void populateSamplerFromHfGenerationConfig(const nlohmann::json &generationConfigJson,
                                                            ModelConfig &config);
 
-} // namespace job::model::io_util
+} // namespace job::model

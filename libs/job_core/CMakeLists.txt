@@ -19,6 +19,7 @@ set(JOBCORE_HEADERS
     job_assert.h
     split_mix64.h
     aligned_allocator.h
+
     job_siphash.h
     job_container_concept.h
     job_list.h
@@ -26,23 +27,41 @@ set(JOBCORE_HEADERS
     job_map.h
     job_obj_hash_concept.h
     job_obj_hash.h
+
+    job_obj_concept.h
+    job_base_obj.h
+    job_connection.h
+    job_signal.h
+    job_obj_annotation.h
+
+    job_object.h
 )
 
 add_library(JosephsOddBuilder_Core SHARED
-    ${JOBCORE_HEADERS}
-    ${JOBCORE_SOURCES}
+    ${JOBCORE_HEADERS}  ${JOBCORE_SOURCES}
 )
 
-set(JOBTHREADS_EXPORT ${CMAKE_CURRENT_BINARY_DIR}/jobcore_export.h)
+set(JOBCORE_EXPORT ${CMAKE_CURRENT_BINARY_DIR}/jobcore_export.h)
 generate_export_header(JosephsOddBuilder_Core
     BASE_NAME JOBCORE
     EXPORT_FILE_NAME "${JOBCORE_EXPORT}"
+)
+
+target_compile_options(JosephsOddBuilder_Core PRIVATE
+    -freflection
+    -fcontracts)
+
+target_link_options(JosephsOddBuilder_Core PRIVATE
+    -fcontracts
 )
 
 set_target_properties(JosephsOddBuilder_Core PROPERTIES
     VERSION ${PROJECT_VERSION}
     SOVERSION ${PROJECT_VERSION_MAJOR}
     OUTPUT_NAME "jobcore"
+    CXX_STANDARD 26
+    CXX_STANDARD_REQUIRED ON
+    CXX_EXTENSIONS OFF
     CXX_VISIBILITY_PRESET hidden
     VISIBILITY_INLINES_HIDDEN ON
 )
@@ -54,7 +73,10 @@ target_include_directories(JosephsOddBuilder_Core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
 )
 
-target_link_libraries(JosephsOddBuilder_Core PUBLIC JosephsOddBuilder_Simd)
+target_link_libraries(JosephsOddBuilder_Core PUBLIC
+    ${YAMLCpp_LIBRARIES}
+    JosephsOddBuilder_Simd
+)
 
 if(JOB_WINDOWS)
     ## siphash
@@ -69,8 +91,8 @@ install(TARGETS JosephsOddBuilder_Core
     INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 )
 
-install(FILES ${JOBCORE_HEADERS} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobcore )
-install(FILES ${JOBCORE_EXPORT} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobcore )
+install(FILES ${JOBCORE_HEADERS}    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobcore )
+install(FILES ${JOBCORE_EXPORT}     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobcore )
 
 if(JOB_LINUX)
     set(PKGCONFIG_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/pkgconfig")

@@ -8,7 +8,7 @@
 
 namespace job::io {
 
-class MockIO : public core::IODevice {
+class MockIO : public IODevice {
 public:
     MockIO();
     ~MockIO() override = default;

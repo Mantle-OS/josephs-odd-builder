@@ -25,7 +25,7 @@ enum class OpenType{
     ReadOnly
 };
 
-class FileIO : public core::IODevice
+class FileIO : public IODevice
 {
 public:
     explicit FileIO(const std::filesystem::path &path, FileMode mode = FileMode::RegularFile, bool writeMode = false);

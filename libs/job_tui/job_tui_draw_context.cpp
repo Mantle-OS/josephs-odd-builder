@@ -9,7 +9,7 @@ namespace job::tui {
 using namespace job::ansi::utils;
 using namespace job::ansi::utils::suffix;
 
-DrawContext::DrawContext(job::core::IODevice::Ptr device) :
+DrawContext::DrawContext(job::io::IODevice::Ptr device) :
     m_device(std::move(device))
 {
     m_fg = RGBColor(255, 255, 255);

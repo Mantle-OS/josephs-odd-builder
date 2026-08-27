@@ -128,7 +128,7 @@ bool SafeTensorsModelConfigReader::read(const std::filesystem::path &modelPath, 
 
     try {
         std::ifstream stream{configPath};
-        io_util::populateModelConfigFromHfJson(
+        populateModelConfigFromHfJson(
             nlohmann::json::parse(stream),
             modelPath.filename().string(),
             config);
@@ -152,7 +152,7 @@ bool SafeTensorsModelConfigReader::read(const std::filesystem::path &modelPath, 
     if (std::filesystem::is_regular_file(generationPath)) {
         try {
             std::ifstream stream{generationPath};
-            io_util::populateSamplerFromHfGenerationConfig(nlohmann::json::parse(stream), config);
+            populateSamplerFromHfGenerationConfig(nlohmann::json::parse(stream), config);
         } catch (const std::exception &e) {
             JOB_LOG_ERROR("[SafeTensorsModelConfigReader] Failed to parse generation_config.json (non-fatal): {}", e.what());
         }

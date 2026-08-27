@@ -62,7 +62,7 @@ struct GenomeSerializer {
         uint32_t layerCount = static_cast<uint32_t>(g.architecture.size());
         file.write(reinterpret_cast<const char*>(&layerCount), sizeof(layerCount));
 
-        for (const auto& gene : g.architecture) {
+        for (const auto &gene : g.architecture) {
             // Explicitly write fields to avoid struct padding/layout issues
             uint32_t type = static_cast<uint32_t>(gene.type);
             uint32_t act  = static_cast<uint32_t>(gene.activation);

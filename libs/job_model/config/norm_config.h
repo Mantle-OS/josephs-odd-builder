@@ -2,6 +2,8 @@
 
 #include <memory>
 
+#include <job_base_obj.h>
+
 #include "jobmodel_export.h"
 
 namespace job::model {
@@ -12,7 +14,7 @@ namespace job::model {
 // separate from attention/FFN/etc -- even though (unlike attention
 // geometry) these values are read at every norm site in the model
 // (pre-attention, pre-FFN, final output), not exclusive to one block.
-class JOBMODEL_EXPORT NormConfig
+class JOBMODEL_EXPORT NormConfig : public job::core::BaseObject
 {
 public:
     using Ptr  = std::shared_ptr<NormConfig>;

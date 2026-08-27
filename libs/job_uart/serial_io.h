@@ -17,7 +17,7 @@
 
 namespace job::uart {
 
-class SerialIO : public job::core::IODevice, public SerialSettings
+class SerialIO : public job::io::IODevice, public SerialSettings
 {
 public:
     enum class Error {

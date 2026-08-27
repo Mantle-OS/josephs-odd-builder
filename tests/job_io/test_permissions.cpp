@@ -6,7 +6,7 @@
 
 #include <job_permissions.h>
 
-using namespace job::core;
+using namespace job::io;
 
 TEST_CASE("IOPermissions basic usage and examples", "[core][permissions][usage]")
 {
@@ -212,56 +212,114 @@ TEST_CASE("IOPermissions edge cases for setuid/setgid/sticky and custom combos",
 }
 
 #ifdef JOB_TEST_BENCHMARKS
-TEST_CASE("IOPermissions toString formatting stress and micro-benchmark",
-          "[core][permissions][stress][benchmark]")
+
+TEST_CASE("IOPermissions formatting exhaustive validation and benchmarks",
+          "[job_io][permissions][stress][benchmark]")
 {
-    std::vector<IOPermissions> perms;
-    perms.reserve(32);
-
-    perms.push_back(IOPermissions::None);
-    perms.push_back(IOPermissions::DefaultFile);
-    perms.push_back(IOPermissions::DefaultDirectory);
-    perms.push_back(IOPermissions::BadIdeas);
-    perms.push_back(IOPermissions::ReadUser);
-    perms.push_back(IOPermissions::ReadWriteUser);
-    perms.push_back(IOPermissions::ReadWriteAll);
-
-    // A few raw octal-style combinations
-    for (unsigned m = 0; m <= 0777u; m += 0177u)
-        perms.push_back(static_cast<IOPermissions>(m));
-
-    SECTION("structural sanity over many iterations")
+    SECTION("all permission bit patterns produce valid formatting")
     {
-        for (int iter = 0; iter < 5000; ++iter) {
-            for (auto p : perms) {
-                auto s1 = toString(p, PermissionStringType::OctalOnly);
-                auto s2 = toString(p, PermissionStringType::NoOctal);
-                auto s3 = toString(p, PermissionStringType::Both);
+        for (unsigned mode = 0; mode <= 07777u; ++mode) {
+            const auto perms = static_cast<IOPermissions>(mode);
 
-                REQUIRE_FALSE(s1.empty());
-                REQUIRE_FALSE(s2.empty());
-                REQUIRE_FALSE(s3.empty());
+            const auto octal = toStringView(perms, PermissionStringType::OctalOnly);
+            const auto symbolic = toStringView(perms, PermissionStringType::NoOctal);
+            const auto both = toStringView(perms, PermissionStringType::Both);
 
-                // "Both" must be "0XYZ rwxr-xr-x" layout
-                auto pos = s3.find(' ');
-                REQUIRE(pos == 4);
-                REQUIRE(s3.size() >= 4 + 1 + 9);
-            }
+            REQUIRE(octal.size() == 4);
+            REQUIRE(symbolic.size() == 9);
+            REQUIRE(both.size() == 14);
+
+            REQUIRE(both.substr(0, 4) == octal);
+            REQUIRE(both[4] == ' ');
+            REQUIRE(both.substr(5, 9) == symbolic);
+
+            REQUIRE(octal[0] >= '0');
+            REQUIRE(octal[0] <= '7');
+            REQUIRE(octal[1] >= '0');
+            REQUIRE(octal[1] <= '7');
+            REQUIRE(octal[2] >= '0');
+            REQUIRE(octal[2] <= '7');
+            REQUIRE(octal[3] >= '0');
+            REQUIRE(octal[3] <= '7');
         }
     }
 
-    SECTION("benchmark toString(PermissionStringType::Both)")
+    SECTION("special permission bits format correctly")
     {
-        BENCHMARK("toString Both on mixed permissions")
-        {
-            std::size_t total = 0;
-            for (auto p : perms) {
-                auto s = toString(p, PermissionStringType::Both);
-                total += s.size();
+        REQUIRE(toStringView(static_cast<IOPermissions>(04755), PermissionStringType::Both) == "4755 rwsr-xr-x");
+        REQUIRE(toStringView(static_cast<IOPermissions>(04644), PermissionStringType::Both) == "4644 rwSr--r--");
+
+        REQUIRE(toStringView(static_cast<IOPermissions>(02755), PermissionStringType::Both) == "2755 rwxr-sr-x");
+        REQUIRE(toStringView(static_cast<IOPermissions>(02644), PermissionStringType::Both) == "2644 rw-r-Sr--");
+
+        REQUIRE(toStringView(static_cast<IOPermissions>(01777), PermissionStringType::Both) == "1777 rwxrwxrwt");
+        REQUIRE(toStringView(static_cast<IOPermissions>(01776), PermissionStringType::Both) == "1776 rwxrwxrwT");
+
+        REQUIRE(toStringView(static_cast<IOPermissions>(07777), PermissionStringType::Both) == "7777 rwsrwsrwt");
+    }
+
+    SECTION("benchmark lookup formatting across all permission values")
+    {
+        BENCHMARK("toStringView Both across all 4096 permissions") {
+            std::uint64_t checksum = 0;
+
+            for (unsigned mode = 0; mode <= 07777u; ++mode) {
+                const auto value = toStringView(
+                    static_cast<IOPermissions>(mode),
+                    PermissionStringType::Both);
+
+                checksum += static_cast<unsigned char>(value[0]);
+                checksum += static_cast<unsigned char>(value[3]);
+                checksum += static_cast<unsigned char>(value[5]);
+                checksum += static_cast<unsigned char>(value[9]);
+                checksum += static_cast<unsigned char>(value[13]);
             }
-            // return something so the compiler can't just nuke the loop
-            return total;
+
+            return checksum;
+        };
+    }
+
+    SECTION("benchmark compatibility string formatting across all permission values")
+    {
+        BENCHMARK("toString Both across all 4096 permissions") {
+            std::uint64_t checksum = 0;
+
+            for (unsigned mode = 0; mode <= 07777u; ++mode) {
+                const auto value = toString(
+                    static_cast<IOPermissions>(mode),
+                    PermissionStringType::Both);
+
+                checksum += static_cast<unsigned char>(value[0]);
+                checksum += static_cast<unsigned char>(value[3]);
+                checksum += static_cast<unsigned char>(value[5]);
+                checksum += static_cast<unsigned char>(value[9]);
+                checksum += static_cast<unsigned char>(value[13]);
+            }
+
+            return checksum;
+        };
+    }
+
+    SECTION("benchmark individual runtime-varying permission lookups")
+    {
+        std::uint32_t state = 0x12345678u;
+
+        BENCHMARK("toStringView Both runtime-varying permission") {
+            // Xorshift keeps the requested permission changing so the compiler
+            // cannot reduce this to one constant table entry.
+            state ^= state << 13;
+            state ^= state >> 17;
+            state ^= state << 5;
+
+            const auto perms = static_cast<IOPermissions>(state & 07777u);
+            const auto value = toStringView(perms, PermissionStringType::Both);
+
+            return static_cast<std::uint32_t>(
+                static_cast<unsigned char>(value[0]) +
+                static_cast<unsigned char>(value[5]) +
+                static_cast<unsigned char>(value[13]));
         };
     }
 }
+
 #endif

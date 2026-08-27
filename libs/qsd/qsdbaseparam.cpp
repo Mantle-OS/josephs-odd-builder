@@ -263,9 +263,7 @@ bool QSdBaseParam::saveToYamlFile(const QString &fileName)
         return ret;
     } else {
         Q_EMIT set_lastErrorString(QString("Error generating YAML string: %1")
-                                         .arg(QString::fromStdString(out.GetLastError())
-                                              )
-                                     );
+                                       .arg(QString::fromStdString(out.GetLastError())));
     }
     return false;
 }

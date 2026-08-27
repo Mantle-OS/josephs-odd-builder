@@ -5,6 +5,8 @@
 #include <string>
 #include <string_view>
 
+#include <job_base_obj.h>
+
 #include <job_ggml_tensor_shapes.h>
 
 #include "jobmodel_export.h"
@@ -17,7 +19,7 @@ namespace job::model {
 // normalization epsilon, RoPE, and FFN width have all been split out into
 // AttentionConfig / NormConfig / RopeConfig / FeedForwardConfig -- each
 // consumed by exactly one piece, unlike the fields that remain here.
-class JOBMODEL_EXPORT TransformerConfig
+class JOBMODEL_EXPORT TransformerConfig : public job::core::BaseObject
 {
 public:
     using Ptr  = std::shared_ptr<TransformerConfig>;

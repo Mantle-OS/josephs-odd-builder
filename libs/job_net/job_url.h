@@ -8,6 +8,7 @@
 
 #include <job_secure_mem.h>
 #include "jobnet_export.h"
+
 namespace job::net {
 
 class JOBNET_EXPORT JobUrl {

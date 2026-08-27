@@ -5,6 +5,8 @@
 #include <string>
 #include <string_view>
 
+#include <job_base_obj.h>
+
 #include "model_architecture.h"
 #include "jobmodel_export.h"
 
@@ -12,7 +14,7 @@ namespace job::model {
 
 // Architecture-specific quirks and specialized knobs.
 // Because every model family thinks standard transformer math is just a suggestion.
-class JOBMODEL_EXPORT ArchConfig
+class JOBMODEL_EXPORT ArchConfig : public job::core::BaseObject
 {
 public:
     using Ptr  = std::shared_ptr<ArchConfig>;

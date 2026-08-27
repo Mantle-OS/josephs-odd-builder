@@ -40,20 +40,34 @@ ggml::JobGgmlTensorOp::UPtr GqaGraph::expand(ggml::JobGgmlTensorOp::UPtr input,
 
 
     const int64_t repeatCount = static_cast<int64_t>(queryHeadCount) / kvHeadCount;
-
     return input
         ->reshape4d(headDimension,
-                    kvHeadCount,
                     1,
+                    kvHeadCount,
                     contextLength)
         ->repeat4d(headDimension,
-                   kvHeadCount,
                    repeatCount,
+                   kvHeadCount,
                    contextLength)
         ->reshape3d(headDimension,
                     static_cast<int64_t>(queryHeadCount),
                     contextLength)
         ->cont();
+
+
+    // return input
+    //     ->reshape4d(headDimension,
+    //                 kvHeadCount,
+    //                 1,
+    //                 contextLength)
+    //     ->repeat4d(headDimension,
+    //                kvHeadCount,
+    //                repeatCount,
+    //                contextLength)
+    //     ->reshape3d(headDimension,
+    //                 static_cast<int64_t>(queryHeadCount),
+    //                 contextLength)
+    //     ->cont();
 }
 
 } // namespace job::model

@@ -65,7 +65,7 @@ public:
     static void unregisterHostBuffer(void *buffer) noexcept;
 
     [[nodiscard]] static JobGgmlBackendBufferType::Ptr splitBufferType(int mainDevice, std::span<const float> tensorSplit);
-    [[nodiscard]] static bool allReduceTensor(std::span<const JobGgmlBackend::Ptr> backends, std::span<const JobGgmlTensor::Ptr> tensors);
+    // [[nodiscard]] static bool allReduceTensor(std::span<const JobGgmlBackend::Ptr> backends, std::span<const JobGgmlTensor::Ptr> tensors);
 
     [[nodiscard]] std::string dump() override;
 };

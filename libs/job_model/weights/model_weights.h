@@ -9,51 +9,13 @@
 #include <job_ggml_context.h>
 #include <job_ggml_tensor.h>
 
-#include "config/model_config.h"
+#include "model_config.h"
+
+#include "layer_weights.h"
+
 #include "jobmodel_export.h"
 
 namespace job::model {
-
-struct JOBMODEL_EXPORT LayerWeights
-{
-    uint32_t layerIndex{0};
-
-    ggml::JobGgmlTensor::UPtr attnNorm;
-    ggml::JobGgmlTensor::UPtr attnNormBias;
-
-    ggml::JobGgmlTensor::UPtr attnQ;
-    ggml::JobGgmlTensor::UPtr attnK;
-    ggml::JobGgmlTensor::UPtr attnV;
-    ggml::JobGgmlTensor::UPtr attnOut;
-
-    ggml::JobGgmlTensor::UPtr attnQBias;
-    ggml::JobGgmlTensor::UPtr attnKBias;
-    ggml::JobGgmlTensor::UPtr attnVBias;
-    ggml::JobGgmlTensor::UPtr attnOutBias;
-
-    ggml::JobGgmlTensor::UPtr attnQNorm;
-    ggml::JobGgmlTensor::UPtr attnKNorm;
-
-    ggml::JobGgmlTensor::UPtr postAttnNorm;
-
-    ggml::JobGgmlTensor::UPtr ffnNorm;
-    ggml::JobGgmlTensor::UPtr ffnNormBias;
-
-    ggml::JobGgmlTensor::UPtr ffnGate;
-    ggml::JobGgmlTensor::UPtr ffnUp;
-    ggml::JobGgmlTensor::UPtr ffnDown;
-
-    ggml::JobGgmlTensor::UPtr ffnGateBias;
-    ggml::JobGgmlTensor::UPtr ffnUpBias;
-    ggml::JobGgmlTensor::UPtr ffnDownBias;
-
-    ggml::JobGgmlTensor::UPtr postFfnNorm;
-
-    ggml::JobGgmlTensor::UPtr ffnGateInp;
-    ggml::JobGgmlTensor::UPtr ffnGateExps;
-    ggml::JobGgmlTensor::UPtr ffnUpExps;
-    ggml::JobGgmlTensor::UPtr ffnDownExps;
-};
 
 class JOBMODEL_EXPORT ModelWeights
 {
@@ -93,10 +55,9 @@ public:
 private:
     [[nodiscard]] bool fail(std::string_view message);
 
-    [[nodiscard]] ggml::JobGgmlTensor::UPtr findTensor(
-        ggml::JobGgmlContext &context,
-        std::string_view canonicalName,
-        std::initializer_list<std::string_view> fallbackAliases = {}) const;
+    [[nodiscard]] ggml::JobGgmlTensor::UPtr findTensor(ggml::JobGgmlContext &context,
+                                                       std::string_view canonicalName,
+                                                       std::initializer_list<std::string_view> fallbackAliases = {}) const;
 
     ggml::JobGgmlTensor::UPtr m_tokenEmbd;
     ggml::JobGgmlTensor::UPtr m_outputNorm;
@@ -110,3 +71,4 @@ private:
 };
 
 } // namespace job::model
+

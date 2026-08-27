@@ -10,7 +10,8 @@ if(JOB_BUILD_ANSI AND JOB_BUILD_TUI)
     endif()
 endif()
 
-add_subdirectory(job-reflection-test)
+# add_subdirectory(job-reflection-test)
+add_subdirectory(job-inference-test)
 
 if(JOB_QT)
 

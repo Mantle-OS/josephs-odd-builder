@@ -57,19 +57,14 @@ ggml::JobGgmlTensorOp::UPtr GatedFfnGraph::build(ggml::JobGgmlTensorOp::UPtr inp
     if (nTokens <= 0)
         throw std::invalid_argument{"GatedFfnGraph requires at least one token"};
 
-    auto hiddenContiguous =
-        hidden
-            ->reshape2d(intermediateSize, nTokens)
-            ->cont();
-
+    auto hiddenContiguous = hidden->reshape2d(intermediateSize, nTokens)->cont();
     return LinearGraph::build(std::move(hiddenContiguous),
                               *weights.ffnDown,
                               weights.ffnDownBias.get(),
                               inputType);
 }
 
-ggml::JobGgmlTensorOp::UPtr GatedFfnGraph::activate(ggml::JobGgmlTensorOp::UPtr input,
-                                                    Activation activation)
+ggml::JobGgmlTensorOp::UPtr GatedFfnGraph::activate(ggml::JobGgmlTensorOp::UPtr input, Activation activation)
 {
     if (!input || !input->isValid())
         throw std::invalid_argument{"GatedFfnGraph activation requires a valid input tensor"};

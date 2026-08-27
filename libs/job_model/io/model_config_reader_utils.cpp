@@ -1,8 +1,10 @@
 #include "model_config_reader_utils.h"
 
-namespace job::model::io_util {
+namespace job::model {
 
-void populateModelConfigFromHfJson(const nlohmann::json &j, const std::string &modelDirName, ModelConfig &config)
+void populateModelConfigFromHfJson(const nlohmann::json &j,
+                                   const std::string &modelDirName,
+                                   ModelConfig &config)
 {
     auto getVal = [&](const std::string &key, auto defaultValue) {
         return jsonValueOr(j, key, defaultValue);
@@ -36,7 +38,8 @@ void populateModelConfigFromHfJson(const nlohmann::json &j, const std::string &m
     config.outputHeadConfig().setTieWordEmbeddings(getVal("tie_word_embeddings", false));
 }
 
-void populateSamplerFromHfGenerationConfig(const nlohmann::json &j, ModelConfig &config)
+void populateSamplerFromHfGenerationConfig(const nlohmann::json &j,
+                                           ModelConfig &config)
 {
     auto getVal = [&](const std::string &key, auto defaultValue) {
         return jsonValueOr(j, key, defaultValue);

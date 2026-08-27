@@ -290,7 +290,6 @@ struct LocalIdentity {
 [[nodiscard]] bool requireSslEchoBenchmark(const std::string &payload)
 {
     const bool succeeded = runSslEchoBenchmark(payload);
-
     if (!succeeded)
         throw std::runtime_error("SslClient/SslServer benchmark iteration failed");
 
@@ -801,29 +800,25 @@ TEST_CASE("SslServer stop disconnects active encrypted clients", "[job_net][ssl_
  * Block three: benchmarks and stress
  */
 
-// #ifdef JOB_TEST_BENCHMARKS
+#ifdef JOB_TEST_BENCHMARKS
 
 TEST_CASE("SslClient and SslServer encrypted echo performance", "[job_net][ssl_client][ssl_server][benchmark]")
 {
-    BENCHMARK("EC P-256 SslClient/SslServer lifecycle and echo")
-    {
+    BENCHMARK("EC P-256 SslClient/SslServer lifecycle and echo") {
         return requireSslEchoBenchmark("benchmark");
     };
 
-    BENCHMARK("EC P-256 SslClient/SslServer 1 KB echo")
-    {
+    BENCHMARK("EC P-256 SslClient/SslServer 1 KB echo") {
         const std::string payload(1024, 'J');
         return requireSslEchoBenchmark(payload);
     };
 
-    BENCHMARK("EC P-256 SslClient/SslServer 4 KB echo")
-    {
+    BENCHMARK("EC P-256 SslClient/SslServer 4 KB echo"){
         const std::string payload(4096, 'B');
         return requireSslEchoBenchmark(payload);
     };
 
-    BENCHMARK("EC P-256 SslClient/SslServer 16 KB echo")
-    {
+    BENCHMARK("EC P-256 SslClient/SslServer 16 KB echo") {
         const std::string payload(16 * 1024, 'T');
         return requireSslEchoBenchmark(payload);
     };
@@ -832,11 +827,10 @@ TEST_CASE("SslClient and SslServer encrypted echo performance", "[job_net][ssl_c
 TEST_CASE("SslClient and SslServer repeated TLS lifecycles remain stable", "[job_net][ssl_client][ssl_server][stress]")
 {
     constexpr size_t ITERATIONS = 50;
-
     for (size_t iteration = 0; iteration < ITERATIONS; ++iteration) {
         INFO("SSL client/server lifecycle iteration: " << iteration);
         REQUIRE(runSslEchoBenchmark("stress"));
     }
 }
 
-// #endif
+#endif

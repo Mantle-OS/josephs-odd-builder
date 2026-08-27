@@ -5,6 +5,7 @@
 #include "jobmodel_export.h"
 
 namespace job::model {
+// we already(or should) a have a config for this why in the heck is this inherit of the config itsself
 
 class JOBMODEL_EXPORT ResidualGraph final
 {
@@ -17,6 +18,7 @@ public:
     ResidualGraph(ResidualGraph &&) = delete;
     ResidualGraph &operator=(ResidualGraph &&) = delete;
 
+    // this needs pre frpom concepts
     [[nodiscard]] static ggml::JobGgmlTensorOp::UPtr build(ggml::JobGgmlTensorOp::UPtr input,
                                                            ggml::JobGgmlTensorOp::UPtr residual);
 };

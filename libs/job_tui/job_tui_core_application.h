@@ -14,7 +14,7 @@
 namespace job::tui {
 class JobTuiCoreApplication {
 public:
-    explicit JobTuiCoreApplication(core::IODevice::Ptr device);
+    explicit JobTuiCoreApplication(io::IODevice::Ptr device);
     ~JobTuiCoreApplication();
 
     void setRoot(JobTuiItem::Ptr root);
@@ -48,7 +48,7 @@ public:
     void setShowCursor(bool showCursor);
 
 private:
-    job::core::IODevice::Ptr        m_device;
+    job::io::IODevice::Ptr        m_device;
     JobTuiItem::Ptr                 m_root;
     std::vector<JobTuiItem::Ptr>    m_children;
     JobTuiItem::Ptr                 m_focusedItem;

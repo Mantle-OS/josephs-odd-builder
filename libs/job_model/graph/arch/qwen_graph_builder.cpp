@@ -1,8 +1,9 @@
 #include "graph/arch/qwen_graph_builder.h"
 
 #include <stdexcept>
+#include <vector>
 
-#include <job_ggml_tensor_op_graph.h>
+// #include <job_ggml_tensor_op_graph.h>
 
 #include "graph/attention_graph.h"
 #include "graph/embedding_graph.h"
@@ -43,13 +44,15 @@ ggml::JobGgmlCGraph::UPtr QwenGraphBuilder::buildForward(ggml::JobGgmlContext &c
     if (!m_weights.outputNorm())
         throw std::runtime_error{"QwenGraphBuilder requires output normalization weights"};
 
-    const TransformerConfig &transformerConfig = m_config.transformerConfig();
-    const AttentionConfig &attentionConfig     = m_config.attentionConfig();
-    const NormConfig &normConfig               = m_config.normConfig();
-    const RopeConfig &ropeConfig               = m_config.ropeConfig();
-    const OutputHeadConfig &outputConfig       = m_config.outputHeadConfig();
+    const TransformerConfig     &transformerConfig = m_config.transformerConfig();
+    const AttentionConfig       &attentionConfig   = m_config.attentionConfig();
+    const NormConfig            &normConfig        = m_config.normConfig();
+    const RopeConfig            &ropeConfig        = m_config.ropeConfig();
+    const OutputHeadConfig      &outputConfig      = m_config.outputHeadConfig();
     const uint32_t nTokens = static_cast<uint32_t>(inputTokens.extent(0));
 
+
+    // these could all be contracts
     if (nTokens == 0)
         throw std::invalid_argument{"QwenGraphBuilder requires at least one input token"};
 
@@ -59,20 +62,16 @@ ggml::JobGgmlCGraph::UPtr QwenGraphBuilder::buildForward(ggml::JobGgmlContext &c
     if (m_kvCache.layerCount() != transformerConfig.blockCount())
         throw std::runtime_error{"QwenGraphBuilder KV layer count does not match model configuration"};
 
-    const uint32_t headDimension =
-        attentionConfig.headDimension(transformerConfig.embeddingLength());
-
+    const uint32_t headDimension = attentionConfig.headDimension(transformerConfig.embeddingLength());
     if (headDimension == 0)
         throw std::runtime_error{"QwenGraphBuilder could not resolve attention head dimension"};
 
-    const uint32_t ropeDimensions =
-        ropeConfig.ropeDimensionCount() > 0
-            ? ropeConfig.ropeDimensionCount()
-            : headDimension;
+    const uint32_t ropeDimensions = ropeConfig.ropeDimensionCount() > 0 ? ropeConfig.ropeDimensionCount() : headDimension;
 
-    //
+    std::vector<ggml::JobGgmlTensorOp::UPtr> cacheWrites;
+    cacheWrites.reserve(static_cast<std::size_t>(transformerConfig.blockCount()) * 2);
+
     // Token embedding.
-    //
     auto cur = EmbeddingGraph::build(ctx, inputTokens, *m_weights.tokenEmbd());
 
     //
@@ -81,21 +80,17 @@ ggml::JobGgmlCGraph::UPtr QwenGraphBuilder::buildForward(ggml::JobGgmlContext &c
     // instead of recreating the old setTensorBackend() placement hack.
     //
     auto positions = cur->arange(static_cast<float>(nPast),
-                                static_cast<float>(nPast + nTokens),
-                                 1.0f)->cast(ggml::JobGgmlType::I32);
+                                static_cast<float>(nPast + nTokens), 1.0f)->cast(ggml::JobGgmlType::I32);
 
     const GatedFfnGraph::Activation hiddenActivation = activation(m_config.archConfig().hiddenActivation());
 
-    //
     // Qwen transformer blocks:
     //
     //   x = x + Attention(RMSNorm(x))
     //   x = x + FFN(RMSNorm(x))
-    //
     for (uint32_t layerIndex = 0; layerIndex < transformerConfig.blockCount(); ++layerIndex) {
 
         const LayerWeights &weights = m_weights.layer(layerIndex);
-
         if (!weights.attnNorm || !weights.attnNorm->isValid())
             throw std::runtime_error{"QwenGraphBuilder requires attention normalization weights"};
 
@@ -107,6 +102,9 @@ ggml::JobGgmlCGraph::UPtr QwenGraphBuilder::buildForward(ggml::JobGgmlContext &c
                                              normConfig.rmsNormEps(),
                                              weights.attnNormBias.get());
 
+        ggml::JobGgmlTensorOp::UPtr kCacheWrite;
+        ggml::JobGgmlTensorOp::UPtr vCacheWrite;
+
         auto attention = AttentionGraph::build(std::move(attentionInput),
                                                weights,
                                                attentionConfig,
@@ -116,10 +114,15 @@ ggml::JobGgmlCGraph::UPtr QwenGraphBuilder::buildForward(ggml::JobGgmlContext &c
                                                nPast,
                                                normConfig.rmsNormEps(),
                                                ropeDimensions,
+                                               &kCacheWrite,
+                                               &vCacheWrite,
                                                2,
                                                inputType,
-                                               &ropeConfig,
-                                               &QwenGraphBuilder::expandGqa);
+                                               &ropeConfig);
+
+
+        cacheWrites.push_back(std::move(kCacheWrite));
+        cacheWrites.push_back(std::move(vCacheWrite));
 
         cur = ResidualGraph::build(std::move(cur),
                                    std::move(attention));
@@ -130,7 +133,6 @@ ggml::JobGgmlCGraph::UPtr QwenGraphBuilder::buildForward(ggml::JobGgmlContext &c
                            weights.ffnNormBias.get());
 
 
-        // replace here ?
         auto ffn = GatedFfnGraph::build(std::move(ffnInput),
                                  weights,
                                  hiddenActivation,
@@ -140,18 +142,16 @@ ggml::JobGgmlCGraph::UPtr QwenGraphBuilder::buildForward(ggml::JobGgmlContext &c
                                    std::move(ffn));
     }
 
-    //
+
     // Final RMSNorm.
-    //
     cur = NormGraph::rms(std::move(cur),
                          *m_weights.outputNorm(),
                          normConfig.rmsNormEps(),
                          m_weights.outputNormBias());
 
-    //
+
     // LM head. ModelWeights::output() already handles tied embeddings by
     // returning tokenEmbd() when there is no dedicated output tensor.
-    //
     const ggml::JobGgmlTensor *outputWeight = m_weights.output();
 
     if (!outputWeight || !outputWeight->isValid())
@@ -162,86 +162,29 @@ ggml::JobGgmlCGraph::UPtr QwenGraphBuilder::buildForward(ggml::JobGgmlContext &c
                                      nullptr,
                                      inputType);
 
-    const float softCap =
-        outputConfig.finalLogitSoftCapping();
+    const float softCap = outputConfig.finalLogitSoftCapping();
 
-    if (softCap > 0.0f) {
+    if (softCap > 0.0f)
         logits = logits->scale(1.0f / softCap)->tanh()->scale(softCap);
-    }
 
     logits->setName("logits");
-    auto graphOp = ggml::JobGgmlTensorOpGraph::wrap(std::move(logits));
 
+    //  FIXME 8192 lives where ?
+    auto graph = ctx.newGraphCustom(8192, false);
 
-    return graphOp->buildGraph(8192);
-    // return graphOp->buildGraph();
-}
+    if (!graph)
+        throw std::runtime_error{"QwenGraphBuilder failed to create forward graph"};
 
-ggml::JobGgmlTensorOp::UPtr QwenGraphBuilder::expandGqa(
-    ggml::JobGgmlTensorOp::UPtr input,
-    uint32_t queryHeadCount)
-{
-    if (!input || !input->isValid())
-        throw std::invalid_argument{"QwenGraphBuilder GQA requires a valid input tensor"};
+    for (auto &cacheWrite : cacheWrites) {
+        if (!cacheWrite || !cacheWrite->isValid())
+            throw std::runtime_error{"QwenGraphBuilder received an invalid KV cache write"};
 
-    if (!input->isThreeDimensional())
-        throw std::invalid_argument{"QwenGraphBuilder GQA requires a three-dimensional input tensor"};
+        graph->buildForwardExpand(*cacheWrite);
+    }
 
-    if (queryHeadCount == 0)
-        throw std::invalid_argument{"QwenGraphBuilder GQA requires at least one query head"};
+    graph->buildForwardExpand(*logits);
 
-    const int64_t headDimension = input->extent(0);
-    const int64_t kvHeadCount   = input->extent(1);
-    const int64_t contextLength = input->extent(2);
-
-    if (headDimension <= 0)
-        throw std::invalid_argument{"QwenGraphBuilder GQA requires a positive head dimension"};
-
-    if (kvHeadCount <= 0)
-        throw std::invalid_argument{"QwenGraphBuilder GQA requires at least one KV head"};
-
-    if (contextLength <= 0)
-        throw std::invalid_argument{"QwenGraphBuilder GQA requires a positive context length"};
-
-    if (static_cast<int64_t>(queryHeadCount) < kvHeadCount)
-        throw std::invalid_argument{"QwenGraphBuilder GQA query head count cannot be less than KV head count"};
-
-    if (static_cast<int64_t>(queryHeadCount) == kvHeadCount)
-        return input;
-
-    if (static_cast<int64_t>(queryHeadCount) % kvHeadCount != 0)
-        throw std::invalid_argument{"QwenGraphBuilder GQA query head count must be divisible by KV head count"};
-
-    const int64_t repeatCount = static_cast<int64_t>(queryHeadCount) / kvHeadCount;
-
-
-    auto reshaped = input->reshape4d(headDimension,
-                                     1,
-                                     kvHeadCount,
-                                     contextLength);
-
-    auto repeated = reshaped->repeat4d(headDimension,
-                                       repeatCount,
-                                       kvHeadCount,
-                                       contextLength);
-
-    auto flattened = repeated->reshape3d(headDimension,
-                                         static_cast<int64_t>(queryHeadCount),
-                                         contextLength);
-
-    return flattened->cont();
-    // return input ->reshape4d(headDimension,
-    //                 1,
-    //                 kvHeadCount,
-    //                 contextLength)
-    //     ->repeat4d(headDimension,
-    //                repeatCount,
-    //                kvHeadCount,
-    //                contextLength)
-    //     ->reshape3d(headDimension,
-    //                 static_cast<int64_t>(queryHeadCount),
-    //                 contextLength)
-    //     ->cont();
+    return graph;
 }
 
 GatedFfnGraph::Activation QwenGraphBuilder::activation(std::string_view name)

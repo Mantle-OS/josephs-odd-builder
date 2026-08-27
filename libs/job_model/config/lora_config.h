@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <memory>
 
+#include <job_base_obj.h>
 #include <job_list.h>
 
 #include "jobmodel_export.h"
@@ -14,7 +15,7 @@ namespace job::model {
 // base model. Pure data -- loading the file and actually applying the
 // delta against LinearGraph is a separate, not-yet-built concern (see
 // lora_graph.* once LinearGraph integration is clear).
-class JOBMODEL_EXPORT Lora
+class JOBMODEL_EXPORT Lora : public job::core::BaseObject
 {
 public:
     using Ptr  = std::shared_ptr<Lora>;
@@ -58,7 +59,7 @@ private:
 };
 
 // An ordered set of LoRAs to apply on top of the base model.
-class JOBMODEL_EXPORT LoraConfig
+class JOBMODEL_EXPORT LoraConfig : public job::core::BaseObject
 {
 public:
     using Ptr  = std::shared_ptr<LoraConfig>;

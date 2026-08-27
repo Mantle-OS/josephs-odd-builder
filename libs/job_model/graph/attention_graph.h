@@ -13,12 +13,11 @@
 
 namespace job::model {
 
+//  we already a have a config for this why in the heck is thisinherit of the config itsself
+
 class JOBMODEL_EXPORT AttentionGraph final
 {
 public:
-
-    using GqaExpander = ggml::JobGgmlTensorOp::UPtr (*)(ggml::JobGgmlTensorOp::UPtr,uint32_t);
-
     AttentionGraph() = delete;
     ~AttentionGraph() = delete;
 
@@ -26,6 +25,25 @@ public:
     AttentionGraph &operator=(const AttentionGraph &) = delete;
     AttentionGraph(AttentionGraph &&) = delete;
     AttentionGraph &operator=(AttentionGraph &&) = delete;
+
+
+    // This is doing way way way to much.
+    // This needs to be broken up into opher graphs
+// ggml::JobGgmlTensorOp::UPtr input,  PREFECT
+// const LayerWeights &weights, PREFECT
+// const AttentionConfig &config,   IF THIS IS ALREADY THIS (Inhertierd)
+// KvCache &kvCache,   PREFECT
+// const ggml::JobGgmlTensor &positions,  FINE for now
+// uint32_t layerIndex,         # BAD should be in the config Or some other config not a options
+// uint32_t nPast,              # BAD should be in the config Or some other config not a options
+// float rmsNormEps,            # BAD  should be in the config Or some other config not a options
+// uint32_t ropeDimensions,     # BAD should be in the config Or some other config not a options
+// ggml::JobGgmlTensorOp::UPtr *kCacheWriteOut,  Good
+// ggml::JobGgmlTensorOp::UPtr *vCacheWriteOut,  GOOD
+// int ropeMode = 2,                              BAD
+// ggml::JobGgmlType inputType = ggml::JobGgmlType::F16,  HACKY But fine for now
+// const RopeConfig *ropeConfig = nullptr); PREFECT
+
 
     [[nodiscard]] static ggml::JobGgmlTensorOp::UPtr build(ggml::JobGgmlTensorOp::UPtr input,
                                                            const LayerWeights &weights,
@@ -36,15 +54,14 @@ public:
                                                            uint32_t nPast,
                                                            float rmsNormEps,
                                                            uint32_t ropeDimensions,
+                                                           ggml::JobGgmlTensorOp::UPtr *kCacheWriteOut,
+                                                           ggml::JobGgmlTensorOp::UPtr *vCacheWriteOut,
                                                            int ropeMode = 2,
                                                            ggml::JobGgmlType inputType = ggml::JobGgmlType::F16,
-                                                           const RopeConfig *ropeConfig = nullptr,
-                                                           GqaExpander gqaExpander = nullptr);
+                                                           const RopeConfig *ropeConfig = nullptr);
 private:
     [[nodiscard]] static ggml::JobGgmlTensorOp::UPtr tensorOp(const ggml::JobGgmlTensor &tensor,
                                                               ggml::JobGgmlContext *ctx);
-
-    GqaExpander gqaExpander = nullptr;
 };
 
 } // namespace job::model

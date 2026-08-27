@@ -30,13 +30,11 @@ ggml::JobGgmlTensor::UPtr ModelWeights::findTensor(
     std::initializer_list<std::string_view> fallbackAliases) const
 {
     auto tensor = context.tensor(std::string{canonicalName});
-
     if (tensor && tensor->isValid())
         return tensor;
 
     for (const auto alias : fallbackAliases) {
         tensor = context.tensor(std::string{alias});
-
         if (tensor && tensor->isValid())
             return tensor;
     }

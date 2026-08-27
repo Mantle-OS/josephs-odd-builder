@@ -8,6 +8,7 @@
 
 namespace job::model {
 
+// we already(or should) a have a config for this why in the heck is this inherit of the config itsself
 class JOBMODEL_EXPORT LinearGraph final
 {
 public:
@@ -19,6 +20,8 @@ public:
     LinearGraph(LinearGraph &&) = delete;
     LinearGraph &operator=(LinearGraph &&) = delete;
 
+
+    // needs contracts for pre and post...
     [[nodiscard]] static ggml::JobGgmlTensorOp::UPtr build(ggml::JobGgmlTensorOp::UPtr input,
                                                            const ggml::JobGgmlTensor &weight,
                                                            const ggml::JobGgmlTensor *bias = nullptr,

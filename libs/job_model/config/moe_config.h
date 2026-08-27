@@ -3,17 +3,14 @@
 #include <cstdint>
 #include <memory>
 
+#include <job_base_obj.h>
+
 #include "jobmodel_export.h"
 
 namespace job::model {
 
 // Mixture of Experts (MoE) routing parameters.
-// Lives on its own -- and ModelConfig holds it as std::optional<MoeConfig> --
-// because most architectures (Llama, Gemma, Phi...) have no concept of an
-// expert at all. A dense model shouldn't carry expert bookkeeping fields
-// it will never use, and (eventually) a QML-facing ModelConfig shouldn't
-// expose MoE properties on model instances that aren't MoE.
-class JOBMODEL_EXPORT MoeConfig
+class JOBMODEL_EXPORT MoeConfig : public job::core::BaseObject
 {
 public:
     using Ptr  = std::shared_ptr<MoeConfig>;

@@ -31,9 +31,9 @@ public:
     }
 
     DenseLayer(const DenseLayer&) = delete;
-    DenseLayer& operator=(const DenseLayer&) = delete;
+    DenseLayer &operator=(const DenseLayer&) = delete;
     DenseLayer(DenseLayer&&) noexcept = default;
-    DenseLayer& operator=(DenseLayer&&) noexcept = default;
+    DenseLayer &operator=(DenseLayer&&) noexcept = default;
 
 
     //////////////////////////////////////////////
@@ -128,51 +128,6 @@ public:
     }
 
 private:
-
-
-    // OLD
-    // static inline void addBiasRow(float *row, const float *bias, size_t count)
-    // {
-    //     using SIMD = job::ai::comp::SIMD;
-    //     constexpr int K = SIMD::width();
-
-    //     size_t j = 0;
-    //     for (; j + K <= count; j += K) {
-    //         auto v = SIMD::add(SIMD::pull(row + j), SIMD::pull(bias + j));
-    //         SIMD::mov(row + j, v);
-    //     }
-    //     for (; j < count; ++j)
-    //         row[j] += bias[j];
-    // }
-
-    // void handleBiasAndActivation(job::threads::ThreadPool &pool, float *outData,
-    //                              size_t rows, size_t cols, bool parallel)
-    // {
-    //     if (m_cfg.hasBias()) {
-    //         float *biasPtr = m_biasPtr;
-    //         if (parallel) {
-    //             job::threads::parallel_for(pool, size_t{0}, rows, [outData, biasPtr, cols](size_t i) {
-    //                 addBiasRow(outData + i*cols, biasPtr, cols);
-    //             });
-    //         } else {
-    //             for(size_t i=0; i<rows; ++i)
-    //                 addBiasRow(outData + i*cols, biasPtr, cols);
-    //         }
-    //     }
-
-    //     const size_t totalElements = rows * cols;
-
-    //     if (parallel) {
-    //         comp::activate_buffer(pool, outData, totalElements, m_cfg.activation, m_alpha);
-    //     } else {
-    //         // Fallback to serial activation to prevent starvation
-    //         comp::activate_buffer_serial(outData, totalElements, m_cfg.activation, m_alpha);
-    //     }
-
-    //     // RUN FOREST RUN !!!!@!@!@!
-    //     // comp::activate_buffer(pool, outData, rows * cols, m_cfg.activation, m_alpha);
-    // }
-
     cords::AiWeights                                            m_storage;
     float                                                       *m_weightsPtr{nullptr};
     float                                                       *m_biasPtr{nullptr};

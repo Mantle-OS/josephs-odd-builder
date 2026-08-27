@@ -13,7 +13,7 @@ namespace job::tui {
 class DrawContext {
 public:
     using Ptr = std::shared_ptr<DrawContext>;
-    explicit DrawContext(job::core::IODevice::Ptr device);
+    explicit DrawContext(job::io::IODevice::Ptr device);
     enum class BorderStyle {
         SINGLE,
         DOUBLE,
@@ -43,7 +43,7 @@ public:
 private:
     void applyColor(const ansi::utils::RGBColor &color, bool isForeground);
 
-    core::IODevice::Ptr     m_device;
+    io::IODevice::Ptr     m_device;
     ansi::utils::RGBColor   m_fg;
     ansi::utils::RGBColor   m_bg;
     bool                    m_writeOk = true;

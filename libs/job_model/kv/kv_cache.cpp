@@ -36,12 +36,9 @@ KvCache::KvCache(const ModelConfig &config, const ggml::JobGgmlBackendBufferType
 
     const std::size_t tensorCount = static_cast<std::size_t>(numLayers) * 2;
 
-    //
     // The context owns tensor metadata only. K/V payload storage is owned by
     // m_buffer and allocated using the caller-resolved backend buffer type.
-    //
     m_ctx = ggml::JobGgmlContext::createUniqMetadata(tensorCount);
-
     if (!m_ctx || !m_ctx->isValid())
         throw std::runtime_error{"Failed to create KV cache metadata context"};
 
@@ -55,25 +52,14 @@ KvCache::KvCache(const ModelConfig &config, const ggml::JobGgmlBackendBufferType
         LayerKvEntry entry;
         entry.layerIndex = i;
 
-        entry.k = m_ctx->newTensor2d(
-            m_kvType,
-            kvRowSize,
-            static_cast<int64_t>(m_maxCtx));
-
-        entry.v = m_ctx->newTensor2d(
-            m_kvType,
-            kvRowSize,
-            static_cast<int64_t>(m_maxCtx));
+        entry.k = m_ctx->newTensor2d(m_kvType, kvRowSize, static_cast<int64_t>(m_maxCtx));
+        entry.v = m_ctx->newTensor2d(m_kvType, kvRowSize, static_cast<int64_t>(m_maxCtx));
 
         if (!entry.k || !entry.k->isValid())
-            throw std::runtime_error{
-                std::format("Failed to create KV key tensor for layer {}", i)
-            };
+            throw std::runtime_error{ std::format("Failed to create KV key tensor for layer {}", i) };
 
         if (!entry.v || !entry.v->isValid())
-            throw std::runtime_error{
-                std::format("Failed to create KV value tensor for layer {}", i)
-            };
+            throw std::runtime_error{ std::format("Failed to create KV value tensor for layer {}", i) };
 
         entry.k->setName(std::format("cache_k_l{}", i));
         entry.v->setName(std::format("cache_v_l{}", i));
@@ -81,15 +67,11 @@ KvCache::KvCache(const ModelConfig &config, const ggml::JobGgmlBackendBufferType
         m_layers.emplace_back(std::move(entry));
     }
 
-    //
     // Determine the physical buffer size using the actual buffer type selected
     // by the runtime. Backend buffer types may impose alignment and allocation
     // requirements that differ from the tensor's logical byte size.
-    //
     const std::size_t alignment = bufferType.alignment();
-
     std::size_t requiredBytes = 0;
-
     for (const LayerKvEntry &entry : m_layers) {
         requiredBytes = alignUp(requiredBytes, alignment);
         requiredBytes += bufferType.allocationSize(*entry.k);
@@ -101,11 +83,9 @@ KvCache::KvCache(const ModelConfig &config, const ggml::JobGgmlBackendBufferType
     if (requiredBytes == 0)
         throw std::runtime_error{"KV cache resolved to an empty backend allocation"};
 
-    //
     // JobGgmlBackendBufferType currently returns unique ownership. Promote the
     // allocated buffer into the shared ownership model used by
     // JobGgmlTensorAllocator.
-    //
     m_buffer = ggml::JobGgmlBackendBuffer::Ptr{
         bufferType.allocateBuffer(requiredBytes)
     };

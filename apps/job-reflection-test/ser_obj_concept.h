@@ -1,12 +1,8 @@
 #pragma once
-
 #include <concepts>
 #include <memory>
 #include <meta>
 #include <type_traits>
-
-namespace job::model {
-
 template <typename T>
 concept SerObjectBase = std::is_class_v<T> &&
                         requires {
@@ -43,5 +39,3 @@ consteval bool hasSerMembers()
 
 template <typename T>
 concept SerObject = SerObjectBase<T> && hasSerMembers<T>();
-
-} // namespace job::model

@@ -13,7 +13,7 @@ using namespace job::tui;
 using namespace job::tui::gui;
 
 int main() {
-    auto dev = IOFactory::createFromType(FactoryType::FILE_STD_OUT, "");
+    auto dev = IOFactory::createFromType(FactoryType::FileStdOut, "");
     if (!dev || !dev->openDevice())
         return 1;
 

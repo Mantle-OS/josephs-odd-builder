@@ -15,7 +15,7 @@
 
 namespace job::io {
 
-class PtyIO : public core::IODevice {
+class PtyIO : public IODevice {
 public:
     enum class State {
         Closed = 0,

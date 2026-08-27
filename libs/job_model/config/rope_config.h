@@ -3,15 +3,16 @@
 #include <cstdint>
 #include <memory>
 
-#include "jobmodel_export.h"
+#include <job_base_obj.h>
 
+#include "jobmodel_export.h"
 namespace job::model {
 
 // Rotary Positional Embedding (RoPE) parameters.
 // Applied to Q/K during attention, but kept as its own class rather than
 // folded into AttentionConfig -- you already named "rope" as a distinct
 // graph-split piece from "attention" and "gqa" from the start.
-class JOBMODEL_EXPORT RopeConfig
+class JOBMODEL_EXPORT RopeConfig : public job::core::BaseObject
 {
 public:
     using Ptr  = std::shared_ptr<RopeConfig>;

@@ -2,6 +2,8 @@
 
 #include <memory>
 
+#include <job_base_obj.h>
+
 #include "jobmodel_export.h"
 
 namespace job::model {
@@ -12,7 +14,7 @@ namespace job::model {
 // final projection to logits -- not architecture identity. tieWordEmbeddings
 // in particular already drives a concrete decision in ModelWeights
 // (whether the output projection reuses the token-embedding tensor).
-class JOBMODEL_EXPORT OutputHeadConfig
+class JOBMODEL_EXPORT OutputHeadConfig : public job::core::BaseObject
 {
 public:
     using Ptr  = std::shared_ptr<OutputHeadConfig>;

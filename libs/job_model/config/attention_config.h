@@ -3,6 +3,8 @@
 #include <cstdint>
 #include <memory>
 
+#include <job_base_obj.h>
+
 #include <job_ggml_tensor_shapes.h>
 
 #include "jobmodel_export.h"
@@ -11,13 +13,7 @@ namespace job::model {
 
 // Attention-block execution knobs and GQA/MHA/MQA geometry.
 // Pulled out of ArchConfig/TransformerConfig because these are exactly
-// the parameters the attention graph-builder piece consumes directly --
-// not architecture identity, not generic transformer shape. The
-// projection-shape helpers take embeddingLength as an explicit parameter
-// rather than reaching into TransformerConfig: it's a real cross-config
-// dependency, so the caller (whoever already holds both configs) supplies
-// it instead of this class assuming which TransformerConfig it belongs to.
-class JOBMODEL_EXPORT AttentionConfig
+class JOBMODEL_EXPORT AttentionConfig : public job::core::BaseObject
 {
 public:
     using Ptr  = std::shared_ptr<AttentionConfig>;
@@ -75,12 +71,12 @@ public:
     // embeddingLength is TransformerConfig::embeddingLength() -- passed in
     // explicitly rather than looked up, since this class doesn't hold a
     // TransformerConfig reference.
-    [[nodiscard]] ggml::JobGgmlLinearShape qProjectionShape(uint32_t embeddingLength) const noexcept;
-    [[nodiscard]] ggml::JobGgmlLinearShape kProjectionShape(uint32_t embeddingLength) const noexcept;
-    [[nodiscard]] ggml::JobGgmlLinearShape vProjectionShape(uint32_t embeddingLength) const noexcept;
-    [[nodiscard]] ggml::JobGgmlLinearShape outProjectionShape(uint32_t embeddingLength) const noexcept;
-    [[nodiscard]] ggml::JobGgmlBSHDShape qActivationShape(int64_t batch, int64_t seq) const noexcept;
-    [[nodiscard]] ggml::JobGgmlBSHDShape kvActivationShape(int64_t batch, int64_t seq) const noexcept;
+    [[nodiscard]] ggml::JobGgmlLinearShape  qProjectionShape(uint32_t embeddingLength) const noexcept;
+    [[nodiscard]] ggml::JobGgmlLinearShape  kProjectionShape(uint32_t embeddingLength) const noexcept;
+    [[nodiscard]] ggml::JobGgmlLinearShape  vProjectionShape(uint32_t embeddingLength) const noexcept;
+    [[nodiscard]] ggml::JobGgmlLinearShape  outProjectionShape(uint32_t embeddingLength) const noexcept;
+    [[nodiscard]] ggml::JobGgmlBSHDShape    qActivationShape(int64_t batch, int64_t seq) const noexcept;
+    [[nodiscard]] ggml::JobGgmlBSHDShape    kvActivationShape(int64_t batch, int64_t seq) const noexcept;
 
     [[nodiscard]] bool isValid() const noexcept;
 

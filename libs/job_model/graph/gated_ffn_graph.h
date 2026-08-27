@@ -10,9 +10,11 @@
 
 namespace job::model {
 
+// we already(or should) a have a config for this why in the heck is this inherit of the config itsself
 class JOBMODEL_EXPORT GatedFfnGraph final
 {
 public:
+    // TODO ADD THE REST These should really live in there own file not here.
     enum class Activation : uint8_t {
         Silu,
         Gelu,
@@ -33,8 +35,7 @@ public:
                                                            ggml::JobGgmlType inputType = ggml::JobGgmlType::F16);
 
 private:
-    [[nodiscard]] static ggml::JobGgmlTensorOp::UPtr activate(ggml::JobGgmlTensorOp::UPtr input,
-                                                              Activation activation);
+    [[nodiscard]] static ggml::JobGgmlTensorOp::UPtr activate(ggml::JobGgmlTensorOp::UPtr input, Activation activation);
 };
 
 } // namespace job::model

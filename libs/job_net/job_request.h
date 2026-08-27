@@ -12,8 +12,9 @@
 #include "resolve/job_ipaddr.h"
 #include "jobnet_export.h"
 
-namespace job::net {
+// DONT USE YET
 
+namespace job::net {
 
 enum class JobNetMethod : std::uint8_t {
     Get,
@@ -28,8 +29,6 @@ enum class Priority : std::uint8_t {
     Medium, // Normal
     Low
 };
-
-
 
 class JOBNET_EXPORT JobNetRequest  {
 

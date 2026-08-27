@@ -99,11 +99,11 @@ void JobSharedMemory::setReadCallback(ReadCallback)
     JOB_LOG_WARN("[JobSharedMemory] Read callbacks not supported");
 }
 
-void JobSharedMemory::setPermissions(core::IOPermissions perms)
+void JobSharedMemory::setPermissions(IOPermissions perms)
 {
     // well ... you're are already connected. what premissions do you have ? live
     if (isAttached() && m_shm_fd != -1){
-        if (::fchmod(m_shm_fd, core::toMode(perms)) != 0) {
+        if (::fchmod(m_shm_fd, io::toMode(perms)) != 0) {
             JOB_LOG_ERROR("[JobSharedMemory] fchmod failed: {}", std::strerror(errno));
             m_last_error = SharedMemoryErrors::Perm;
         }else{
@@ -149,7 +149,7 @@ bool JobSharedMemory::attach()
 
     int mmap_prot = PROT_READ | PROT_WRITE;
 
-    mode_t mode = job::core::toMode(permissions());
+    mode_t mode = job::io::toMode(permissions());
 
     // open sesame SHM
     m_shm_fd = ::shm_open(m_key.c_str(), oflags, mode);

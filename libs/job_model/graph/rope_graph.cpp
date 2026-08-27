@@ -10,6 +10,8 @@ ggml::JobGgmlTensorOp::UPtr RopeGraph::build(ggml::JobGgmlTensorOp::UPtr input,
                                              uint32_t ropeDimensions,
                                              int mode)
 {
+
+    // contractsd ......
     if (!input || !input->isValid())
         throw std::invalid_argument{"RopeGraph requires a valid input tensor"};
 
@@ -22,9 +24,7 @@ ggml::JobGgmlTensorOp::UPtr RopeGraph::build(ggml::JobGgmlTensorOp::UPtr input,
     if (ropeDimensions > static_cast<uint32_t>(std::numeric_limits<int>::max()))
         throw std::invalid_argument{"RopeGraph rotary dimension exceeds GGML integer range"};
 
-    return input->rope(positions,
-                       static_cast<int>(ropeDimensions),
-                       mode);
+    return input->rope(positions, static_cast<int>(ropeDimensions), mode);
 }
 
 ggml::JobGgmlTensorOp::UPtr RopeGraph::build(ggml::JobGgmlTensorOp::UPtr input,
@@ -48,6 +48,9 @@ ggml::JobGgmlTensorOp::UPtr RopeGraph::build(ggml::JobGgmlTensorOp::UPtr input,
         throw std::invalid_argument{ "RopeGraph rotary dimension exceeds GGML integer range" };
     }
 
+
+    // this is unacceptable. and should be from the RopeConfig That should be the only thing that is passed into this
+    // function both fallbackDimensions and mode should be in the config. RopeExtGraph should be a thing....
     return input->ropeExt(positions,
                           nullptr,
                           static_cast<int>(ropeDimensions),

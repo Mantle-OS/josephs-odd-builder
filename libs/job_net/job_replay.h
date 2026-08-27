@@ -10,6 +10,8 @@
 #include "job_http_header.h"
 #include "job_request.h"
 
+// DONT USE YET NOT FINISHED YET
+
 namespace job::net {
 class JOBNET_EXPORT JobNetReply
 {
@@ -27,7 +29,6 @@ public:
     bool isRunning() const;
     JobUrl url() const;
 
-
     std::string header(JobIana::IanaHeaders header) const;
 
     bool hasRawHeader(std::string_view name) const;
@@ -36,7 +37,6 @@ public:
 
     const std::vector<std::pair<std::string, std::string>>  &rawHeaderPairs() const;
     JobHttpHeader headers() const;
-
 
     JobSslContext sslConfiguration() const;
     void setSslConfiguration(const JobSslContext &context);
@@ -75,6 +75,6 @@ protected:
     virtual void sslContextImpl(JobSslContext &ctx) const;
     virtual void setSslContextImpl(const JobSslContext &ctx);
     virtual void ignoreSslErrorsImpl(const std::vector<JobSslError::SslErrNo> &);
-
 };
+
 }

@@ -4,10 +4,10 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <utility>
 
-#include "ser_obj_concept.h"
-
-namespace job::model {
+#include "obj.h"
+#include "obj_concept.h"
 
 enum class SomeEnum : std::uint8_t {
     Foo,
@@ -15,23 +15,13 @@ enum class SomeEnum : std::uint8_t {
     Car
 };
 
-class SerNestedObj
+class SerNestedObj : public Object
 {
 public:
-    using Ptr  = std::shared_ptr<SerNestedObj>;
-    using WPtr = std::weak_ptr<SerNestedObj>;
-    using UPtr = std::unique_ptr<SerNestedObj>;
+    using Ptr = std::shared_ptr<SerNestedObj>;
 
     SerNestedObj() = default;
     ~SerNestedObj() = default;
-
-    SerNestedObj(const SerNestedObj &) = delete;
-    SerNestedObj &operator=(const SerNestedObj &) = delete;
-    SerNestedObj(SerNestedObj &&) noexcept = default;
-    SerNestedObj &operator=(SerNestedObj &&) noexcept = default;
-
-    [[nodiscard]] static Ptr createShared() { return std::make_shared<SerNestedObj>(); }
-    [[nodiscard]] static UPtr createUniq() { return std::make_unique<SerNestedObj>(); }
 
     [[nodiscard]] const std::string &name() const noexcept { return m_name; }
     void setName(std::string name) { m_name = std::move(name); }
@@ -44,7 +34,6 @@ public:
 
     [[nodiscard]] bool enabled() const noexcept { return m_enabled; }
     void setEnabled(bool enabled) noexcept { m_enabled = enabled; }
-
 
     [[nodiscard]] std::int8_t int8() const noexcept { return m_int8; }
     void setInt8(std::int8_t value) noexcept { m_int8 = value; }
@@ -61,8 +50,8 @@ public:
     [[nodiscard]] std::uint16_t uint16() const noexcept { return m_uint16; }
     void setUint16(std::uint16_t value) noexcept { m_uint16 = value; }
 
-    [[nodiscard]] std::uint32_t uid() const noexcept { return m_uid; }
-    void setUid(std::uint32_t value) noexcept { m_uid = value; }
+    [[nodiscard]] std::uint32_t uid() const noexcept { return m_uid_field; }
+    void setUid(std::uint32_t value) noexcept { m_uid_field = value; }
 
     [[nodiscard]] std::uint64_t uid64() const noexcept { return m_uid64; }
     void setUid64(std::uint64_t value) noexcept { m_uid64 = value; }
@@ -76,7 +65,6 @@ public:
     [[nodiscard]] SomeEnum someEnum() const noexcept { return m_someEnum; }
     void setSomeEnum(SomeEnum value) noexcept { m_someEnum = value; }
 
-private:
     std::string m_name;
 
     std::int8_t  m_int8{0};
@@ -86,16 +74,16 @@ private:
 
     std::uint8_t  m_uint8{0};
     std::uint16_t m_uint16{0};
-    std::uint32_t m_uid{0};
+    std::uint32_t m_uid_field{0};
     std::uint64_t m_uid64{0};
 
-    short          m_short{0};
-    unsigned short m_ushort{0};
-    int            m_inter{-1};
-    unsigned int   m_uint{0};
-    long           m_long{0};
-    unsigned long  m_ulong{0};
-    long long      m_longLong{0};
+    short              m_short{0};
+    unsigned short     m_ushort{0};
+    int                m_inter{-1};
+    unsigned int       m_uint{0};
+    long               m_long{0};
+    unsigned long      m_ulong{0};
+    long long          m_longLong{0};
     unsigned long long m_ulongLong{0};
 
     char          m_char{'A'};
@@ -117,6 +105,4 @@ private:
     SomeEnum m_someEnum{SomeEnum::Bar};
 };
 
-static_assert(SerObject<SerNestedObj>);
-
-} // namespace job::model
+static_assert(ObjectType<SerNestedObj>);

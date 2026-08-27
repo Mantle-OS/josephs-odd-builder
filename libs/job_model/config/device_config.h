@@ -4,24 +4,15 @@
 #include <memory>
 #include <optional>
 
+#include <job_base_obj.h>
+
 #include <job_ggml_enums.h>
 
 #include "jobmodel_export.h"
 
 namespace job::model {
 
-// Device/runtime budget and placement PREFERENCE for one model instance --
-// not a handle to any live device. Fully portable, value-semantic, never
-// populated by a reader (GgufModelConfigReader / HfJsonModelConfigReader):
-// nothing about "which physical GPU" comes from a model file, it's always
-// application-supplied at load time.
-//
-// Resolving this against an actual JobGgmlDeviceManager -- picking a
-// concrete JobGgmlDevice*, and pinning a specific uid when the caller
-// wants to (e.g. multi-model / diffusion-pipeline partitioning) -- is
-// JobModel::load()'s job, not this class's. This class only ever borrows
-// nothing and owns nothing beyond its own plain data.
-class JOBMODEL_EXPORT DeviceConfig
+class JOBMODEL_EXPORT DeviceConfig : public job::core::BaseObject
 {
 public:
     using Ptr  = std::shared_ptr<DeviceConfig>;
@@ -63,12 +54,12 @@ public:
     [[nodiscard]] bool isValid() const noexcept;
 
 private:
-    std::optional<ggml::JobGgmlDeviceImpl> m_preferredDeviceKind;
-    uint64_t m_memoryBudgetBytes{0};
-    uint32_t m_threadBudget{0};
-    bool     m_useMmap{true};
-    bool     m_useMLock{false};
-    bool     m_noAlloc{false};
+    std::optional<ggml::JobGgmlDeviceImpl>  m_preferredDeviceKind{ggml::JobGgmlDeviceImpl::Cuda};
+    uint64_t                                m_memoryBudgetBytes{0};
+    uint32_t                                m_threadBudget{0};
+    bool                                    m_useMmap{true};
+    bool                                    m_useMLock{false};
+    bool                                    m_noAlloc{false};
 };
 
 } // namespace job::model

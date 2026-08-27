@@ -23,7 +23,7 @@ bool HfJsonModelConfigReader::read(const std::filesystem::path &modelPath, Model
     try {
         std::ifstream f(configPath);
         nlohmann::json j = nlohmann::json::parse(f);
-        io_util::populateModelConfigFromHfJson(j, modelPath.filename().string(), config);
+        populateModelConfigFromHfJson(j, modelPath.filename().string(), config);
     } catch (const std::exception &e) {
         // Also catches std::invalid_argument from the throwing float
         // setters (rmsNormEps, ropeFreqBase, ...) on an out-of-range value.
@@ -37,7 +37,7 @@ bool HfJsonModelConfigReader::read(const std::filesystem::path &modelPath, Model
         try {
             std::ifstream gf(genConfigPath);
             nlohmann::json gj = nlohmann::json::parse(gf);
-            io_util::populateSamplerFromHfGenerationConfig(gj, config);
+            populateSamplerFromHfGenerationConfig(gj, config);
         } catch (const std::exception &e) {
             JOB_LOG_ERROR("[HfJsonModelConfigReader] Failed to parse generation_config.json (non-fatal): {}", e.what());
         }

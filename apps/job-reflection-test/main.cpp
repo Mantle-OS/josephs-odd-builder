@@ -1,272 +1,920 @@
-#include <contracts>
 #include <fstream>
 #include <iostream>
 #include <chrono>
-#include <sys/mman.h>
-#include <fcntl.h>
-#include <unistd.h>
 #include <memory>
 #include <array>
-#include <meta>
 
-#include "obj_concept.h"
+#include <meta>
+#include <contracts>
+
+// #include "obj_concept.h"
 
 #include "ping.h"
 #include "pong.h"
 #include "ser_obj.h"
+#include "ser_nested_obj.h"
 #include "tmp_file.h"
 
+#include "packed.h"
+#include "ipc_mmap.h"
+#include "ipc_shm.h"
 
-enum class LayerType : uint8_t {
-    Input       = 0,    // Input.
-    Dense       = 1,    // Standard Linear
-    SparseMoE   = 2,    // Mixture of Experts
-    Attention   = 3,    // Self/Cross Attention
-    Embedding   = 4,    // Token -> Vector
-    LayerNorm   = 5,    // Normalization
-    RMSNorm     = 6,    // LLaMA style norm
-    Residual    = 7,    // Add
-    LinearLoRA  = 8,    // Add
-    Output      = 9,    // Logits
-    Abstract     = 254  // Unknown slash bad layer type
-};
+#include "test_loop.h"
+#include "ipc_tcp.h"
+#include "ipc_unix.h"
+#include "ipc_ssl.h"
+#include "ipc_udp.h"
 
 
-enum class ActivationType : uint8_t {
-    Identity    = 0,   // f(x) = x
-    Sigmoid     = 1,   // squashes to (0, 1)
-    Tanh        = 2,   // squashes to (−1, 1)
-    HardTanh    = 3,   // piecewise linear cheap approximations
-    ///
-    ReLU        = 4,    // max(0, x)
-    LeakyReLU   = 5,    // x for x > 0, αx for x ≤ 0 (α small, like 0.01)
-    PReLU       = 6,    // like Leaky, but α is learned.
-    RReLU       = 7,    // α random in training.
-    ELU         = 8,    // exponential on the negative side
-    SELU        = 9,    // scaled variant designed for self-normalizing networks.
-    ///
-    GELU        = 10,   // gaussian error linear unit
-    AproxGELU   = 11,   // Tanh-based approximation of GELU (faster)
-    Swish       = 12,   // x * sigmoid(βx) (β sometimes = 1)
-    HSwish      = 13,   // piecewise linear approximation to Swish.
-    Mish        = 14,   // x * tanh(softplus(x))
-    HMish       = 15,   // piecewise linears mimicking Mish/Swish.
-    Softplus    = 16,   // log(1 + exp(x)) (a smooth ReLU).
-    ///
-    Maxout      = 17,   // f(x) = max(x₁, x₂, …, x_k) across groups of channels.
-    //
-    GDN         = 18    // generalized divisive normalization
-};
+#include <iostream>
+#include <iomanip>
+#include <vector>
+#include <span>
 
+#include "ping.h"
+#include "pong.h"
+#include "ser_nested_obj.h"
+#include "ser_obj.h"
 
+#include <cassert>
+#include <chrono>
+#include <iomanip>
+#include <iostream>
+#include <span>
+#include <vector>
 
-struct Packed {
-    LayerType      type{LayerType::Dense};
-    ActivationType activation{ActivationType::Identity};
-    std::uint8_t   _pad[2]{};
-    std::uint32_t  inputs{0};
-    std::uint32_t  outputs{0};
-    std::uint32_t  weightOffset{0};
-    std::uint32_t  weightCount{0};
-    std::uint32_t  biasOffset{0};
-    std::uint32_t  biasCount{0};
-    std::uint32_t  auxiliaryData{0};
+#include "ping.h"
+#include "pong.h"
+#include "ser_nested_obj.h"
+#include "ser_obj.h"
+#include "ipc_shm.h"
 
-    static consteval auto reflectedMembers()
+// =============================================================================
+// 1. Core Signal/Slot & Scope Lifetime Tests
+// =============================================================================
+void runSignalSlotTests() {
+    std::cout << "\n=== 1. Signal / Slot & Lifetime Tests ===\n";
+
+    auto ping = makeUniq<Ping>();
+    auto pong = makeUniq<Pong>();
+
+    std::cout << "Ping UID: " << ping->uid() << " | Pong UID: " << pong->uid() << "\n";
+
+    connect<&Ping::pingChanged, &Pong::handlePing>(*ping, *pong);
+    connect<&Pong::pongChanged, &Ping::handlePong>(*pong, *ping);
+
+    ping->emit(42);
+    pong->emit(84);
+
+    ping->debugJson();
+    pong->debugYaml();
+
+    // Scope disconnection check
     {
-        constexpr auto ctx = std::meta::access_context::unchecked();
-        return std::define_static_array(std::meta::nonstatic_data_members_of(^^Packed, ctx));
+        auto scopedPong = makeUniq<Pong>();
+        connect<&Ping::pingChanged, &Pong::handlePing>(*ping, *scopedPong);
+        assert(ping->pingChanged.connectionCount() == 2);
     }
+    assert(ping->pingChanged.connectionCount() == 1);
+    std::cout << "Signal/Slot RAII disconnection verified.\n";
+}
 
-    static consteval std::size_t reflectedMemberCount()
-    {
-        return reflectedMembers().size();
-    }
-};
+// =============================================================================
+// 2. Reflection Serialization Tests (JSON / YAML / Binary)
+// =============================================================================
+void runSerializationTests() {
+    std::cout << "\n=== 2. Reflection Serialization Tests ===\n";
 
-static_assert(sizeof(Packed) == 32);
-static_assert(Packed::reflectedMemberCount() == 10);
+    auto ser = makeUniq<SerObj>();
+    ser->setName("RootJobEntity");
+    ser->setCount(42);
+    ser->setValue(13.37f);
+    ser->setFloatList({1.0f, 2.5f, 5.25f, 10.125f});
 
-struct Serializer
-{
-    static bool save(const Packed &g, const std::string &filename)
-    {
-        std::ofstream out(filename, std::ios::binary);
-        if (!out)
-            return false;
+    ser->nestedObject().setName("DirectChild");
+    ser->nestedObject().setId(101);
+    ser->nestedObject().setWeight(75.5f);
+    ser->nestedObject().setEnabled(true);
+    ser->nestedObject().setSomeEnum(SomeEnum::Car);
 
-        out.write(reinterpret_cast<const char *>(&g), sizeof(Packed));
-        return out.good();
-    }
+    auto childA = makeShared<SerNestedObj>();
+    childA->setName("SharedWorker_0");
+    childA->setId(201);
+    childA->setWeight(12.3f);
+    childA->setEnabled(true);
+    childA->setSomeEnum(SomeEnum::Foo);
 
-    static Packed load(const std::string &filename)
-    {
-        Packed g{};
+    auto childB = makeShared<SerNestedObj>();
+    childB->setName("SharedWorker_1");
+    childB->setId(202);
+    childB->setWeight(98.7f);
+    childB->setEnabled(false);
+    childB->setSomeEnum(SomeEnum::Bar);
 
-        std::ifstream in(filename, std::ios::binary);
-        if (!in)
-            return {};
+    ser->nestedObjects().push_back(std::move(childA));
+    ser->nestedObjects().push_back(std::move(childB));
 
-        in.read(reinterpret_cast<char *>(&g), sizeof(Packed));
-        if (!in || in.gcount() != sizeof(Packed))
-            return {};
+    ser->debugJson();
+    ser->debugYaml();
 
-        return g;
-    }
-};
+    std::vector<uint8_t> binaryBuffer;
+    ser->toBinary(binaryBuffer);
+    std::cout << "Packed Binary Size: " << binaryBuffer.size() << " bytes\n";
 
-class MappedFile
-{
-    int m_fd{-1};
-    void *m_data{nullptr};
-    std::size_t m_size{0};
+    auto restored = makeUniq<SerObj>();
+    std::span<const uint8_t> streamSpan(binaryBuffer);
+    const bool ok = restored->fromBinary(streamSpan);
 
-public:
-    MappedFile(const std::string &path, std::size_t size) : m_size(size)
-    {
-        m_fd = ::open(path.c_str(), O_RDWR | O_CREAT, 0644);
-        ::ftruncate(m_fd, size);
-        m_data = ::mmap(nullptr, size, PROT_READ | PROT_WRITE, MAP_SHARED, m_fd, 0);
-    }
+    assert(ok);
+    assert(restored->name() == "RootJobEntity");
+    assert(restored->nestedObjects().size() == 2);
+    assert(restored->nestedObjects()[0]->name() == "SharedWorker_0");
+    std::cout << "In-memory binary roundtrip verified.\n";
 
-    ~MappedFile()
-    {
-        if (m_data)
-            ::munmap(m_data, m_size);
+}
 
-        if (m_fd >= 0)
-            ::close(m_fd);
-    }
+// =============================================================================
+// Main Entrypoint
+// =============================================================================
+int main() {
+    std::cout << "========================================================\n";
+    std::cout << "     Joseph's Odd Builder - Reflection & IPC Suite     \n";
+    std::cout << "========================================================\n";
 
-    [[nodiscard]] const Packed *asPacked(std::size_t offset = 0) const noexcept
-    {
-        auto *ptr = const_cast<char *>(static_cast<const char *>(m_data) + offset);
-        return std::start_lifetime_as<Packed>(ptr);
-    }
+    runSignalSlotTests();
+    runSerializationTests();
 
-    [[nodiscard]] Packed *asPackedMut(std::size_t offset = 0) noexcept
-    {
-        return std::start_lifetime_as<Packed>(static_cast<char *>(m_data) + offset);
-    }
-};
-
-
-template <typename T>
-void dumpReflected(const T &obj)
-{
-    template for (constexpr auto member : T::reflectedMembers()) {
-        std::cout << std::meta::identifier_of(member) << ": ";
-
-        using V = std::remove_cvref_t<decltype(obj.[:member:])>;
-
-        if constexpr (std::is_enum_v<V>) {
-            using U = std::underlying_type_t<V>;
-            std::cout << static_cast<std::uint64_t>(static_cast<U>(obj.[:member:]));
-        } else if constexpr (std::is_array_v<V>) {
-            std::cout << '[';
-
-            bool first = true;
-            for (const auto &value : obj.[:member:]) {
-                if (!first)
-                    std::cout << ", ";
-
-                std::cout << static_cast<std::uint64_t>(value);
-                first = false;
-            }
-
-            std::cout << ']';
-        } else {
-            std::cout << obj.[:member:];
-        }
-
-        std::cout << '\n';
-    }
+    std::cout << "\nAll test suites completed successfully!\n";
+    return 0;
 }
 
 
+#ifdef UDP_TEST
+int main()
+{
+    TestLoop loop;
+
+    constexpr std::size_t Messages = 100'000;
+
+    Packed src;
+    src.type = LayerType::Attention;
+    src.activation = ActivationType::GELU;
+    src.inputs = 4096;
+    src.outputs = 8192;
+    src.weightOffset = 128;
+    src.weightCount = 16384;
+    src.biasOffset = 16512;
+    src.biasCount = 4096;
+    src.auxiliaryData = 8;
+
+    std::atomic<bool> clientConnected{false};
+    std::atomic<bool> socketError{false};
+    std::atomic<bool> finished{false};
+    std::atomic<std::size_t> echoes{0};
+
+    JobUrl url("udp://127.0.0.1:0");
+
+    auto server = std::make_shared<UdpServer>(loop.loop);
+    auto client = std::make_shared<UdpClient>(loop.loop);
+
+    std::weak_ptr<UdpServer> weakServer = server;
+
+    server->onMessage = [weakServer, &socketError](const char *data, std::size_t len, const JobIpAddr &sender) {
+        auto server = weakServer.lock();
+        if (!server)
+            return;
+
+        Packed packed;
+        if (!PackedUdp::read(data, len, packed)) {
+            socketError.store(true, std::memory_order_release);
+            return;
+        }
+
+        const ssize_t written = server->sendTo(PackedUdp::data(packed), PackedUdp::size(), sender);
+        if (written != static_cast<ssize_t>(PackedUdp::size()))
+            socketError.store(true, std::memory_order_release);
+    };
+
+    const bool started = server->start(url);
+    contract_assert(started);
+    contract_assert(server->isRunning());
+    contract_assert(server->port() > 0);
+
+    using Clock = std::chrono::high_resolution_clock;
+    Clock::time_point start;
+    Clock::time_point end;
+
+    std::weak_ptr<UdpClient> weakClient = client;
+
+    client->onConnect = [&]() {
+        clientConnected.store(true, std::memory_order_release);
+
+        start = Clock::now();
+
+        const ssize_t written = client->send(PackedUdp::data(src), PackedUdp::size());
+        if (written != static_cast<ssize_t>(PackedUdp::size()))
+            socketError.store(true, std::memory_order_release);
+    };
+
+    client->onMessage = [weakClient, &src, &echoes, &finished, &socketError, &end](const char *data, std::size_t len) {
+        auto client = weakClient.lock();
+        if (!client)
+            return;
+
+        Packed packed;
+        if (!PackedUdp::read(data, len, packed)) {
+            socketError.store(true, std::memory_order_release);
+            return;
+        }
+
+        asm volatile("" : : "g"(&packed) : "memory");
+
+        const std::size_t count = echoes.fetch_add(1, std::memory_order_relaxed) + 1;
+
+        if (count == Messages) {
+            end = Clock::now();
+            finished.store(true, std::memory_order_release);
+            return;
+        }
+
+        const ssize_t written = client->send(PackedUdp::data(src), PackedUdp::size());
+        if (written != static_cast<ssize_t>(PackedUdp::size()))
+            socketError.store(true, std::memory_order_release);
+    };
+
+    const JobIpAddr clientAddr("127.0.0.1", server->port());
+    const bool connecting = client->connectToHost(clientAddr);
+    contract_assert(connecting);
+
+    while (!finished.load(std::memory_order_acquire) &&
+           !socketError.load(std::memory_order_acquire))
+        std::this_thread::yield();
+
+    contract_assert(clientConnected.load(std::memory_order_acquire));
+    contract_assert(!socketError.load(std::memory_order_acquire));
+
+    const std::size_t received = echoes.load(std::memory_order_acquire);
+    contract_assert(received == Messages);
+
+    const auto totalNs = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    const double totalSeconds = static_cast<double>(totalNs) / 1'000'000'000.0;
+    const double packedPerSecond = static_cast<double>(Messages) / totalSeconds;
+    const double oneWayMiBPerSecond = (packedPerSecond * sizeof(Packed)) / (1024.0 * 1024.0);
+    const double roundTripMiBPerSecond = (packedPerSecond * sizeof(Packed) * 2.0) / (1024.0 * 1024.0);
+
+    std::cout << "\nreflected Packed UDP:\n";
+    dumpPacked(src);
+
+    std::cout << "\nstructure size: " << sizeof(Packed) << " bytes\n";
+    std::cout << Messages << " UDP echo transfers: " << totalNs << " ns\n";
+    std::cout << "Packed/sec: " << packedPerSecond << '\n';
+    std::cout << "one-way payload: " << oneWayMiBPerSecond << " MiB/s\n";
+    std::cout << "roundtrip payload: " << roundTripMiBPerSecond << " MiB/s\n";
+    std::cout << "echoes: " << received << '\n';
+
+    if (client->isConnected())
+        client->disconnect();
+
+    if (server->isRunning())
+        server->stop();
+
+    return 0;
+}
+#endif
 
 
-// int main()
-// {
-//     const std::string path = "/tmp/job-packed-mmap.bin";
-//     constexpr int iterations = 1'000'000;
 
-//     Packed src;
-//     src.type = LayerType::Attention;
-//     src.activation = ActivationType::GELU;
-//     src.inputs = 4096;
-//     src.outputs = 8192;
-//     src.weightOffset = 128;
-//     src.weightCount = 16384;
-//     src.biasOffset = 16512;
-//     src.biasCount = 4096;
-//     src.auxiliaryData = 8;
 
-//     {
-//         MappedFile file(path, sizeof(Packed));
-//         Packed *mapped = file.asPackedMut();
+#ifdef SHM_TEST
+int main()
+{
+    constexpr std::size_t Iterations = 1'000'000;
 
-//         using Clock = std::chrono::high_resolution_clock;
+    Packed src;
+    src.type            = LayerType::Attention;
+    src.activation      = ActivationType::GELU;
+    src.inputs          = 4096;
+    src.outputs         = 8192;
+    src.weightOffset    = 128;
+    src.weightCount     = 16384;
+    src.biasOffset      = 16512;
+    src.biasCount       = 4096;
+    src.auxiliaryData   = 8;
 
-//         const auto writeStart = Clock::now();
+    SharedPacked shared;
+    const bool opened = shared.open("/job-packed-shm");
+    contract_assert(opened);
 
-//         for (int i = 0; i < iterations; ++i) {
-//             *mapped = src;
-//             mapped->inputs = static_cast<std::uint32_t>(4096 + (i & 1));
+    Packed *mapped = shared.asPackedMut();
+    contract_assert(mapped);
 
-//             asm volatile("" : : "g"(mapped) : "memory");
-//         }
+    using Clock = std::chrono::high_resolution_clock;
 
-//         const auto writeEnd = Clock::now();
+    const auto writeStart = Clock::now();
+    for (std::size_t i = 0; i < Iterations; ++i) {
+        *mapped = src;
+        mapped->inputs = static_cast<std::uint32_t>(4096 + (i & 1));
+        asm volatile("" : : "g"(mapped) : "memory");
+    }
+    const auto writeEnd = Clock::now();
 
-//         std::uint64_t checksum = 0;
-//         const Packed *read = file.asPacked();
+    const Packed *read = shared.asPacked();
+    contract_assert(read);
 
-//         const auto readStart = Clock::now();
+    std::uint64_t checksum = 0;
 
-//         for (int i = 0; i < iterations; ++i) {
-//             // asm volatile("" : "+g"(checksum));
-//             asm volatile("" : : : "memory");
+    const auto readStart = Clock::now();
+    for (std::size_t i = 0; i < Iterations; ++i) {
+        asm volatile("" : : : "memory");
 
-//             checksum += read->inputs;
-//             checksum += read->outputs;
-//             checksum += read->weightCount;
-//             checksum += read->biasCount;
-//             checksum += read->auxiliaryData;
-//         }
+        checksum += read->inputs;
+        checksum += read->outputs;
+        checksum += read->weightCount;
+        checksum += read->biasCount;
+        checksum += read->auxiliaryData;
+    }
+    const auto readEnd = Clock::now();
 
-//         const auto readEnd = Clock::now();
+    contract_assert(read->type == LayerType::Attention);
+    contract_assert(read->activation == ActivationType::GELU);
+    contract_assert(read->inputs == 4097);
+    contract_assert(read->outputs == 8192);
+    contract_assert(read->weightOffset == 128);
+    contract_assert(read->weightCount == 16384);
+    contract_assert(read->biasOffset == 16512);
+    contract_assert(read->biasCount == 4096);
+    contract_assert(read->auxiliaryData == 8);
+    contract_assert(checksum != 0);
 
-//         contract_assert(read->type == LayerType::Attention);
-//         contract_assert(read->activation == ActivationType::GELU);
-//         contract_assert(read->inputs == 4097);
-//         contract_assert(read->outputs == 8192);
-//         contract_assert(read->weightOffset == 128);
-//         contract_assert(read->weightCount == 16384);
-//         contract_assert(read->biasOffset == 16512);
-//         contract_assert(read->biasCount == 4096);
-//         contract_assert(read->auxiliaryData == 8);
-//         contract_assert(checksum != 0);
+    std::cout << "\nreflected Packed SHM:\n";
+    dumpPacked(*read);
 
-//         std::cout << "\nreflected Packed:\n";
-//         dumpReflected(*read);
+    const auto writeNs = std::chrono::duration_cast<std::chrono::nanoseconds>(writeEnd - writeStart).count();
+    const auto readNs = std::chrono::duration_cast<std::chrono::nanoseconds>(readEnd - readStart).count();
 
-//         const auto writeNs = std::chrono::duration_cast<std::chrono::nanoseconds>(writeEnd - writeStart).count();
-//         const auto readNs = std::chrono::duration_cast<std::chrono::nanoseconds>(readEnd - readStart).count();
+    std::cout << "\nstructure size: " << sizeof(Packed) << " bytes\n";
+    std::cout << Iterations << " SHM writes: " << writeNs << " ns\n";
+    std::cout << Iterations << " SHM reads:  " << readNs << " ns\n";
+    std::cout << "write avg: " << static_cast<double>(writeNs) / Iterations << " ns\n";
+    std::cout << "read avg:  " << static_cast<double>(readNs) / Iterations << " ns\n";
+    std::cout << "checksum: " << checksum << '\n';
 
-//         std::cout << "\nstructure size: " << sizeof(Packed) << " bytes\n";
-//         std::cout << iterations << " mapped writes: " << writeNs << " ns\n";
-//         std::cout << iterations << " mapped reads:  " << readNs << " ns\n";
-//         std::cout << "write avg: " << static_cast<double>(writeNs) / iterations << " ns\n";
-//         std::cout << "read avg:  " << static_cast<double>(readNs) / iterations << " ns\n";
-//         std::cout << "checksum: " << checksum << '\n';
-//     }
+    shared.close();
 
-//     std::remove(path.c_str());
+    return 0;
+}
+#endif
 
-//     return 0;
-// }
+#ifdef SSL_TEST
+int main()
+{
+    TestLoop loop;
 
+    constexpr std::size_t Messages = 100000;
+
+    Packed src;
+    src.type = LayerType::Attention;
+    src.activation = ActivationType::GELU;
+    src.inputs = 4096;
+    src.outputs = 8192;
+    src.weightOffset = 128;
+    src.weightCount = 16384;
+    src.biasOffset = 16512;
+    src.biasCount = 4096;
+    src.auxiliaryData = 8;
+
+    std::string certificatePath;
+    std::string privateKeyPath;
+
+    {
+        PackedSslCert cert;
+
+        certificatePath = cert.certificatePath();
+        privateKeyPath = cert.privateKeyPath();
+
+        const bool generated = cert.generate();
+        contract_assert(generated);
+        contract_assert(std::filesystem::exists(certificatePath));
+        contract_assert(std::filesystem::exists(privateKeyPath));
+
+        auto serverContext = cert.createServerContext();
+        auto clientContext = cert.createClientContext();
+
+        contract_assert(serverContext);
+        contract_assert(clientContext);
+
+        std::atomic<bool> serverConnected{false};
+        std::atomic<bool> serverEncrypted{false};
+        std::atomic<bool> serverDisconnected{false};
+        std::atomic<bool> clientConnected{false};
+        std::atomic<bool> clientEncrypted{false};
+        std::atomic<bool> clientDisconnected{false};
+        std::atomic<bool> socketError{false};
+        std::atomic<bool> sslError{false};
+        std::atomic<bool> finished{false};
+        std::atomic<std::size_t> echoes{0};
+
+        auto serverReader = PackedSslReader::createShared();
+        auto clientReader = PackedSslReader::createShared();
+
+        auto server = std::make_shared<job::net::SslServer>(loop.loop, serverContext);
+        std::weak_ptr<job::net::SslClient> serverClient;
+
+        server->onClientConnected = [&](const job::net::SslClient::Ptr &client) {
+            serverConnected.store(true, std::memory_order_release);
+            serverClient = client;
+        };
+
+        server->onClientEncrypted = [&](const job::net::SslClient::Ptr &) {
+            serverEncrypted.store(true, std::memory_order_release);
+        };
+
+        serverReader->setCallback([&](const Packed &packed) {
+            const auto client = serverClient.lock();
+            if (!client) {
+                socketError.store(true, std::memory_order_release);
+                return;
+            }
+
+            const int64_t sent = client->send(PackedSslReader::data(packed), PackedSslReader::size());
+            if (sent != static_cast<int64_t>(PackedSslReader::size()))
+                socketError.store(true, std::memory_order_release);
+        });
+
+        server->onClientMessage = [&](const job::net::SslClient::Ptr &, const char *data, std::size_t len) {
+            serverReader->read(data, len);
+        };
+
+        server->onClientDisconnected = [&](const job::net::SslClient::Ptr &) {
+            serverDisconnected.store(true, std::memory_order_release);
+        };
+
+        server->onSocketError = [&](int) {
+            socketError.store(true, std::memory_order_release);
+        };
+
+        server->onSslError = [&](const job::net::SslClient::Ptr &, job::net::JobSslError::SslErrNo error, const std::string &) {
+            if (job::net::JobSslError::isFatalSslError(error))
+                sslError.store(true, std::memory_order_release);
+        };
+
+        const bool started = server->start("127.0.0.1", 0);
+        contract_assert(started);
+        contract_assert(server->isRunning());
+        contract_assert(server->port() > 0);
+
+        auto client = std::make_shared<job::net::SslClient>(loop.loop, clientContext);
+
+        using Clock = std::chrono::high_resolution_clock;
+        Clock::time_point start;
+        Clock::time_point end;
+
+        client->onConnect = [&]() {
+            clientConnected.store(true, std::memory_order_release);
+        };
+
+        client->onEncrypted = [&]() {
+            clientEncrypted.store(true, std::memory_order_release);
+
+            start = Clock::now();
+
+            const int64_t sent = client->send(PackedSslReader::data(src), PackedSslReader::size());
+            if (sent != static_cast<int64_t>(PackedSslReader::size()))
+                socketError.store(true, std::memory_order_release);
+        };
+
+        clientReader->setCallback([&](const Packed &packed) {
+            asm volatile("" : : "g"(&packed) : "memory");
+
+            const std::size_t count = echoes.fetch_add(1, std::memory_order_relaxed) + 1;
+
+            if (count == Messages) {
+                end = Clock::now();
+                finished.store(true, std::memory_order_release);
+                return;
+            }
+
+            const int64_t sent = client->send(PackedSslReader::data(src), PackedSslReader::size());
+            if (sent != static_cast<int64_t>(PackedSslReader::size()))
+                socketError.store(true, std::memory_order_release);
+        });
+
+        client->onMessage = [&](const char *data, std::size_t len) {
+            clientReader->read(data, len);
+        };
+
+        client->onDisconnect = [&]() {
+            clientDisconnected.store(true, std::memory_order_release);
+        };
+
+        client->onSocketError = [&](int) {
+            socketError.store(true, std::memory_order_release);
+        };
+
+        client->onSslError = [&](job::net::JobSslError::SslErrNo error, const std::string &) {
+            if (job::net::JobSslError::isFatalSslError(error))
+                sslError.store(true, std::memory_order_release);
+        };
+
+        const bool connecting = client->connectToHost(job::net::JobIpAddr("127.0.0.1", server->port()));
+        contract_assert(connecting);
+
+        while (!finished.load(std::memory_order_acquire) &&
+               !socketError.load(std::memory_order_acquire) &&
+               !sslError.load(std::memory_order_acquire))
+            std::this_thread::yield();
+
+        contract_assert(!socketError.load(std::memory_order_acquire));
+        contract_assert(!sslError.load(std::memory_order_acquire));
+        contract_assert(serverConnected.load(std::memory_order_acquire));
+        contract_assert(serverEncrypted.load(std::memory_order_acquire));
+        contract_assert(clientConnected.load(std::memory_order_acquire));
+        contract_assert(clientEncrypted.load(std::memory_order_acquire));
+
+        const std::size_t received = echoes.load(std::memory_order_acquire);
+        contract_assert(received == Messages);
+
+        const auto totalNs = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+        const double totalSeconds = static_cast<double>(totalNs) / 1'000'000'000.0;
+        const double packedPerSecond = static_cast<double>(Messages) / totalSeconds;
+        const double oneWayMiBPerSecond = (packedPerSecond * sizeof(Packed)) / (1024.0 * 1024.0);
+        const double roundTripMiBPerSecond = (packedPerSecond * sizeof(Packed) * 2.0) / (1024.0 * 1024.0);
+
+        std::cout << "\nreflected Packed SSL:\n";
+        dumpPacked(src);
+
+        std::cout << "\nstructure size: " << sizeof(Packed) << " bytes\n";
+        std::cout << Messages << " SSL echo transfers: " << totalNs << " ns\n";
+        std::cout << "Packed/sec: " << packedPerSecond << '\n';
+        std::cout << "one-way payload: " << oneWayMiBPerSecond << " MiB/s\n";
+        std::cout << "roundtrip payload: " << roundTripMiBPerSecond << " MiB/s\n";
+        std::cout << "echoes: " << received << '\n';
+
+        client->disconnect();
+
+        int retries = 0;
+        while (!clientDisconnected.load(std::memory_order_acquire) && retries < 2000) {
+            std::this_thread::sleep_for(1ms);
+            ++retries;
+        }
+
+        retries = 0;
+        while (!serverDisconnected.load(std::memory_order_acquire) && retries < 2000) {
+            std::this_thread::sleep_for(1ms);
+            ++retries;
+        }
+
+        contract_assert(clientDisconnected.load(std::memory_order_acquire));
+        contract_assert(serverDisconnected.load(std::memory_order_acquire));
+
+        server->stop();
+    }
+
+    contract_assert(!std::filesystem::exists(certificatePath));
+    contract_assert(!std::filesystem::exists(privateKeyPath));
+
+    return 0;
+}
+#endif
+
+#ifdef UNIX_TEST
+int main()
+{
+    TestLoop loop;
+
+    constexpr std::size_t Messages = 10'000;
+
+    const std::string path = make_temp_sock_path("packed_unix");
+
+    Packed src;
+    src.type = LayerType::Attention;
+    src.activation = ActivationType::GELU;
+    src.inputs = 4096;
+    src.outputs = 8192;
+    src.weightOffset = 128;
+    src.weightCount = 16384;
+    src.biasOffset = 16512;
+    src.biasCount = 4096;
+    src.auxiliaryData = 8;
+
+    std::atomic<bool> clientConnected{false};
+    std::atomic<bool> clientDisconnected{false};
+    std::atomic<bool> serverSawDisconnect{false};
+    std::atomic<bool> finished{false};
+    std::atomic<std::size_t> echoes{0};
+
+    auto server = PackedUnixServer::createShared(loop.loop);
+
+    server->onPacked = [&](job::net::UnixClient::Ptr client, const Packed &packed) {
+        server->send(client, packed);
+    };
+
+    server->onClientDisconnected = [&](job::net::UnixClient::Ptr) {
+        serverSawDisconnect.store(true, std::memory_order_release);
+    };
+
+    const bool started = server->start(path, 0);
+    contract_assert(started);
+    contract_assert(server->isRunning());
+
+    auto client = PackedUnixClient::createShared(loop.loop);
+
+    using Clock = std::chrono::high_resolution_clock;
+    Clock::time_point start;
+    Clock::time_point end;
+
+    client->onConnect = [&]() {
+        clientConnected.store(true, std::memory_order_release);
+
+        start = Clock::now();
+        client->send(src);
+    };
+
+    client->onPacked = [&](const Packed &packed) {
+        asm volatile("" : : "g"(&packed) : "memory");
+
+        const std::size_t count = echoes.fetch_add(1, std::memory_order_relaxed) + 1;
+
+        if (count == Messages) {
+            end = Clock::now();
+            finished.store(true, std::memory_order_release);
+            return;
+        }
+
+        client->send(src);
+    };
+
+    client->onDisconnect = [&]() {
+        clientDisconnected.store(true, std::memory_order_release);
+    };
+
+    const bool connecting = client->connect(path);
+    contract_assert(connecting);
+
+    while (!finished.load(std::memory_order_acquire))
+        std::this_thread::yield();
+
+    const auto totalNs = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    const double totalSeconds = static_cast<double>(totalNs) / 1'000'000'000.0;
+    const double packedPerSecond = static_cast<double>(Messages) / totalSeconds;
+    const double oneWayMiBPerSecond = (packedPerSecond * sizeof(Packed)) / (1024.0 * 1024.0);
+    const double roundTripMiBPerSecond = (packedPerSecond * sizeof(Packed) * 2.0) / (1024.0 * 1024.0);
+
+    const std::size_t received = echoes.load(std::memory_order_acquire);
+    contract_assert(received == Messages);
+
+    std::cout << "\nreflected Packed Unix async:\n";
+    dumpPacked(src);
+
+    std::cout << "\nstructure size: " << sizeof(Packed) << " bytes\n";
+    std::cout << Messages << " Unix echo transfers: " << totalNs << " ns\n";
+    std::cout << "Packed/sec: " << packedPerSecond << '\n';
+    std::cout << "one-way payload: " << oneWayMiBPerSecond << " MiB/s\n";
+    std::cout << "roundtrip payload: " << roundTripMiBPerSecond << " MiB/s\n";
+    std::cout << "echoes: " << received << '\n';
+
+    client->disconnect();
+
+    int retries = 0;
+    while (!clientDisconnected.load(std::memory_order_acquire) && retries < 2000) {
+        std::this_thread::sleep_for(1ms);
+        ++retries;
+    }
+
+    retries = 0;
+    while (!serverSawDisconnect.load(std::memory_order_acquire) && retries < 2000) {
+        std::this_thread::sleep_for(1ms);
+        ++retries;
+    }
+
+    contract_assert(clientDisconnected.load(std::memory_order_acquire));
+    contract_assert(serverSawDisconnect.load(std::memory_order_acquire));
+
+    server->stop();
+
+    return 0;
+}
+#endif
+
+
+
+#ifdef TCP_TEST
+int main()
+{
+    TestLoop loop;
+
+    constexpr std::size_t Messages = 10'000;
+
+    Packed src;
+    src.type = LayerType::Attention;
+    src.activation = ActivationType::GELU;
+    src.inputs = 4096;
+    src.outputs = 8192;
+    src.weightOffset = 128;
+    src.weightCount = 16384;
+    src.biasOffset = 16512;
+    src.biasCount = 4096;
+    src.auxiliaryData = 8;
+
+    std::atomic<bool> clientConnected{false};
+    std::atomic<bool> clientDisconnected{false};
+    std::atomic<bool> serverSawDisconnect{false};
+    std::atomic<std::size_t> echoes{0};
+
+    auto server = std::make_shared<TcpServer>(loop.loop);
+
+    server->onClientConnected = [&](TcpClient::Ptr client) {
+        auto reader = std::make_shared<PackedTcpReader>();
+        std::weak_ptr<TcpClient> weakClient = client;
+
+        reader->setCallback([weakClient](const Packed &packed) {
+            auto client = weakClient.lock();
+            if (!client)
+                return;
+
+            client->send(PackedTcpReader::data(packed), PackedTcpReader::size());
+        });
+
+        client->onMessage = [reader](const char *data, std::size_t len) {
+            reader->read(data, len);
+        };
+
+        client->onDisconnect = [&]() {
+            serverSawDisconnect.store(true, std::memory_order_release);
+        };
+    };
+
+    const bool started = server->start("127.0.0.1", 0);
+    contract_assert(started);
+
+    const std::uint16_t port = server->port();
+    contract_assert(port > 0);
+
+    auto client = std::make_shared<TcpClient>(loop.loop);
+    auto reader = std::make_shared<PackedTcpReader>();
+
+    reader->setCallback([&echoes](const Packed &packed) {
+        asm volatile("" : : "g"(&packed) : "memory");
+        echoes.fetch_add(1, std::memory_order_release);
+    });
+
+    client->onConnect = [&]() {
+        clientConnected.store(true, std::memory_order_release);
+    };
+
+    client->onMessage = [reader](const char *data, std::size_t len) {
+        reader->read(data, len);
+    };
+
+    client->onDisconnect = [&]() {
+        clientDisconnected.store(true, std::memory_order_release);
+    };
+
+    const JobIpAddr address("127.0.0.1", port);
+    const bool connecting = client->connectToHost(address);
+    contract_assert(connecting);
+
+    while (!clientConnected.load(std::memory_order_acquire))
+        std::this_thread::yield();
+
+    echoes.store(0, std::memory_order_relaxed);
+
+    using Clock = std::chrono::high_resolution_clock;
+    const auto start = Clock::now();
+
+    for (std::size_t i = 0; i < Messages; ++i) {
+        while (!client->send(PackedTcpReader::data(src), PackedTcpReader::size()))
+            std::this_thread::yield();
+    }
+
+    while (echoes.load(std::memory_order_acquire) != Messages)
+        std::this_thread::yield();
+
+    const auto end = Clock::now();
+
+    const auto totalNs = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    const double totalSeconds = static_cast<double>(totalNs) / 1'000'000'000.0;
+    const double packedPerSecond = static_cast<double>(Messages) / totalSeconds;
+    const double oneWayMiBPerSecond = (packedPerSecond * sizeof(Packed)) / (1024.0 * 1024.0);
+    const double roundTripMiBPerSecond = (packedPerSecond * sizeof(Packed) * 2.0) / (1024.0 * 1024.0);
+
+    const std::size_t received = echoes.load(std::memory_order_acquire);
+
+    contract_assert(received == Messages);
+
+    std::cout << "\nreflected Packed TCP flood:\n";
+    dumpPacked(src);
+
+    std::cout << "\nstructure size: " << sizeof(Packed) << " bytes\n";
+    std::cout << Messages << " TCP echo transfers: " << totalNs << " ns\n";
+    std::cout << "Packed/sec: " << packedPerSecond << '\n';
+    std::cout << "one-way payload: " << oneWayMiBPerSecond << " MiB/s\n";
+    std::cout << "roundtrip payload: " << roundTripMiBPerSecond << " MiB/s\n";
+    std::cout << "echoes: " << received << '\n';
+
+    client->disconnect();
+
+    int retries = 0;
+    while (!clientDisconnected.load(std::memory_order_acquire) && retries < 2000) {
+        std::this_thread::sleep_for(1ms);
+        ++retries;
+    }
+
+    retries = 0;
+    while (!serverSawDisconnect.load(std::memory_order_acquire) && retries < 2000) {
+        std::this_thread::sleep_for(1ms);
+        ++retries;
+    }
+
+    contract_assert(clientDisconnected.load(std::memory_order_acquire));
+    contract_assert(serverSawDisconnect.load(std::memory_order_acquire));
+
+    server->stop();
+
+    return 0;
+}
+#endif
+
+
+
+
+
+#if IPC_MMAP
+int main()
+{
+    const std::string path = "/tmp/job-packed-mmap.bin";
+    constexpr int iterations = 1'000'000;
+
+    TmpFile tmp(path, sizeof(Packed), '\0');
+
+    Packed src;
+    src.type = LayerType::Attention;
+    src.activation = ActivationType::GELU;
+    src.inputs = 4096;
+    src.outputs = 8192;
+    src.weightOffset = 128;
+    src.weightCount = 16384;
+    src.biasOffset = 16512;
+    src.biasCount = 4096;
+    src.auxiliaryData = 8;
+
+    {
+        MappedFile file(tmp.path(), sizeof(Packed));
+        Packed *mapped = file.asPackedMut();
+
+        using Clock = std::chrono::high_resolution_clock;
+
+        const auto writeStart = Clock::now();
+        for (int i = 0; i < iterations; ++i) {
+            *mapped = src;
+            mapped->inputs = static_cast<std::uint32_t>(4096 + (i & 1));
+            asm volatile("" : : "g"(mapped) : "memory");
+        }
+        const auto writeEnd = Clock::now();
+
+        std::uint64_t checksum = 0;
+        const Packed *read = file.asPacked();
+
+        const auto readStart = Clock::now();
+        for (int i = 0; i < iterations; ++i) {
+            asm volatile("" : : : "memory"); // agressive as fuck lol
+
+            checksum += read->inputs;
+            checksum += read->outputs;
+            checksum += read->weightCount;
+            checksum += read->biasCount;
+            checksum += read->auxiliaryData;
+        }
+        const auto readEnd = Clock::now();
+
+        contract_assert(read->type == LayerType::Attention);
+        contract_assert(read->activation == ActivationType::GELU);
+        contract_assert(read->inputs == 4097);
+        contract_assert(read->outputs == 8192);
+        contract_assert(read->weightOffset == 128);
+        contract_assert(read->weightCount == 16384);
+        contract_assert(read->biasOffset == 16512);
+        contract_assert(read->biasCount == 4096);
+        contract_assert(read->auxiliaryData == 8);
+        contract_assert(checksum != 0);
+
+        std::cout << "\nreflected Packed:\n";
+        dumpPacked(*read);
+
+        const auto writeNs = std::chrono::duration_cast<std::chrono::nanoseconds>(writeEnd - writeStart).count();
+        const auto readNs = std::chrono::duration_cast<std::chrono::nanoseconds>(readEnd - readStart).count();
+
+        std::cout << "\nstructure size: " << sizeof(Packed) << " bytes\n";
+        std::cout << iterations << " mapped writes: " << writeNs << " ns\n";
+        std::cout << iterations << " mapped reads:  " << readNs << " ns\n";
+        std::cout << "write avg: " << static_cast<double>(writeNs) / iterations << " ns\n";
+        std::cout << "read avg:  " << static_cast<double>(readNs) / iterations << " ns\n";
+        std::cout << "checksum: " << checksum << '\n';
+    }
+
+    return 0;
+}
+#endif
 
 
 // int main()
@@ -330,16 +978,26 @@ void dumpReflected(const T &obj)
 //     return 0;
 // }
 
-int main()
-{
-    Pong pong;
-    {
-        Ping ping;
-        connect<&Ping::pingChanged, &Pong::handlePing>(ping, pong);
-        for(int i = 0; i <= 10; ++i )
-            ping.emit(i);
-    }
+// int main()
+// {
+//     Pong pong;
+//     {
+//         Ping ping;
+//         connect<&Ping::pingChanged, &Pong::handlePing>(ping, pong);
+//         for(int i = 0; i <= 10; ++i )
+//             ping.emit(i);
+//     }
 
-    return 0;
-}
+//     return 0;
+// }
 // divide(10, 0);
+
+
+
+
+
+
+
+
+
+

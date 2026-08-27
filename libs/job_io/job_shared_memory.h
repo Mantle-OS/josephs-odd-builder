@@ -46,7 +46,7 @@ enum class SharedMemoryMode : uint8_t {
     Write // Read + Write access
 };
 
-class JobSharedMemory final : public core::IODevice {
+class JobSharedMemory final : public IODevice {
 public:
     using Ptr = std::shared_ptr<JobSharedMemory>;
 
@@ -73,7 +73,7 @@ public:
 
     void setNonBlocking(bool enabled) override;
     void setReadCallback(ReadCallback cb) override;
-    void setPermissions(core::IOPermissions perms) override;
+    void setPermissions(IOPermissions perms) override;
 
     [[nodiscard]] bool attach();
     [[nodiscard]] bool detach();

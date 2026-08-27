@@ -12,7 +12,7 @@ using namespace job::tui::gui;
 
 int main()
 {
-    auto device = IOFactory::createFromType(FactoryType::FILE_STD_OUT, "");
+    auto device = IOFactory::createFromType(FactoryType::FileStdOut, "");
     if (!device || !device->openDevice()) {
         std::cerr << "Failed to open IODevice\n";
         return 1;

@@ -21,12 +21,6 @@ if(JOB_BUILD_SERIALIZER_MSGPACK)
     include(cmake/job_msgpack_gen_lib.cmake)
 endif()
 
-
-
-
-
-
-
 if(JOB_QT)
     ## Order matters here. stable diffusion cpp MUST come before Llama as stable diffusion cpp builds GGML which llama depends on
     include(cmake/cmake_stable_diffusion_cpp_build_flags.cmake)

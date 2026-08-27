@@ -225,38 +225,38 @@ JobGgmlBackendBufferType::Ptr JobGgmlCuda::splitBufferType(int mainDevice, std::
 }
 
 
-bool JobGgmlCuda::allReduceTensor(std::span<const JobGgmlBackend::Ptr> backends,
-                                  std::span<const JobGgmlTensor::Ptr> tensors)
-{
-    if (backends.empty() || tensors.empty() || backends.size() != tensors.size())
-        return false;
+// bool JobGgmlCuda::allReduceTensor(std::span<const JobGgmlBackend::Ptr> backends,
+//                                   std::span<const JobGgmlTensor::Ptr> tensors)
+// {
+//     if (backends.empty() || tensors.empty() || backends.size() != tensors.size())
+//         return false;
 
 
-    std::vector<ggml_backend_t> nativeBackends;
-    std::vector<ggml_tensor *> nativeTensors;
+//     std::vector<ggml_backend_t> nativeBackends;
+//     std::vector<ggml_tensor *> nativeTensors;
 
-    nativeBackends.reserve(backends.size());
-    nativeTensors.reserve(tensors.size());
+//     nativeBackends.reserve(backends.size());
+//     nativeTensors.reserve(tensors.size());
 
-    for (std::size_t index = 0; index < backends.size(); ++index) {
-        const JobGgmlBackend::Ptr &backend = backends[index];
-        const JobGgmlTensor::Ptr &tensor = tensors[index];
-        if (!backend ||
-            !backend->isValid() ||
-            !tensor ||
-            !tensor->isValid()) {
-            return false;
-        }
+//     for (std::size_t index = 0; index < backends.size(); ++index) {
+//         const JobGgmlBackend::Ptr &backend = backends[index];
+//         const JobGgmlTensor::Ptr &tensor = tensors[index];
+//         if (!backend ||
+//             !backend->isValid() ||
+//             !tensor ||
+//             !tensor->isValid()) {
+//             return false;
+//         }
 
-        nativeBackends.push_back(backend->backend());
-        nativeTensors.push_back(tensor->tensor());
-    }
+//         nativeBackends.push_back(backend->backend());
+//         nativeTensors.push_back(tensor->tensor());
+//     }
 
-    return ggml_backend_cuda_allreduce_tensor(nativeBackends.data(),
-                                              nativeTensors.data(),
-                                              nativeBackends.size()
-                                              );
-}
+//     return ggml_backend_cuda_allreduce_tensor(nativeBackends.data(),
+//                                               nativeTensors.data(),
+//                                               nativeBackends.size()
+//                                               );
+// }
 
 std::string JobGgmlCuda::dump()
 {

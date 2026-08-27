@@ -6,7 +6,7 @@ This module `jobtui`  links against `job_ansi`, `job_core`, `job_io`, and `job_t
 
 job:
 - `job::ansi` provides ANSI strings + attributes + colors etc
-- `job::core` provides `job::core::IODevice` for output
+- `job::core` provides `job::io::IODevice` for output
 - `job::threads` provides `job::threads::JobIoAsyncThread`
 - `job::tui` item tree + layout + event loop + drawing helpers
 - `job::tui::gui` widgets/containers/layouts
@@ -24,7 +24,7 @@ Owns the terminal session:
 Rendering is “paint the tree”:
 - root item paints first
 - top-level children paint after
-- output is ANSI cursor moves + styled text written to an job::core::IODevice
+- output is ANSI cursor moves + styled text written to an job::io::IODevice
 
 There is a dirty flag + a minimum render interval.
 
@@ -60,7 +60,7 @@ Writer for terminal output.
 - rectangles/boxes with a few border styles
 - foreground/background color application
 
-Writes ANSI escape sequences + text directly to `job::core::IODevice`.
+Writes ANSI escape sequences + text directly to `job::io::IODevice`.
 
 ## Event
 Input is translated into events:
