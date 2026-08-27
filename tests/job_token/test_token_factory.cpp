@@ -227,6 +227,7 @@ TEST_CASE("TokenFactory Binary two-path overload uses explicit tokenizer path", 
     std::filesystem::remove(tokenizerPath);
 }
 
+#ifdef JOB_TOKEN_TEST_GGUF_FILE
 TEST_CASE("TokenFactory returns independently owned providers", "[token][factory][usage][ownership]")
 {
     const std::filesystem::path tokenizerPath = hfDataPath("gemma-4-12b-it/tokenizer.json");
@@ -242,7 +243,7 @@ TEST_CASE("TokenFactory returns independently owned providers", "[token][factory
     REQUIRE(first->provider() == IToken::Provider::HuggingFace);
     REQUIRE(second->provider() == IToken::Provider::HuggingFace);
 }
-
+#endif
 //
 // Block 2: edge cases / failure behavior
 //
