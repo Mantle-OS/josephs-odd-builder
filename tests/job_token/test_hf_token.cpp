@@ -22,7 +22,7 @@ using job::token::kInvalidToken;
 //
 // Block 1: usage / examples
 //
-
+#ifdef JOB_TOKEN_TEST_DATA_DIR
 static std::filesystem::path hfDataPath(std::string_view relativePath)
 {
     return std::filesystem::path{JOB_TOKEN_TEST_DATA_DIR} / std::filesystem::path{relativePath};
@@ -51,6 +51,7 @@ TEST_CASE("HfToken loads checked-in Qwen tokenizer fixture", "[token][hf][integr
     REQUIRE(token.tokenType() != TokenType::Unknown);
     REQUIRE(token.vocabSize() > 0);
 }
+#endif
 
 TEST_CASE("HfToken starts as HuggingFace provider", "[token][hf][usage]")
 {

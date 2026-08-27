@@ -45,10 +45,12 @@ add_executable(test_job_ggml
 )
 
 # test_ggml_tensor_op_for_science.cpp # fun side quest
+if(NOT JOB_CI_BUILD)
+    target_compile_definitions(test_job_ggml PRIVATE
+        JOB_TEST_GGUF_FILE="/srv/ai/ComfyUI/models/text_encoders/ZImage_Turbo/Qwen3-4B-Instruct-2507-Q4_K_M.gguf"
+    )
+endif()
 
-target_compile_definitions(test_job_ggml PRIVATE
-    JOB_TEST_GGUF_FILE="/srv/ai/ComfyUI/models/text_encoders/ZImage_Turbo/Qwen3-4B-Instruct-2507-Q4_K_M.gguf"
-)
 
 if(JOB_WINDOWS)
     target_compile_options(test_job_ggml PRIVATE /wd4251)

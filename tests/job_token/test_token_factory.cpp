@@ -104,11 +104,11 @@ private:
 
 using job::token::TokenFactoryBinaryTestData;
 
+#ifdef JOB_TOKEN_TEST_GGUF_FILE
 static std::filesystem::path hfDataPath(std::string_view relativePath)
 {
     return std::filesystem::path{JOB_TOKEN_TEST_DATA_DIR} / std::filesystem::path{relativePath};
 }
-
 //
 // Block 1: usage / examples
 //
@@ -159,7 +159,9 @@ TEST_CASE("TokenFactory HuggingFace two-path overload routes tokenizer path firs
     REQUIRE(token->provider() == IToken::Provider::HuggingFace);
     REQUIRE(token->vocabSize() > 0);
 }
+#endif
 
+#ifdef JOB_TOKEN_TEST_GGUF_FILE
 TEST_CASE("TokenFactory creates GGUF provider from model path", "[token][factory][usage][gguf]")
 {
     const std::filesystem::path modelPath{JOB_TOKEN_TEST_GGUF_FILE};
@@ -188,6 +190,7 @@ TEST_CASE("TokenFactory GGUF two-path overload uses model path", "[token][factor
     REQUIRE(token->provider() == IToken::Provider::Gguf);
     REQUIRE(token->vocabSize() > 0);
 }
+#endif
 
 TEST_CASE("TokenFactory creates Binary provider from binary tokenizer path", "[token][factory][usage][binary]")
 {
@@ -281,6 +284,7 @@ TEST_CASE("TokenFactory Binary returns null for missing tokenizer file", "[token
     REQUIRE(token == nullptr);
 }
 
+#ifdef JOB_TOKEN_TEST_GGUF_FILE
 TEST_CASE("TokenFactory HuggingFace two-path overload fails when tokenizer path is missing", "[token][factory][edge][hf][routing]")
 {
     const std::filesystem::path configPath = hfDataPath("gemma-4-12b-it/tokenizer_config.json");
@@ -291,7 +295,6 @@ TEST_CASE("TokenFactory HuggingFace two-path overload fails when tokenizer path 
 
     REQUIRE(token == nullptr);
 }
-
 TEST_CASE("TokenFactory GGUF two-path overload ignores missing tokenizer path", "[token][factory][edge][gguf][routing]")
 {
     const std::filesystem::path modelPath{JOB_TOKEN_TEST_GGUF_FILE};
@@ -304,6 +307,7 @@ TEST_CASE("TokenFactory GGUF two-path overload ignores missing tokenizer path", 
     REQUIRE(token->provider() == IToken::Provider::Gguf);
     REQUIRE(token->vocabSize() > 0);
 }
+#endif
 
 TEST_CASE("TokenFactory Binary two-path overload ignores missing model path", "[token][factory][edge][binary][routing]")
 {

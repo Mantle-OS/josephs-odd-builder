@@ -29,7 +29,7 @@ RUN apt-get update && \
         libwireplumber-0.5-dev libspa-0.2-dev pipewire-alsa libpipewire-0.3-dev \
         libspa-0.2-jack libspa-0.2-bluetooth libspa-0.2-modules libasound2-dev \
         libopus-dev libflac-dev libogg-dev libvorbis-dev  libwavpack-dev \
-        libgl1 libglib2.0-0 && \
+        libgl1 libglib2.0-0 libudev-dev && \
     rm -rf /var/lib/apt/lists/*
 
 RUN update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-16 100 --slave /usr/bin/g++ g++ /usr/bin/g++-16 && \

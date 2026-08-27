@@ -33,7 +33,7 @@ TEST_CASE("GgufToken starts as GGUF provider", "[token][gguf][usage]")
     REQUIRE(token.preTokenizer().empty());
     REQUIRE(token.merges().empty());
 }
-
+#ifdef JOB_TOKEN_TEST_GGUF_FILE
 TEST_CASE("GgufToken loads checked-in configured GGUF model", "[token][gguf][usage][integration][io]")
 {
     const std::filesystem::path path{JOB_TOKEN_TEST_GGUF_FILE};
@@ -147,6 +147,7 @@ TEST_CASE("GgufToken can be loaded repeatedly from the same file", "[token][gguf
     REQUIRE(token.modelName() == firstModelName);
     REQUIRE(token.preTokenizer() == firstPreTokenizer);
 }
+#endif
 
 //
 // Block 2: edge cases / failure behavior
@@ -217,6 +218,7 @@ TEST_CASE("GgufToken rejects malformed byte span", "[token][gguf][edge][memory][
     REQUIRE_FALSE(token.load(std::span<const std::byte>{buffer}));
 }
 
+#ifdef JOB_TOKEN_TEST_GGUF_FILE
 TEST_CASE("GgufToken failed load clears previous tokenizer state", "[token][gguf][edge][state][failure]")
 {
     const std::filesystem::path path{JOB_TOKEN_TEST_GGUF_FILE};
@@ -272,3 +274,4 @@ TEST_CASE("GgufToken clear restores GGUF defaults", "[token][gguf][edge][state]"
     REQUIRE_FALSE(token.addEosToken());
     REQUIRE(token.chatTemplate().empty());
 }
+#endif

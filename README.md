@@ -1,8 +1,9 @@
 # Joseph's Odd Builder
 
-Joseph's Odd Builder, or **JOB**, is a C++23/26 GNU/Linux playground for building userland libraries, runtimes, tools, simulations, and applications.
+Joseph's Odd Builder, or **JOB**, is a C++26(minus nvidia cu stuff at 23) GNU/Linux playground for building userland libraries, runtimes, tools, 
+simulations, and applications.
 
-The project is split into two major documentation areas:
+The project is split into 2 major documentation areas kinda... 
 
 ## JOB Core Ecosystem
 
@@ -71,4 +72,3 @@ This is an experimental systems playground. APIs are allowed to change while the
   * [stable_diffusion cpp](cmake/cmake_stable_diffusion_cpp_build_flags.cmake)
 * The code is young'ish there are bound to be issues though we do test things. [see section 11](docs/coding_style.md)   
 * job_model and job_token are changing almost everyday at this point. but this should settle down at some point.
-

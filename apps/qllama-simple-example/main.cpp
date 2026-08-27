@@ -48,20 +48,13 @@ int main(int argc, char *argv[])
 
     QObject::connect(engine, &QLlamaEngine::generationStarted, []() {
         qDebug() << "\n[Inference Started] Prompt processing complete. Response Stream:";
-        qDebug() << "----------------------------------------------------";
-    });
-
-    QObject::connect(engine, &QLlamaEngine::tokenStreamed, [](const QString &chunk) {
-        // Output text pieces as they clear the generation worker loop boundaries
-        fprintf(stdout, "%s", qPrintable(chunk));
-        fflush(stdout);
     });
 
     QObject::connect(engine, &QLlamaEngine::generationFinished, [&app](const QString &fullText) {
         qDebug() << "\n----------------------------------------------------";
         qDebug() << "[Inference Finished] Total Text Length Compiled:" << fullText.length() << "characters.";
         qDebug() << "Closing execution environment context.";
-        app.quit(); // Gracefully drop out of our Qt event queue loop
+        app.quit(); // Gracefully drop out of Qt event queue loop
     });
 
     QObject::connect(engine, &QLlamaEngine::executionError, [&app](const QString &err) {
@@ -70,8 +63,6 @@ int main(int argc, char *argv[])
     });
 
     engine->set_prompt("<|im_start|>user\nExplain why minimal software architectures with fewer third-party dependencies are inherently more robust.<|im_end|>\n<|im_start|>assistant\n");
-
-    // Queue the start sequence execution call right after the application loop spins up
     QTimer::singleShot(100, engine, &QLlamaEngine::generate);
 
     return app.exec();

@@ -41,14 +41,15 @@ add_executable(test_job_token
     ${JOBTOKEN_TESTS}
 )
 
-target_compile_definitions(test_job_token PRIVATE
-    JOB_TOKEN_TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/hf"
-)
+if(NOT JOB_CI_BUILD)
+    target_compile_definitions(test_job_token PRIVATE
+        JOB_TOKEN_TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/hf"
+    )
 
-target_compile_definitions(test_job_token PRIVATE
-    JOB_TOKEN_TEST_GGUF_FILE="/srv/ai/ComfyUI/models/text_encoders/ZImage_Turbo/Qwen3-4B-Instruct-2507-Q4_K_M.gguf"
-)
-
+    target_compile_definitions(test_job_token PRIVATE
+        JOB_TOKEN_TEST_GGUF_FILE="/srv/ai/ComfyUI/models/text_encoders/ZImage_Turbo/Qwen3-4B-Instruct-2507-Q4_K_M.gguf"
+    )
+endif()
 
 target_link_libraries(test_job_token PRIVATE
     JosephsOddBuilder_Core
