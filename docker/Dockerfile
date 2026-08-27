@@ -17,9 +17,9 @@ ENV LD_LIBRARY_PATH=${CUDA_HOME}/lib64:${LD_LIBRARY_PATH}
 
 RUN apt-get update && \
     apt-get install --no-install-recommends -y \
-        gcc-16 linux-headers-$(uname -r) \
+        gcc-16 \
         g++-16 build-essential chrpath \
-        wget git wget ca-certificates \
+        wget git wget ca-certificates git cmake \
         libcublas-dev-13-3 && \
         libssl-dev libzstd-dev pkgconf libpkgconf-dev zlib1g-dev \
         libsodium-dev libflatbuffers-dev nlohmann-json3-dev \
