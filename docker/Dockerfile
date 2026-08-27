@@ -46,7 +46,7 @@ RUN wget https://developer.download.nvidia.com/compute/cuda/repos/debian12/x86_6
         cuda-libraries-dev-13-3 \
         libcusparse-13-3 libcusparse-dev-13-3  cublas13 libcublas13-dev-cuda-13 \
         cuda-cudart-13-3 cuda-cudart-dev-13-3 libcurand-13-3 libcurand-dev-13-3 \
-        cuda-libraries-13-3  cuda-runtime-13-3 cuda-opencl-13-3
+        cuda-libraries-13-3  cuda-runtime-13-3 cuda-opencl-13-3 && \
     rm cuda-keyring_1.1-1_all.deb
 
 RUN update-alternatives --install /usr/bin/nvcc nvcc /usr/local/cuda-13.3/bin/nvcc 100 && \
