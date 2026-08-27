@@ -1,9 +1,6 @@
 name: Build and Test JOB
 on:
-  push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
+  workflow_call:
 
 env:
   BUILD_TYPE: Release
@@ -13,6 +10,9 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: ghcr.io/${{ github.repository }}:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
     steps:
     - uses: actions/checkout@v4
       with:
