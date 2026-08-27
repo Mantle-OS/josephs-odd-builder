@@ -477,6 +477,7 @@ TEST_CASE("JobGgufKv reads scalar integer values",
     REQUIRE(kv.readInt() == 36);
 }
 
+#ifdef JOB_TEST_GGUF_FILE
 TEST_CASE("JobGguf inspects Qwen model metadata without loading tensor payloads",
           "[gguf][usage][integration][external][qwen]")
 {
@@ -690,7 +691,7 @@ TEST_CASE("JobGguf inspects Qwen model metadata without loading tensor payloads"
     WARN("REAL MODEL: tensor count = "
          << gguf.tensorCount());
 }
-
+#endif
 
 // Block two: edge cases / contracts
 TEST_CASE("GGUF enum helpers describe every supported value type", "[gguf][edge][type]")
