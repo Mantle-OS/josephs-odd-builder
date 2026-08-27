@@ -3,6 +3,8 @@
 #include "layer_factory.h"
 #include "noise_table.h"
 
+// Junkish but proves a point
+
 namespace job::ai::infer {
 
 Runner::Runner(const evo::Genome &genome, threads::ThreadPool::Ptr pool, uint8_t initialWsMB):

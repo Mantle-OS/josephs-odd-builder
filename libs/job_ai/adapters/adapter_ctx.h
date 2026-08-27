@@ -8,7 +8,7 @@ struct AdapterCtx {
     float               dt{0.0f};                               // for Verlet / dynamics
     int                 embedDim{0};                            // for attention
     int                 headDim{0};                             // optional
-    // TODO - kinda lol: add padding/mask info later if EVEN needed
+    // TODO - kinda lol: add padding/mask info later if EVEN needed I kinda ran out ouf L[1,2,3] here on the arm board(sam9x)
 };
 
 }

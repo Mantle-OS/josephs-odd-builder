@@ -9,7 +9,8 @@
 #include "qllamabase.h"
 #include "qllamavocab.h"
 
-class QLlamaEngine : public QLlamaBase
+#include "qllama_export.h"
+class QLLAMA_EXPORT QLlamaEngine : public QLlamaBase
 {
     Q_OBJECT
 

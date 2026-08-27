@@ -42,7 +42,7 @@ void StencilAdapter::adaptParallel(threads::ThreadPool &pool,
 
     size_t elementsPerBatch = static_cast<size_t>(S) * D;
 
-    // FIXME: In v3, ask Workspace for this buffer to avoid malloc.
+    // Later once there is a "Workspace" ask Workspace for this buffer to avoid this malloc :(.
     cords::AiWeights scratch(B * elementsPerBatch);
 
     threads::parallel_for(pool, size_t{0}, size_t(B), [&](size_t b) {
@@ -104,7 +104,7 @@ void StencilAdapter::adapt(threads::ThreadPool &pool,
 
     size_t elementsPerBatch = static_cast<size_t>(S) * D;
 
-    // FIXME: In v3, ask Workspace for this buffer to avoid malloc.
+    // malloc.
     cords::AiWeights scratch(B * elementsPerBatch);
     for(size_t b = 0; b < size_t(B); ++b){
         const float *srcBatch = sources.data() + (b * elementsPerBatch);
@@ -145,5 +145,4 @@ void StencilAdapter::adapt(threads::ThreadPool &pool,
         simd::transpose(scratchBatch, outBatch, D, S);
     };
 }
-\
 }

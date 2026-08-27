@@ -24,7 +24,6 @@ public:
     [[nodiscard]] bool isCompatible(const evo::Genome &g) const;                    // well
     void reload(const evo::Genome &genome);                                         // flywheel
 
-
 private:
     void buildNetwork();                                                        // build the network
     threads::ThreadPool::Ptr                                m_pool;             // The thread pool

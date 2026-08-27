@@ -63,9 +63,6 @@ if(JOB_BUILD_SERIALIZER)
 
         endif()
     endif()
-
-
-
 endif()
 
 if(JOB_BUILD_SCIENCE)
@@ -76,7 +73,6 @@ if(JOB_BUILD_AI)
     add_subdirectory(job_ai)
 endif()
 
-
 if(JOB_BUILD_ANSI)
     add_subdirectory(job_ansi)
 endif()
@@ -85,11 +81,9 @@ if(JOB_BUILD_TUI)
     add_subdirectory(job_tui)
 endif()
 
-
 if(JOB_BUILD_SOUND)
     add_subdirectory(job_sound)
 endif()
-
 
 
 if(JOB_QT)
@@ -104,16 +98,12 @@ if(JOB_QT)
     add_subdirectory(qzstd)
 
     if(JOB_BUILD_QSD)
-        add_subdirectory(qsd)                   # fully cross platform | not tested on hardware for win32
+        add_subdirectory(qsd)
     endif()
-
-
 
     if(JOB_BUILD_QLLAMA)
-        add_subdirectory(qllama)                # fully cross platform | not tested on hardware for win32 | NOTE: I got towards the end of this and only exposed (get it working now deal) so much. This should be refactored to soon to "really" expose the whole lamma_cpp deal.
+        add_subdirectory(qllama)
     endif()
-
-
 
     if(JOB_BUILD_QHF)
         # add_subdirectory(qhf)                 # Depends on session manager

@@ -11,7 +11,8 @@
 #include "qllamabase.h"
 #include "qllamaenums.h"
 
-class QLlamaTokenData : public QLlamaBase
+#include "qllama_export.h"
+class QLLAMA_EXPORT QLlamaTokenData : public QLlamaBase
 {
     Q_OBJECT
     QML_ELEMENT

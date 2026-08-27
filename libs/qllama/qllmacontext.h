@@ -18,7 +18,8 @@
 #include "qllamasampler.h"
 
 
-class QLlamaContext : public QLlamaBase
+#include "qllama_export.h"
+class QLLAMA_EXPORT QLlamaContext : public QLlamaBase
 {
     Q_OBJECT
     QML_ELEMENT

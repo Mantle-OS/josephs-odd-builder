@@ -26,16 +26,18 @@ std::string Rk4Adapter::name() const
     return "RK4 (Runge-Kutta 4th Order)";
 }
 
-void Rk4Adapter::adaptParallel( job::threads::ThreadPool &pool,
+void Rk4Adapter::adaptParallel(job::threads::ThreadPool &pool,
                                const AttentionShape &shape,
-                               const ViewR &sources, [[maybe_unused]] const ViewR &targets, [[maybe_unused]] const ViewR &values, ViewR &output,
+                               const ViewR &sources, [[maybe_unused]]
+                               const ViewR &targets, [[maybe_unused]]
+                               const ViewR &values, ViewR &output,
                                const AdapterCtx &ctx)
 {
     const size_t batch = static_cast<size_t>(shape.batch);
     const int seq = static_cast<int>(shape.seq);
     const int dim = static_cast<int>(shape.dim);
 
-    // SHIT FIXME
+    // Shit sticks .... FIXME LATER Works for now but wasteful.....
     if (dim < 3)
         return;
 
@@ -46,8 +48,7 @@ void Rk4Adapter::adaptParallel( job::threads::ThreadPool &pool,
     });
 }
 
-void Rk4Adapter::adapt(
-    job::threads::ThreadPool &pool,
+void Rk4Adapter::adapt(job::threads::ThreadPool &pool,
     const AttentionShape &shape,
     const ViewR &sources, [[maybe_unused]] const ViewR &targets, [[maybe_unused]] const ViewR &values, ViewR &output,
     const AdapterCtx &ctx
@@ -57,7 +58,7 @@ void Rk4Adapter::adapt(
     const int seq = static_cast<int>(shape.seq);
     const int dim = static_cast<int>(shape.dim);
 
-    // SHIT FIXME
+    // see my note about sticks
     if (dim < 3)
         return;
 
@@ -65,8 +66,6 @@ void Rk4Adapter::adapt(
     for(size_t i = 0 ; i < batch; ++i)
         apply(seq, dim, poolPtr, sources, output, ctx, i);
 }
-
-
 
 void Rk4Adapter::apply(int seq, int dim,
                        ThreadPool::Ptr pool,
@@ -80,13 +79,13 @@ void Rk4Adapter::apply(int seq, int dim,
     const float *in_ptr = sources.data() + (size * seq * dim);
     float *out_ptr      = output.data()  + (size * seq * dim);
 
-
-    PhysicsContext physCtx;
+    PhysicsContext physCtx; // borrow from verlet config (NOT BORROW POINTERS )
     physCtx.particles = bodies.data();
     physCtx.count = seq;
     physCtx.valueIn = in_ptr;    // Read V from here
     physCtx.valueOut = out_ptr;  // Write Mixed V here
     physCtx.stride = dim;
+
     // Standard Layout: Dims 7+ are Payload
     physCtx.valueDim = (dim > 7) ? (dim - 7) : 0;
 
@@ -99,13 +98,13 @@ void Rk4Adapter::apply(int seq, int dim,
         p.position.y = in_ptr[idx + m_cfg.dim_mapping[1]];
         p.position.z = in_ptr[idx + m_cfg.dim_mapping[2]];
 
-        // Map Velocity (if dims exist)
+        // Map Velocity (if dims even exist)
         if (dim >= 6) {
             p.velocity.x = in_ptr[idx + m_cfg.dim_mapping[3]];
             p.velocity.y = in_ptr[idx + m_cfg.dim_mapping[4]];
             p.velocity.z = in_ptr[idx + m_cfg.dim_mapping[5]];
         } else {
-            p.velocity = {0,0,0}; // Fixed
+            p.velocity = {0,0,0};
         }
 
         // Map Mass
@@ -119,13 +118,11 @@ void Rk4Adapter::apply(int seq, int dim,
         p.acceleration = {0,0,0};
     }
 
-    // auto calcForces = [&](std::vector<Particle>& /*ignored*/) {
-    //     computeForcesAndMixing(physCtx);
-    // };
     auto calcForces = [physCtx](std::vector<Particle> &currentParticles) mutable {
         physCtx.particles = currentParticles.data();
         computeForcesAndMixing(physCtx);
     };
+
     Solver integrator(pool, &bodies,
                       [](Particle &p) -> Vec3f& { return p.position; },
                       [](Particle &p) -> Vec3f& { return p.velocity; },
@@ -152,8 +149,7 @@ void Rk4Adapter::apply(int seq, int dim,
 
         if (dim >= 7)
             out_ptr[idx + m_cfg.dim_mapping[6]] = p.mass;
-
     }
-
 }
+
 }

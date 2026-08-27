@@ -71,6 +71,8 @@ if(GGML_ZDNN)
     list(APPEND JOBGGML_DEVICE_IMPL_SOURCES device/impl/job_ggml_zdnn.cpp)
 endif()
 
+## Maybe later
+
 # if(GGML_VIRTGPU)
 #     add_compile_definitions(JOB_GGML_VIRTGPU)
 #     list(APPEND JOBGGML_DEVICE_IMPL_HEADERS device/impl/job_ggml_virtgpu.h)
@@ -185,15 +187,13 @@ set(JOBGGML_QUANTIZATION_HEADERS
     quant/job_ggml_quantizer.h
 )
 
-# last
 set(JOBGGML_HEADERS
-    job_ggml_enums.h            # done for now till we fgind more enums in the stack
-    job_ggml_type_traits.h      # done
+    job_ggml_enums.h
+    job_ggml_type_traits.h
     job_ggml_threadpool_params.h
     job_ggml_threadpool.h
     job_ggml_abort_callback.h
-
-    job_ggml.h                  # not done last
+    job_ggml.h
 )
 
 ############ SOURCES

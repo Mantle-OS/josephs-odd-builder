@@ -165,6 +165,7 @@ Pane {
 
 
                 TextField {
+                    id: flowShiftField
                     text: "1.0"
                     inputMethodHints: Qt.ImhFormattedNumbersOnly
                     validator: DoubleValidator {

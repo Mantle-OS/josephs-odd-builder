@@ -6,5 +6,4 @@ struct StencilConfig {
     float                       diffusionRate   = 0.1f;                             // Rate
     science::BoundaryMode       boundary        = science::BoundaryMode::Wrap;
 };
-
 }

@@ -32,7 +32,6 @@ bool QLlamaContext::initContext(QLlamaModel *model, QLlamaContextParams *params)
     m_linkedModel = model;
     llama_context_params nativeCtxParams = params->prepareContextParams();
 
-    qDebug() << "[qllama] Provisioning compute sub-graph memory contexts...";
     // TODO this is "deprecated" next time stable diffision ups the ggml then we will update.
     m_context = llama_new_context_with_model(m_linkedModel->nativeModel(), nativeCtxParams);
 
@@ -89,7 +88,7 @@ void QLlamaContext::clearKvCache()
         if (mem) {
             ::llama_memory_clear(mem, true);
 
-            qDebug() << "[qllama] Success. Public memory blocks cleared.";
+            // qDebug() << "[qllama] Success. Public memory blocks cleared.";
         } else {
             qWarning() << "[qllama] Failed to clear: Context returned a null memory handle pointer.";
         }
@@ -126,7 +125,7 @@ bool QLlamaContext::syncActiveLoRAs()
     }
 
     if (!nativeAdapters.empty()) {
-        qDebug() << "[qllama] Syncing" << nativeAdapters.size() << "active LoRA adapters over to the graph execution core.";
+        // qDebug() << "[qllama] Syncing" << nativeAdapters.size() << "active LoRA adapters over to the graph execution core.";
 
         // Use the public API call to cross the C/C++ ABI boundary cleanly
         ::llama_set_adapters_lora(

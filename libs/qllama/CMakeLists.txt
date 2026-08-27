@@ -11,6 +11,8 @@ set(QLLAMA_HEADERS
     qllamamodelkvoverride.h
     qllamamodeltensorbuftoverride.h
 
+    # qlla
+
     qllamamodelparams.h
     qllamaadapterlora.h
     qllamacontextparams.h
@@ -50,7 +52,7 @@ if(BUILD_SHARED_LIBS)
     qt_add_library(qt-llama SHARED)
 else()
     qt_add_library(qt-llama STATIC)
-    add_compile_definitions(qt-llama QLLAMA_STATIC_DEFINE)
+    add_compile_definitions(QLLAMA_STATIC_DEFINE)
 endif()
 
 qt_add_qml_module(qt-llama
@@ -99,7 +101,7 @@ target_link_libraries(qt-llama
         ${YAMLCpp_LIBRARIES}
         ${LibSodium_LIBRARIES}
         qt-sodium
-        qml-ai-utilsplugin
+        # qml-ai-utilsplugin
         $<BUILD_INTERFACE:ggml>
         $<BUILD_INTERFACE:llama>
         $<BUILD_INTERFACE:llama-common>
@@ -120,7 +122,7 @@ install(FILES ${QLLAMA_EXPORT_HEADER} DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/q
 install(FILES ${QLLAMA_HEADERS}       DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/qt-llama")
 
 if(BUILD_SHARED_LIBS)
-    # install(FILES ${QLLAMA_QML} DESTINATION "${QLLAMA_INSTALL_DIR}")
+    install(FILES ${QLLAMA_QML} DESTINATION "${QLLAMA_INSTALL_DIR}")
 endif()
 
 if(JOB_LINUX)

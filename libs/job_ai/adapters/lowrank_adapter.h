@@ -5,7 +5,6 @@
 #include "iadapter.h"
 #include "lowrank_config.h"
 
-
 namespace job::ai::adapters {
 
 class LowRankAdapter : public IAdapter {
@@ -20,15 +19,20 @@ public:
     [[nodiscard]] std::string name() const override;
 
     void adaptParallel(job::threads::ThreadPool &pool,
-                       const cords::AttentionShape &shape, const cords::ViewR &sources, const cords::ViewR &targets, const cords::ViewR &values, cords::ViewR &output,
-                       [[maybe_unused]] const AdapterCtx &ctx
-                       ) override;
+                       const cords::AttentionShape &shape,
+                       const cords::ViewR &sources,
+                       const cords::ViewR &targets,
+                       const cords::ViewR &values,
+                       cords::ViewR &output,
+                       [[maybe_unused]] const AdapterCtx &ctx) override;
 
     void adapt(job::threads::ThreadPool &pool,
-               const cords::AttentionShape &shape, const cords::ViewR &sources, const cords::ViewR &targets, const cords::ViewR &values,
+               const cords::AttentionShape &shape,
+               const cords::ViewR &sources,
+               const cords::ViewR &targets,
+               const cords::ViewR &values,
                cords::ViewR &output,
-               [[maybe_unused]] const AdapterCtx &ctx
-               )override;
+               [[maybe_unused]] const AdapterCtx &ctx) override;
 
     void apply(int S, int D,
                const cords::ViewR &sources,
@@ -37,8 +41,7 @@ public:
                cords::ViewR &output,
                cords::AiWeights scratch,
                size_t floatsPerBatch,
-               size_t size
-               );
+               size_t size);
 
 private:
     LowRankConfig m_cfg;

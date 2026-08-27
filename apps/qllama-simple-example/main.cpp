@@ -13,15 +13,10 @@ int main(int argc, char *argv[])
 {
     QCoreApplication app(argc, argv);
 
-    qDebug() << "====================================================";
-    qDebug() << "        [QLlama] 1st Ever Super Alpha Run           ";
-    qDebug() << "====================================================";
-
     auto *modelParams = new QLlamaModelParams(&app);
     modelParams->set_nGpuLayers(99); // Offload as many layers to CUDA cores as possible
 
     auto *model = new QLlamaModel(&app);
-    // Just for testing later I can make a --model command line flag but but I mean is this all even working ?
     model->set_modelPath("/srv/ai/ComfyUI/models/text_encoders/ZImage_Turbo/Qwen3-4B-Instruct-2507-Q4_K_M.gguf");
 
     if (!model->loadModel(modelParams)) {

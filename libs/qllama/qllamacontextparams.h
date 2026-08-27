@@ -10,7 +10,8 @@
 #include "qllamabase.h"
 #include "qllamaenums.h"
 
-class QLlamaContextParams : public QLlamaBase
+#include "qllama_export.h"
+class QLLAMA_EXPORT  QLlamaContextParams : public QLlamaBase
 {
     Q_OBJECT
     QML_ELEMENT

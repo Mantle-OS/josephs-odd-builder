@@ -25,7 +25,6 @@ public:
     explicit Rk4Adapter(Rk4Config cfg);
 
     [[nodiscard]] AdapterType type() const override;
-
     [[nodiscard]] std::string name() const override;
 
     void adaptParallel(job::threads::ThreadPool &pool,

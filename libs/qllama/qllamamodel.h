@@ -9,7 +9,8 @@
 #include "qllamabase.h"
 #include "qllamamodelparams.h"
 
-class QLlamaModel : public QLlamaBase
+#include "qllama_export.h"
+class QLLAMA_EXPORT QLlamaModel : public QLlamaBase
 {
     Q_OBJECT
     QP_RW(QString, modelPath,    "")

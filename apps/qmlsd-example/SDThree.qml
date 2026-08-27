@@ -43,9 +43,8 @@ Pane{
                     QSD.ImageGenerationParams.sampleParams.sampleSteps       = 8
                     QSD.ImageGenerationParams.sampleParams.guidance.txtCfg   = parseFloat(1.0)
 
-                    // QSD.ImageGenerationParams.sampleParams.eta = 0.0
                     QSD.ImageGenerationParams.sampleParams.flowShift = 1.0
-                    // QSD.ImageGenerationParams.sampleParams.guidance.imgCfg = 1.0
+
 
                     QSD.generateImage(outputImage, autoSaveSwitch.checked)
 

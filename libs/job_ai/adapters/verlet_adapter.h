@@ -26,13 +26,17 @@ public:
 
     void adaptParallel(threads::ThreadPool &pool,
                        const cords::AttentionShape &shape,
-                       const cords::ViewR &sources,  const cords::ViewR &targets,  const cords::ViewR &values,
+                       const cords::ViewR &sources,
+                       const cords::ViewR &targets,
+                       const cords::ViewR &values,
                        cords::ViewR &output,
                        const AdapterCtx &ctx) override;
 
     void adapt(threads::ThreadPool &pool,
                const cords::AttentionShape &shape,
-               const cords::ViewR &sources,  const cords::ViewR &targets,  const cords::ViewR &values,
+               const cords::ViewR &sources,
+               const cords::ViewR &targets,
+               const cords::ViewR &values,
                cords::ViewR &output,
                const AdapterCtx &ctx) override;
 

@@ -6,9 +6,8 @@
 
 #include <property-macros.h>
 #include "qllamabase.h"
-
-
-class QLlamaSampler : public QLlamaBase
+#include "qllama_export.h"
+class QLLAMA_EXPORT QLlamaSampler : public QLlamaBase
 {
     Q_OBJECT
     QML_ELEMENT

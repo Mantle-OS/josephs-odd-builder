@@ -107,7 +107,7 @@ option(JOB_BUILD_QAIUTILS "Build the qaiutils Qt adapter library" ON)
 option(JOB_BUILD_QSODIUM "Build the qsodium Qt adapter library" ON)
 option(JOB_BUILD_QZSTD "Build the qzstd Qt adapter library" ON)
 option(JOB_BUILD_QSD "Build the qsd diffusion adapter library" ON)
-option(JOB_BUILD_QLLAMA "Build the qllama inference adapter library" OFF)
+option(JOB_BUILD_QLLAMA "Build the qllama inference adapter library" ON)
 option(JOB_BUILD_QHF "Build the qhf Hugging Face adapter library" OFF)
 option(JOB_BUILD_QSESSIONMANAGER "Build the Qt session manager" OFF)
 

@@ -63,8 +63,7 @@ void LowRankAdapter::apply(int S, int D,
                            cords::ViewR &output,
                            cords::AiWeights scratch,
                            size_t floatsPerBatch,
-                           size_t size
-                           )
+                           size_t size)
 {
     const float *q_ptr = targets.data() + size * S * D;
     const float *k_ptr = sources.data() + size * S * D;

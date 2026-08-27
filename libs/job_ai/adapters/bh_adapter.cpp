@@ -22,15 +22,13 @@ std::string BhAdapter::name() const
     return "Barnes-Hut (Tree Code)";
 }
 
-void BhAdapter::adaptParallel(
-    threads::ThreadPool &pool,
-    const AttentionShape &shape,
-    const ViewR &sources,
-    [[maybe_unused]] const ViewR &targets,
-    [[maybe_unused]] const ViewR &values,
-    ViewR &output,
-    [[maybe_unused]] const AdapterCtx &ctx
-    )
+void BhAdapter::adaptParallel(threads::ThreadPool &pool,
+                              const AttentionShape &shape,
+                              const ViewR &sources,
+                              [[maybe_unused]] const ViewR &targets,
+                              [[maybe_unused]] const ViewR &values,
+                              ViewR &output,
+                              [[maybe_unused]] const AdapterCtx &ctx)
 {
     const size_t B = static_cast<size_t>(shape.batch);
     job::threads::parallel_for(pool, size_t{0}, B, [&](size_t i) {
@@ -51,7 +49,11 @@ void BhAdapter::adapt(threads::ThreadPool &pool,
         apply(pool, shape, sources, output, i);
 }
 
-void BhAdapter::apply(threads::ThreadPool &pool, const cords::AttentionShape &shape, const cords::ViewR &sources, cords::ViewR &output, size_t i)
+void BhAdapter::apply(threads::ThreadPool &pool,
+                      const cords::AttentionShape &shape,
+                      const cords::ViewR &sources,
+                      cords::ViewR &output,
+                      size_t i)
 {
 
     const int S = static_cast<int>(shape.seq);
@@ -67,11 +69,10 @@ void BhAdapter::apply(threads::ThreadPool &pool, const cords::AttentionShape &sh
         int idx = i * D;
         p.position.x = in_ptr[idx + m_cfg.dim_mapping[0]];
         p.position.y = in_ptr[idx + m_cfg.dim_mapping[1]];
-        p.position.z = (D > 2) ?
-                           in_ptr[idx + m_cfg.dim_mapping[2]] :
-                           0.0f;
+        p.position.z = (D > 2) ? in_ptr[idx + m_cfg.dim_mapping[2]] : 0.0f;
         p.mass = 1.0f;
         p.acceleration = {0,0,0};
+
         if (D >= 7)
             p.mass = std::abs(in_ptr[idx + m_cfg.dim_mapping[6]]); // [[COME_BACK]] OOB dim_mappings
         else
@@ -82,20 +83,14 @@ void BhAdapter::apply(threads::ThreadPool &pool, const cords::AttentionShape &sh
     float theta = (S < 128) ? 0.0f : m_cfg.theta;
     float g_const = m_cfg.gravity * 0.001f;
     float softening = 0.5f;
-    auto get_pos = [](const BhTraits::Body &body) -> const BhTraits::Vec3& {
-        return body.position;
-    };
-
-    auto get_mass = [](const BhTraits::Body &body) -> BhTraits::Real {
-        return body.mass;
-    };
-
+    auto get_pos = [](const BhTraits::Body &body) -> const BhTraits::Vec3& { return body.position; };
+    auto get_mass = [](const BhTraits::Body &body) -> BhTraits::Real { return body.mass; };
     Solver solver(poolPtr,
                   get_pos,
                   get_mass,
                   theta,     // Dynamic Theta
                   g_const,   // Scaled Gravity
-                  softening      // Epsilon Squared (keep small but safe));
+                  softening  // Epsilon Squared (keep small but safe));
                   );
 
     std::vector<BhTraits::Vec3> forces;

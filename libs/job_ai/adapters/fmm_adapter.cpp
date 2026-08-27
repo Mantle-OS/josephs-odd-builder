@@ -56,8 +56,6 @@ void FmmAdapter::adapt(threads::ThreadPool &pool,
         apply(pool, shape, sources, output, i);
 }
 
-
-
 void FmmAdapter::apply(threads::ThreadPool &pool,
                        const cords::AttentionShape &shape,
                        const cords::ViewR &sources,
@@ -70,12 +68,8 @@ void FmmAdapter::apply(threads::ThreadPool &pool,
     const int D = static_cast<int>(shape.dim);
     std::vector<FmmTraits::Body> bodies(S);
 
-    // Pointers to this batch's data slice
     const float *k_ptr = sources.data() + (size * S * D);
-    // const float *o_ptr = targets.data() + (B * S * D);
-
     float *out_ptr = output.data() + (size * S * D);
-
     for (int i = 0; i < S; ++i) {
         auto &p = bodies[i];
         int idx = i * D;
@@ -83,22 +77,18 @@ void FmmAdapter::apply(threads::ThreadPool &pool,
         p.position.x = k_ptr[idx + m_cfg.dim_mapping[0]];
         p.position.y = k_ptr[idx + m_cfg.dim_mapping[1]];
 
-
-        // Handle 2D embeddings gracefully (e.g. RoPE)
+        // embeddings (e.g. RoPE)
         if (D > 2)
             p.position.z = k_ptr[idx + m_cfg.dim_mapping[2]];
         else
             p.position.z = 0.0f;
 
         p.mass = 1.0f;
-
-
         p.acceleration = {0,0,0};
         p.id = i;
     }
 
-
-    // The Math Dragon: FMM Execution
+    // The Math Dragon settings
     typename Solver::Params fmmParams;
     fmmParams.theta       = m_cfg.theta;
     fmmParams.maxLeafSize = m_cfg.maxLeaf;
@@ -107,14 +97,13 @@ void FmmAdapter::apply(threads::ThreadPool &pool,
 
     engine.compute(bodies);
 
-    // decoder: Force -> Output Tensor
-    // The "Force" felt by a token is the aggregate "Attention" it received. map this force vector back into the embedding.
+    // decoder: Force -> Output Tensor The "Force" felt by a token is the aggregate "Attention" it received. map this force vector back into the embedding.
     for (const auto &p : bodies) {
-        // Use p.id because FMM might have reordered the vector
+        // Use p.id because FMM might have reordered the vector... jerk
         int i = p.id;
         int idx = i * D;
 
-        // write context vector (force) apply gravity constant (G)
+        // write force and apply G
         float fx = p.acceleration.x * m_cfg.gravity;
         float fy = p.acceleration.y * m_cfg.gravity;
         float fz = p.acceleration.z * m_cfg.gravity;

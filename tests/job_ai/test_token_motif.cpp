@@ -19,9 +19,7 @@
 
 using namespace job::ai::token;
 
-// =========================================================
 // CorpusChemist
-// =========================================================
 TEST_CASE("CorpusChemist: Breaking Bad", "[token][motif][chemist]")
 {
     // BLOCK ONE: Single Threaded Discovery (Fallback)
@@ -325,13 +323,3 @@ TEST_CASE("MotifToken benchmarks", "[token][motif][benchmark]")
     };
 }
 #endif
-
-
-
-
-
-
-
-
-
-

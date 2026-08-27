@@ -204,7 +204,6 @@ Signals:
 Runs inference directly against `llama.cpp` in a background thread.
 
 Key features:
-
 * Qt thread worker model
 * Token-by-token streaming
 * Direct context + sampler execution

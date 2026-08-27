@@ -1,6 +1,7 @@
 #include "qllamamodel.h"
 #include <QDebug>
 #include <QFileInfo>
+#include "qllamamodelparams.h"
 
 QLlamaModel::QLlamaModel(QObject *parent) :
     QLlamaBase{parent}
@@ -56,8 +57,8 @@ bool QLlamaModel::loadModel(QLlamaModelParams *params)
     set_isLoaded(true);
     Q_EMIT modelLoaded();
 
-    qDebug() << "[qllama] Success. Loaded" << get_architecture() << "architecture engine with size"
-             << get_tensorCount() << "bytes and" << get_parameterCount() << "active parameters.";
+    // qDebug() << "[qllama] Success. Loaded" << get_architecture() << "architecture engine with size"
+             // << get_tensorCount() << "bytes and" << get_parameterCount() << "active parameters.";
 
     return true;
 }

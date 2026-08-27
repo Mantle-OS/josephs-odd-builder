@@ -17,7 +17,11 @@ std::string FlashAdapter::name() const
 }
 
 void FlashAdapter::adaptParallel(threads::ThreadPool &pool,
-                         const cords::AttentionShape &shape, const cords::ViewR &sources, const cords::ViewR &targets, const cords::ViewR &values, cords::ViewR &output,
+                         const cords::AttentionShape &shape,
+                                 const cords::ViewR &sources,
+                                 const cords::ViewR &targets,
+                                 const cords::ViewR &values,
+                                 cords::ViewR &output,
                          [[maybe_unused]] const AdapterCtx &ctx)
 {
     job::ai::comp::flashParallelAttentionForward(
@@ -33,7 +37,11 @@ void FlashAdapter::adaptParallel(threads::ThreadPool &pool,
 }
 
 void FlashAdapter::adapt([[maybe_unused]] threads::ThreadPool &pool,
-                         const cords::AttentionShape &shape, const cords::ViewR &sources, const cords::ViewR &targets, const cords::ViewR &values, cords::ViewR &output,
+                         const cords::AttentionShape &shape,
+                         const cords::ViewR &sources,
+                         const cords::ViewR &targets,
+                         const cords::ViewR &values,
+                         cords::ViewR &output,
                          [[maybe_unused]] const AdapterCtx &ctx)
 {
     job::ai::comp::flashAttentionForward(
@@ -46,5 +54,4 @@ void FlashAdapter::adapt([[maybe_unused]] threads::ThreadPool &pool,
         1.0f / std::sqrt(float(shape.dim))
         );
 }
-
-}
+} //  namespace

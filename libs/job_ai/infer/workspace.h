@@ -51,13 +51,6 @@ public:
         return m_isView ? m_view : m_memory.data();
     }
 
-
-
-    // float *bufferA() noexcept { return m_memory.data(); }
-
-    // float *bufferB() noexcept { return m_memory.data() + (m_memory.size() / 2); }
-
-
 private:
     bool isView() const noexcept
     {
@@ -72,13 +65,11 @@ private:
         m_viewBytes = 0;
     }
 
-
     bool            m_isView{false};
     float           *m_view{nullptr};
     std::size_t     m_viewBytes{0};
 
     std::vector<float, job::core::AlignedAllocator<float, 64>> m_memory;
-
 };
 
 } // namespace job::ai::infer

@@ -9,7 +9,8 @@
 #include <atomic>
 
 // Dedicated, non-blocking background processor tracking generation states very alpha
-class QLlamaLocalWorker : public QObject
+#include "qllama_export.h"
+class QLLAMA_EXPORT QLlamaLocalWorker : public QObject
 {
     Q_OBJECT
 public:

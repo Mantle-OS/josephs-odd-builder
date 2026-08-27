@@ -17,15 +17,20 @@ public:
     [[nodiscard]] std::string name() const override;
 
     void adaptParallel(threads::ThreadPool &pool,
-               const cords::AttentionShape &shape, const cords::ViewR &sources, const cords::ViewR &targets, const cords::ViewR &values,
-               cords::ViewR &output,
-               [[maybe_unused]] const AdapterCtx &ctx
-               ) override;
+                       const cords::AttentionShape &shape,
+                       const cords::ViewR &sources,
+                       const cords::ViewR &targets,
+                       const cords::ViewR &values,
+                       cords::ViewR &output,
+                       [[maybe_unused]] const AdapterCtx &ctx) override;
 
-    void adapt([[maybe_unused]] threads::ThreadPool &pool, const cords::AttentionShape &shape, const cords::ViewR &sources, const cords::ViewR &targets, const cords::ViewR &values,
+    void adapt([[maybe_unused]] threads::ThreadPool &pool,
+               const cords::AttentionShape &shape,
+               const cords::ViewR &sources,
+               const cords::ViewR &targets,
+               const cords::ViewR &values,
                cords::ViewR &output,
-               [[maybe_unused]] const AdapterCtx &ctx
-               ) override;
+               [[maybe_unused]] const AdapterCtx &ctx) override;
 
 };
 }

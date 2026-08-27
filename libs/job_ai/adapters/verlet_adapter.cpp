@@ -86,7 +86,7 @@ void VerletAdapter::apply(int S, int D,
     physCtx.stride = D;
     physCtx.valueDim = (D > 7) ? (D - 7) : 0;
 
-    // Dims [0,1,2] -> Pos || Dims [3,4,5] -> Vel (if D >= 6) || Dims [6]     -> Mass (if D >= 7)
+    // Dims [0,1,2] -> Pos || Dims [3,4,5] -> Vel (if D >= 6) || Dims [6] -> Mass (if D >= 7)
     for (int i = 0; i < S; ++i) {
         auto &p = bodies[i];
         int idx = i * D;
@@ -115,29 +115,14 @@ void VerletAdapter::apply(int S, int D,
         p.acceleration = {0,0,0};
     }
 
-    auto get_pos = [](Particle& p) -> Vec3f& {
-        return p.position;
-    };
-    auto get_vel = [](Particle& p) -> Vec3f& {
-        return p.velocity;
-    };
-    auto get_acc = [](Particle& p) -> Vec3f& {
-        return p.acceleration;
-    };
-    // auto calc_accel = [](std::vector<Particle>& ps) {
-    //     computeNbodyForces(ps);
-    // };
-
-    auto calc_accel = [&](std::vector<Particle>& /*ignored*/) {
-        computeForcesAndMixing(physCtx);
-    };
-
+    auto get_pos = [](Particle& p) -> Vec3f& { return p.position; };
+    auto get_vel = [](Particle& p) -> Vec3f& { return p.velocity; };
+    auto get_acc = [](Particle& p) -> Vec3f& { return p.acceleration; };
+    auto calc_accel = [&](std::vector<Particle>& /*ignored*/) { computeForcesAndMixing(physCtx); };
 
     // the magic !
     science::VerletIntegrator<Particle, Vec3f> integrator(pool, &bodies, get_pos, get_vel, get_acc, calc_accel);
-    float dt = (ctx.dt > 0.0f) ?
-                   ctx.dt :
-                   m_cfg.dt;
+    float dt = (ctx.dt > 0.0f) ? ctx.dt : m_cfg.dt;
 
     //  kick rocks :P
     integrator.step(dt, science::VVScheme::KDK);
@@ -156,16 +141,9 @@ void VerletAdapter::apply(int S, int D,
             out_ptr[idx + 4] = p.velocity.y;
             out_ptr[idx + 5] = p.velocity.z;
         }
-
-        // if (D > 6)
-        //     std::memcpy(out_ptr + idx + 6, in_ptr + idx + 6, (D - 6) * sizeof(float));
-
-        if (D >= 7) {
+        if (D >= 7)
             out_ptr[idx + 6] = p.mass;
-        }
     }
 }
-
-
 
 } // namespace job::ai::adapters

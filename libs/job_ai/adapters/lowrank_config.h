@@ -2,6 +2,6 @@
 namespace job::ai::adapters {
 struct LowRankConfig {
     float scale = 1.0f;
-    // Could add kernel type (ReLU, ELU+1) here later
+    // Could add kernel type (ReLU, ELU+1) here later again running out of cache on CPU
 };
 }
