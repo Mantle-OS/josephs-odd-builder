@@ -15,17 +15,10 @@
 [[nodiscard]] static std::string uniqueSemaphoreName()
 {
     static std::atomic<std::uint64_t> sequence{0};
+    auto const timestamp = std::chrono::steady_clock::now().time_since_epoch().count();
+    auto const threadId = std::hash<std::thread::id>{}(std::this_thread::get_id());
 
-    auto const timestamp =
-        std::chrono::steady_clock::now()
-            .time_since_epoch()
-            .count();
-
-    auto const threadId =
-        std::hash<std::thread::id>{}(std::this_thread::get_id());
-
-    auto const id =
-        sequence.fetch_add(1, std::memory_order_relaxed);
+    auto const id = sequence.fetch_add(1, std::memory_order_relaxed);
 
     return "/jobsem_test_"
            + std::to_string(timestamp)

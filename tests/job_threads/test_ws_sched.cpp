@@ -13,7 +13,7 @@ using namespace std::chrono_literals;
 TEST_CASE("JobWorkStealingScheduler create and shutdown", "[threading][scheduler][work_stealing]")
 {
     auto scheduler = std::make_shared<JobWorkStealingScheduler>(4);
-    auto pool = ThreadPool::create(scheduler, 4);
+    auto pool = ThreadPool::create(scheduler);
 
     REQUIRE(pool != nullptr);
 
@@ -69,7 +69,7 @@ TEST_CASE("JobWorkStealingScheduler handles high concurrent load", "[threading][
 
 TEST_CASE("JobWorkStealingScheduler forces stealing behavior", "[threading][scheduler][work_stealing]")
 {
-    const size_t numThreads = 4;
+    const size_t numThreads = std::thread::hardware_concurrency();
     auto scheduler = std::make_shared<JobWorkStealingScheduler>(numThreads);
     auto pool = ThreadPool::create(scheduler, numThreads);
     REQUIRE(pool != nullptr);
@@ -119,4 +119,3 @@ TEST_CASE("JobWorkStealingScheduler handles workerCount = 0", "[threading][sched
     REQUIRE(counter.load() == 1);
     pool->shutdown();
 }
-// CHECKPOINT v1.0

@@ -34,10 +34,10 @@ TEST_CASE("ThreadPool submit task and get future", "[threading][thread_pool]")
     pool->shutdown();
 }
 
-TEST_CASE("ThreadPool run multiple tasks 4 threads", "[threading][thread_pool]")
+TEST_CASE("ThreadPool run multiple tasks std::thread::hardware_concurrency() threads", "[threading][thread_pool]")
 {
     auto scheduler = std::make_shared<FifoScheduler>();
-    auto pool = ThreadPool::create(scheduler, 4);
+    auto pool = ThreadPool::create(scheduler);
     std::atomic<int> counter = 0;
 
     for (int i = 0; i < 100; ++i) {
@@ -149,7 +149,7 @@ TEST_CASE("ThreadPool submit() is thread-safe (concurrency)", "[threading][threa
     std::vector<std::thread> hammer_threads;
 
     auto scheduler = std::make_shared<FifoScheduler>();
-    auto pool = ThreadPool::create(scheduler, 8);
+    auto pool = ThreadPool::create(scheduler);
 
     for (int i = 0; i < kNumHammerThreads; ++i) {
         hammer_threads.emplace_back([&]() {

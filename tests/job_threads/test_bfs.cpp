@@ -33,7 +33,7 @@ TEST_CASE("parallel_bfs visits all reachable nodes level by level", "[threading]
     };
 
     auto sched = std::make_shared<FifoScheduler>();
-    auto pool  = ThreadPool::create(sched, 4);
+    auto pool  = ThreadPool::create(sched);
 
     // Collect visits as (depth, vertex).
     std::vector<std::pair<std::size_t, std::size_t>> visits;
@@ -116,7 +116,7 @@ TEST_CASE("parallel_bfs returns correct depth and parent arrays", "[threading][b
     };
 
     auto sched = std::make_shared<FifoScheduler>();
-    auto pool  = ThreadPool::create(sched, 4);
+    auto pool  = ThreadPool::create(sched);
 
     BfsResult res = parallel_bfs(*pool, adj, 0,
                                  [](std::size_t /*depth*/, std::size_t /*v*/) {
@@ -189,7 +189,7 @@ TEST_CASE("parallel_bfs visits each node at most once", "[threading][bfs][graph]
     };
 
     auto sched = std::make_shared<FifoScheduler>();
-    auto pool  = ThreadPool::create(sched, 4);
+    auto pool  = ThreadPool::create(sched);
 
     std::vector<int> visitCount(adj.size(), 0);
     std::mutex       m;
@@ -219,7 +219,7 @@ TEST_CASE("parallel_bfs handles self-loops and duplicate edges", "[threading][bf
     };
 
     auto sched = std::make_shared<FifoScheduler>();
-    auto pool  = ThreadPool::create(sched, 2);
+    auto pool  = ThreadPool::create(sched);
 
     std::vector<int> visitCount(adj.size(), 0);
     std::mutex m;
@@ -272,8 +272,7 @@ TEST_CASE("parallel_bfs handles edge cases safely", "[threading][bfs][graph][edg
 TEST_CASE("parallel_bfs handles large graphs efficiently", "[threading][bfs][graph][stress]")
 {
     auto sched = std::make_shared<FifoScheduler>();
-    // 8 threads
-    auto pool  = ThreadPool::create(sched, 8);
+    auto pool  = ThreadPool::create(sched);
 
     // BinTree 10 -> ~1024 nodes
     constexpr std::size_t kDepth = 10;

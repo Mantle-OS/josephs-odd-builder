@@ -52,7 +52,7 @@ TEST_CASE("JobThreadGraph runs linear dependencies", "[threading][graph][linear]
 TEST_CASE("JobThreadGraph handles diamond dependency (A->B, A->C, B->D, C->D)", "[threading][graph][diamond]")
 {
     auto sched = std::make_shared<FifoScheduler>();
-    auto pool = ThreadPool::create(sched, 4);
+    auto pool = ThreadPool::create(sched);
 
     JobThreadGraph graph(pool);
 
@@ -195,7 +195,7 @@ TEST_CASE("JobThreadGraph detects simple cycle", "[threading][graph][cycle]")
 
 TEST_CASE("JobThreadGraph handles multiple independent chains", "[threading][graph][multiroot]")
 {
-    auto pool = ThreadPool::create(std::make_shared<FifoScheduler>(), 4);
+    auto pool = ThreadPool::create(std::make_shared<FifoScheduler>());
     JobThreadGraph g(pool);
 
     std::vector<std::string> log;
@@ -250,7 +250,7 @@ TEST_CASE("JobThreadGraph fan-in waits for all prerequisites", "[threading][grap
 
 TEST_CASE("JobThreadGraph partial failure blocks only dependents", "[threading][graph][partialfail]")
 {
-    auto pool = ThreadPool::create(std::make_shared<FifoScheduler>(), 4);
+    auto pool = ThreadPool::create(std::make_shared<FifoScheduler>());
     JobThreadGraph g(pool);
 
     std::atomic<bool> u_executed{false};
@@ -311,7 +311,7 @@ TEST_CASE("JobThreadGraph rerun without reset executes again", "[threading][grap
 #ifndef JOB_CI_BUILD
 TEST_CASE("JobThreadGraph handles long chain", "[threading][graph][stress]")
 {
-    auto pool = ThreadPool::create(std::make_shared<FifoScheduler>(), 8);
+    auto pool = ThreadPool::create(std::make_shared<FifoScheduler>());
     JobThreadGraph g(pool);
 
     constexpr int N = 200;
@@ -329,7 +329,7 @@ TEST_CASE("JobThreadGraph handles long chain", "[threading][graph][stress]")
 
 TEST_CASE("JobThreadGraph reset recomputes depsLeft", "[threading][graph][reset-indegee]")
 {
-    auto pool = ThreadPool::create(std::make_shared<FifoScheduler>(), 4);
+    auto pool = ThreadPool::create(std::make_shared<FifoScheduler>());
     JobThreadGraph g(pool);
 
     std::atomic<int> d_seen{0};

@@ -93,7 +93,7 @@ TEST_CASE("Actor processes basic messages", "[threading][actor][basic]")
 TEST_CASE("Actor handles high volume (Testing Batching)", "[threading][actor][load]")
 {
     auto sched = std::make_shared<FifoScheduler>();
-    auto pool = ThreadPool::create(sched, 4);
+    auto pool = ThreadPool::create(sched);
 
     auto actor = std::make_shared<CounterActor>(pool);
 

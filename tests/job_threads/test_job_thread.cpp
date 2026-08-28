@@ -59,9 +59,14 @@ TEST_CASE("JobThread lifecycle with overridden run (Inheritance)", "[threading][
     public:
         std::atomic<bool> didRun{false};
         std::atomic<bool> stopTokenWasHonored{false};
-        MyTestThread() : JobThread(JobThreadOptions::normal()) {}
+        MyTestThread() :
+            JobThread(JobThreadOptions::normal())
+        {
+
+        }
     protected:
-        void run(std::stop_token token) noexcept override {
+        void run(std::stop_token token) noexcept override
+        {
             didRun.store(true);
             while (!token.stop_requested())
                 std::this_thread::sleep_for(1ms);

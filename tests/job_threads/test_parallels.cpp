@@ -21,11 +21,62 @@ using namespace job::threads;
 using namespace std::chrono_literals;
 
 #ifdef JOB_CI_BUILD
-const int max_threads = 4;
+    const int max_threads = std::thread::hardware_concurrency();
 #else
     const int max_threads = 8;
 #endif
 
+
+TEST_CASE("parallel_reduce correctly sums elements", "[threading][algorithms][parallel_reduce]")
+{
+    JobFifoCtx sched(max_threads);
+    constexpr size_t kVectorSize = 100000;
+    std::vector<int> data(kVectorSize);
+    std::iota(data.begin(), data.end(), 1);
+
+    // Calculate expected sum (n * (n + 1) / 2)
+    long long expected_sum = (long long)kVectorSize * (kVectorSize + 1) / 2;
+
+    auto map_fn = [](int val) -> long long {
+        return static_cast<long long>(val);
+    };
+
+    auto reduce_fn = [](long long a, long long b) -> long long {
+        return a + b;
+    };
+
+    long long init = 0;
+    long long result = parallel_reduce(*sched.pool, data.begin(), data.end(), init, map_fn, reduce_fn);
+
+    REQUIRE(result == expected_sum);
+
+    init = 1000;
+    result = parallel_reduce(*sched.pool, data.begin(), data.end(), init, map_fn, reduce_fn);
+    REQUIRE(result == expected_sum + 1000);
+}
+
+TEST_CASE("parallel_reduce finds max element", "[threading][algorithms][parallel_reduce]")
+{
+    JobFifoCtx sched(max_threads);
+    std::vector<int> data = {1, 5, 2, 100, 50, 99, 1000, 3, 45, 999};
+
+    auto map_fn = [](int val) {
+        return val;
+    };
+
+    auto reduce_fn = [](int a, int b) {
+        return std::max(a, b);
+    };
+
+    int init = std::numeric_limits<int>::min();
+    int max_val = parallel_reduce(*sched.pool, data.begin(), data.end(), init, map_fn, reduce_fn);
+
+    REQUIRE(max_val == 1000);
+
+    std::vector<int> empty_data;
+    max_val = parallel_reduce(*sched.pool, empty_data.begin(), empty_data.end(), init, map_fn, reduce_fn);
+    REQUIRE(max_val == init);
+}
 
 TEST_CASE("parallel_for correctly processes all elements", "[threading][algorithms][parallel_for]") {
     JobFifoCtx sched(max_threads);
@@ -245,66 +296,3 @@ TEST_CASE("parallel_for benchmark Linear vs Strided on skewed workload", "[threa
     };
 }
 #endif
-
-//////////////////////////////////////////////////////////
-/// end parallel_for
-
-
-//////////////////////////////////////////////////////////
-/// start parallel_reduce
-
-TEST_CASE("parallel_reduce correctly sums elements", "[threading][algorithms][parallel_reduce]")
-{
-    JobFifoCtx sched(max_threads);
-    constexpr size_t kVectorSize = 100000;
-    std::vector<int> data(kVectorSize);
-    std::iota(data.begin(), data.end(), 1);
-
-    // Calculate expected sum (n * (n + 1) / 2)
-    long long expected_sum = (long long)kVectorSize * (kVectorSize + 1) / 2;
-
-    auto map_fn = [](int val) -> long long {
-        return static_cast<long long>(val);
-    };
-
-    auto reduce_fn = [](long long a, long long b) -> long long {
-        return a + b;
-    };
-
-    long long init = 0;
-    long long result = parallel_reduce(*sched.pool, data.begin(), data.end(), init, map_fn, reduce_fn);
-
-    REQUIRE(result == expected_sum);
-
-    init = 1000;
-    result = parallel_reduce(*sched.pool, data.begin(), data.end(), init, map_fn, reduce_fn);
-    REQUIRE(result == expected_sum + 1000);
-}
-
-TEST_CASE("parallel_reduce finds max element", "[threading][algorithms][parallel_reduce]")
-{
-    JobFifoCtx sched(max_threads);
-    std::vector<int> data = {1, 5, 2, 100, 50, 99, 1000, 3, 45, 999};
-
-    auto map_fn = [](int val) {
-        return val;
-    };
-
-    auto reduce_fn = [](int a, int b) {
-        return std::max(a, b);
-    };
-
-    int init = std::numeric_limits<int>::min();
-    int max_val = parallel_reduce(*sched.pool, data.begin(), data.end(), init, map_fn, reduce_fn);
-
-    REQUIRE(max_val == 1000);
-
-    std::vector<int> empty_data;
-    max_val = parallel_reduce(*sched.pool, empty_data.begin(), empty_data.end(), init, map_fn, reduce_fn);
-    REQUIRE(max_val == init);
-}
-
-#ifdef JOB_TEST_BENCHMARKS
-#endif
-
-

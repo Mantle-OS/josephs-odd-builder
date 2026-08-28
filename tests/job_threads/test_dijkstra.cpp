@@ -22,7 +22,7 @@ static constexpr float kInf = std::numeric_limits<float>::max();
 
 // Simple reference Dijkstra (single-threaded, exact)
 DijkstraResult<float> sequentialDijkstra(const WeightedAdjList<float> &adj,
-                                         std::size_t                     start)
+                                         std::size_t start)
 {
     const std::size_t n = adj.size();
     DijkstraResult<float> res;
@@ -112,7 +112,7 @@ TEST_CASE("parallelDijkstra computes correct shortest paths on a small graph",
     adj[4] = { };
 
     auto sched = std::make_shared<FifoScheduler>();
-    auto pool  = ThreadPool::create(sched, 4);
+    auto pool  = ThreadPool::create(sched);
 
     std::vector<std::size_t> visitOrder;
     visitOrder.reserve(adj.size());
@@ -327,7 +327,7 @@ TEST_CASE("parallelDijkstra scales on a larger tree-shaped graph",
           "[threading][graph][dijkstra][stress]")
 {
     auto sched = std::make_shared<FifoScheduler>();
-    auto pool  = ThreadPool::create(sched, 8);
+    auto pool  = ThreadPool::create(sched);
 
     // Full binary tree with unit weights.
     constexpr std::size_t kDepth = 10;
@@ -446,7 +446,7 @@ TEST_CASE("parallelDijkstra easy API is consistent with explicit delta", "[threa
     auto adj = makeRandomGraph(kNodes, kMaxOut, kSeedGraph);
 
     auto sched = std::make_shared<FifoScheduler>();
-    auto pool  = ThreadPool::create(sched, 4);
+    auto pool  = ThreadPool::create(sched);
 
     // Easy API: delta chosen internally.
     auto resEasy = parallelDijkstra<float>(*pool, adj, startVertex);
@@ -514,9 +514,9 @@ TEST_CASE("parallelDijkstra: performance on random sparse graph",
     // parallelDijkstra with 4 workers.
     {
         auto sched4 = std::make_shared<FifoScheduler>();
-        auto pool4  = ThreadPool::create(sched4, 4);
+        auto pool4  = ThreadPool::create(sched4);
 
-        BENCHMARK("parallelDijkstra (ThreadPool, 4 workers)") {
+        BENCHMARK("parallelDijkstra (ThreadPool, std::thread::hardware_concurrency workers)") {
             auto res = parallelDijkstra<float>(*pool4, adj, start,
                                                [](std::size_t, float) {});
             return res.distance[(kNodes - 1) / 2];

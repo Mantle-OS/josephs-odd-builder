@@ -28,7 +28,7 @@ struct BbToyState {
 TEST_CASE("parallel_branch_and_bound finds optimal leaf in tiny binary tree", "[threading][bnb][search][basic]")
 {
     auto sched = std::make_shared<FifoScheduler>();
-    auto pool  = ThreadPool::create(sched, 4);
+    auto pool  = ThreadPool::create(sched);
 
     constexpr int kMaxDepth = 4;
 
@@ -108,7 +108,7 @@ struct KnapsackState {
 TEST_CASE("parallel_branch_and_bound solves tiny knapsack instance", "[threading][bnb][search][knapsack]")
 {
     auto sched = std::make_shared<FifoScheduler>();
-    auto pool  = ThreadPool::create(sched, 4);
+    auto pool  = ThreadPool::create(sched);
 
     // KnapsackState: weights: {2, 3, 4, 5}, values: {3, 4, 5, 8}, capacity: 5
     // Optimal solution: take item 0 and 1 ? No (weight=5, value=7).
@@ -196,11 +196,11 @@ TEST_CASE("parallel_branch_and_bound solves tiny knapsack instance", "[threading
     REQUIRE(result.nodesExpanded > 0);
     REQUIRE(result.nodesPruned > 0);
 }
-// GOOD
+
 TEST_CASE("parallel_branch_and_bound handles ties in optimal cost", "[threading][bnb][ties]")
 {
     auto sched = std::make_shared<FifoScheduler>();
-    auto pool  = ThreadPool::create(sched, 4);
+    auto pool  = ThreadPool::create(sched);
 
     struct State {
         int depth{0};
@@ -255,7 +255,7 @@ TEST_CASE("parallel_branch_and_bound respects timeout and aborts search early",
           "[threading][bnb][timeout]")
 {
     auto sched = std::make_shared<FifoScheduler>();
-    auto pool  = ThreadPool::create(sched, 4);
+    auto pool  = ThreadPool::create(sched);
 
     struct State { int depth{0}; };
 
@@ -311,7 +311,7 @@ TEST_CASE("parallel_branch_and_bound respects timeout and aborts search early",
 TEST_CASE("parallel_branch_and_bound reports non-zero elapsed time", "[threading][bnb][timing]")
 {
     auto sched = std::make_shared<FifoScheduler>();
-    auto pool  = ThreadPool::create(sched, 4);
+    auto pool  = ThreadPool::create(sched);
 
     SECTION("even for trivial searches")
     {
@@ -408,7 +408,7 @@ TEST_CASE("parallel_branch_and_bound reports non-zero elapsed time", "[threading
 TEST_CASE("parallel_branch_and_bound handles nodes with many children", "[threading][bnb][branching]")
 {
     auto sched = std::make_shared<FifoScheduler>();
-    auto pool  = ThreadPool::create(sched, 4);
+    auto pool  = ThreadPool::create(sched);
 
     struct State {
         int depth{0};
@@ -454,9 +454,6 @@ TEST_CASE("parallel_branch_and_bound handles nodes with many children", "[thread
     REQUIRE(res.bestCost == kMaxDepth);  // Best path: always choose child 0 (cost +1)
     REQUIRE(res.nodesExpanded > 0);
     REQUIRE(res.nodesPruned > 0);
-
-    INFO("High-branching tree: expanded " << res.nodesExpanded
-                                          << " nodes, pruned " << res.nodesPruned);
 }
 
 
@@ -597,7 +594,7 @@ TEST_CASE("parallel_branch_and_bound handles trivial and no-solution cases", "[t
 TEST_CASE("parallel_branch_and_bound handles moderately deep binary tree", "[threading][bnb][stress]")
 {
     auto sched = std::make_shared<FifoScheduler>();
-    auto pool  = ThreadPool::create(sched, 8);
+    auto pool  = ThreadPool::create(sched);
 
     struct StressState {
         int depth{0};

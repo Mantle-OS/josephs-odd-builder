@@ -148,7 +148,7 @@ TEST_CASE("JobSporadicScheduler Stop wakes next() when queue is empty", "[sporad
 TEST_CASE("ThreadPool + JobSporadicScheduler run in EDF order (1 worker)", "[pool][sporadic]")
 {
     auto sched = std::make_shared<JobSporadicScheduler>();
-    auto pool  = ThreadPool::create(sched, /*threadCount=*/1, JobThreadOptions::normal());
+    auto pool  = ThreadPool::create(sched, 1, JobThreadOptions::normal());
 
     REQUIRE(pool != nullptr);
 
@@ -203,5 +203,3 @@ TEST_CASE("JobSporadicScheduler admits tasks based on m_capacity > 1", "[threadi
     REQUIRE(sched->admit(2, *descD_pass) == true);
     INFO("Correctly admitted Task D with earlier deadline");
 }
-
-// CHECKPOINT v1.0

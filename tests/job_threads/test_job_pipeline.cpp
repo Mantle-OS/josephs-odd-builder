@@ -55,7 +55,7 @@ TEST_CASE("JobPipeline connects stages linearly", "[threading][pipeline][linear]
 TEST_CASE("JobPipeline handles Fan-Out", "[threading][pipeline][fanout]")
 {
     auto sched = std::make_shared<FifoScheduler>();
-    auto pool = ThreadPool::create(sched, 4);
+    auto pool = ThreadPool::create(sched);
 
     JobPipeline pipe(pool);
 
@@ -181,7 +181,7 @@ TEST_CASE("JobPipeline stage invokes error handler on exception", "[threading][p
 TEST_CASE("JobPipeline processes many messages end-to-end", "[threading][pipeline][load]")
 {
     auto sched = std::make_shared<FifoScheduler>();
-    auto pool  = ThreadPool::create(sched, 4);
+    auto pool  = ThreadPool::create(sched);
     JobPipeline pipe(pool);
 
     auto input  = pipe.createInput<int>();
