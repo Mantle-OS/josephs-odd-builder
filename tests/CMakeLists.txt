@@ -1,4 +1,4 @@
-if(JOB_BUILD_ANSI)
+if(JOB_BUILD_SIMD)
     add_subdirectory(job_simd)
 endif()
 
