@@ -18,6 +18,9 @@ jobs:
       with:
         submodules: recursive
         fetch-depth: 0
+    - name: Mark workspace safe for Git
+      run: git config --global --add safe.directory "${{ github.workspace }}"
+
     - name: Show pinned revisions
       run: |
         echo "======================================"
