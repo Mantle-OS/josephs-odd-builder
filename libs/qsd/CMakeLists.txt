@@ -81,6 +81,7 @@ endif()
 qt_add_qml_module(qml-stable-diffusion
     URI QSd
     VERSION 1.0
+    OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/QSd"
     OUTPUT_TARGETS QML_SD_OUTPUT_TARGETS
     SOURCES
       ${QMLSD_HEADERS}

@@ -72,6 +72,8 @@ extern job::ggml::JobGgml *g_jobGgml; // Borrowed from main() stack.
 // }
 // //// END MANAGER
 
+
+#ifndef JOB_CI_BUILD
 inline JobGgmlVulkan *testVulkanDevice()
 {
     auto *manager = g_jobGgml->deviceManager();
@@ -87,6 +89,7 @@ inline JobGgmlVulkan *testVulkanDevice()
 
     return devices.at(0);
 }
+#endif
 
 // really stupid ....
 inline JobGgmlCuda *testCudaDevice(std::size_t idx = 0)

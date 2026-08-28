@@ -128,6 +128,7 @@ endif()
 qt_add_qml_module(qml-sodium
     URI Sodium
     VERSION 1.0
+    OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/Sodium"
     OUTPUT_TARGETS QML_SODIUM_OUTPUT_TARGETS
     SOURCES
       ${QDEC_SODIUM_HEADERS}

@@ -85,8 +85,10 @@ endif()
 ## Tests
 pkg_check_modules(CatchTwo REQUIRED catch2-with-main)
 
-
 if(JOB_QT)
+    # stop warning me about working plugins......
+    # set(QT_SKIP_AUTO_PLUGIN_INCLUSION OFF)
+    set(QT_SKIP_AUTO_QML_PLUGIN_INCLUSION OFF)
     find_package(Qt6 6.2 COMPONENTS
         Core
         Gui
@@ -95,7 +97,21 @@ if(JOB_QT)
         Qml
         Quick
         QuickControls2
-      REQUIRED
+        REQUIRED
     )
-    set(QML_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/qt6/qml" )
+
+    set(QML_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/qt6/qml")
+
+    qt_policy(SET QTP0001 NEW)
+    qt_policy(SET QTP0004 NEW)
+
+
+    if(TARGET Qt6::qtquick2plugin)
+        message(STATUS "Qt6::qtquick2plugin exists")
+    else()
+        message(FATAL_ERROR "Qt6::qtquick2plugin DOES NOT exist")
+    endif()
+
+    message(STATUS "QT6_IS_SHARED_LIBS_BUILD = ${QT6_IS_SHARED_LIBS_BUILD}")
+    # message(FATAL_ERROR "BUILD_SHARED_LIBS = ${BUILD_SHARED_LIBS}")
 endif()

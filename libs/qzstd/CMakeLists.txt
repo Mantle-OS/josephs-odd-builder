@@ -126,6 +126,7 @@ endif()
 qt_add_qml_module(qml-zstd
     URI QZstd
     VERSION 1.0
+    OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/QZstd"
     OUTPUT_TARGETS QML_ZSTD_OUTPUT_TARGETS
     SOURCES
       ${QMLZSTD_HEADERS}

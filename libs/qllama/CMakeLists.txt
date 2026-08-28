@@ -58,6 +58,7 @@ endif()
 qt_add_qml_module(qt-llama
     URI QLlama
     VERSION 1.0
+    OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/QLlama"
     OUTPUT_TARGETS QLLAMA_OUTPUT_TARGETS
     SOURCES
         ${QLLAMA_HEADERS}
