@@ -18,18 +18,19 @@ set(JOBNET_SOURCES
 )
 
 set(JOBNET_HTTP_HEADERS
-    # http/job_http_method.h
-    # http/job_http_status.h
-    # http/job_http_request.h
-    # http/job_http_response.h
-    # http/job_http_parser.h
-    # http/job_http_client.h
+    http/job_http_method.h
+    http/job_http_status_code.h
+    http/job_http_status.h
+    http/job_http_request.h
+    http/job_http_response.h
+    http/job_http_parser.h
+    http/job_http_client.h
 )
 set(JOBNET_HTTP_SOURCES
-    # http/job_http_request.cpp
-    # http/job_http_response.cpp
-    # http/job_http_parser.cpp
-    # http/job_http_client.cpp
+    http/job_http_request.cpp
+    http/job_http_response.cpp
+    http/job_http_parser.cpp
+    http/job_http_client.cpp
 )
 
 set(JOBNET_RESOLVE_HEADERS
@@ -140,14 +141,23 @@ generate_export_header(JosephsOddBuilder_Net
     BASE_NAME JOBNET
     EXPORT_FILE_NAME "${JOBNET_EXPORT}"
 )
+target_compile_options(JosephsOddBuilder_Net PRIVATE
+    -freflection
+    -fcontracts)
+
+target_link_options(JosephsOddBuilder_Net PRIVATE
+    -fcontracts
+)
 
 set_target_properties(JosephsOddBuilder_Net PROPERTIES
     VERSION ${PROJECT_VERSION}
     SOVERSION ${PROJECT_VERSION_MAJOR}
     OUTPUT_NAME "jobnet"
+    CXX_STANDARD 26
+    CXX_STANDARD_REQUIRED ON
+    CXX_EXTENSIONS OFF
     CXX_VISIBILITY_PRESET hidden
     VISIBILITY_INLINES_HIDDEN ON
-    # Might need fPIC
 )
 
 target_include_directories(JosephsOddBuilder_Net PUBLIC

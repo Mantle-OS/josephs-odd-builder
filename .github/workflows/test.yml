@@ -1,4 +1,5 @@
 name: Build and Test JOB
+
 on:
   workflow_call:
 
@@ -8,11 +9,13 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
+
     container:
       image: ghcr.io/mantle-os/josephs-odd-builder:latest
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
+
     steps:
     - uses: actions/checkout@v4
       with:
@@ -20,63 +23,87 @@ jobs:
         fetch-depth: 0
 
     - name: Configure CMake
-      run: cmake -B ${{ github.workspace }}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DJOB_CI_BUILD=ON
+      run: cmake -B ${{ github.workspace }}/build -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} -DJOB_CI_BUILD=ON
 
     - name: Build
-      run: cmake --build ${{ github.workspace }}/build --config ${{env.BUILD_TYPE}} --target all -j$(nproc)
+      run: cmake --build ${{ github.workspace }}/build --config ${{ env.BUILD_TYPE }} --target all -j$(nproc)
 
-    # job_ai job_aipkg job_ansi job_core job_crypto job_ggml job_io job_net job_science job_serializer job_simd job_sound job_threads job_token job_uart job_zstd
-    - name: Test Stack
+    - name: Test Job SIMD
       run: |
-        pwd
-        ls -alh
-        ls -alh "${{ github.workspace }}/"
-        ls -alh "${{ github.workspace }}/build"
-        ls -alh "${{ github.workspace }}/build/tests"
-        for i in job_core job_ansi job_simd;
-        do
-            cd "${{ github.workspace }}/build/tests/${i}"
-            "./test_${i}"
-            cd -
-        done
+        cd "${{ github.workspace }}/build/tests/job_simd"
+        ./test_job_simd
 
-    # - name: Test Threads
-    #   working-directory: ${{github.workspace}}/build/tests/job_threads
-    #   run: ./test_job_threads
+    - name: Test Job Core
+      run: |
+        cd "${{ github.workspace }}/build/tests/job_core"
+        ./test_job_core
 
-    # - name: Test Crypto
-    #   working-directory: ${{github.workspace}}/build/tests/job_crypto
-    #   run: ./test_job_crypto
+    - name: Test Job Threads
+      run: |
+        cd "${{ github.workspace }}/build/tests/job_threads"
+        ./test_job_threads
 
-    # - name: Test IO
-    #   working-directory: ${{github.workspace}}/build/tests/job_io
-    #   run: ./test_job_io
+    - name: Test Job Crypto
+      run: |
+        cd "${{ github.workspace }}/build/tests/job_crypto"
+        ./test_job_crypto
 
-    # - name: Test Net
-    #   working-directory: ${{github.workspace}}/build/tests/job_net
-    #   run: ./test_job_net
+    - name: Test Job Net
+      run: |
+        cd "${{ github.workspace }}/build/tests/job_net"
+        ./test_job_net
 
-    # - name: Test Serializer Core
-    #   working-directory: ${{github.workspace}}/build/tests/job_serializer
-    #   run: ./test_job_serializer
+    - name: Test Job IO
+      run: |
+        cd "${{ github.workspace }}/build/tests/job_io"
+        ./test_job_io
 
-    # # - name: Test Serializer MsgPack Plugin
-    # #   working-directory: ${{github.workspace}}/build/tests/job_serializer_msgpack
-    # #   run: ./test_job_serializer_msgpack
+    - name: Test Job Serializer
+      run: |
+        cd "${{ github.workspace }}/build/tests/job_serializer"
+        ./test_job_serializer
 
-    # - name: Test UART
-    #   working-directory: ${{github.workspace}}/build/tests/job_uart
-    #   run: ./test_job_uart
+    - name: Test Job Sound
+      run: |
+        cd "${{ github.workspace }}/build/tests/job_sound"
+        ./test_job_sound
 
-    # - name: Test Science
-    #   working-directory: ${{github.workspace}}/build/tests/job_science
-    #   run: ./test_job_science
+    - name: Test Job Science
+      run: |
+        cd "${{ github.workspace }}/build/tests/job_science"
+        ./test_job_science
 
-    # - name: Test AI
-    #   working-directory: ${{github.workspace}}/build/tests/job_ai
-    #   run: ./test_job_ai
+    - name: Test Job Zstd
+      run: |
+        cd "${{ github.workspace }}/build/tests/job_zstd"
+        ./test_job_zstd
 
-    # - name: Test Ansi
-    #   working-directory: ${{github.workspace}}/build/tests/job_ansi
-    #   run: ./test_job_ansi
+    - name: Test Job UART
+      run: |
+        cd "${{ github.workspace }}/build/tests/job_uart"
+        ./test_job_uart
 
+    - name: Test Job ANSI
+      run: |
+        cd "${{ github.workspace }}/build/tests/job_ansi"
+        ./test_job_ansi
+
+    - name: Test Job AI
+      run: |
+        cd "${{ github.workspace }}/build/tests/job_ai"
+        ./test_job_ai
+
+    - name: Test Job AiPkg
+      run: |
+        cd "${{ github.workspace }}/build/tests/job_aipkg"
+        ./test_job_aipkg
+
+    - name: Test Job Token
+      run: |
+        cd "${{ github.workspace }}/build/tests/job_token"
+        ./test_job_token
+
+    - name: Test Job GGML
+      run: |
+        cd "${{ github.workspace }}/build/tests/job_ggml"
+        ./test_job_ggml

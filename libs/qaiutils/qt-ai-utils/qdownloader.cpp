@@ -96,6 +96,8 @@ void QDownloader::processQueue()
     if (m_shuttingDown)
         return;
 
+
+
     while (!m_queue.isEmpty() && m_active.size() < m_maxConcurrent) {
         DownloadItem *item = m_queue.dequeue();
 
