@@ -17,6 +17,22 @@ jobs:
     - uses: actions/checkout@v4
       with:
         submodules: recursive
+        fetch-depth: 0
+    - name: Show pinned revisions
+      run: |
+        echo "======================================"
+        echo "Gitlinks stored in parent"
+        echo "======================================"
+        git ls-tree HEAD 3rdparty/llama.cpp
+        git ls-tree HEAD 3rdparty/stable-diffusion.cpp
+        echo "======================================"
+        echo "Checked out submodules"
+        echo "======================================"
+        git submodule status --recursive
+        echo "======================================"
+        echo "stable-diffusion ggml sync revision"
+        echo "======================================"
+        cat 3rdparty/stable-diffusion.cpp/ggml/scripts/sync-llama.last
 
     - name: Configure CMake
       run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DJOB_CI_BUILD=ON
