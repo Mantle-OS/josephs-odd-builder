@@ -9,17 +9,27 @@ set(JOBNET_HEADERS
     job_iana.h
     job_http_header.h
     job_url.h
-
-    job_request.h
-    job_replay.h
-    job_downloader.h
 )
 
 set(JOBNET_SOURCES
     job_url.cpp
     job_http_header.cpp
     isocket_io.cpp
+)
 
+set(JOBNET_HTTP_HEADERS
+    # http/job_http_method.h
+    # http/job_http_status.h
+    # http/job_http_request.h
+    # http/job_http_response.h
+    # http/job_http_parser.h
+    # http/job_http_client.h
+)
+set(JOBNET_HTTP_SOURCES
+    # http/job_http_request.cpp
+    # http/job_http_response.cpp
+    # http/job_http_parser.cpp
+    # http/job_http_client.cpp
 )
 
 set(JOBNET_RESOLVE_HEADERS
@@ -106,23 +116,25 @@ set(JOBNET_CLIENTS_SOURCES
     clients/ssl_client.cpp
 )
 
+
+set(JOB_NET_COMPILE_THIS
+    ${JOBNET_HEADERS}           ${JOBNET_SOURCES}
+    ${JOBNET_RESOLVE_HEADERS}   ${JOBNET_RESOLVE_SOURCES}
+    ${JOBNET_SOCKETS_HEADERS}   ${JOBNET_SOCKETS_SOURCES}
+    ${JOBNET_SERVERS_HEADERS}   ${JOBNET_SERVERS_SOURCES}
+    ${JOBNET_CLIENTS_HEADERS}   ${JOBNET_CLIENTS_SOURCES}
+    ${JOBNET_HTTP_HEADERS}      ${JOBNET_HTTP_SOURCES}
+)
+
 if(BUILD_SHARED_LIBS)
-    add_library(JosephsOddBuilder_Net SHARED
-        ${JOBNET_HEADERS}           ${JOBNET_SOURCES}
-        ${JOBNET_RESOLVE_HEADERS}   ${JOBNET_RESOLVE_SOURCES}
-        ${JOBNET_SOCKETS_HEADERS}   ${JOBNET_SOCKETS_SOURCES}
-        ${JOBNET_SERVERS_HEADERS}   ${JOBNET_SERVERS_SOURCES}
-        ${JOBNET_CLIENTS_HEADERS}   ${JOBNET_CLIENTS_SOURCES}
+    add_library(JosephsOddBuilder_Net SHARED ${JOB_NET_COMPILE_THIS}
     )
 else()
-    add_library(JosephsOddBuilder_Net STATIC
-        ${JOBNET_HEADERS}           ${JOBNET_SOURCES}
-        ${JOBNET_RESOLVE_HEADERS}   ${JOBNET_RESOLVE_SOURCES}
-        ${JOBNET_SOCKETS_HEADERS}   ${JOBNET_SOCKETS_SOURCES}
-        ${JOBNET_SERVERS_HEADERS}   ${JOBNET_SERVERS_SOURCES}
-        ${JOBNET_CLIENTS_HEADERS}   ${JOBNET_CLIENTS_SOURCES}
-    )
+    add_library(JosephsOddBuilder_Net STATIC ${JOB_NET_COMPILE_THIS})
+    target_compile_definitions(JosephsOddBuilder_Net PUBLIC JOBNET_STATIC_DEFINE)
 endif()
+
+
 set(JOBNET_EXPORT ${CMAKE_CURRENT_BINARY_DIR}/jobnet_export.h)
 generate_export_header(JosephsOddBuilder_Net
     BASE_NAME JOBNET
@@ -140,19 +152,22 @@ set_target_properties(JosephsOddBuilder_Net PROPERTIES
 
 target_include_directories(JosephsOddBuilder_Net PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/>
-    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobnet>
 
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/resolve>
-    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/resolve>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobnet/resolve>
 
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/sockets>
-    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/sockets>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobnet/sockets>
 
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/clients>
-    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/clients>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobnet/clients>
 
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/servers>
-    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/servers>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobnet/servers>
+
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/http>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobnet/http>
 
     ## export file
     $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
@@ -199,7 +214,7 @@ install(FILES ${JOBNET_RESOLVE_HEADERS}     DESTINATION ${CMAKE_INSTALL_INCLUDED
 install(FILES ${JOBNET_SOCKETS_HEADERS}     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobnet/sockets )
 install(FILES ${JOBNET_CLIENTS_HEADERS}     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobnet/clients )
 install(FILES ${JOBNET_SERVERS_HEADERS}     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobnet/servers )
-
+install(FILES ${JOBNET_HTTP_HEADERS}        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobnet/http )
 
 if(JOB_LINUX)
     set(PKGCONFIG_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/pkgconfig")

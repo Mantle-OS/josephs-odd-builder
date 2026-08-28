@@ -20,18 +20,18 @@ jobs:
         fetch-depth: 0
 
     - name: Configure CMake
-      run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DJOB_CI_BUILD=ON
+      run: cmake -B ${{ github.workspace }}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DJOB_CI_BUILD=ON
 
     - name: Build
-      run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}} --target all -j$(nproc)
+      run: cmake --build ${{ github.workspace }}/build --config ${{env.BUILD_TYPE}} --target all -j$(nproc)
 
     # job_ai job_aipkg job_ansi job_core job_crypto job_ggml job_io job_net job_science job_serializer job_simd job_sound job_threads job_token job_uart job_zstd
     - name: Test Stack
       run: |
-        echo "${pwd}"
+        pwd
         ls -alh
-        ls -alh build
-        ls -alh build/tests
+        ls -alh "${{ github.workspace }}/"
+        ls -alh "${{ github.workspace }}/build"
         ls -alh "${{ github.workspace }}/build/tests"
         for i in job_core job_ansi job_simd;
         do
