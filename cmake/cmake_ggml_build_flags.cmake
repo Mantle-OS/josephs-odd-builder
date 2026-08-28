@@ -13,9 +13,13 @@ set(GGML_CUDA ON)
 ## OpenCL
 set(GGML_OPENCL ON)
 
-## Vulkan
-set(GGML_VULKAN ON)
-set(GGML_VULKAN_SHADERS_GEN_TOOLCHAIN "/usr/bin/glslc")
+## Vulkan the github free runners do not have enough memory to build this.....
+if(JOB_CI_BUILD)
+    set(GGML_VULKAN OFF)
+else()
+    set(GGML_VULKAN ON)
+    set(GGML_VULKAN_SHADERS_GEN_TOOLCHAIN "/usr/bin/glslc")
+endif()
 
 ## Enables the RPC backend.
 set(GGML_RPC ON)

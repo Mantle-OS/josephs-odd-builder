@@ -1,7 +1,7 @@
 set(JOB_CUDA_TOOLKIT_ROOT_DIR    "/usr/local/cuda-13.3"                CACHE STRING "Where the cuda toolkit is ")
 set(JOB_CUDA_COMPILER            "/usr/local/cuda-13.3/bin/nvcc"       CACHE STRING "full path to the nvcc compiler")
 set(JOB_CUDA_HOST_COMPILER       "/usr/bin/g++-16"                     CACHE STRING "the compiler that nvcc is compiled with")
-set(JOB_CUDA_ARCHITECTURES       "120"                                 CACHE STRING "version of the cuda api")
+set(JOB_CUDA_ARCHITECTURES       "120a"                                CACHE STRING "version of the cuda api")
 
 if(JOB_CUDA)
     message(STATUS "Building with CUDA support")

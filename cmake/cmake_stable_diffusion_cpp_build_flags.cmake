@@ -3,7 +3,12 @@ set(SD_BUILD_EXAMPLES OFF)
 set(SD_USE_SYSTEM_WEBM OFF)
 set(SD_USE_SYSTEM_WEBP ON)
 set(SD_CUDA ON)
-set(SD_VULKAN ON)
+if(JOB_CI_BUILD)
+    set(SD_VULKAN OFF)
+else()
+    set(SD_VULKAN ON)
+endif()
+
 set(SD_OPENCL ON)
 
 ## ggml is a git submodule to STABLE_DIFFUSION_CPP

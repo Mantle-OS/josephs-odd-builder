@@ -56,6 +56,7 @@ option(JOB_APPS   "Build the Example applications that are supported" ON)
 option(JOB_CI_BUILD "Enable settings specific to CI environments" OFF)
 if(JOB_CI_BUILD)
     add_compile_definitions(JOB_CI_BUILD)
+    add_compile_definitions(JOB_CI_MAX_THREADS=4)
 endif()
 
 option(JOB_TEST_BENCHMARKS "build and run the benchhmarks in the tests (release mode only)" ON)

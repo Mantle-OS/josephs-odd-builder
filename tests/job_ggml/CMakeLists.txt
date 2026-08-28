@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.16)
 
 set(JOB_GGML_TEST_IMPL test_ggml_cpu.cpp)
+
 if(GGML_VULKAN)
     add_compile_definitions(JOB_GGML_VULKAN)
     list(APPEND JOB_GGML_TEST_IMPL test_ggml_vulkan.cpp)
