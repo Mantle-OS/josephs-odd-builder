@@ -14,7 +14,9 @@ set(QSODIUM_HEADERS
     qt-sodium/qsodiumpasswordutils.h
     qt-sodium/qsodiumsecretbox.h
     qt-sodium/qsodiumhash.h
+    qt-sodium/qsodiumhmacsha256.h
     qt-sodium/qsodium.h
+
 )
 
 set(QSODIUM_CXX
@@ -25,19 +27,15 @@ set(QSODIUM_CXX
     qt-sodium/qsodiumpasswordutils.cpp
     qt-sodium/qsodiumsecretbox.cpp
     qt-sodium/qsodiumhash.cpp
+    qt-sodium/qsodiumhmacsha256.cpp
     qt-sodium/qsodium.cpp
 )
 
 if(BUILD_SHARED_LIBS)
-    qt_add_library(qt-sodium SHARED
-          ${QSODIUM_HEADERS}
-          ${QSODIUM_CXX}
-    )
+    qt_add_library(qt-sodium SHARED ${QSODIUM_HEADERS} ${QSODIUM_CXX})
 else()
-    qt_add_library(qt-sodium STATIC
-          ${QSODIUM_HEADERS}
-          ${QSODIUM_CXX}
-    )
+    qt_add_library(qt-sodium STATIC ${QSODIUM_HEADERS} ${QSODIUM_CXX})
+    target_compile_definitions(qt-sodium PUBLIC QSODIUM_STATIC_DEFINE)
 endif()
 
 set(QTSODIUM_EXPORT_HEADER "${CMAKE_CURRENT_BINARY_DIR}/qsodium_export.h")
@@ -106,6 +104,8 @@ set(QDEC_SODIUM_HEADERS
     qml-sodium/qmlsodiumkeys.h
     qml-sodium/qmlsecuremem.h
     qml-sodium/qmlsecurememinput.h
+    qml-sodium/qmlsodiumhmacsha256.h
+
 )
 
 set(QDEC_SODIUM_CXX
@@ -116,6 +116,7 @@ set(QDEC_SODIUM_CXX
     qml-sodium/qmlsodiumkeys.cpp
     qml-sodium/qmlsecuremem.cpp
     qml-sodium/qmlsecurememinput.cpp
+    qml-sodium/qmlsodiumhmacsha256.cpp
 )
 
 if(BUILD_SHARED_LIBS)
@@ -128,7 +129,7 @@ endif()
 qt_add_qml_module(qml-sodium
     URI Sodium
     VERSION 1.0
-    OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/Sodium"
+    # OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/Sodium"
     OUTPUT_TARGETS QML_SODIUM_OUTPUT_TARGETS
     SOURCES
       ${QDEC_SODIUM_HEADERS}

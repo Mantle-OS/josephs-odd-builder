@@ -7,11 +7,12 @@ set(CMAKE_AUTOMOC ON)
 
 set(SODIUM_EXAMPLE_QML
     main.qml
-    SecureBox.qml    # showing how QmlSodiumBox Element works
-    CryptoSigner.qml # showing how QmlSodiumCryptoSign works
-    HashView.qml     # showing how QmlSodiumHash singleton works
-    KeyManager.qml   # showing how QmlSodiumKeys Element works
-    PasswordUtils.qml # showing how QmlSodiumPasswordUtils Element
+    SecureBox.qml
+    CryptoSigner.qml
+    HashView.qml
+    KeyManager.qml
+    PasswordUtils.qml
+    HMacSha256.qml
 )
 
 qt_add_executable(qml-sodium-example main.cpp)

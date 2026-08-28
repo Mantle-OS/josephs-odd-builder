@@ -99,6 +99,6 @@ if(JOB_QT)
 
     set(QML_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/qt6/qml")
 
-    qt_policy(SET QTP0001 NEW)
-    qt_policy(SET QTP0004 NEW)
+    # qt_policy(SET QTP0001 NEW)
+    # qt_policy(SET QTP0004 NEW)
 endif()

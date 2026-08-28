@@ -17,6 +17,7 @@ set(JOBCRYPTO_HEADERS
     job_crypto.h
     job_ssl_options.h
     job_x509_generator.h
+    job_hmac_sha256.h
 )
 
 set(JOBCRYPTO_SOURCES
@@ -29,6 +30,7 @@ set(JOBCRYPTO_SOURCES
     job_secret_box.cpp
     job_hash.cpp
     job_crypto.cpp
+    job_hmac_sha256.cpp
 )
 
 if(JOB_WINDOWS)

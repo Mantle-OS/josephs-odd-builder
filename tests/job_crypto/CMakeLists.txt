@@ -13,6 +13,7 @@ add_executable(test_job_crypto
     test_job_hash.cpp
     test_job_crypto.cpp
     test_job_x509_generator.cpp
+    test_job_hmac_sha256.cpp
 )
 
 if(JOB_WINDOWS)

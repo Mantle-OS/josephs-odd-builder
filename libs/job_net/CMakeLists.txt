@@ -17,16 +17,48 @@ set(JOBNET_SOURCES
     isocket_io.cpp
 )
 
+
+
+set(JOBNET_AUTH_HEADERS
+    auth/job_http_auth_type.h
+    auth/job_ihttp_auth.h
+
+    auth/job_bearer_auth.h
+    auth/job_token_auth.h
+    auth/job_api_key_auth.h
+    auth/job_basic_auth.h
+    auth/job_custom_auth.h
+
+    auth/job_aws4_auth.h
+
+    auth/job_http_auth_factory.h
+)
+
+set(JOBNET_AUTH_SOURCES
+    auth/job_ihttp_auth.cpp
+
+    auth/job_bearer_auth.cpp
+    auth/job_token_auth.cpp
+    auth/job_api_key_auth.cpp
+    auth/job_basic_auth.cpp
+    auth/job_custom_auth.cpp
+    auth/job_aws4_auth.cpp
+    auth/job_http_auth_factory.cpp
+)
+
 set(JOBNET_HTTP_HEADERS
     http/job_http_method.h
     http/job_http_status_code.h
     http/job_http_status.h
+    ## Blocked till auth is done
     http/job_http_request.h
     http/job_http_response.h
     http/job_http_parser.h
     http/job_http_client.h
 )
 set(JOBNET_HTTP_SOURCES
+    http/job_http_status.cpp
+    ## Blocked till auth is done
     http/job_http_request.cpp
     http/job_http_response.cpp
     http/job_http_parser.cpp
@@ -125,6 +157,7 @@ set(JOB_NET_COMPILE_THIS
     ${JOBNET_SERVERS_HEADERS}   ${JOBNET_SERVERS_SOURCES}
     ${JOBNET_CLIENTS_HEADERS}   ${JOBNET_CLIENTS_SOURCES}
     ${JOBNET_HTTP_HEADERS}      ${JOBNET_HTTP_SOURCES}
+    ${JOBNET_AUTH_HEADERS}      ${JOBNET_AUTH_SOURCES}
 )
 
 if(BUILD_SHARED_LIBS)
@@ -179,6 +212,9 @@ target_include_directories(JosephsOddBuilder_Net PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/http>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobnet/http>
 
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/auth>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobnet/auth>
+
     ## export file
     $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
 )
@@ -225,6 +261,7 @@ install(FILES ${JOBNET_SOCKETS_HEADERS}     DESTINATION ${CMAKE_INSTALL_INCLUDED
 install(FILES ${JOBNET_CLIENTS_HEADERS}     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobnet/clients )
 install(FILES ${JOBNET_SERVERS_HEADERS}     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobnet/servers )
 install(FILES ${JOBNET_HTTP_HEADERS}        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobnet/http )
+install(FILES ${JOBNET_HTTP_HEADERS}        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobnet/auth )
 
 if(JOB_LINUX)
     set(PKGCONFIG_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/pkgconfig")
