@@ -6,6 +6,7 @@ env:
   BUILD_TYPE: Release
   GGML_NLOOP: 3
   GGML_N_THREADS: 1
+  GGML_VK_DISABLE_COOPMAT2: 1
 
 jobs:
   build:
