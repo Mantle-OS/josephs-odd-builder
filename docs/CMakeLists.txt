@@ -67,3 +67,27 @@ add_custom_target(JOBGGML_Documentation SOURCES
     job_ggml/quant.md
     job_ggml/misc.md  # this is enums & type_traits and abort callback threadpool stuff;
 )
+
+
+add_custom_target(JOBSCHEMA_Documentation SOURCES
+    job_schema/design/intro.md
+    job_schema/design/job_schema_design.md
+    job_schema/design/job_schema_gen_design.md
+    job_schema/design/job_schema_gen_example_design.md
+    job_schema/design/test_job_schema_design.md
+    job_schema/design/job_schema_design_deps.md
+)
+
+add_custom_target(JOBYML_Documentation SOURCES
+    job_yaml/design/intro.md
+    job_yaml/design/job_yaml_design.md
+    job_yaml/design/job_yaml_parser_design.md
+    job_yaml/design/job_yaml_emitter_design.md
+    job_yaml/design/test_job_yaml_design.md
+    job_yaml/design/job_yaml_design_deps.md
+)
+
+
+
+
+

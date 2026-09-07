@@ -1,14 +1,16 @@
 #include <catch2/catch_all.hpp>
 
+#include <cstdint>
 #include <string>
-
-#include <schema.h>
-#include <runtime_object.h>
+#include <vector>
 
 #include <job_emitter_msgpack.h>
 #include <job_serializer_msgpack.h>
+#include <runtime_object.h>
+#include <schema.h>
 
 #include "../job_serializer/test_emitter.h"
+
 using namespace job::serializer;
 using namespace job::serializer::msg_pack;
 
@@ -16,6 +18,7 @@ TEST_CASE("JobEmitterMsgPack generates pack/unpack functions", "[job_emitter_msg
 {
     JobEmitterMsgPack emitter{};
     Schema s = TestEmitter::getEmitterTestSchema();
+
     REQUIRE(s.isValid());
 
     auto [header, source] = emitter.render(s);
@@ -85,40 +88,84 @@ TEST_CASE("JobSerializerMsgPack (Runtime) round-trips bool/float/double scalars"
     Schema s = TestEmitter::getEmitterTestSchema();
 
     s.fields.push_back({
-        .key = 20, .name = "flag", .type = "bool", .kind = FieldKind::Scalar,
-        .size{}, .ctype{}, .ref_include{}, .ref_sym{}, .required = false, .comment{}
+        .key = 20,
+        .name = "flag",
+        .type = "bool",
+        .kind = FieldKind::Scalar,
+        .size{},
+        .ctype{},
+        .ref_include{},
+        .ref_sym{},
+        .required = false,
+        .comment{}
     });
+
     s.fields.push_back({
-        .key = 21, .name = "ratio", .type = "float", .kind = FieldKind::Scalar,
-        .size{}, .ctype{}, .ref_include{}, .ref_sym{}, .required = false, .comment{}
+        .key = 21,
+        .name = "ratio",
+        .type = "float",
+        .kind = FieldKind::Scalar,
+        .size{},
+        .ctype{},
+        .ref_include{},
+        .ref_sym{},
+        .required = false,
+        .comment{}
     });
+
     s.fields.push_back({
-        .key = 22, .name = "precise", .type = "double", .kind = FieldKind::Scalar,
-        .size{}, .ctype{}, .ref_include{}, .ref_sym{}, .required = false, .comment{}
+        .key = 22,
+        .name = "precise",
+        .type = "double",
+        .kind = FieldKind::Scalar,
+        .size{},
+        .ctype{},
+        .ref_include{},
+        .ref_sym{},
+        .required = false,
+        .comment{}
     });
+
     REQUIRE(s.isValid());
 
-    RuntimeObject obj_in{};
-    obj_in.setField("flag", FieldValue{ .value = FieldValue::Scalar{ true } });
-    obj_in.setField("ratio", FieldValue{ .value = FieldValue::Scalar{ 3.5f } });
-    obj_in.setField("precise", FieldValue{ .value = FieldValue::Scalar{ 2.71828 } });
+    RuntimeObject objIn{};
+
+    objIn.setField("flag", FieldValue{
+                               .value = FieldValue::Scalar{true}
+                           });
+
+    objIn.setField("ratio", FieldValue{
+                                .value = FieldValue::Scalar{3.5f}
+                            });
+
+    objIn.setField("precise", FieldValue{
+                                  .value = FieldValue::Scalar{2.71828}
+                              });
 
     std::vector<uint8_t> buffer;
-    REQUIRE(ser.encode(s, obj_in, buffer, SerializeFormat::Binary));
 
-    RuntimeObject obj_out{};
-    REQUIRE(ser.decode(s, obj_out, buffer, SerializeFormat::Binary));
+    REQUIRE(ser.encode(s, objIn, buffer, SerializeFormat::Binary));
 
-    auto flag_val = obj_out.getField("flag");
-    REQUIRE(flag_val.has_value());
-    REQUIRE(flag_val->isScalar());
-    REQUIRE(std::get<FieldValue::Scalar>(flag_val->value) == FieldValue::Scalar{ true });
+    RuntimeObject objOut{};
 
-    auto ratio_val = obj_out.getField("ratio");
-    REQUIRE(ratio_val.has_value());
-    REQUIRE(std::get<float>(std::get<FieldValue::Scalar>(ratio_val->value)) == Catch::Approx(3.5f));
+    REQUIRE(ser.decode(s, objOut, buffer, SerializeFormat::Binary));
 
-    auto precise_val = obj_out.getField("precise");
-    REQUIRE(precise_val.has_value());
-    REQUIRE(std::get<double>(std::get<FieldValue::Scalar>(precise_val->value)) == Catch::Approx(2.71828));
+    auto flagVal = objOut.getField("flag");
+
+    REQUIRE(flagVal.has_value());
+    REQUIRE(flagVal->isScalar());
+    REQUIRE(std::get<FieldValue::Scalar>(flagVal->value) ==
+            FieldValue::Scalar{true});
+
+    auto ratioVal = objOut.getField("ratio");
+
+    REQUIRE(ratioVal.has_value());
+    REQUIRE(std::get<float>(std::get<FieldValue::Scalar>(ratioVal->value)) ==
+            Catch::Approx(3.5f));
+
+    auto preciseVal = objOut.getField("precise");
+
+    REQUIRE(preciseVal.has_value());
+    REQUIRE(std::get<double>(std::get<FieldValue::Scalar>(preciseVal->value)) ==
+            Catch::Approx(2.71828));
 }

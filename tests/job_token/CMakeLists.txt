@@ -50,7 +50,13 @@ if(NOT JOB_CI_BUILD)
         JOB_TOKEN_TEST_GGUF_FILE="/srv/ai/ComfyUI/models/text_encoders/ZImage_Turbo/Qwen3-4B-Instruct-2507-Q4_K_M.gguf"
     )
 endif()
+target_compile_options(test_job_token PRIVATE -freflection -fcontracts)
+target_link_options(test_job_token PRIVATE -fcontracts)
 
+set_target_properties(test_job_token PROPERTIES
+    CXX_STANDARD 26
+    CXX_STANDARD_REQUIRED ON
+)
 target_link_libraries(test_job_token PRIVATE
     JosephsOddBuilder_Core
     JosephsOddBuilder_Simd

@@ -2,11 +2,10 @@
 
 #include <string>
 
-
 #include <schema.h>
+#include <emitters/cpp_emitter.h>
 
 #include "test_emitter.h"
-#include <emitters/cpp_emitter.h>
 
 using namespace job::serializer;
 
@@ -14,6 +13,7 @@ TEST_CASE("Emitter::render generates valid header and source content", "[emitter
 {
     TestEmitter emitter{};
     Schema s = TestEmitter::getEmitterTestSchema();
+
     REQUIRE(s.isValid());
 
     auto [header, source] = emitter.render(s);
@@ -59,12 +59,14 @@ TEST_CASE("Emitter::render generates valid header and source content", "[emitter
 
     SECTION("Invalid schema returns empty strings")
     {
-        Schema s_invalid{};
-        REQUIRE_FALSE(s_invalid.isValid());
+        Schema invalidSchema{};
 
-        auto [h, src] = emitter.render(s_invalid);
-        REQUIRE(h.empty());
-        REQUIRE(src.empty());
+        REQUIRE_FALSE(invalidSchema.isValid());
+
+        auto [headerOut, sourceOut] = emitter.render(invalidSchema);
+
+        REQUIRE(headerOut.empty());
+        REQUIRE(sourceOut.empty());
     }
 }
 
@@ -72,12 +74,14 @@ TEST_CASE("Emitter correctly generates types for variable-size 'bin' (bug fix)",
 {
     TestEmitter emitter{};
     Schema s = TestEmitter::getEmitterTestSchema();
+
     s.fields.push_back({
         .key = 10,
         .name = "var_bin_data",
         .type = "bin",
         .kind = FieldKind::Bin,
-        .size{}, .ctype{},
+        .size{},
+        .ctype{},
         .ref_include{},
         .ref_sym{},
         .required = false,
@@ -96,8 +100,11 @@ TEST_CASE("Emitter correctly generates types for variable-size 'bin' (bug fix)",
         .required = false,
         .comment{}
     });
+
     REQUIRE(s.isValid());
+
     auto [header, source] = emitter.render(s);
+
     SECTION("Header generates std::vector<uint8_t> for 'bin'")
     {
         REQUIRE(stringContains(header, "std::vector<uint8_t> var_bin_data;"));

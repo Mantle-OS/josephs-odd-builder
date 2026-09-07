@@ -2,12 +2,20 @@ if(JOB_BUILD_SIMD)
     add_subdirectory(job_simd)
 endif()
 
+if(JOB_BUILD_YAML)
+    add_subdirectory(job_yaml)
+endif()
+
 if(JOB_BUILD_CORE)
     add_subdirectory(job_core)
 endif()
 
 if(JOB_BUILD_THREADS)
     add_subdirectory(job_threads)
+endif()
+
+if(JOB_BUILD_SCHEMA)
+    add_subdirectory(job_schema)
 endif()
 
 if(JOB_BUILD_CRYPTO)
@@ -27,7 +35,6 @@ if(JOB_LINUX)
         add_subdirectory(job_uart)
     endif()
 endif()
-
 
 if(JOB_BUILD_NET)
     add_subdirectory(job_net)

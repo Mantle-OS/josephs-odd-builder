@@ -180,11 +180,15 @@ TEST_CASE("AsyncEventLoop postDelayed", "[threading][async_loop]")
     auto start_time = std::chrono::steady_clock::now();
 
     loop.start();
-    loop.postDelayed([&] {
+
+    const std::uint64_t timerId = loop.postDelayed([&] {
         task_ran.store(true);
     }, 50ms);
 
+    REQUIRE(timerId != 0);
+
     REQUIRE_FALSE(task_ran.load());
+
     std::this_thread::sleep_for(25ms);
     REQUIRE_FALSE(task_ran.load());
 
@@ -197,7 +201,7 @@ TEST_CASE("AsyncEventLoop postDelayed", "[threading][async_loop]")
     auto end_time = std::chrono::steady_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
 
-    REQUIRE(task_ran.load() == true);
+    REQUIRE(task_ran.load());
     REQUIRE(duration.count() >= 50);
 
     loop.stop();
@@ -275,20 +279,25 @@ TEST_CASE("AsyncEventLoop handles re-entrancy (post from a timer)", "[threading]
 {
     AsyncEventLoop loop;
     std::atomic<bool> task_from_timer_ran{false};
+
     loop.start();
-    loop.postDelayed([&] {
+
+    const std::uint64_t timerId = loop.postDelayed([&] {
         loop.post([&] {
             task_from_timer_ran.store(true);
         });
     }, 10ms);
 
+    REQUIRE(timerId != 0);
+
     int retries = 0;
+
     // this needs to go somewhere else . . .
     while (!task_from_timer_ran.load() && retries < 100) {
         std::this_thread::sleep_for(2ms);
         retries++;
     }
 
-    REQUIRE(task_from_timer_ran.load() == true);
+    REQUIRE(task_from_timer_ran.load());
     loop.stop();
 }

@@ -3,6 +3,8 @@
 #include <string>
 #include <string_view>
 
+#include <job_secure_mem.h>
+
 #include "job_ihttp_auth.h"
 #include "jobnet_export.h"
 
@@ -27,7 +29,7 @@ public:
     [[nodiscard]] const std::string &region() const noexcept;
     [[nodiscard]] const std::string &service() const noexcept;
 
-    [[nodiscard]] const job::crypto::JobSecureMem &sessionToken() const noexcept;
+    [[nodiscard]] job::crypto::JobSecureMem::Ptr sessionToken() const noexcept;
     [[nodiscard]] bool hasSessionToken() const noexcept;
 
     void clear() noexcept override;
@@ -41,7 +43,7 @@ private:
              std::string_view service);
 
     Aws4Auth(std::string_view accessKeyId,
-             job::crypto::JobSecureMem &&secretAccessKey,
+             job::crypto::JobSecureMem::Ptr secretAccessKey,
              std::string_view region,
              std::string_view service);
 
@@ -52,18 +54,18 @@ private:
              std::string_view service);
 
     Aws4Auth(std::string_view accessKeyId,
-             job::crypto::JobSecureMem &&secretAccessKey,
-             job::crypto::JobSecureMem &&sessionToken,
+             job::crypto::JobSecureMem::Ptr secretAccessKey,
+             job::crypto::JobSecureMem::Ptr sessionToken,
              std::string_view region,
              std::string_view service);
 
     void setSessionToken(std::string_view token);
-    void setSessionToken(job::crypto::JobSecureMem &&token) noexcept;
+    void setSessionToken(job::crypto::JobSecureMem::Ptr token) noexcept;
 
-    std::string               m_accessKeyId;
-    std::string               m_region;
-    std::string               m_service;
-    job::crypto::JobSecureMem m_sessionToken;
+    std::string m_accessKeyId;
+    std::string m_region;
+    std::string m_service;
+    job::crypto::JobSecureMem::Ptr m_sessionToken;
 };
 
 } // namespace job::net

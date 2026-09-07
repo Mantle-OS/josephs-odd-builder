@@ -6,6 +6,7 @@ namespace job::threads {
 
 constexpr size_t kDefaultTimerReservation = 32;
 using namespace std::chrono_literals;
+
 AsyncEventLoop::AsyncEventLoop()
 {
     // FIXME
@@ -26,11 +27,13 @@ void AsyncEventLoop::start(bool realTime)
     JobThreadOptions opts = realTime ?
                                 JobThreadOptions::realtimeDefault() :
                                 JobThreadOptions::normal();
+
     std::snprintf(opts.name.data(), opts.name.size(), "AsyncLoop");
 
     m_thread = std::make_shared<JobThread>(opts);
 
     auto idle_heartbeat = std::chrono::milliseconds(opts.heartbeat);
+
     m_thread->setRunFunction([this, idle_heartbeat](std::stop_token token) {
         this->loop(token, idle_heartbeat);
     });
@@ -43,26 +46,30 @@ void AsyncEventLoop::start(bool realTime)
 
 void AsyncEventLoop::stop()
 {
-    if (!m_running.exchange(false))
+    const bool wasRunning = m_running.exchange(false);
+
+    if (!m_thread)
         return;
 
-    if (m_thread)
-        m_thread->requestStop();
+    m_thread->requestStop();
 
-    {
-        std::scoped_lock lock(m_timerMutex);
-        m_timers.clear();
+    if (wasRunning) {
+        {
+            std::scoped_lock lock(m_timerMutex);
+            m_timers.clear();
+        }
+
+        m_queue.stop();
     }
 
-    m_queue.stop();
+    if (m_thread->isCurrentThread())
+        return;
 
-    if (m_thread) {
-        (void)m_thread->join();
+    if (m_thread->join())
         m_thread.reset();
-    }
 }
 
-bool AsyncEventLoop::isRunning() const
+bool AsyncEventLoop::isRunning() const noexcept
 {
     return m_running.load(std::memory_order_relaxed);
 }
@@ -72,16 +79,17 @@ void AsyncEventLoop::post(std::function<void()> task, int priority)
     m_queue.post(std::move(task), priority);
 }
 
-uint64_t AsyncEventLoop::postDelayed(std::function<void()> task, std::chrono::milliseconds delay)
+std::uint64_t AsyncEventLoop::postDelayed(std::function<void()> task,
+                                          std::chrono::milliseconds delay)
 {
     return addTimer(std::move(task), delay, false);
 }
 
-uint64_t AsyncEventLoop::addTimer(std::function<void()> callback,
-                                  std::chrono::milliseconds interval,
-                                  bool repeat)
+std::uint64_t AsyncEventLoop::addTimer(std::function<void()> callback,
+                                       std::chrono::milliseconds interval,
+                                       bool repeat)
 {
-    const uint64_t id = m_nextTimerId.fetch_add(1, std::memory_order_relaxed);
+    const std::uint64_t id = m_nextTimerId.fetch_add(1, std::memory_order_relaxed);
     const auto now = std::chrono::steady_clock::now();
 
     core::JobTimer timer;
@@ -91,6 +99,7 @@ uint64_t AsyncEventLoop::addTimer(std::function<void()> callback,
     timer.set_repeat(repeat);
     timer.set_isActive(true);
     timer.set_callback(std::move(callback));
+
     {
         std::scoped_lock lock(m_timerMutex);
         m_timers.push_back(std::move(timer));
@@ -98,21 +107,23 @@ uint64_t AsyncEventLoop::addTimer(std::function<void()> callback,
 
     // Wake up sleepy head
     m_queue.post([] {}, 0);
+
     return id;
 }
 
-
-bool AsyncEventLoop::cancelTimer(uint64_t id)
+bool AsyncEventLoop::cancelTimer(std::uint64_t id)
 {
     std::scoped_lock lock(m_timerMutex);
+
     const auto before = m_timers.size();
+
     std::erase_if(m_timers, [id](const core::JobTimer &t) {
         return t.id() == id;
     });
 
-    if (m_timers.size() != before) {
+    if (m_timers.size() != before)
         post([] {}, 0);
-    }
+
     return m_timers.size() != before;
 }
 
@@ -124,10 +135,11 @@ std::chrono::milliseconds AsyncEventLoop::calculateNextWakeup() const
         return std::chrono::milliseconds::max();
 
     const auto now = std::chrono::steady_clock::now();
+
     core::JobTimer::TimePoint soonest_time = std::chrono::steady_clock::time_point::max();
     bool foundActive = false;
 
-    for (const auto& timer : m_timers) {
+    for (const auto &timer : m_timers) {
         if (timer.isActive()) {
             if (!foundActive || timer.next() < soonest_time) {
                 soonest_time = timer.next();
@@ -154,11 +166,11 @@ void AsyncEventLoop::processTimers()
     for (auto &timer : m_timers) {
         if (timer.expired(now)) {
             post(timer.callback(), 0);
-            if (timer.repeat()) {
+
+            if (timer.repeat())
                 timer.set_next(now + timer.interval());
-            } else {
+            else
                 timer.set_isActive(false);
-            }
         }
     }
 
@@ -166,15 +178,17 @@ void AsyncEventLoop::processTimers()
         return !t.isActive();
     });
 }
+
 void AsyncEventLoop::processTasks()
 {
     for (int i = 0; i < 100; ++i) {
-        auto taskOpt = m_queue.take(0ms); // Non-blocking take
+        auto taskOpt = m_queue.take(0ms);
+
         if (taskOpt.has_value()) {
             if (*taskOpt) {
                 try {
                     (*taskOpt)();
-                } catch (const std::exception& e) {
+                } catch (const std::exception &e) {
                     JOB_LOG_ERROR("[AsyncEventLoop] Task exception: %s", e.what());
                 } catch (...) {
                     JOB_LOG_ERROR("[AsyncEventLoop] Task unknown exception");
@@ -189,8 +203,8 @@ void AsyncEventLoop::processTasks()
 void AsyncEventLoop::loop(std::stop_token token, std::chrono::milliseconds idle_heartbeat)
 {
     while (!token.stop_requested()) {
-
         auto next_wakeup = calculateNextWakeup();
+
         if (next_wakeup == std::chrono::milliseconds::max() && m_queue.isEmpty())
             next_wakeup = idle_heartbeat;
         else if (next_wakeup == std::chrono::milliseconds::max() && !m_queue.isEmpty())
@@ -204,7 +218,7 @@ void AsyncEventLoop::loop(std::stop_token token, std::chrono::milliseconds idle_
         if (taskOpt.has_value() && *taskOpt) {
             try {
                 (*taskOpt)();
-            } catch (const std::exception& e) {
+            } catch (const std::exception &e) {
                 JOB_LOG_ERROR("[AsyncEventLoop] Task exception: %s", e.what());
             } catch (...) {
                 JOB_LOG_ERROR("[AsyncEventLoop] Task unknown exception");
@@ -222,5 +236,4 @@ void AsyncEventLoop::runOnce()
     processTasks();
 }
 
-} // job::threads
-
+} // namespace job::threads

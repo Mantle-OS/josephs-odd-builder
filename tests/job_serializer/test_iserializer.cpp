@@ -1,12 +1,13 @@
 #include <catch2/catch_all.hpp>
 
+#include <cstdint>
 #include <string>
+#include <vector>
 
+#include <iserializer.h>
 #include <job_serializer_utils.h>
 #include <runtime_object.h>
 #include <schema.h>
-
-#include <iserializer.h>
 
 #include "test_emitter.h"
 
@@ -14,9 +15,9 @@ using namespace job::serializer;
 
 TEST_CASE("ISerializer (base class) default JSON encode/decode", "[iserializer]")
 {
-    // We are now testing the BASE class, which *is* the BaseSerializer
     ISerializer ser{};
     Schema s = TestEmitter::getEmitterTestSchema();
+
     s.fields.push_back({
         .key = 100,
         .name = "items",
@@ -30,37 +31,43 @@ TEST_CASE("ISerializer (base class) default JSON encode/decode", "[iserializer]"
         .comment{}
     });
 
-    RuntimeObject obj_in;
+    RuntimeObject objIn;
 
-    FieldValue::Struct sub_item;
-    sub_item["id"] = FieldValue{ .value = FieldValue::Scalar{ (uint32_t)1 } };
+    FieldValue::Struct subItem;
+    subItem["id"] = FieldValue{
+        .value = FieldValue::Scalar{static_cast<uint32_t>(1)}
+    };
 
-    FieldValue::List list_of_items;
-    list_of_items.push_back(FieldValue{ .value = sub_item });
+    FieldValue::List listOfItems;
+    listOfItems.push_back(FieldValue{.value = subItem});
 
-    obj_in.setField("items", FieldValue{.value = list_of_items });
-    obj_in.setField("count", FieldValue{ .value = FieldValue::Scalar{ (uint32_t)42 } });
-    obj_in.setField("bogus_field", FieldValue{ .value = FieldValue::Scalar{ (int32_t)-1 } });
+    objIn.setField("items", FieldValue{.value = listOfItems});
+    objIn.setField("count", FieldValue{
+                                .value = FieldValue::Scalar{static_cast<uint32_t>(42)}
+                            });
+    objIn.setField("bogus_field", FieldValue{
+                                      .value = FieldValue::Scalar{static_cast<int32_t>(-1)}
+                                  });
 
     std::vector<uint8_t> buffer;
 
-    SECTION("Encode: Full Recursive Object"){
-        // Use the base class's router, which will call encodeJson
-        REQUIRE(ser.encode(s, obj_in, buffer, SerializeFormat::Json));
+    SECTION("Encode: Full Recursive Object")
+    {
+        REQUIRE(ser.encode(s, objIn, buffer, SerializeFormat::Json));
         REQUIRE_FALSE(buffer.empty());
 
-        std::string json_str(buffer.begin(), buffer.end());
+        std::string jsonStr(buffer.begin(), buffer.end());
 
-        REQUIRE(stringContains(json_str, "\"count\": 42"));
-        REQUIRE_FALSE(stringContains(json_str, "bogus_field"));
+        REQUIRE(stringContains(jsonStr, "\"count\": 42"));
+        REQUIRE_FALSE(stringContains(jsonStr, "bogus_field"));
 
-        // Check for our recursive list/struct
-        REQUIRE(stringContains(json_str, "\"items\": ["));
-        REQUIRE(stringContains(json_str, "\"id\": 1"));
+        REQUIRE(stringContains(jsonStr, "\"items\": ["));
+        REQUIRE(stringContains(jsonStr, "\"id\": 1"));
     }
 
-    SECTION("Decode: Full Recursive Object"){
-        std::string json_str = R"( {
+    SECTION("Decode: Full Recursive Object")
+    {
+        const std::string jsonStr = R"({
             "count": 123,
             "items": [
                 { "id": 10, "name": "first" },
@@ -68,37 +75,50 @@ TEST_CASE("ISerializer (base class) default JSON encode/decode", "[iserializer]"
             ],
             "bogus_field": "this-should-be-ignored-by-decoder"
         })";
-        std::vector<uint8_t> in_buf(json_str.begin(), json_str.end());
-        RuntimeObject obj_out;
 
-        REQUIRE(ser.decode(s, obj_out, in_buf, SerializeFormat::Json));
+        std::vector<uint8_t> inBuf(jsonStr.begin(), jsonStr.end());
+        RuntimeObject objOut;
 
-        REQUIRE(obj_out.hasField("count"));
-        REQUIRE(obj_out.hasField("items"));
-        REQUIRE_FALSE(obj_out.hasField("bogus_field"));
+        REQUIRE(ser.decode(s, objOut, inBuf, SerializeFormat::Json));
 
-        auto count_val = obj_out.getField("count");
-        REQUIRE(count_val->isScalar());
-        REQUIRE(std::get<FieldValue::Scalar>(count_val->value) == FieldValue::Scalar{ (int64_t)123 });
+        REQUIRE(objOut.hasField("count"));
+        REQUIRE(objOut.hasField("items"));
+        REQUIRE_FALSE(objOut.hasField("bogus_field"));
 
-        auto items_val = obj_out.getField("items");
-        REQUIRE(items_val->isList());
+        auto countVal = objOut.getField("count");
 
-        auto& list_vec = std::get<FieldValue::List>(items_val->value);
-        REQUIRE(list_vec.size() == 2);
+        REQUIRE(countVal.has_value());
+        REQUIRE(countVal->isScalar());
+        REQUIRE(std::get<FieldValue::Scalar>(countVal->value) ==
+                FieldValue::Scalar{static_cast<int64_t>(123)});
 
-        auto item_1 = list_vec[0];
-        REQUIRE(item_1.isStruct());
-        auto& item_1_map = std::get<FieldValue::Struct>(item_1.value);
-        REQUIRE(item_1_map.count("id"));
-        REQUIRE(item_1_map.count("name"));
-        REQUIRE(std::get<FieldValue::Scalar>(item_1_map["id"].value) == FieldValue::Scalar{ (int64_t)10 });
+        auto itemsVal = objOut.getField("items");
+
+        REQUIRE(itemsVal.has_value());
+        REQUIRE(itemsVal->isList());
+
+        auto &listVec = std::get<FieldValue::List>(itemsVal->value);
+
+        REQUIRE(listVec.size() == 2);
+
+        auto item1 = listVec[0];
+
+        REQUIRE(item1.isStruct());
+
+        auto &item1Map = std::get<FieldValue::Struct>(item1.value);
+
+        REQUIRE(item1Map.count("id"));
+        REQUIRE(item1Map.count("name"));
+        REQUIRE(std::get<FieldValue::Scalar>(item1Map["id"].value) ==
+                FieldValue::Scalar{static_cast<int64_t>(10)});
     }
 }
 
-TEST_CASE("ISerializer (base class) default YAML encode/decode", "[iserializer]"){
+TEST_CASE("ISerializer (base class) default YAML encode/decode", "[iserializer]")
+{
     ISerializer ser{};
     Schema s = TestEmitter::getEmitterTestSchema();
+
     s.fields.push_back({
         .key = 100,
         .name = "items",
@@ -112,36 +132,47 @@ TEST_CASE("ISerializer (base class) default YAML encode/decode", "[iserializer]"
         .comment{}
     });
 
-    RuntimeObject obj_in;
-    FieldValue::Struct sub_item;
-    sub_item["id"] = FieldValue{ .value = FieldValue::Scalar{ (uint32_t)1 } };
-    sub_item["name"] = FieldValue{ .value = FieldValue::Scalar{ std::string("test_item") } };
+    RuntimeObject objIn;
 
-    FieldValue::List list_of_items;
-    list_of_items.push_back(FieldValue{ .value = sub_item });
+    FieldValue::Struct subItem;
+    subItem["id"] = FieldValue{
+        .value = FieldValue::Scalar{static_cast<uint32_t>(1)}
+    };
+    subItem["name"] = FieldValue{
+        .value = FieldValue::Scalar{std::string("test_item")}
+    };
 
-    obj_in.setField("items", FieldValue{ .value = list_of_items });
+    FieldValue::List listOfItems;
+    listOfItems.push_back(FieldValue{.value = subItem});
 
-    obj_in.setField("count", FieldValue{ .value = FieldValue::Scalar{ (uint32_t)42 } });
-    obj_in.setField("bogus_field", FieldValue{ .value = FieldValue::Scalar{ (int32_t)-1 } });
+    objIn.setField("items", FieldValue{.value = listOfItems});
+    objIn.setField("count", FieldValue{
+                                .value = FieldValue::Scalar{static_cast<uint32_t>(42)}
+                            });
+    objIn.setField("bogus_field", FieldValue{
+                                      .value = FieldValue::Scalar{static_cast<int32_t>(-1)}
+                                  });
 
     std::vector<uint8_t> buffer;
 
-    SECTION("Encode: Full Recursive Object (YAML)") {
-        REQUIRE(ser.encode(s, obj_in, buffer, SerializeFormat::Yaml));
+    SECTION("Encode: Full Recursive Object (YAML)")
+    {
+        REQUIRE(ser.encode(s, objIn, buffer, SerializeFormat::Yaml));
         REQUIRE_FALSE(buffer.empty());
 
-        std::string yaml_str(buffer.begin(), buffer.end());
-        REQUIRE(stringContains(yaml_str, "count: 42"));
-        REQUIRE_FALSE(stringContains(yaml_str, "bogus_field"));
+        std::string yamlStr(buffer.begin(), buffer.end());
 
-        REQUIRE(stringContains(yaml_str, "items:"));
-        REQUIRE(stringContains(yaml_str, "id: 1"));
-        REQUIRE(stringContains(yaml_str, "name: test_item"));
+        REQUIRE(stringContains(yamlStr, "count: 42"));
+        REQUIRE_FALSE(stringContains(yamlStr, "bogus_field"));
+
+        REQUIRE(stringContains(yamlStr, "items:"));
+        REQUIRE(stringContains(yamlStr, "id: 1"));
+        REQUIRE(stringContains(yamlStr, "name: test_item"));
     }
 
-    SECTION("Decode: Full Recursive Object (YAML)") {
-        std::string yaml_str = R"(
+    SECTION("Decode: Full Recursive Object (YAML)")
+    {
+        const std::string yamlStr = R"(
 count: 123
 items:
   - id: 10
@@ -149,31 +180,43 @@ items:
   - id: 20
     name: second
 bogus_field: this-should-be-ignored-by-decoder)";
-        std::vector<uint8_t> in_buf(yaml_str.begin(), yaml_str.end());
-        RuntimeObject obj_out;
 
-        REQUIRE(ser.decode(s, obj_out, in_buf, SerializeFormat::Yaml));
+        std::vector<uint8_t> inBuf(yamlStr.begin(), yamlStr.end());
+        RuntimeObject objOut;
 
-        REQUIRE(obj_out.hasField("count"));
-        REQUIRE(obj_out.hasField("items"));
-        REQUIRE_FALSE(obj_out.hasField("bogus_field"));
+        REQUIRE(ser.decode(s, objOut, inBuf, SerializeFormat::Yaml));
 
-        auto count_val = obj_out.getField("count");
-        REQUIRE(count_val->isScalar());
-        REQUIRE(std::get<FieldValue::Scalar>(count_val->value) == FieldValue::Scalar{ std::string("123") });
+        REQUIRE(objOut.hasField("count"));
+        REQUIRE(objOut.hasField("items"));
+        REQUIRE_FALSE(objOut.hasField("bogus_field"));
 
-        auto items_val = obj_out.getField("items");
-        REQUIRE(items_val->isList());
+        auto countVal = objOut.getField("count");
 
-        auto& list_vec = std::get<FieldValue::List>(items_val->value);
-        REQUIRE(list_vec.size() == 2);
+        REQUIRE(countVal.has_value());
+        REQUIRE(countVal->isScalar());
+        REQUIRE(std::get<FieldValue::Scalar>(countVal->value) ==
+                FieldValue::Scalar{std::string("123")});
 
-        auto item_1 = list_vec[0];
-        REQUIRE(item_1.isStruct());
-        auto& item_1_map = std::get<FieldValue::Struct>(item_1.value);
-        REQUIRE(item_1_map.count("id"));
-        REQUIRE(item_1_map.count("name"));
-        REQUIRE(std::get<FieldValue::Scalar>(item_1_map["id"].value) == FieldValue::Scalar{ std::string("10") });
-        REQUIRE(std::get<FieldValue::Scalar>(item_1_map["name"].value) == FieldValue::Scalar{ std::string("first") });
+        auto itemsVal = objOut.getField("items");
+
+        REQUIRE(itemsVal.has_value());
+        REQUIRE(itemsVal->isList());
+
+        auto &listVec = std::get<FieldValue::List>(itemsVal->value);
+
+        REQUIRE(listVec.size() == 2);
+
+        auto item1 = listVec[0];
+
+        REQUIRE(item1.isStruct());
+
+        auto &item1Map = std::get<FieldValue::Struct>(item1.value);
+
+        REQUIRE(item1Map.count("id"));
+        REQUIRE(item1Map.count("name"));
+        REQUIRE(std::get<FieldValue::Scalar>(item1Map["id"].value) ==
+                FieldValue::Scalar{std::string("10")});
+        REQUIRE(std::get<FieldValue::Scalar>(item1Map["name"].value) ==
+                FieldValue::Scalar{std::string("first")});
     }
 }

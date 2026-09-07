@@ -128,12 +128,22 @@ add_library(JosephsOddBuilder_Science SHARED
     ${JOB_SCIENCE_INTEGRATORS_HEADERS}  ${JOB_SCIENCE_INTEGRATORS_SOURCES}
 
     ${JOB_SCIENCE_ENGINE_HEADERS}      ${JOB_SCIENCE_ENGINE_SOURCES}
- )
+)
+
+target_compile_options(JosephsOddBuilder_Science PRIVATE
+    -freflection
+    -fcontracts)
+
+target_link_options(JosephsOddBuilder_Science PRIVATE
+    -fcontracts
+)
 
 set_target_properties(JosephsOddBuilder_Science PROPERTIES
     VERSION ${PROJECT_VERSION}
     SOVERSION ${PROJECT_VERSION_MAJOR}
     OUTPUT_NAME "jobscience"
+    CXX_STANDARD 26
+    CXX_STANDARD_REQUIRED ON
 )
 
 target_link_libraries(JosephsOddBuilder_Science PUBLIC

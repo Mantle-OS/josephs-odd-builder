@@ -1,5 +1,7 @@
 #include "job_ihttp_auth.h"
 
+#include <utility>
+
 namespace job::net {
 
 IJobHttpAuth::IJobHttpAuth(std::string_view headerName,
@@ -13,7 +15,7 @@ IJobHttpAuth::IJobHttpAuth(std::string_view headerName,
 
 IJobHttpAuth::IJobHttpAuth(std::string_view headerName,
                            std::string_view scheme,
-                           job::crypto::JobSecureMem &&token) :
+                           job::crypto::JobSecureMem::Ptr token) :
     m_headerName(headerName),
     m_scheme(scheme),
     m_token(std::move(token))
@@ -25,31 +27,14 @@ const std::string &IJobHttpAuth::headerName() const noexcept
     return m_headerName;
 }
 
-const std::string &IJobHttpAuth::scheme() const noexcept
-{
-    return m_scheme;
-}
-
-const job::crypto::JobSecureMem &IJobHttpAuth::token() const noexcept
-{
-    return m_token;
-}
-
-bool IJobHttpAuth::hasToken() const noexcept
-{
-    return !m_token.empty();
-}
-
-void IJobHttpAuth::clear() noexcept
-{
-    m_headerName.clear();
-    m_scheme.clear();
-    m_token.clear();
-}
-
 void IJobHttpAuth::setHeaderName(std::string_view headerName)
 {
     m_headerName = headerName;
+}
+
+const std::string &IJobHttpAuth::scheme() const noexcept
+{
+    return m_scheme;
 }
 
 void IJobHttpAuth::setScheme(std::string_view scheme)
@@ -57,24 +42,48 @@ void IJobHttpAuth::setScheme(std::string_view scheme)
     m_scheme = scheme;
 }
 
+bool IJobHttpAuth::hasToken() const noexcept
+{
+    return m_token && !m_token->empty();
+}
+
+job::crypto::JobSecureMem::Ptr IJobHttpAuth::token() const noexcept
+{
+    return m_token;
+}
+
 void IJobHttpAuth::setToken(std::string_view token)
 {
     if (token.empty()) {
-        m_token.clear();
+        m_token.reset();
         return;
     }
 
-    if (!m_token.allocate(token.size())) {
-        m_token.clear();
+    auto secureToken = job::crypto::JobSecureMem::createShared(token.size());
+
+    if (!secureToken || secureToken->empty()) {
+        m_token.reset();
         return;
     }
 
-    m_token.copyFrom(token.data(), token.size());
+    secureToken->copyFrom(token.data(), token.size());
+    m_token = std::move(secureToken);
 }
 
-void IJobHttpAuth::setToken(job::crypto::JobSecureMem &&token) noexcept
+void IJobHttpAuth::setToken(job::crypto::JobSecureMem::Ptr token) noexcept
 {
     m_token = std::move(token);
+}
+
+void IJobHttpAuth::clear() noexcept
+{
+    m_headerName.clear();
+    m_scheme.clear();
+
+    if (m_token)
+        m_token->clear();
+
+    m_token.reset();
 }
 
 } // namespace job::net

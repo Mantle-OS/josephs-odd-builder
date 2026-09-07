@@ -1,6 +1,13 @@
 #include "job_util_msgpack.h"
 
-#include <job_serializer_logger.h>
+#include <cstdint>
+#include <cstring>
+#include <sstream>
+#include <stdexcept>
+#include <string>
+#include <utility>
+
+#include <job_logger.h>
 
 namespace job::serializer::msg_pack {
 
@@ -25,13 +32,16 @@ std::string JobUtilMsgPack::getCppType(const Field &f)
         return "std::vector<" + f.ref_sym.value_or("UNKNOWN_STRUCT") + ">";
     }
 
-    JOB_SER_WARN( "[JobUtilMsgPack] Could not gather the CPP type for {} This is not good .... not good at all", static_cast<int>(f.kind));
-    return "void"; // Should not happen
+    JOB_LOG_WARN("[JobUtilMsgPack] Could not gather the CPP type for {} This is not good .... not good at all",
+                 static_cast<int>(f.kind));
+
+    return "void";
 }
 
 std::string JobUtilMsgPack::getPackFunc(const Field &f)
 {
     std::ostringstream ss;
+
     ss << "        // Pack field: " << f.name << "\n";
     ss << "        pk.pack_str(" << f.name.size() << ");\n";
     ss << "        pk.pack_str_body(\"" << f.name << "\", " << f.name.size() << ");\n";
@@ -62,6 +72,7 @@ std::string JobUtilMsgPack::getPackFunc(const Field &f)
 std::string JobUtilMsgPack::getUnpackFunc(const Field &f)
 {
     std::ostringstream ss;
+
     ss << "        // Unpack field: " << f.name << "\n";
     ss << "        if (key == \"" << f.name << "\") {\n";
 
@@ -79,6 +90,7 @@ std::string JobUtilMsgPack::getUnpackFunc(const Field &f)
         ss << "            " << f.name << ".unpack_msgpack(val_obj);\n";
     } else if (f.kind == FieldKind::Bin) {
         ss << "            if (val_obj.type == msgpack::type::BIN) {\n";
+
         if (f.size) {
             ss << "                if (val_obj.via.bin.size != " << *f.size << ")\n";
             ss << "                    throw std::runtime_error(\"size mismatch unpacking bin field '" << f.name << "', expected " << *f.size << " bytes, got \" + std::to_string(val_obj.via.bin.size));\n";
@@ -86,6 +98,7 @@ std::string JobUtilMsgPack::getUnpackFunc(const Field &f)
         } else {
             ss << "                " << f.name << ".assign(val_obj.via.bin.ptr, val_obj.via.bin.ptr + val_obj.via.bin.size);\n";
         }
+
         ss << "            }\n";
     } else if (f.kind == FieldKind::ListBin) {
         ss << "            if (val_obj.type == msgpack::type::ARRAY) {\n";
@@ -94,6 +107,7 @@ std::string JobUtilMsgPack::getUnpackFunc(const Field &f)
         ss << "                for (uint32_t i = 0; i < val_obj.via.array.size; ++i) {\n";
         ss << "                    const auto &elem = val_obj.via.array.ptr[i];\n";
         ss << "                    if (elem.type != msgpack::type::BIN) continue;\n";
+
         if (f.size) {
             ss << "                    if (elem.via.bin.size != " << *f.size << ")\n";
             ss << "                        throw std::runtime_error(\"size mismatch unpacking list<bin> element in '" << f.name << "', expected " << *f.size << " bytes, got \" + std::to_string(elem.via.bin.size));\n";
@@ -102,17 +116,21 @@ std::string JobUtilMsgPack::getUnpackFunc(const Field &f)
         } else {
             ss << "                    std::vector<uint8_t> item(elem.via.bin.ptr, elem.via.bin.ptr + elem.via.bin.size);\n";
         }
+
         ss << "                    " << f.name << ".push_back(std::move(item));\n";
         ss << "                }\n";
         ss << "            }\n";
     } else {
         ss << "            val_obj.convert(" << f.name << ");\n";
     }
+
     ss << "        }";
+
     return ss.str();
 }
 
-bool JobUtilMsgPack::packFieldValue(const FieldValue &fv, msgpack::packer<msgpack::sbuffer> &pk) noexcept
+bool JobUtilMsgPack::packFieldValue(const FieldValue &fv,
+                                    msgpack::packer<msgpack::sbuffer> &pk) noexcept
 {
     if (fv.isScalar()) {
         std::visit(ScalarPackVisitor{pk}, std::get<FieldValue::Scalar>(fv.value));
@@ -123,83 +141,107 @@ bool JobUtilMsgPack::packFieldValue(const FieldValue &fv, msgpack::packer<msgpac
     } else if (fv.isList()) {
         const auto &list = std::get<FieldValue::List>(fv.value);
         pk.pack_array(list.size());
+
         for (const auto &item : list)
             if (!packFieldValue(item, pk))
                 return false;
     } else if (fv.isStruct()) {
         const auto &map = std::get<FieldValue::Struct>(fv.value);
         pk.pack_map(map.size());
+
         for (const auto &[key, val] : map) {
             pk.pack_str(key.size());
             pk.pack_str_body(key.data(), key.size());
+
             if (!packFieldValue(val, pk))
                 return false;
         }
     } else {
         pk.pack_nil();
     }
+
     return true;
 }
 
-bool JobUtilMsgPack::unpackFieldValue(const msgpack::object &obj, FieldValue &out_fv) noexcept
+bool JobUtilMsgPack::unpackFieldValue(const msgpack::object &obj,
+                                      FieldValue &out_fv) noexcept
 {
     switch (obj.type) {
     case msgpack::type::NIL:
         out_fv.value = std::monostate{};
         break;
+
     case msgpack::type::NEGATIVE_INTEGER:
         out_fv.value = FieldValue::Scalar{obj.as<int64_t>()};
         break;
+
     case msgpack::type::POSITIVE_INTEGER:
         out_fv.value = FieldValue::Scalar{obj.as<uint64_t>()};
         break;
+
     case msgpack::type::STR:
         out_fv.value = FieldValue::Scalar{obj.as<std::string>()};
         break;
+
     case msgpack::type::BOOLEAN:
         out_fv.value = FieldValue::Scalar{obj.as<bool>()};
         break;
+
     case msgpack::type::FLOAT32:
         out_fv.value = FieldValue::Scalar{obj.as<float>()};
         break;
+
     case msgpack::type::FLOAT64:
         out_fv.value = FieldValue::Scalar{obj.as<double>()};
         break;
+
     case msgpack::type::BIN:
-        out_fv.value = FieldValue::Binary(obj.via.bin.ptr, obj.via.bin.ptr + obj.via.bin.size);
+        out_fv.value = FieldValue::Binary(obj.via.bin.ptr,
+                                          obj.via.bin.ptr + obj.via.bin.size);
         break;
+
     case msgpack::type::ARRAY: {
         FieldValue::List list;
         list.reserve(obj.via.array.size);
+
         for (uint32_t i = 0; i < obj.via.array.size; ++i) {
             FieldValue item;
+
             if (!unpackFieldValue(obj.via.array.ptr[i], item))
                 return false;
+
             list.push_back(std::move(item));
         }
+
         out_fv.value = std::move(list);
         break;
     }
+
     case msgpack::type::MAP: {
         FieldValue::Struct map;
+
         for (uint32_t i = 0; i < obj.via.map.size; ++i) {
             const msgpack::object_kv &kv = obj.via.map.ptr[i];
             std::string key = kv.key.as<std::string>();
+
             FieldValue val;
+
             if (!unpackFieldValue(kv.val, val))
                 return false;
+
             map[std::move(key)] = std::move(val);
         }
+
         out_fv.value = std::move(map);
         break;
     }
+
     default:
-        JOB_SER_WARN("[msgpack] Unsupported msgpack type: {}",  static_cast<int>(obj.type));
+        JOB_LOG_WARN("[msgpack] Unsupported msgpack type: {}", static_cast<int>(obj.type));
         return false;
     }
+
     return true;
 }
 
-
 }
-

@@ -1,4 +1,5 @@
 set(TARGET_NAME job-ansi-example)
+
 project(${TARGET_NAME}
     VERSION 0.1
     DESCRIPTION ""
@@ -14,16 +15,17 @@ set(ANSIPP_EXAMPLE_DEPS
     JosephsOddBuilder_Ansi
     JosephsOddBuilder_TUI
 )
+
 # window.cpp
-add_executable(${TARGET_NAME}_window window.cpp )
+add_executable(${TARGET_NAME}_window window.cpp)
 target_link_libraries(${TARGET_NAME}_window PRIVATE ${ANSIPP_EXAMPLE_DEPS})
 
 # items.cpp
-add_executable(${TARGET_NAME}_items items.cpp )
+add_executable(${TARGET_NAME}_items items.cpp)
 target_link_libraries(${TARGET_NAME}_items PRIVATE ${ANSIPP_EXAMPLE_DEPS})
 
 # focus.cpp
-add_executable(${TARGET_NAME}_focus focus.cpp )
+add_executable(${TARGET_NAME}_focus focus.cpp)
 target_link_libraries(${TARGET_NAME}_focus PRIVATE ${ANSIPP_EXAMPLE_DEPS})
 
 # test_anchor.cpp
@@ -46,7 +48,6 @@ target_link_libraries(${TARGET_NAME}_mouseClick PRIVATE ${ANSIPP_EXAMPLE_DEPS})
 add_executable(${TARGET_NAME}_label test_label.cpp)
 target_link_libraries(${TARGET_NAME}_label PRIVATE ${ANSIPP_EXAMPLE_DEPS})
 
-
 # test_linear_layout.cpp
 add_executable(${TARGET_NAME}_linear_layout test_linear_layout.cpp)
 target_link_libraries(${TARGET_NAME}_linear_layout PRIVATE ${ANSIPP_EXAMPLE_DEPS})
@@ -67,4 +68,34 @@ target_link_libraries(${TARGET_NAME}_test_checkbox PRIVATE ${ANSIPP_EXAMPLE_DEPS
 add_executable(${TARGET_NAME}_test_radio_button test_radio_button.cpp)
 target_link_libraries(${TARGET_NAME}_test_radio_button PRIVATE ${ANSIPP_EXAMPLE_DEPS})
 
+set(ANSIPP_EXAMPLE_TARGETS
+    ${TARGET_NAME}_window
+    ${TARGET_NAME}_items
+    ${TARGET_NAME}_focus
+    ${TARGET_NAME}_anchor
+    ${TARGET_NAME}_rectangle
+    ${TARGET_NAME}_gradient
+    ${TARGET_NAME}_mouseClick
+    ${TARGET_NAME}_label
+    ${TARGET_NAME}_linear_layout
+    ${TARGET_NAME}_grid_layout
+    ${TARGET_NAME}_button_test
+    ${TARGET_NAME}_test_checkbox
+    ${TARGET_NAME}_test_radio_button
+)
 
+foreach(EXAMPLE_TARGET IN LISTS ANSIPP_EXAMPLE_TARGETS)
+    set_target_properties(${EXAMPLE_TARGET} PROPERTIES
+        CXX_STANDARD 26
+        CXX_STANDARD_REQUIRED ON
+    )
+
+    target_compile_options(${EXAMPLE_TARGET} PRIVATE
+        -freflection
+        -fcontracts
+    )
+
+    target_link_options(${EXAMPLE_TARGET} PRIVATE
+        -fcontracts
+    )
+endforeach()

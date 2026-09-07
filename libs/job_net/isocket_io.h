@@ -9,11 +9,12 @@
 // threads
 #include <job_io_async_thread.h>
 #include <job_logger.h>
-#include <job_assert.h>
 #include "job_url.h"
 #include "resolve/job_ipaddr.h"
 #include "resolve/job_resolver.h"
 #include "sockets/job_socket_error.h"
+#include "sockets/job_socket_io_result.h"
+
 #include "jobnet_export.h"
 namespace job::net {
 class JOBNET_EXPORT ISocketIO : public std::enable_shared_from_this<ISocketIO> {
@@ -92,8 +93,8 @@ public:
     virtual bool listen(int backlog = 5) = 0;
     virtual ISocketIO::Ptr accept() = 0;
     virtual void disconnect() = 0;
-    virtual int64_t read(void *buffer, size_t size) = 0;
-    virtual int64_t write(const void *buffer, size_t size) = 0;
+    virtual NetIoResult read(void *buffer, size_t size) = 0;
+    virtual NetIoResult write(const void *buffer, size_t size) = 0;
     virtual SocketState state() const noexcept = 0;
     virtual SocketErrors::SocketErrNo lastError() const noexcept = 0;
     virtual SocketType type() const noexcept = 0;
@@ -132,6 +133,22 @@ public:
         }
     }
 
+    [[nodiscard]] bool setWriteInterest(bool enable) noexcept
+    {
+        const threads::IOEvent desired = enable ? (m_events | threads::IOEvent::Write) :
+                                                static_cast<threads::IOEvent>(static_cast<std::uint32_t>(m_events) &
+                                                                           ~static_cast<std::uint32_t>(threads::IOEvent::Write));
+        if (desired == m_events)
+            return true;
+
+        if (!setEvents(desired))
+            return false;
+
+        m_events = desired;
+        return true;
+    }
+    [[nodiscard]] threads::IOEvent events() const noexcept { return m_events; }
+
     std::function<void()> onConnect;
     std::function<void(const char*, size_t)> onRead;
     std::function<void(const char*, size_t)> onWrite;
@@ -147,6 +164,7 @@ protected:
     std::weak_ptr<threads::JobIoAsyncThread> m_loop;
     JobResolver::Ptr m_resolver{nullptr};
     int m_fd{-1};
+    threads::IOEvent m_events{threads::IOEvent::None};
 };
 constexpr ISocketIO::SocketOption operator|(ISocketIO::SocketOption a, ISocketIO::SocketOption b) noexcept
 {

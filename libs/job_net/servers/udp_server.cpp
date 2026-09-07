@@ -44,10 +44,10 @@ bool UdpServer::isRunning() const noexcept
 {
     return m_socket && m_socket->isOpen();
 }
-ssize_t UdpServer::sendTo(const void *buffer, size_t size, const JobIpAddr &dest)
+NetIoResult UdpServer::sendTo(const void *buffer, size_t size, const JobIpAddr &dest)
 {
     if (!isRunning())
-        return -1;
+        return NetIoResult::error();
     return m_socket->sendTo(buffer, size, dest);
 }
 void UdpServer::setupSocketCallbacks()

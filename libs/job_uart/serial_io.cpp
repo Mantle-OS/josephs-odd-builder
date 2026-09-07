@@ -98,7 +98,8 @@ bool SerialIO::openDevice()
 void SerialIO::closeDevice()
 {
     if (m_fd != -1 && m_loop) {
-        m_loop->unregisterFD(m_fd);
+        if (!m_loop->unregisterFD(m_fd))
+            JOB_LOG_WARN("[SerialIO] Failed to unregister fd {}", m_fd);
     }
 
     if (m_loop) {

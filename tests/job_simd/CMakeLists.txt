@@ -14,7 +14,13 @@ if(JOB_LINUX)
 elseif(JOB_WINDOWS)
     target_link_libraries(JosephsOddBuilder_Threads PUBLIC ws2_32)
 endif()
+target_compile_options(test_job_simd PRIVATE -freflection -fcontracts)
+target_link_options(test_job_simd PRIVATE -fcontracts)
 
+set_target_properties(test_job_simd PROPERTIES
+    CXX_STANDARD 26
+    CXX_STANDARD_REQUIRED ON
+)
 target_link_libraries(test_job_simd PRIVATE
     ${CatchTwo_LIBRARIES}
     JosephsOddBuilder_Simd

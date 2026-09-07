@@ -21,23 +21,28 @@ public:
     bool connectToHost(const JobIpAddr &ipaddr);
     bool connectToHost(const JobUrl &url);
     void disconnect();
-    ssize_t send(const void *data, size_t size);
-    ssize_t send(const std::string &data);
-    ssize_t sendTo(const void *buffer, size_t size, const JobIpAddr &dest);
+    NetIoResult send(const void *data, size_t size);
+    NetIoResult send(const std::string &data);
+
+    [[nodiscard]] bool setWriteInterest(bool enable);
+
+    NetIoResult sendTo(const void *buffer, size_t size, const JobIpAddr &dest);
     [[nodiscard]] bool isConnected() const noexcept;
     [[nodiscard]] SocketErrors::SocketErrNo lastError() const noexcept;
     [[nodiscard]] std::string lastErrorString() const noexcept;
-    std::function<void()> onConnect;
-    std::function<void(const char*, size_t)> onMessage;
-    std::function<void()> onDisconnect;
-    std::function<void(int)> onError;
+    std::function<void()>                       onConnect;
+    std::function<void(const char*, size_t)>    onMessage;
+    std::function<void()>                       onWritable;
+    std::function<void()>                       onDisconnect;
+    std::function<void(int)>                    onError;
     void setResolver(JobResolver::Ptr resolver);
+
 private:
     void setupSocketCallbacks();
-    threads::JobIoAsyncThread::Ptr m_loop;
-    JobResolver::Ptr m_resolver;
-    UdpSocket::Ptr m_socket;
-    std::atomic<bool> m_connected{false};
-    std::vector<char> m_readBuffer;
+    threads::JobIoAsyncThread::Ptr  m_loop;
+    JobResolver::Ptr                m_resolver;
+    UdpSocket::Ptr                  m_socket;
+    std::atomic<bool>               m_connected{false};
+    std::vector<char>               m_readBuffer;
 };
 } // namespace job::net

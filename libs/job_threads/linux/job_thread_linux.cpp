@@ -13,28 +13,42 @@
 
 namespace job::threads {
 
-static pthread_t &provider(unsigned char *handleStorage) noexcept {return *reinterpret_cast<pthread_t *>(handleStorage);}
+static pthread_t &provider(unsigned char *handleStorage) noexcept
+{
+    return *reinterpret_cast<pthread_t *>(handleStorage);
+}
+
+static const pthread_t &provider(const unsigned char *handleStorage) noexcept
+{
+    return *reinterpret_cast<const pthread_t *>(handleStorage);
+}
+
 using JobThreadArgs = ThreadArgs<JobThread, JobThread::StartResult>;
+
+bool JobThread::isCurrentThread() const noexcept
+{
+    if (!m_joinable)
+        return false;
+
+    return ::pthread_equal(::pthread_self(), provider(m_handleStorage)) != 0;
+}
 
 JobThread::StartResult JobThread::start()
 {
-    // m_starting serializes attempts to transition this object into a new execution. If another start is already underway, reject this one.
     if (m_starting.test_and_set(std::memory_order_acq_rel))
         return StartResult::AlreadyRunning;
 
-    // A running thread cannot be started again. A completed but still joinable thread must also be joined before m_handleStorage can safely be reused for a new pthread handle.
     if (m_running.load(std::memory_order_acquire) || m_joinable) {
         m_starting.clear(std::memory_order_release);
         return StartResult::AlreadyRunning;
     }
 
-    // std::stop_source cannot be reset after request_stop(). Every new execution therefore requires a fresh stop state.
     m_stopSource = std::stop_source{};
 
     auto promise = std::make_shared<std::promise<StartResult>>();
-    auto future  = promise->get_future();
+    auto future = promise->get_future();
 
-    auto *args = new (std::nothrow) JobThreadArgs {
+    auto *args = new (std::nothrow) JobThreadArgs{
         this,
         promise,
         m_stopSource.get_token()
@@ -45,7 +59,12 @@ JobThread::StartResult JobThread::start()
         return StartResult::ThreadError;
     }
 
-    int const createResult = pthread_create(&provider(m_handleStorage), nullptr, &JobThread::threadEntry, args);
+    int const createResult = ::pthread_create(
+        &provider(m_handleStorage),
+        nullptr,
+        &JobThread::threadEntry,
+        args
+        );
 
     if (createResult != 0) {
         delete args;
@@ -60,9 +79,8 @@ JobThread::StartResult JobThread::start()
 
     StartResult const result = future.get();
 
-    // If startup initialization failed, reap the created pthread immediately so the JobThread object returns to a reusable state.
     if (result != StartResult::Started && m_joinable) {
-        (void)pthread_join(provider(m_handleStorage), nullptr);
+        (void)::pthread_join(provider(m_handleStorage), nullptr);
         m_joinable = false;
     }
 
@@ -72,25 +90,29 @@ JobThread::StartResult JobThread::start()
 void *JobThread::threadEntry(void *arg)
 {
     std::unique_ptr<JobThreadArgs> args(static_cast<JobThreadArgs *>(arg));
-    auto *self    = args->self;
-    auto promise  = args->promise;
-    auto token    = args->token;
+
+    auto *self = args->self;
+    auto promise = args->promise;
+    auto token = args->token;
 
     StartResult result = StartResult::Started;
+
     {
         std::lock_guard<std::mutex> lock(self->m_mutex);
 
         if (self->applyScheduling() != 0)
             result = StartResult::SchedulingFailed;
 
-        if (result == StartResult::Started && self->m_options.pinToCore && self->applyAffinity() != 0)
+        if (result == StartResult::Started &&
+            self->m_options.pinToCore &&
+            self->applyAffinity() != 0) {
             result = StartResult::AffinityFailed;
+        }
     }
 
     if (result == StartResult::Started)
         self->m_running.store(true, std::memory_order_release);
 
-    // Unblock the caller waiting inside start().
     promise->set_value(result);
 
     if (result != StartResult::Started) {
@@ -98,12 +120,17 @@ void *JobThread::threadEntry(void *arg)
         return nullptr;
     }
 
-    // Set the native thread name after startup has succeeded.
     {
         std::lock_guard<std::mutex> lock(self->m_mutex);
+
         if (self->m_options.name[0] != '\0') {
             char nameBuffer[16]{};
-            std::strncpy(nameBuffer, self->m_options.name.data(), sizeof(nameBuffer) - 1);
+            std::strncpy(
+                nameBuffer,
+                self->m_options.name.data(),
+                sizeof(nameBuffer) - 1
+                );
+
             (void)::pthread_setname_np(::pthread_self(), nameBuffer);
         }
     }
@@ -115,7 +142,6 @@ void *JobThread::threadEntry(void *arg)
         functionToRun = self->m_runFunc;
     }
 
-    // Startup is now complete \0/. Further start() calls are rejected by m_running
     self->m_starting.clear(std::memory_order_release);
 
     if (functionToRun)
@@ -138,10 +164,15 @@ bool JobThread::join() noexcept
         return false;
     }
 
-    int const result = pthread_join(provider(m_handleStorage), nullptr);
+    if (isCurrentThread()) {
+        m_lastJoinError.store(EDEADLK, std::memory_order_release);
+        m_joining.clear(std::memory_order_release);
+        return false;
+    }
+
+    int const result = ::pthread_join(provider(m_handleStorage), nullptr);
 
     if (result != 0) {
-        // Preserve m_joinable. its not proven that the native thread was successfully reaped, so its storage must not be reused by start().
         m_lastJoinError.store(result, std::memory_order_release);
         m_joining.clear(std::memory_order_release);
         return false;
@@ -162,9 +193,10 @@ int JobThread::applyScheduling() noexcept
     if (!m_options.realtime)
         return 0;
 
-    if (m_options.lockMemory)
-        if (mlockall(MCL_CURRENT | MCL_FUTURE) == -1)
+    if (m_options.lockMemory) {
+        if (::mlockall(MCL_CURRENT | MCL_FUTURE) == -1)
             return errno;
+    }
 
     sched_param parameters{};
     parameters.sched_priority = m_options.priority;
@@ -173,8 +205,7 @@ int JobThread::applyScheduling() noexcept
                            SCHED_FIFO :
                            SCHED_RR;
 
-    // pthread_setschedparam returns the error number directly.
-    int const result = pthread_setschedparam(pthread_self(), policy, &parameters);
+    int const result = ::pthread_setschedparam(::pthread_self(), policy, &parameters);
     if (result != 0)
         return result;
 
@@ -194,7 +225,7 @@ int JobThread::applyAffinity() noexcept
     CPU_ZERO(&cpuSet);
     CPU_SET(m_options.coreId, &cpuSet);
 
-    if (sched_setaffinity( 0, sizeof(cpu_set_t), &cpuSet ) != 0)
+    if (::sched_setaffinity(0, sizeof(cpu_set_t), &cpuSet) != 0)
         return errno;
 
     return 0;

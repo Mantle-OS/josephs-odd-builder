@@ -1,22 +1,38 @@
 #pragma once
 
+#include <atomic>
+#include <concepts>
+#include <cstddef>
+#include <functional>
+#include <memory>
+#include <mutex>
 #include <string>
 #include <string_view>
-#include <atomic>
-#include <functional>
+#include <utility>
+#include <vector>
 
+#include <sys/ioctl.h>
+#include <sys/types.h>
 #include <termios.h>
 #include <unistd.h>
-#include <sys/ioctl.h>
 
 #include <io_base.h>
-
 #include <job_io_async_thread.h>
+
+#include "pty_environ.h"
+
+// #include "jobio_export.h"
+// JOBIO_EXPORT
 
 namespace job::io {
 
-class PtyIO : public IODevice {
+class PtyIO : public IODevice
+{
 public:
+    using Ptr  = std::shared_ptr<PtyIO>;
+    using WPtr = std::weak_ptr<PtyIO>;
+    using UPtr = std::unique_ptr<PtyIO>;
+
     enum class State {
         Closed = 0,
         Opening,
@@ -36,7 +52,18 @@ public:
         WriteError,
         ReadError,
         IoctlError,
-        LoopError
+        LoopError,
+        EnvironmentError,
+        SignalError,
+        PidFdError,
+        WaitError
+    };
+
+    enum class ShellType {
+        Sh = 0,
+        Dash,
+        Bash,
+        Zsh
     };
 
     using ReadCallback = IODevice::ReadCallback;
@@ -47,12 +74,28 @@ public:
 
     PtyIO(const PtyIO &) = delete;
     PtyIO &operator=(const PtyIO &) = delete;
+    PtyIO(PtyIO &&) = delete;
+    PtyIO &operator=(PtyIO &&) = delete;
+
+    template <typename... Args>
+        requires std::constructible_from<PtyIO, Args...>
+    [[nodiscard]] static Ptr createShared(Args &&...args)
+    {
+        return std::make_shared<PtyIO>(std::forward<Args>(args)...);
+    }
+
+    template <typename... Args>
+        requires std::constructible_from<PtyIO, Args...>
+    [[nodiscard]] static UPtr createUniq(Args &&...args)
+    {
+        return std::make_unique<PtyIO>(std::forward<Args>(args)...);
+    }
 
     [[nodiscard]] bool openDevice() override;
     void closeDevice() override;
 
-    [[nodiscard]] ssize_t read(char *buffer, size_t maxlen) override;
-    [[nodiscard]] ssize_t write(const char *data, size_t len) override;
+    [[nodiscard]] ssize_t read(char *buffer, std::size_t maxlen) override;
+    [[nodiscard]] ssize_t write(const char *data, std::size_t len) override;
 
     [[nodiscard]] int fd() const override;
     [[nodiscard]] bool isOpen() const override;
@@ -61,75 +104,91 @@ public:
     void setNonBlocking(bool enabled) override;
     void setExitCallback(ExitCallback cb);
 
+    // Environment ------------------------------------------------------------
+
+    [[nodiscard]] PtyEnviron &environ() noexcept;
+    [[nodiscard]] const PtyEnviron &environ() const noexcept;
+
+    [[nodiscard]] bool buildEnviron();
+
+    // Process / shell --------------------------------------------------------
+
+    [[nodiscard]] bool startProcess(const std::string &program,
+                                    const std::vector<std::string> &arguments = {});
+
+    [[nodiscard]] bool startShell(ShellType shellType);
     [[nodiscard]] bool startShell(const std::string &shellPath);
+
+    // Process control --------------------------------------------------------
+
+    [[nodiscard]] bool terminateProcess();
+    [[nodiscard]] bool killProcess();
+
+    [[nodiscard]] bool terminateProcess(int pid);
+    [[nodiscard]] bool killProcess(int pid);
+
+    // Terminal ---------------------------------------------------------------
+
     void setWindowSize(int rows, int cols);
     void setLocalecho(bool enabled);
 
-    [[nodiscard]] const std::string &slaveName() const;
-    [[nodiscard]] pid_t childPid() const;
-    [[nodiscard]] State state() const;
-    [[nodiscard]] Error error() const;
-    [[nodiscard]] const std::string &errorString() const;
+    [[nodiscard]] std::string slaveName() const;
+    [[nodiscard]] pid_t childPid() const noexcept;
+    [[nodiscard]] State state() const noexcept;
+    [[nodiscard]] Error error() const noexcept;
+    [[nodiscard]] std::string_view errorString() const noexcept;
 
 private:
-    int m_masterFd = -1;
-    int m_slaveFd = -1;
-    std::string m_slaveName = {};
-    pid_t m_childPid = -1;
+    static termios makeDefaultTermios();
+
+    [[nodiscard]] static std::string_view shellPath(ShellType shellType) noexcept;
+
+    [[nodiscard]] bool signalChild(int signal);
+    [[nodiscard]] bool signalProcess(pid_t pid, int signal);
+
+    [[nodiscard]] bool reapChild(bool wait);
+
+    [[nodiscard]] bool openPidFd();
+    void closePidFd() noexcept;
+
+    void onEvents(threads::IOEvent events);
+    void onPidEvents(threads::IOEvent events);
+
+    void setError(Error err);
+    static std::string_view errorToString(Error err);
+
+    std::atomic<int> m_masterFd{-1};
+    std::atomic<int> m_slaveFd{-1};
+    std::atomic<int> m_pidFd{-1};
+
+    std::string m_slaveName;
+
+    std::atomic<pid_t> m_childPid{-1};
 
     std::shared_ptr<threads::JobIoAsyncThread> m_loop;
-    void onEvents(threads::IOEvent events);
 
-    std::atomic<bool> m_localecho = false;
-    std::atomic<bool> m_nonBlocking = false;
+    PtyEnviron m_environ;
 
-    ReadCallback m_readCallback = nullptr;
-    ExitCallback m_exitCallback = nullptr;
+    std::atomic<bool> m_localecho{false};
+    std::atomic<bool> m_nonBlocking{false};
+
+    ReadCallback m_readCallback;
+    ExitCallback m_exitCallback;
 
     std::atomic<State> m_state{State::Closed};
     std::atomic<Error> m_error{Error::None};
 
-    std::string m_errorString = "No error";
-
+    mutable std::mutex m_lifecycleMutex;
     mutable std::mutex m_cbMutex;
 
-    struct termios m_termios;
-    inline struct termios makeDefaultTermios()
-    {
-        struct termios tio{};
-        tio.c_iflag = ICRNL | IXON;
-        tio.c_oflag = OPOST;
-        tio.c_cflag = CREAD | CS8;
-        tio.c_lflag = ICANON | ECHO | ISIG;
+    termios m_termios{};
 
-        tio.c_cc[VINTR]    = 3;
-        tio.c_cc[VQUIT]    = 28;
-        tio.c_cc[VERASE]   = 127;
-        tio.c_cc[VKILL]    = 21;
-        tio.c_cc[VEOF]     = 4;
-        tio.c_cc[VEOL]     = 0;
-        tio.c_cc[VEOL2]    = 0;
-        tio.c_cc[VSTART]   = 17;
-        tio.c_cc[VSTOP]    = 19;
-        tio.c_cc[VSUSP]    = 26;
-        tio.c_cc[VREPRINT] = 18;
-        tio.c_cc[VDISCARD] = 15;
-        tio.c_cc[VWERASE]  = 23;
-        tio.c_cc[VLNEXT]   = 22;
-
-        return tio;
-    }
-
-    struct winsize m_winsize = {
+    winsize m_winsize{
         .ws_row = 24,
         .ws_col = 80,
         .ws_xpixel = 0,
         .ws_ypixel = 0,
     };
-
-    void setError(Error err);
-    static std::string_view errorToString(Error err);
 };
 
 } // namespace job::io
-

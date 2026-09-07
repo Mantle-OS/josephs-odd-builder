@@ -4,16 +4,14 @@
 
 namespace job::net {
 
-BasicAuth::BasicAuth(std::string_view username,
-                     std::string_view password) :
+BasicAuth::BasicAuth(std::string_view username, std::string_view password) :
     IJobHttpAuth("Authorization", "Basic", password),
     m_username(username)
 {
 
 }
 
-BasicAuth::BasicAuth(std::string_view username,
-                     job::crypto::JobSecureMem &&password) :
+BasicAuth::BasicAuth(std::string_view username, job::crypto::JobSecureMem::Ptr password) :
     IJobHttpAuth("Authorization", "Basic", std::move(password)),
     m_username(username)
 {

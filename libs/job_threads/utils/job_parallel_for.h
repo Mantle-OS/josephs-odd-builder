@@ -3,8 +3,9 @@
 #include <algorithm>
 #include <cstddef>
 #include <exception>
+#include <contracts>
 
-#include <job_assert.h>
+#include <job_contract.h>
 
 #include "job_latch.h"
 #include "job_thread_pool.h"
@@ -25,7 +26,7 @@ void parallel_for(ThreadPool &pool,
                   std::size_t grain = 0,
                   AccessPattern mode = AccessPattern::Linear)
 {
-    JOB_ASSERT(last >= first);
+    contract_assert(last >= first);
     if (last <= first)
         return;
 

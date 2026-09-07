@@ -41,11 +41,14 @@ TcpSocket::~TcpSocket()
 void TcpSocket::closeSocket()
 {
     m_state.store(SocketState::Closed);
+
     if (m_fd < 0)
         return;
 
-    if (auto loop = m_loop.lock())
-        loop->unregisterFD(m_fd);
+    if (auto loop = m_loop.lock()) {
+        if (!loop->unregisterFD(m_fd))
+            JOB_LOG_WARN("[TcpSocket] Failed to unregister fd {}", m_fd);
+    }
 
     ::close(m_fd);
     m_fd = -1;
@@ -274,41 +277,62 @@ ISocketIO::Ptr TcpSocket::accept()
     return sock;
 }
 
-ssize_t TcpSocket::read(void *buffer, size_t size)
+NetIoResult TcpSocket::write(const void *buffer, size_t size)
 {
     if (m_fd < 0)
-        return -1;
+        return NetIoResult::error();
 
-    ssize_t n = ::recv(m_fd, buffer, size, 0);
+    if (size == 0)
+        return NetIoResult::transferred(0);
 
-    if (n < 0) {
-        if (errno == EAGAIN || errno == EWOULDBLOCK)
-            return 0; // Not an error
-
-        m_errors.setError(errno);
-        return -1;
+    if (!buffer) {
+        m_errors.setError(EFAULT);
+        return NetIoResult::error();
     }
-    if (n == 0) {
-        // Peer closed connection
-        disconnect();
-        return 0;
-    }
-    return n;
-}
-
-ssize_t TcpSocket::write(const void *buffer, size_t size)
-{
-    if (m_fd < 0) return -1;
 
     std::lock_guard<std::mutex> lock(m_writeMutex);
-    ssize_t n = ::send(m_fd, buffer, size, MSG_NOSIGNAL);
+
+    const ssize_t n = ::send(m_fd, buffer, size, MSG_NOSIGNAL);
 
     if (n < 0) {
-        if (errno == EAGAIN || errno == EWOULDBLOCK) return 0; // Not an error
+        // EINTR is not a failure: nothing was sent, the caller retries.
+        if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR)
+            return NetIoResult::retry();
+
         m_errors.setError(errno);
-        return -1;
+        return NetIoResult::error();
     }
-    return n;
+
+    return NetIoResult::transferred(static_cast<size_t>(n));
+}
+
+NetIoResult TcpSocket::read(void *buffer, size_t size)
+{
+    if (m_fd < 0)
+        return NetIoResult::error();
+
+    if (size == 0)
+        return NetIoResult::transferred(0);
+
+    const ssize_t n = ::recv(m_fd, buffer, size, 0);
+
+    if (n < 0) {
+        if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR)
+            return NetIoResult::retry();
+
+        m_errors.setError(errno);
+        return NetIoResult::error();
+    }
+
+    if (n == 0) {
+        // Orderly peer shutdown. disconnect() still fires onDisconnect; the
+        // status is what lets a caller in the middle of a read loop tell this
+        // apart from "drained for now".
+        disconnect();
+        return NetIoResult::eof();
+    }
+
+    return NetIoResult::transferred(static_cast<size_t>(n));
 }
 
 ISocketIO::SocketState TcpSocket::state() const noexcept
@@ -484,6 +508,12 @@ void TcpSocket::onEvents(threads::IOEvent events)
             disconnect();
         }
         return;
+    }
+
+    if (threads::hasEvent(events, threads::IOEvent::Write) && m_state.load() == SocketState::Connected) {
+        if (onWrite)
+            onWrite(nullptr, 0);
+        // Fall through: an edge-triggered event may carry Read as well.
     }
 
     if (threads::hasEvent(events, threads::IOEvent::Read)) {

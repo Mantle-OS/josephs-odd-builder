@@ -16,10 +16,17 @@ if(JOB_BUILD_CRYPTO)
     add_subdirectory(job_crypto)
 endif()
 
+if(JOB_BUILD_NET)
+    add_subdirectory(job_net)
+endif()
+
 if(JOB_BUILD_ZSTD)
     add_subdirectory(job_zstd)
 endif()
 
+if(JOB_BUILD_YAML)
+    add_subdirectory(job_yaml)
+endif()
 
 if(JOB_CUDA)
     # add_subdirectory(job_cuda)  ## OLD me learning cuda can be deleted
@@ -46,8 +53,8 @@ if(JOB_LINUX)
     endif()
 endif()
 
-if(JOB_BUILD_NET)
-    add_subdirectory(job_net)
+if(JOB_BUILD_SCHEMA)
+    add_subdirectory(job_schema)
 endif()
 
 if(JOB_BUILD_SERIALIZER)
@@ -106,7 +113,7 @@ if(JOB_QT)
     endif()
 
     if(JOB_BUILD_QHF)
-        # add_subdirectory(qhf)                 # Depends on session manager
+        add_subdirectory(qhf)                 # Depends on session manager
     endif()
 
     if(JOB_BUILD_QSESSIONMANAGER)

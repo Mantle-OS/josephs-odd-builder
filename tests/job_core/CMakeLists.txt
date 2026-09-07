@@ -7,6 +7,7 @@ set(JOB_CORE_TEST_OBJECTS
     test_job_base_obj.cpp
     test_job_signal.cpp
     test_job_object.cpp
+    test_job_light_object.cpp
 )
 
 if(JOB_QT)
@@ -22,6 +23,7 @@ endif()
 add_executable(test_job_core
     ../test_spin_till.h
     main.cpp
+    ## Just for right now as they test saturatyion and what not
     # test_timer.cpp
     # test_logger.cpp
     # test_job_siphash.cpp
@@ -33,14 +35,8 @@ add_executable(test_job_core
     ${JOB_CORE_TEST_OBJECTS}
 
 )
-target_compile_options(test_job_core PRIVATE
-    -freflection
-    -fcontracts)
-
-target_link_options(test_job_core PRIVATE
-    -fcontracts
-)
-
+target_compile_options(test_job_core PRIVATE -freflection -fcontracts)
+target_link_options(test_job_core PRIVATE -fcontracts)
 set_target_properties(test_job_core PROPERTIES
     CXX_STANDARD 26
     CXX_STANDARD_REQUIRED ON

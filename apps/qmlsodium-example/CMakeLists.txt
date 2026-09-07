@@ -13,6 +13,7 @@ set(SODIUM_EXAMPLE_QML
     KeyManager.qml
     PasswordUtils.qml
     HMacSha256.qml
+    ShaView.qml
 )
 
 qt_add_executable(qml-sodium-example main.cpp)

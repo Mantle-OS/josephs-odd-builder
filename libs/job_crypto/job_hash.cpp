@@ -45,12 +45,7 @@ std::vector<unsigned char> JobHash::hashBuffer(const std::vector<unsigned char> 
     }
 
     std::vector<unsigned char> outHash(hashSize);
-
-    int const result = crypto_generichash(
-        outHash.data(), outHash.size(),
-        data.data(), data.size(),
-        key, keylen
-        );
+    int const result = crypto_generichash(outHash.data(), outHash.size(), data.data(), data.size(), key, keylen);
 
     if (result != 0) {
 #ifndef NDEBUG
@@ -68,10 +63,7 @@ std::vector<unsigned char> JobHash::hashFile(const std::string &filePath,
                                              std::size_t keylen) noexcept
 {
     if (!JobCryptoInit::isInitialized() && !JobCryptoInit::initialize()){
-        JOB_LOG_DEBUG(
-            "[JobHash] File hashing stopped because the crypto runtime is unavailable: {}",
-            filePath
-            );
+        JOB_LOG_DEBUG("[JobHash] File hashing stopped because the crypto runtime is unavailable: {}", filePath);
         return {};
     }
 

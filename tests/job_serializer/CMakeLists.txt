@@ -12,13 +12,23 @@ add_executable(test_job_serializer
     test_writier.cpp
 )
 
+set_target_properties(test_job_serializer PROPERTIES
+    CXX_STANDARD 26
+    CXX_STANDARD_REQUIRED ON
+    CXX_EXTENSIONS OFF
+)
+
+target_compile_options(test_job_serializer
+    PRIVATE
+        -freflection
+        -fcontracts
+)
+
 target_link_libraries(test_job_serializer PRIVATE
-    Threads::Threads
     ${CatchTwo_LIBRARIES}
     ${LibMsgPackC_LIBRARIES}
     ${YAMLCpp_LIBRARIES}
     JosephsOddBuilder_Core
-    JosephsOddBuilder_Threads
     JosephsOddBuilder_IO
     JosephsOddBuilder_Serializer
 )

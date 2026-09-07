@@ -1,11 +1,16 @@
 #pragma once
 
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
+#include <optional>
 #include <string>
 #include <unordered_map>
-#include <optional>
+
+#include <aipkg_ledger/ledger_revoke.hpp>
 
 #include "job_aipkg_utils.h"
-#include <aipkg_ledger/ledger_revoke.hpp>
+#include "jobaipkg_export.h"
 
 namespace job::aipkg {
 
@@ -18,7 +23,7 @@ enum class RevokeKind : uint32_t
     Package     = 3,
 };
 
-class JobAiPkgRevocationIndex
+class JOBAIPKG_EXPORT JobAiPkgRevocationIndex
 {
 public:
     JobAiPkgRevocationIndex() = default;
@@ -27,11 +32,13 @@ public:
 
     [[nodiscard]] bool isKeyRevoked(const Hash32 &publicKey) const noexcept;
     [[nodiscard]] bool isAttestationRevoked(const Hash32 &attestationLeafHash) const noexcept;
-    [[nodiscard]] bool isPackageRevoked(const std::string &pkgId, const std::string &version) const noexcept;
+    [[nodiscard]] bool isPackageRevoked(const std::string &pkgId,
+                                        const std::string &version) const noexcept;
 
     [[nodiscard]] std::optional<AiPkgRevoke> keyRevocation(const Hash32 &publicKey) const noexcept;
     [[nodiscard]] std::optional<AiPkgRevoke> attestationRevocation(const Hash32 &attestationLeafHash) const noexcept;
-    [[nodiscard]] std::optional<AiPkgRevoke> packageRevocation(const std::string &pkgId, const std::string &version) const noexcept;
+    [[nodiscard]] std::optional<AiPkgRevoke> packageRevocation(const std::string &pkgId,
+                                                               const std::string &version) const noexcept;
 
     [[nodiscard]] size_t size() const noexcept;
 
@@ -51,4 +58,4 @@ private:
     std::unordered_map<std::string, AiPkgRevoke>            m_revokedPackages; // key: pkgId + "\x1f" + version
 };
 
-} // namespace job::aipkg
+}

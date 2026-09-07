@@ -114,7 +114,8 @@ sudo apt-get install \
     libcurand-13-3 \
     libcurand-dev-13-3 \
     cuda-opencl-dev-13-3 \
-    cuda-opencl-13-3
+    cuda-opencl-13-3 \
+    nvidia-vulkan-icd
 rm -f /tmp/cuda-keyring_1.1-1_all.deb
 ```
 

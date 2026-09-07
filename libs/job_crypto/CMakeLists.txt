@@ -13,11 +13,24 @@ set(JOBCRYPTO_HEADERS
     job_crypto_sign.h
     job_password_utils.h
     job_secret_box.h
-    job_hash.h
     job_crypto.h
+
     job_ssl_options.h
     job_x509_generator.h
+
+    job_hash.h
     job_hmac_sha256.h
+
+    job_sha256.h
+    job_sha512.h
+    job_sha3.h
+    job_sha224.h
+    job_sha384.h
+    job_sha_blake2b.h
+    job_sha_generic.h
+
+    job_sha_types.h
+    job_sha.h
 )
 
 set(JOBCRYPTO_SOURCES
@@ -28,24 +41,27 @@ set(JOBCRYPTO_SOURCES
     job_crypto_sign.cpp
     job_password_utils.cpp
     job_secret_box.cpp
-    job_hash.cpp
     job_crypto.cpp
+
+    job_hash.cpp
     job_hmac_sha256.cpp
+    job_sha256.cpp
+    job_sha512.cpp
+    job_sha3.cpp
+    job_sha224.cpp
+    job_sha384.cpp
+    job_sha_blake2b.cpp
+    job_sha_generic.cpp
+    job_sha.cpp
 )
 
 if(JOB_WINDOWS)
-    list(APPEND JOBCRYPTO_SOURCES
-        win32/job_x509_generator_win32.cpp
-    )
+    list(APPEND JOBCRYPTO_SOURCES win32/job_x509_generator_win32.cpp )
 elseif(JOB_LINUX)
-    list(APPEND JOBCRYPTO_SOURCES
-        linux/job_x509_generator_linux.cpp
-    )
+    list(APPEND JOBCRYPTO_SOURCES linux/job_x509_generator_linux.cpp )
 else()
     message(FATAL_ERROR "OSX and FreeBSD as currently unsupported atm libcrypto should work on both platforms. Merge requests welcome")
 endif()
-
-
 
 add_library(JosephsOddBuilder_Crypto SHARED
    ${JOBCRYPTO_HEADERS}
@@ -58,14 +74,24 @@ generate_export_header(JosephsOddBuilder_Crypto
     EXPORT_FILE_NAME "${JOBCRYPTO_EXPORT}"
 )
 
+
+target_compile_options(JosephsOddBuilder_Crypto PRIVATE
+    -freflection
+    -fcontracts)
+
+target_link_options(JosephsOddBuilder_Crypto PRIVATE
+    -fcontracts
+)
+
 set_target_properties(JosephsOddBuilder_Crypto PROPERTIES
     VERSION ${PROJECT_VERSION}
     SOVERSION ${PROJECT_VERSION_MAJOR}
     OUTPUT_NAME "jobcrypto"
+    CXX_STANDARD 26
+    CXX_STANDARD_REQUIRED ON
     CXX_VISIBILITY_PRESET hidden
     VISIBILITY_INLINES_HIDDEN ON
 )
-
 
 if(JOB_WINDOWS)
     target_link_libraries(JosephsOddBuilder_Crypto PRIVATE

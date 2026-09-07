@@ -43,8 +43,8 @@ public:
     bool listen(int backlog = 5) override;
     ISocketIO::Ptr accept() override;
     void disconnect() override;
-    ssize_t read(void *buffer, size_t size) override;
-    ssize_t write(const void *buffer, size_t size) override;
+    NetIoResult read(void *buffer, size_t size) override;
+    NetIoResult write(const void *buffer, size_t size) override;
     [[nodiscard]] ISocketIO::SocketState state() const noexcept override;
     [[nodiscard]] SocketErrors::SocketErrNo lastError() const noexcept override;
     std::string lastErrorString() const noexcept;

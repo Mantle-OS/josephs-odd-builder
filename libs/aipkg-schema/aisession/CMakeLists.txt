@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.16)
+
 set(TARGET_NAME "aisession")
-set(DESC "A library for ledger in ai package manager")
+set(DESC "A library for ledger in ai session manager")
 set(VER 0.1)
 
 project(${TARGET_NAME}
@@ -10,12 +11,17 @@ project(${TARGET_NAME}
 )
 
 # Notes
-# include prefix:  "aisession"
-# c_struct prefix:  "AiSession[ClassName]"
+# include prefix: "aisession"
+# c_struct prefix: "AiSession[ClassName]"
+
 job_msgpack_gen_lib(
     NAME ${TARGET_NAME}
     VERSION ${VER}
     DESCRIPTION ${DESC}
+
+    EXPORT_HEADER aisession_export.h
+    EXPORT_MACRO AISESSION_EXPORT
+
     SCHEMA_FILES
         ${CMAKE_CURRENT_SOURCE_DIR}/input/session_user.yaml
         ${CMAKE_CURRENT_SOURCE_DIR}/input/session_user_index.yaml
@@ -23,4 +29,4 @@ job_msgpack_gen_lib(
         ${CMAKE_CURRENT_SOURCE_DIR}/input/session_credential.yaml
         ${CMAKE_CURRENT_SOURCE_DIR}/input/session_provider.yaml
         ${CMAKE_CURRENT_SOURCE_DIR}/input/session_vault.yaml
-    )
+)

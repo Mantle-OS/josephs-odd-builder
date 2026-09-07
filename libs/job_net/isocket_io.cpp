@@ -37,28 +37,15 @@ void ISocketIO::registerEvents(threads::IOEvent events)
                     self->onEvents(e);
             })) {
             JOB_LOG_ERROR("[ISocketIO] Failed to register FD {}", m_fd);
+        } else {
+            m_events = events;
         }
-    } else {
-        JOB_LOG_ERROR("[ISocketIO] Failed to register FD {}: Event loop is null", m_fd);
-    }
-}
-/*
-void ISocketIO::registerEvents(threads::IOEvent events)
-{
-    if (m_fd < 0) {
-        JOB_LOG_ERROR("[ISocketIO] registerEvents called on invalid fd");
-        return;
-    }
-
-    if (auto loop = m_loop.lock()) {
-        if (!loop->registerFD(m_fd, events, [this](threads::IOEvent e) { onEvents(e); }))
-            JOB_LOG_ERROR("[ISocketIO] Failed to register FD {}", m_fd);
 
     } else {
         JOB_LOG_ERROR("[ISocketIO] Failed to register FD {}: Event loop is null", m_fd);
     }
 }
-*/
+
 void ISocketIO::modifyEvents(threads::IOEvent events)
 {
     if (m_fd < 0) {
@@ -66,8 +53,12 @@ void ISocketIO::modifyEvents(threads::IOEvent events)
         return;
     }
     if (auto loop = m_loop.lock()) {
+
         if (!loop->modifyFD(m_fd, events))
             JOB_LOG_ERROR("[ISocketIO] Failed to modify FD {}", m_fd);
+        else
+            m_events = events;
+
     } else {
         JOB_LOG_ERROR("[ISocketIO] Failed to modify FD {}: Event loop is null", m_fd);
     }

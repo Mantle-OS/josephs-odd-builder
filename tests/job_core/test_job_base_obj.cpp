@@ -5,18 +5,23 @@
 #include <catch2/benchmark/catch_benchmark.hpp>
 #endif
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <map>
 #include <memory>
+#include <optional>
+#include <set>
 #include <span>
 #include <string>
 #include <vector>
 
 #include <job_base_obj.h>
 #include <job_obj_concept.h>
+
+#include <job_yaml_node.h>
 
 #include "test_job_object_fixtures.h"
 
@@ -26,6 +31,7 @@ using namespace job::core::tests;
 // =============================================================================
 // Block 1: Usage / Examples
 // =============================================================================
+
 TEST_CASE("BaseObject: JSON serialization roundtrip with nested objects and smart pointers", "[core][base_obj][json][example]")
 {
     ComputeNodeConfig config;
@@ -52,7 +58,7 @@ TEST_CASE("BaseObject: JSON serialization roundtrip with nested objects and smar
     config.auxiliarySensors.push_back(aux1);
     config.auxiliarySensors.push_back(aux2);
 
-    nlohmann::json serializedJson = config.toJson();
+    const nlohmann::json serializedJson = config.toJson();
     REQUIRE(serializedJson.is_object());
     REQUIRE(serializedJson["nodeName"] == "edge-inference-01");
     REQUIRE(serializedJson["threadPoolSize"] == 32);
@@ -60,9 +66,8 @@ TEST_CASE("BaseObject: JSON serialization roundtrip with nested objects and smar
     REQUIRE(serializedJson["auxiliarySensors"].size() == 2);
 
     ComputeNodeConfig restored;
-    const bool success = restored.fromJson(serializedJson);
+    REQUIRE(restored.fromJson(serializedJson));
 
-    REQUIRE(success);
     CHECK(restored.nodeName == "edge-inference-01");
     CHECK(restored.threadPoolSize == 32);
     CHECK(restored.memoryBudgetGb == 64.0);
@@ -88,14 +93,13 @@ TEST_CASE("BaseObject: YAML serialization roundtrip", "[core][base_obj][yaml][ex
     config.primarySensor.sensorTag = "inlet_flow";
     config.primarySensor.initialMode = DeviceMode::Suspended;
 
-    YAML::Node yamlNode = config.toYaml();
+    const YAML::Node yamlNode = config.toYaml();
     REQUIRE(yamlNode.IsMap());
     REQUIRE(yamlNode["nodeName"].as<std::string>() == "cluster-head");
 
     ComputeNodeConfig restored;
-    const bool success = restored.fromYaml(yamlNode);
+    REQUIRE(restored.fromYaml(yamlNode));
 
-    REQUIRE(success);
     CHECK(restored.nodeName == "cluster-head");
     CHECK(restored.primarySensor.sensorTag == "inlet_flow");
     CHECK(restored.primarySensor.initialMode == DeviceMode::Suspended);
@@ -120,16 +124,138 @@ TEST_CASE("BaseObject: Binary serialization roundtrip across span stream", "[cor
 
     ComputeNodeConfig restored;
     std::span<const std::uint8_t> streamSpan(buffer);
-    const bool success = restored.fromBinary(streamSpan);
+    REQUIRE(restored.fromBinary(streamSpan));
 
-    REQUIRE(success);
     CHECK(streamSpan.empty());
     CHECK(restored.nodeName == "hpc-worker-99");
     CHECK(restored.threadPoolSize == 128);
     CHECK(restored.scalingFactors.size() == 4);
     CHECK(restored.primarySensor.sensorTag == "die_top");
     REQUIRE(restored.auxiliarySensors.size() == 1);
+    REQUIRE(restored.auxiliarySensors[0] != nullptr);
     CHECK(restored.auxiliarySensors[0]->sensorTag == "pcie_lane");
+}
+
+TEST_CASE("BaseObject: Optional values roundtrip across supported formats", "[core][base_obj][optional][example]")
+{
+    OptionalConfig config;
+    config.optionalValue = 42;
+    config.optionalName = "optional-name";
+    config.optionalSensor.emplace();
+    config.optionalSensor->sensorTag = "optional-direct";
+
+    config.optionalSharedSensor = std::make_shared<SubSensorConfig>();
+    (*config.optionalSharedSensor)->sensorTag = "optional-shared";
+
+    SECTION("JSON")
+    {
+        const nlohmann::json serialized = config.toJson();
+
+        OptionalConfig restored;
+        REQUIRE(restored.fromJson(serialized));
+
+        REQUIRE(restored.optionalValue);
+        CHECK(*restored.optionalValue == 42);
+        REQUIRE(restored.optionalName);
+        CHECK(*restored.optionalName == "optional-name");
+        REQUIRE(restored.optionalSensor);
+        CHECK(restored.optionalSensor->sensorTag == "optional-direct");
+        REQUIRE(restored.optionalSharedSensor);
+        REQUIRE(*restored.optionalSharedSensor != nullptr);
+        CHECK((*restored.optionalSharedSensor)->sensorTag == "optional-shared");
+    }
+
+    SECTION("YAML")
+    {
+        const YAML::Node serialized = config.toYaml();
+
+        OptionalConfig restored;
+        REQUIRE(restored.fromYaml(serialized));
+
+        REQUIRE(restored.optionalValue);
+        CHECK(*restored.optionalValue == 42);
+        REQUIRE(restored.optionalName);
+        CHECK(*restored.optionalName == "optional-name");
+        REQUIRE(restored.optionalSensor);
+        CHECK(restored.optionalSensor->sensorTag == "optional-direct");
+        REQUIRE(restored.optionalSharedSensor);
+        REQUIRE(*restored.optionalSharedSensor != nullptr);
+        CHECK((*restored.optionalSharedSensor)->sensorTag == "optional-shared");
+    }
+
+    SECTION("Binary")
+    {
+        std::vector<std::uint8_t> buffer;
+        config.toBinary(buffer);
+
+        OptionalConfig restored;
+        std::span<const std::uint8_t> streamSpan(buffer);
+        REQUIRE(restored.fromBinary(streamSpan));
+
+        CHECK(streamSpan.empty());
+        REQUIRE(restored.optionalValue);
+        CHECK(*restored.optionalValue == 42);
+        REQUIRE(restored.optionalName);
+        CHECK(*restored.optionalName == "optional-name");
+        REQUIRE(restored.optionalSensor);
+        CHECK(restored.optionalSensor->sensorTag == "optional-direct");
+        REQUIRE(restored.optionalSharedSensor);
+        REQUIRE(*restored.optionalSharedSensor != nullptr);
+        CHECK((*restored.optionalSharedSensor)->sensorTag == "optional-shared");
+    }
+}
+
+TEST_CASE("BaseObject: Shared and unique ownership roundtrip", "[core][base_obj][pointer][example]")
+{
+    PointerConfig config;
+
+    config.sharedSensor = std::make_shared<SubSensorConfig>();
+    config.sharedSensor->sensorTag = "shared";
+
+    config.uniqueSensor = std::make_unique<SubSensorConfig>();
+    config.uniqueSensor->sensorTag = "unique";
+
+    SECTION("JSON")
+    {
+        const nlohmann::json serialized = config.toJson();
+
+        PointerConfig restored;
+        REQUIRE(restored.fromJson(serialized));
+
+        REQUIRE(restored.sharedSensor != nullptr);
+        REQUIRE(restored.uniqueSensor != nullptr);
+        CHECK(restored.sharedSensor->sensorTag == "shared");
+        CHECK(restored.uniqueSensor->sensorTag == "unique");
+    }
+
+    SECTION("YAML")
+    {
+        const YAML::Node serialized = config.toYaml();
+
+        PointerConfig restored;
+        REQUIRE(restored.fromYaml(serialized));
+
+        REQUIRE(restored.sharedSensor != nullptr);
+        REQUIRE(restored.uniqueSensor != nullptr);
+        CHECK(restored.sharedSensor->sensorTag == "shared");
+        CHECK(restored.uniqueSensor->sensorTag == "unique");
+    }
+
+    SECTION("Binary")
+    {
+        std::vector<std::uint8_t> buffer;
+        config.toBinary(buffer);
+
+        PointerConfig restored;
+        std::span<const std::uint8_t> streamSpan(buffer);
+        REQUIRE(restored.fromBinary(streamSpan));
+
+        CHECK(streamSpan.empty());
+        REQUIRE(restored.sharedSensor != nullptr);
+        REQUIRE(restored.uniqueSensor != nullptr);
+        CHECK(restored.sharedSensor->sensorTag == "shared");
+        CHECK(restored.uniqueSensor->sensorTag == "unique");
+    }
 }
 
 TEST_CASE("BaseObject: JSON file save and load roundtrip", "[core][base_obj][json][file][example]")
@@ -297,6 +423,17 @@ TEST_CASE("BaseObject: Edge cases in serialization", "[core][base_obj][edge_case
         CHECK(!restored.lastErrorString.empty());
     }
 
+    SECTION("JSON non-object root fails gracefully")
+    {
+        ComputeNodeConfig restored;
+        const nlohmann::json value = "invalid_scalar_root";
+
+        const bool success = restored.fromJson(value);
+
+        CHECK_FALSE(success);
+        CHECK_THAT(restored.lastErrorString, Catch::Matchers::ContainsSubstring("object"));
+    }
+
     SECTION("YAML parsing non-map root node fails gracefully")
     {
         ComputeNodeConfig restored;
@@ -309,11 +446,22 @@ TEST_CASE("BaseObject: Edge cases in serialization", "[core][base_obj][edge_case
     }
 }
 
-TEST_CASE("BaseObject: SmartPointer concept includes shared and unique ownership", "[core][base_obj][edge_cases][smart_pointer]")
+TEST_CASE("BaseObject: Pointer concepts distinguish ownership semantics", "[core][base_obj][edge_cases][smart_pointer]")
 {
     STATIC_REQUIRE(SmartPointer<std::shared_ptr<SubSensorConfig>>);
     STATIC_REQUIRE(SmartPointer<std::unique_ptr<SubSensorConfig>>);
     STATIC_REQUIRE_FALSE(SmartPointer<int>);
+
+    STATIC_REQUIRE(SharedPointer<std::shared_ptr<SubSensorConfig>>);
+    STATIC_REQUIRE(UniquePointer<std::unique_ptr<SubSensorConfig>>);
+    STATIC_REQUIRE(WeakPointer<std::weak_ptr<SubSensorConfig>>);
+
+    STATIC_REQUIRE(OwningSmartPointer<std::shared_ptr<SubSensorConfig>>);
+    STATIC_REQUIRE(OwningSmartPointer<std::unique_ptr<SubSensorConfig>>);
+    STATIC_REQUIRE_FALSE(OwningSmartPointer<std::weak_ptr<SubSensorConfig>>);
+
+    STATIC_REQUIRE(UnsupportedPersistentPointer<SubSensorConfig *>);
+    STATIC_REQUIRE(UnsupportedPersistentPointer<std::weak_ptr<SubSensorConfig>>);
 }
 
 TEST_CASE("BaseObject: Nested deserialization failures propagate to the parent", "[core][base_obj][edge_cases][nested_error]")
@@ -390,7 +538,7 @@ TEST_CASE("BaseObject: Missing JSON and YAML members preserve existing values", 
         restored.nodeName = "existing-node";
         restored.threadPoolSize = 888;
 
-        YAML::Node node;
+        YAML::Node node(YAML::NodeType::Map);
         node["nodeName"] = "updated-node";
 
         REQUIRE(restored.fromYaml(node));
@@ -444,6 +592,50 @@ TEST_CASE("BaseObject: Null smart pointers roundtrip across supported formats", 
 
         REQUIRE(restored.auxiliarySensors.size() == 1);
         CHECK(restored.auxiliarySensors[0] == nullptr);
+    }
+}
+
+TEST_CASE("BaseObject: Null optionals reset existing values across supported formats", "[core][base_obj][edge_cases][optional][null]")
+{
+    SECTION("JSON")
+    {
+        OptionalConfig restored;
+        restored.optionalValue = 777;
+
+        nlohmann::json serialized = restored.toJson();
+        serialized["optionalValue"] = nullptr;
+
+        REQUIRE(restored.fromJson(serialized));
+        CHECK_FALSE(restored.optionalValue.has_value());
+    }
+
+    SECTION("YAML")
+    {
+        OptionalConfig restored;
+        restored.optionalValue = 777;
+
+        YAML::Node serialized = restored.toYaml();
+        serialized["optionalValue"] = YAML::Node(YAML::NodeType::Null);
+
+        REQUIRE(restored.fromYaml(serialized));
+        CHECK_FALSE(restored.optionalValue.has_value());
+    }
+
+    SECTION("Binary")
+    {
+        OptionalConfig source;
+        source.optionalValue.reset();
+
+        std::vector<std::uint8_t> buffer;
+        source.toBinary(buffer);
+
+        OptionalConfig restored;
+        restored.optionalValue = 777;
+
+        std::span<const std::uint8_t> streamSpan(buffer);
+        REQUIRE(restored.fromBinary(streamSpan));
+
+        CHECK_FALSE(restored.optionalValue.has_value());
     }
 }
 
@@ -506,7 +698,7 @@ TEST_CASE("BaseObject: Primitive special types roundtrip", "[core][base_obj][edg
     }
 }
 
-TEST_CASE("BaseObject: Containers roundtrip at useful boundaries", "[core][base_obj][edge_cases][container]")
+TEST_CASE("BaseObject: Vector containers roundtrip at useful boundaries", "[core][base_obj][edge_cases][container][vector]")
 {
     SECTION("Empty containers")
     {
@@ -542,9 +734,8 @@ TEST_CASE("BaseObject: Containers roundtrip at useful boundaries", "[core][base_
     {
         ContainerConfig config;
 
-        for (std::int32_t i = 0; i < 1024; ++i) {
+        for (std::int32_t i = 0; i < 1024; ++i)
             config.values.push_back(i);
-        }
 
         std::vector<std::uint8_t> buffer;
         config.toBinary(buffer);
@@ -559,7 +750,181 @@ TEST_CASE("BaseObject: Containers roundtrip at useful boundaries", "[core][base_
     }
 }
 
-TEST_CASE("BaseObject: Binary map containers roundtrip", "[core][base_obj][edge_cases][map][binary]")
+TEST_CASE("BaseObject: Fixed arrays roundtrip across supported formats", "[core][base_obj][edge_cases][container][array]")
+{
+    FixedContainerConfig config;
+    config.values = {9, 8, 7, 6};
+
+    SECTION("JSON")
+    {
+        const nlohmann::json serialized = config.toJson();
+
+        FixedContainerConfig restored;
+        REQUIRE(restored.fromJson(serialized));
+        CHECK(restored.values == config.values);
+    }
+
+    SECTION("YAML")
+    {
+        const YAML::Node serialized = config.toYaml();
+
+        FixedContainerConfig restored;
+        REQUIRE(restored.fromYaml(serialized));
+        CHECK(restored.values == config.values);
+    }
+
+    SECTION("Binary")
+    {
+        std::vector<std::uint8_t> buffer;
+        config.toBinary(buffer);
+
+        FixedContainerConfig restored;
+        std::span<const std::uint8_t> streamSpan(buffer);
+        REQUIRE(restored.fromBinary(streamSpan));
+
+        CHECK(streamSpan.empty());
+        CHECK(restored.values == config.values);
+    }
+}
+
+TEST_CASE("BaseObject: Fixed arrays reject size mismatches", "[core][base_obj][edge_cases][container][array][invalid]")
+{
+    SECTION("JSON")
+    {
+        FixedContainerConfig restored;
+        nlohmann::json serialized = nlohmann::json::object();
+        serialized["values"] = nlohmann::json::array({1, 2, 3});
+
+        CHECK_FALSE(restored.fromJson(serialized));
+        CHECK_THAT(restored.lastErrorString, Catch::Matchers::ContainsSubstring("size"));
+    }
+
+    SECTION("YAML")
+    {
+        FixedContainerConfig restored;
+        YAML::Node serialized(YAML::NodeType::Map);
+        serialized["values"].push_back(1);
+        serialized["values"].push_back(2);
+        serialized["values"].push_back(3);
+
+        CHECK_FALSE(restored.fromYaml(serialized));
+        CHECK_THAT(restored.lastErrorString, Catch::Matchers::ContainsSubstring("size"));
+    }
+}
+
+TEST_CASE("BaseObject: Set containers roundtrip across supported formats", "[core][base_obj][edge_cases][container][set]")
+{
+    SetConfig config;
+    config.values = {5, 1, 9, 5};
+    config.names = {"beta", "alpha", "gamma"};
+
+    SECTION("JSON")
+    {
+        const nlohmann::json serialized = config.toJson();
+
+        SetConfig restored;
+        REQUIRE(restored.fromJson(serialized));
+
+        CHECK(restored.values == config.values);
+        CHECK(restored.names == config.names);
+    }
+
+    SECTION("YAML")
+    {
+        const YAML::Node serialized = config.toYaml();
+
+        SetConfig restored;
+        REQUIRE(restored.fromYaml(serialized));
+
+        CHECK(restored.values == config.values);
+        CHECK(restored.names == config.names);
+    }
+
+    SECTION("Binary")
+    {
+        std::vector<std::uint8_t> buffer;
+        config.toBinary(buffer);
+
+        SetConfig restored;
+        std::span<const std::uint8_t> streamSpan(buffer);
+        REQUIRE(restored.fromBinary(streamSpan));
+
+        CHECK(streamSpan.empty());
+        CHECK(restored.values == config.values);
+        CHECK(restored.names == config.names);
+    }
+}
+
+TEST_CASE("BaseObject: Map containers roundtrip across supported formats", "[core][base_obj][edge_cases][container][map]")
+{
+    MapConfig config;
+    config.entries = {
+        {1, "cpu"},
+        {2, "cuda"},
+        {3, "vulkan"}
+    };
+
+    SubSensorConfig cpu;
+    cpu.sensorTag = "cpu";
+    cpu.sampleRateHz = 100.0f;
+
+    SubSensorConfig gpu;
+    gpu.sensorTag = "gpu";
+    gpu.sampleRateHz = 200.0f;
+
+    config.sensors.emplace("cpu", cpu);
+    config.sensors.emplace("gpu", gpu);
+
+    SECTION("JSON")
+    {
+        const nlohmann::json serialized = config.toJson();
+
+        REQUIRE(serialized["entries"].is_array());
+        REQUIRE(serialized["sensors"].is_array());
+
+        MapConfig restored;
+        REQUIRE(restored.fromJson(serialized));
+
+        CHECK(restored.entries == config.entries);
+        REQUIRE(restored.sensors.size() == 2);
+        CHECK(restored.sensors.at("cpu").sensorTag == "cpu");
+        CHECK(restored.sensors.at("gpu").sampleRateHz == 200.0f);
+    }
+
+    SECTION("YAML")
+    {
+        const YAML::Node serialized = config.toYaml();
+
+        REQUIRE(serialized["entries"].IsSequence());
+        REQUIRE(serialized["sensors"].IsSequence());
+
+        MapConfig restored;
+        REQUIRE(restored.fromYaml(serialized));
+
+        CHECK(restored.entries == config.entries);
+        REQUIRE(restored.sensors.size() == 2);
+        CHECK(restored.sensors.at("cpu").sensorTag == "cpu");
+        CHECK(restored.sensors.at("gpu").sampleRateHz == 200.0f);
+    }
+
+    SECTION("Binary")
+    {
+        std::vector<std::uint8_t> buffer;
+        config.toBinary(buffer);
+
+        MapConfig restored;
+        std::span<const std::uint8_t> streamSpan(buffer);
+        REQUIRE(restored.fromBinary(streamSpan));
+
+        CHECK(streamSpan.empty());
+        CHECK(restored.entries == config.entries);
+        REQUIRE(restored.sensors.size() == 2);
+        CHECK(restored.sensors.at("cpu").sensorTag == "cpu");
+        CHECK(restored.sensors.at("gpu").sampleRateHz == 200.0f);
+    }
+}
+
+TEST_CASE("BaseObject: Legacy BinaryMapConfig remains valid across all formats", "[core][base_obj][edge_cases][map]")
 {
     BinaryMapConfig config;
     config.entries = {
@@ -568,15 +933,237 @@ TEST_CASE("BaseObject: Binary map containers roundtrip", "[core][base_obj][edge_
         {3, "vulkan"}
     };
 
-    std::vector<std::uint8_t> buffer;
-    config.toBinary(buffer);
+    SECTION("JSON")
+    {
+        const nlohmann::json serialized = config.toJson();
 
-    BinaryMapConfig restored;
-    std::span<const std::uint8_t> streamSpan(buffer);
-    REQUIRE(restored.fromBinary(streamSpan));
+        BinaryMapConfig restored;
+        REQUIRE(restored.fromJson(serialized));
+        CHECK(restored.entries == config.entries);
+    }
 
-    CHECK(streamSpan.empty());
-    CHECK(restored.entries == config.entries);
+    SECTION("YAML")
+    {
+        const YAML::Node serialized = config.toYaml();
+
+        BinaryMapConfig restored;
+        REQUIRE(restored.fromYaml(serialized));
+        CHECK(restored.entries == config.entries);
+    }
+
+    SECTION("Binary")
+    {
+        std::vector<std::uint8_t> buffer;
+        config.toBinary(buffer);
+
+        BinaryMapConfig restored;
+        std::span<const std::uint8_t> streamSpan(buffer);
+        REQUIRE(restored.fromBinary(streamSpan));
+
+        CHECK(streamSpan.empty());
+        CHECK(restored.entries == config.entries);
+    }
+}
+
+TEST_CASE("BaseObject: Nested container combinations roundtrip", "[core][base_obj][edge_cases][container][nested]")
+{
+    NestedContainerConfig config;
+
+    SubSensorConfig direct;
+    direct.sensorTag = "optional-direct";
+    config.optionalSensors.push_back(direct);
+    config.optionalSensors.push_back(std::nullopt);
+
+    auto shared = std::make_shared<SubSensorConfig>();
+    shared->sensorTag = "shared-vector";
+    config.sharedSensors.push_back(shared);
+    config.sharedSensors.push_back(nullptr);
+
+    auto named = std::make_shared<SubSensorConfig>();
+    named->sensorTag = "named-shared";
+    config.namedSensors.emplace("sensor-a", named);
+    config.namedSensors.emplace("sensor-null", nullptr);
+
+    SECTION("JSON")
+    {
+        const nlohmann::json serialized = config.toJson();
+
+        NestedContainerConfig restored;
+        REQUIRE(restored.fromJson(serialized));
+
+        REQUIRE(restored.optionalSensors.size() == 2);
+        REQUIRE(restored.optionalSensors[0]);
+        CHECK(restored.optionalSensors[0]->sensorTag == "optional-direct");
+        CHECK_FALSE(restored.optionalSensors[1].has_value());
+
+        REQUIRE(restored.sharedSensors.size() == 2);
+        REQUIRE(restored.sharedSensors[0] != nullptr);
+        CHECK(restored.sharedSensors[0]->sensorTag == "shared-vector");
+        CHECK(restored.sharedSensors[1] == nullptr);
+
+        REQUIRE(restored.namedSensors.size() == 2);
+        REQUIRE(restored.namedSensors.at("sensor-a") != nullptr);
+        CHECK(restored.namedSensors.at("sensor-a")->sensorTag == "named-shared");
+        CHECK(restored.namedSensors.at("sensor-null") == nullptr);
+    }
+
+    SECTION("YAML")
+    {
+        const YAML::Node serialized = config.toYaml();
+
+        NestedContainerConfig restored;
+        REQUIRE(restored.fromYaml(serialized));
+
+        REQUIRE(restored.optionalSensors.size() == 2);
+        REQUIRE(restored.optionalSensors[0]);
+        CHECK(restored.optionalSensors[0]->sensorTag == "optional-direct");
+        CHECK_FALSE(restored.optionalSensors[1].has_value());
+
+        REQUIRE(restored.sharedSensors.size() == 2);
+        REQUIRE(restored.sharedSensors[0] != nullptr);
+        CHECK(restored.sharedSensors[0]->sensorTag == "shared-vector");
+        CHECK(restored.sharedSensors[1] == nullptr);
+
+        REQUIRE(restored.namedSensors.size() == 2);
+        REQUIRE(restored.namedSensors.at("sensor-a") != nullptr);
+        CHECK(restored.namedSensors.at("sensor-a")->sensorTag == "named-shared");
+        CHECK(restored.namedSensors.at("sensor-null") == nullptr);
+    }
+
+    SECTION("Binary")
+    {
+        std::vector<std::uint8_t> buffer;
+        config.toBinary(buffer);
+
+        NestedContainerConfig restored;
+        std::span<const std::uint8_t> streamSpan(buffer);
+        REQUIRE(restored.fromBinary(streamSpan));
+
+        CHECK(streamSpan.empty());
+        REQUIRE(restored.optionalSensors.size() == 2);
+        REQUIRE(restored.optionalSensors[0]);
+        CHECK(restored.optionalSensors[0]->sensorTag == "optional-direct");
+        CHECK_FALSE(restored.optionalSensors[1].has_value());
+
+        REQUIRE(restored.sharedSensors.size() == 2);
+        REQUIRE(restored.sharedSensors[0] != nullptr);
+        CHECK(restored.sharedSensors[0]->sensorTag == "shared-vector");
+        CHECK(restored.sharedSensors[1] == nullptr);
+
+        REQUIRE(restored.namedSensors.size() == 2);
+        REQUIRE(restored.namedSensors.at("sensor-a") != nullptr);
+        CHECK(restored.namedSensors.at("sensor-a")->sensorTag == "named-shared");
+        CHECK(restored.namedSensors.at("sensor-null") == nullptr);
+    }
+}
+
+TEST_CASE("BaseObject: NoSerialize annotations exclude members from persistence", "[core][base_obj][edge_cases][annotation]")
+{
+    AnnotationConfig config;
+    config.serializedValue = "persistent";
+    config.transientValue = "transient-secret";
+    config.noResetValue = "still-serialized";
+    config.runtimeValue = "runtime-secret";
+
+    SECTION("JSON")
+    {
+        const nlohmann::json serialized = config.toJson();
+
+        CHECK(serialized.contains("serializedValue"));
+        CHECK(serialized.contains("noResetValue"));
+        CHECK_FALSE(serialized.contains("transientValue"));
+        CHECK_FALSE(serialized.contains("runtimeValue"));
+    }
+
+    SECTION("YAML")
+    {
+        const YAML::Node serialized = config.toYaml();
+
+        CHECK(static_cast<bool>(serialized["serializedValue"]));
+        CHECK(static_cast<bool>(serialized["noResetValue"]));
+        CHECK_FALSE(static_cast<bool>(serialized["transientValue"]));
+        CHECK_FALSE(static_cast<bool>(serialized["runtimeValue"]));
+    }
+
+    SECTION("Binary")
+    {
+        AnnotationConfig withTransient;
+        withTransient.serializedValue = "persistent";
+        withTransient.noResetValue = "still-serialized";
+        withTransient.transientValue = "one";
+        withTransient.runtimeValue = "two";
+
+        AnnotationConfig differentTransient;
+        differentTransient.serializedValue = "persistent";
+        differentTransient.noResetValue = "still-serialized";
+        differentTransient.transientValue = "completely-different";
+        differentTransient.runtimeValue = "also-different";
+
+        std::vector<std::uint8_t> first;
+        std::vector<std::uint8_t> second;
+        withTransient.toBinary(first);
+        differentTransient.toBinary(second);
+
+        CHECK(first == second);
+    }
+}
+
+TEST_CASE("BaseObject: NoSerialize members are preserved during deserialization", "[core][base_obj][edge_cases][annotation][deserialize]")
+{
+    AnnotationConfig source;
+    source.serializedValue = "serialized-new";
+    source.noResetValue = "no-reset-new";
+
+    SECTION("JSON")
+    {
+        const nlohmann::json serialized = source.toJson();
+
+        AnnotationConfig restored;
+        restored.transientValue = "keep-transient";
+        restored.runtimeValue = "keep-runtime";
+
+        REQUIRE(restored.fromJson(serialized));
+
+        CHECK(restored.serializedValue == "serialized-new");
+        CHECK(restored.noResetValue == "no-reset-new");
+        CHECK(restored.transientValue == "keep-transient");
+        CHECK(restored.runtimeValue == "keep-runtime");
+    }
+
+    SECTION("YAML")
+    {
+        const YAML::Node serialized = source.toYaml();
+
+        AnnotationConfig restored;
+        restored.transientValue = "keep-transient";
+        restored.runtimeValue = "keep-runtime";
+
+        REQUIRE(restored.fromYaml(serialized));
+
+        CHECK(restored.serializedValue == "serialized-new");
+        CHECK(restored.noResetValue == "no-reset-new");
+        CHECK(restored.transientValue == "keep-transient");
+        CHECK(restored.runtimeValue == "keep-runtime");
+    }
+
+    SECTION("Binary")
+    {
+        std::vector<std::uint8_t> buffer;
+        source.toBinary(buffer);
+
+        AnnotationConfig restored;
+        restored.transientValue = "keep-transient";
+        restored.runtimeValue = "keep-runtime";
+
+        std::span<const std::uint8_t> streamSpan(buffer);
+        REQUIRE(restored.fromBinary(streamSpan));
+
+        CHECK(streamSpan.empty());
+        CHECK(restored.serializedValue == "serialized-new");
+        CHECK(restored.noResetValue == "no-reset-new");
+        CHECK(restored.transientValue == "keep-transient");
+        CHECK(restored.runtimeValue == "keep-runtime");
+    }
 }
 
 TEST_CASE("BaseObject: lastErrorString is runtime state and is not serialized", "[core][base_obj][edge_cases][error_state]")
@@ -778,6 +1365,440 @@ TEST_CASE("BaseObject: Failed deserialization documents partial mutation semanti
     CHECK(!restored.lastErrorString.empty());
 }
 
+
+
+// =============================================================================
+// JobYaml challenger coverage
+// =============================================================================
+TEST_CASE("BaseObject: JobYaml floating scalar spellings",
+          "[core][base_obj][job_yaml][scalar][float]")
+{
+    float value = 0.0f;
+
+    CHECK(job::yaml::YamlSink::scalar(value, "250"));
+    CHECK(value == 250.0f);
+
+    CHECK(job::yaml::YamlSink::scalar(value, "250.0"));
+    CHECK(value == 250.0f);
+}
+
+TEST_CASE("BaseObject: JobYaml boolean scalar spellings",
+          "[core][base_obj][job_yaml][scalar][bool]")
+{
+    bool value = true;
+
+    REQUIRE(job::yaml::YamlSink::scalar(value, "false"));
+    CHECK_FALSE(value);
+
+    REQUIRE(job::yaml::YamlSink::scalar(value, "true"));
+    CHECK(value);
+}
+
+
+
+TEST_CASE("BaseObject: JobYaml direct nested object roundtrip",
+          "[core][base_obj][job_yaml][nested][debug]")
+{
+    SubSensorConfig config;
+    config.sensorTag = "direct-sensor";
+    config.sampleRateHz = 250.0f;
+    config.calibrateOnBoot = false;
+    config.initialMode = DeviceMode::Compute;
+
+    const job::yaml::YamlNode serialized = config.toJobYaml();
+
+    REQUIRE(serialized.isMapping());
+
+    const auto *sensorTag = serialized.member("sensorTag");
+    REQUIRE(sensorTag != nullptr);
+    REQUIRE(sensorTag->isScalar());
+    CHECK(sensorTag->scalar() == "direct-sensor");
+
+    const auto *sampleRateHz = serialized.member("sampleRateHz");
+    REQUIRE(sampleRateHz != nullptr);
+    REQUIRE(sampleRateHz->isScalar());
+
+    const auto *calibrateOnBoot = serialized.member("calibrateOnBoot");
+    REQUIRE(calibrateOnBoot != nullptr);
+    REQUIRE(calibrateOnBoot->isScalar());
+
+    const auto *initialMode = serialized.member("initialMode");
+    REQUIRE(initialMode != nullptr);
+    REQUIRE(initialMode->isScalar());
+
+    WARN("sensorTag=" << sensorTag->scalar());
+    WARN("sampleRateHz=" << sampleRateHz->scalar());
+    WARN("calibrateOnBoot=" << calibrateOnBoot->scalar());
+    WARN("initialMode=" << initialMode->scalar());
+
+    SubSensorConfig restored;
+    const bool success = restored.fromJobYaml(serialized);
+
+    WARN("lastErrorString=" << restored.lastErrorString);
+    REQUIRE(success);
+
+    CHECK(restored.sensorTag == config.sensorTag);
+    CHECK(restored.sampleRateHz == config.sampleRateHz);
+    CHECK(restored.calibrateOnBoot == config.calibrateOnBoot);
+    CHECK(restored.initialMode == config.initialMode);
+}
+
+
+
+
+TEST_CASE("BaseObject: JobYaml serialization roundtrip with nested objects and smart pointers",
+          "[core][base_obj][job_yaml][example]")
+{
+    ComputeNodeConfig config;
+    config.nodeName = "job-yaml-compute-node";
+    config.threadPoolSize = 64;
+    config.memoryBudgetGb = 128.0;
+    config.scalingFactors = {1.25f, 2.5f, 5.0f};
+
+    config.primarySensor.sensorTag = "core_temp";
+    config.primarySensor.sampleRateHz = 250.0f;
+    config.primarySensor.calibrateOnBoot = false;
+    config.primarySensor.initialMode = DeviceMode::Compute;
+
+    auto aux1 = std::make_shared<SubSensorConfig>();
+    aux1->sensorTag = "ambient_0";
+    aux1->sampleRateHz = 10.0f;
+    aux1->initialMode = DeviceMode::Idle;
+
+    auto aux2 = std::make_shared<SubSensorConfig>();
+    aux2->sensorTag = "vram_hotspot";
+    aux2->sampleRateHz = 500.0f;
+    aux2->initialMode = DeviceMode::Compute;
+
+    config.auxiliarySensors.push_back(aux1);
+    config.auxiliarySensors.push_back(aux2);
+
+    const job::yaml::YamlNode serialized = config.toJobYaml();
+
+    REQUIRE(serialized.isMapping());
+
+    const auto *nodeName = serialized.member("nodeName");
+    REQUIRE(nodeName != nullptr);
+    REQUIRE(nodeName->isScalar());
+    CHECK(nodeName->scalar() == "job-yaml-compute-node");
+
+    const auto *threadPoolSize = serialized.member("threadPoolSize");
+    REQUIRE(threadPoolSize != nullptr);
+    REQUIRE(threadPoolSize->isScalar());
+    CHECK(threadPoolSize->scalar() == "64");
+
+    const auto *sensors = serialized.member("auxiliarySensors");
+    REQUIRE(sensors != nullptr);
+    REQUIRE(sensors->isSequence());
+    REQUIRE(sensors->sequence().size() == 2);
+
+    ComputeNodeConfig restored;
+    REQUIRE(restored.fromJobYaml(serialized));
+
+    CHECK(restored.nodeName == config.nodeName);
+    CHECK(restored.threadPoolSize == config.threadPoolSize);
+    CHECK(restored.memoryBudgetGb == config.memoryBudgetGb);
+    CHECK(restored.scalingFactors == config.scalingFactors);
+    CHECK(restored.primarySensor.sensorTag == config.primarySensor.sensorTag);
+    CHECK(restored.primarySensor.sampleRateHz == config.primarySensor.sampleRateHz);
+    CHECK(restored.primarySensor.calibrateOnBoot == config.primarySensor.calibrateOnBoot);
+    CHECK(restored.primarySensor.initialMode == config.primarySensor.initialMode);
+
+    REQUIRE(restored.auxiliarySensors.size() == 2);
+    REQUIRE(restored.auxiliarySensors[0] != nullptr);
+    REQUIRE(restored.auxiliarySensors[1] != nullptr);
+    CHECK(restored.auxiliarySensors[0]->sensorTag == "ambient_0");
+    CHECK(restored.auxiliarySensors[0]->sampleRateHz == 10.0f);
+    CHECK(restored.auxiliarySensors[1]->sensorTag == "vram_hotspot");
+    CHECK(restored.auxiliarySensors[1]->sampleRateHz == 500.0f);
+}
+
+TEST_CASE("BaseObject: JobYaml optional and ownership semantics",
+          "[core][base_obj][job_yaml][optional][pointer]")
+{
+    OptionalConfig config;
+    config.optionalValue = 42;
+    config.optionalName = "optional-name";
+
+    config.optionalSensor.emplace();
+    config.optionalSensor->sensorTag = "optional-direct";
+
+    config.optionalSharedSensor = std::make_shared<SubSensorConfig>();
+    (*config.optionalSharedSensor)->sensorTag = "optional-shared";
+
+    const job::yaml::YamlNode serialized = config.toJobYaml();
+
+    OptionalConfig restored;
+    REQUIRE(restored.fromJobYaml(serialized));
+
+    REQUIRE(restored.optionalValue);
+    CHECK(*restored.optionalValue == 42);
+
+    REQUIRE(restored.optionalName);
+    CHECK(*restored.optionalName == "optional-name");
+
+    REQUIRE(restored.optionalSensor);
+    CHECK(restored.optionalSensor->sensorTag == "optional-direct");
+
+    REQUIRE(restored.optionalSharedSensor);
+    REQUIRE(*restored.optionalSharedSensor != nullptr);
+    CHECK((*restored.optionalSharedSensor)->sensorTag == "optional-shared");
+
+    OptionalConfig nullSource;
+    nullSource.optionalValue.reset();
+    nullSource.optionalName.reset();
+    nullSource.optionalSensor.reset();
+    nullSource.optionalSharedSensor.reset();
+
+    const job::yaml::YamlNode nullSerialized = nullSource.toJobYaml();
+
+    restored.optionalValue = 777;
+    restored.optionalName = "must-reset";
+    restored.optionalSensor.emplace();
+    restored.optionalSharedSensor = std::make_shared<SubSensorConfig>();
+
+    REQUIRE(restored.fromJobYaml(nullSerialized));
+
+    CHECK_FALSE(restored.optionalValue.has_value());
+    CHECK_FALSE(restored.optionalName.has_value());
+    CHECK_FALSE(restored.optionalSensor.has_value());
+    CHECK_FALSE(restored.optionalSharedSensor.has_value());
+}
+
+TEST_CASE("BaseObject: JobYaml shared and unique ownership roundtrip",
+          "[core][base_obj][job_yaml][pointer]")
+{
+    PointerConfig config;
+
+    config.sharedSensor = std::make_shared<SubSensorConfig>();
+    config.sharedSensor->sensorTag = "shared";
+
+    config.uniqueSensor = std::make_unique<SubSensorConfig>();
+    config.uniqueSensor->sensorTag = "unique";
+
+    const job::yaml::YamlNode serialized = config.toJobYaml();
+
+    PointerConfig restored;
+    REQUIRE(restored.fromJobYaml(serialized));
+
+    REQUIRE(restored.sharedSensor != nullptr);
+    REQUIRE(restored.uniqueSensor != nullptr);
+    CHECK(restored.sharedSensor->sensorTag == "shared");
+    CHECK(restored.uniqueSensor->sensorTag == "unique");
+}
+
+TEST_CASE("BaseObject: JobYaml primitive special types roundtrip",
+          "[core][base_obj][job_yaml][primitive]")
+{
+    PrimitiveConfig config;
+    config.mode = DeviceMode::Suspended;
+    config.rawByte = std::byte{0xA5};
+    config.wideChar = L'Z';
+    config.utf8Char = u8'Y';
+    config.utf16Char = u'X';
+    config.utf32Char = U'W';
+
+    const job::yaml::YamlNode serialized = config.toJobYaml();
+
+    PrimitiveConfig restored;
+    REQUIRE(restored.fromJobYaml(serialized));
+
+    CHECK(restored.mode == DeviceMode::Suspended);
+    CHECK(restored.rawByte == std::byte{0xA5});
+    CHECK(restored.wideChar == L'Z');
+    CHECK(restored.utf8Char == u8'Y');
+    CHECK(restored.utf16Char == u'X');
+    CHECK(restored.utf32Char == U'W');
+}
+
+TEST_CASE("BaseObject: JobYaml container semantics",
+          "[core][base_obj][job_yaml][container]")
+{
+    SECTION("Fixed array")
+    {
+        FixedContainerConfig config;
+        config.values = {9, 8, 7, 6};
+
+        const job::yaml::YamlNode serialized = config.toJobYaml();
+
+        FixedContainerConfig restored;
+        REQUIRE(restored.fromJobYaml(serialized));
+        CHECK(restored.values == config.values);
+    }
+
+    SECTION("Set")
+    {
+        SetConfig config;
+        config.values = {5, 1, 9, 5};
+        config.names = {"beta", "alpha", "gamma"};
+
+        const job::yaml::YamlNode serialized = config.toJobYaml();
+
+        SetConfig restored;
+        REQUIRE(restored.fromJobYaml(serialized));
+
+        CHECK(restored.values == config.values);
+        CHECK(restored.names == config.names);
+    }
+
+    SECTION("Map")
+    {
+        MapConfig config;
+        config.entries = {
+            {1, "cpu"},
+            {2, "cuda"},
+            {3, "vulkan"}
+        };
+
+        SubSensorConfig cpu;
+        cpu.sensorTag = "cpu";
+        cpu.sampleRateHz = 100.0f;
+
+        SubSensorConfig gpu;
+        gpu.sensorTag = "gpu";
+        gpu.sampleRateHz = 200.0f;
+
+        config.sensors.emplace("cpu", cpu);
+        config.sensors.emplace("gpu", gpu);
+
+        const job::yaml::YamlNode serialized = config.toJobYaml();
+
+        const auto *entries = serialized.member("entries");
+        REQUIRE(entries != nullptr);
+        REQUIRE(entries->isSequence());
+        REQUIRE(entries->sequence().size() == 3);
+
+        for (const auto &entry : entries->sequence()) {
+            REQUIRE(entry.isSequence());
+            REQUIRE(entry.sequence().size() == 2);
+        }
+
+        MapConfig restored;
+        REQUIRE(restored.fromJobYaml(serialized));
+
+        CHECK(restored.entries == config.entries);
+        REQUIRE(restored.sensors.size() == 2);
+        CHECK(restored.sensors.at("cpu").sensorTag == "cpu");
+        CHECK(restored.sensors.at("gpu").sampleRateHz == 200.0f);
+    }
+}
+
+TEST_CASE("BaseObject: JobYaml nested container combinations roundtrip",
+          "[core][base_obj][job_yaml][container][nested]")
+{
+    NestedContainerConfig config;
+
+    SubSensorConfig direct;
+    direct.sensorTag = "optional-direct";
+    config.optionalSensors.push_back(direct);
+    config.optionalSensors.push_back(std::nullopt);
+
+    auto shared = std::make_shared<SubSensorConfig>();
+    shared->sensorTag = "shared-vector";
+    config.sharedSensors.push_back(shared);
+    config.sharedSensors.push_back(nullptr);
+
+    auto named = std::make_shared<SubSensorConfig>();
+    named->sensorTag = "named-shared";
+    config.namedSensors.emplace("sensor-a", named);
+    config.namedSensors.emplace("sensor-null", nullptr);
+
+    const job::yaml::YamlNode serialized = config.toJobYaml();
+
+    NestedContainerConfig restored;
+    REQUIRE(restored.fromJobYaml(serialized));
+
+    REQUIRE(restored.optionalSensors.size() == 2);
+    REQUIRE(restored.optionalSensors[0]);
+    CHECK(restored.optionalSensors[0]->sensorTag == "optional-direct");
+    CHECK_FALSE(restored.optionalSensors[1].has_value());
+
+    REQUIRE(restored.sharedSensors.size() == 2);
+    REQUIRE(restored.sharedSensors[0] != nullptr);
+    CHECK(restored.sharedSensors[0]->sensorTag == "shared-vector");
+    CHECK(restored.sharedSensors[1] == nullptr);
+
+    REQUIRE(restored.namedSensors.size() == 2);
+    REQUIRE(restored.namedSensors.at("sensor-a") != nullptr);
+    CHECK(restored.namedSensors.at("sensor-a")->sensorTag == "named-shared");
+    CHECK(restored.namedSensors.at("sensor-null") == nullptr);
+}
+
+TEST_CASE("BaseObject: JobYaml NoSerialize annotations preserve persistence semantics",
+          "[core][base_obj][job_yaml][annotation]")
+{
+    AnnotationConfig config;
+    config.serializedValue = "persistent";
+    config.transientValue = "transient-secret";
+    config.noResetValue = "still-serialized";
+    config.runtimeValue = "runtime-secret";
+
+    const job::yaml::YamlNode serialized = config.toJobYaml();
+
+    CHECK(serialized.member("serializedValue") != nullptr);
+    CHECK(serialized.member("noResetValue") != nullptr);
+    CHECK(serialized.member("transientValue") == nullptr);
+    CHECK(serialized.member("runtimeValue") == nullptr);
+
+    AnnotationConfig restored;
+    restored.transientValue = "keep-transient";
+    restored.runtimeValue = "keep-runtime";
+
+    REQUIRE(restored.fromJobYaml(serialized));
+
+    CHECK(restored.serializedValue == "persistent");
+    CHECK(restored.noResetValue == "still-serialized");
+    CHECK(restored.transientValue == "keep-transient");
+    CHECK(restored.runtimeValue == "keep-runtime");
+}
+
+TEST_CASE("BaseObject: JobYaml missing members preserve existing values",
+          "[core][base_obj][job_yaml][missing_fields]")
+{
+    job::yaml::YamlNode serialized;
+    serialized.setMapping();
+    serialized.setMemberScalar("nodeName", "updated-node");
+
+    ComputeNodeConfig restored;
+    restored.nodeName = "existing-node";
+    restored.threadPoolSize = 888;
+
+    REQUIRE(restored.fromJobYaml(serialized));
+
+    CHECK(restored.nodeName == "updated-node");
+    CHECK(restored.threadPoolSize == 888);
+}
+
+TEST_CASE("BaseObject: JobYaml invalid scalar member fails gracefully",
+          "[core][base_obj][job_yaml][invalid]")
+{
+    ComputeNodeConfig config;
+    job::yaml::YamlNode serialized = config.toJobYaml();
+
+    auto *threadPoolSize = serialized.member("threadPoolSize");
+    REQUIRE(threadPoolSize != nullptr);
+
+    threadPoolSize->setScalar("not-an-integer");
+
+    ComputeNodeConfig restored;
+    const bool success = restored.fromJobYaml(serialized);
+
+    CHECK_FALSE(success);
+    CHECK(!restored.lastErrorString.empty());
+}
+
+TEST_CASE("BaseObject: JobYaml non-mapping root fails gracefully",
+          "[core][base_obj][job_yaml][invalid][root]")
+{
+    job::yaml::YamlNode node{"invalid_scalar_root"};
+
+    ComputeNodeConfig restored;
+
+    CHECK_FALSE(restored.fromJobYaml(node));
+    CHECK_THAT(restored.lastErrorString, Catch::Matchers::ContainsSubstring("mapping"));
+}
+
+
 // =============================================================================
 // Block 3: Benchmarks / Stress
 // =============================================================================
@@ -802,8 +1823,9 @@ TEST_CASE("BaseObject serialization benchmarks", "[core][base_obj][benchmark]")
     std::vector<std::uint8_t> binaryBuffer;
     config.toBinary(binaryBuffer);
 
-    nlohmann::json jsonPayload = config.toJson();
-    YAML::Node yamlPayload = config.toYaml();
+    const nlohmann::json jsonPayload = config.toJson();
+    const YAML::Node yamlPayload = config.toYaml();
+    const job::yaml::YamlNode jobYamlPayload = config.toJobYaml();
 
     BENCHMARK("Binary Serialization (toBinary)")
     {
@@ -816,7 +1838,13 @@ TEST_CASE("BaseObject serialization benchmarks", "[core][base_obj][benchmark]")
     {
         ComputeNodeConfig restored;
         std::span<const std::uint8_t> span(binaryBuffer);
-        return restored.fromBinary(span);
+
+        if (!restored.fromBinary(span))
+            return std::size_t{0};
+
+        return restored.scalingFactors.size() +
+               restored.auxiliarySensors.size() +
+               restored.threadPoolSize;
     };
 
     BENCHMARK("JSON Serialization (toJson)")
@@ -827,21 +1855,49 @@ TEST_CASE("BaseObject serialization benchmarks", "[core][base_obj][benchmark]")
     BENCHMARK("JSON Deserialization (fromJson)")
     {
         ComputeNodeConfig restored;
-        return restored.fromJson(jsonPayload);
+
+        if (!restored.fromJson(jsonPayload))
+            return std::size_t{0};
+
+        return restored.scalingFactors.size() +
+               restored.auxiliarySensors.size() +
+               restored.threadPoolSize;
     };
 
-    BENCHMARK("YAML Serialization (toYaml)")
+    BENCHMARK("YAML-cpp Serialization (toYaml)")
     {
         return config.toYaml();
     };
 
-    BENCHMARK("YAML Deserialization (fromYaml)")
+    BENCHMARK("YAML-cpp Deserialization (fromYaml)")
     {
         ComputeNodeConfig restored;
-        return restored.fromYaml(yamlPayload);
+
+        if (!restored.fromYaml(yamlPayload))
+            return std::size_t{0};
+
+        return restored.scalingFactors.size() +
+               restored.auxiliarySensors.size() +
+               restored.threadPoolSize;
+    };
+
+    BENCHMARK("JobYaml Serialization (toJobYaml)")
+    {
+        return config.toJobYaml();
+    };
+
+    BENCHMARK("JobYaml Deserialization (fromJobYaml)")
+    {
+        ComputeNodeConfig restored;
+
+        if (!restored.fromJobYaml(jobYamlPayload))
+            return std::size_t{0};
+
+        return restored.scalingFactors.size() +
+               restored.auxiliarySensors.size() +
+               restored.threadPoolSize;
     };
 }
-
 TEST_CASE("BaseObject nested serialization stress benchmark", "[core][base_obj][benchmark][stress]")
 {
     ComputeNodeConfig config;
@@ -866,7 +1922,13 @@ TEST_CASE("BaseObject nested serialization stress benchmark", "[core][base_obj][
 
         ComputeNodeConfig restored;
         std::span<const std::uint8_t> streamSpan(buffer);
-        return restored.fromBinary(streamSpan);
+
+        if (!restored.fromBinary(streamSpan))
+            return std::size_t{0};
+
+        return restored.scalingFactors.size() +
+               restored.auxiliarySensors.size() +
+               restored.threadPoolSize;
     };
 
     BENCHMARK("Large nested JSON roundtrip")
@@ -874,16 +1936,116 @@ TEST_CASE("BaseObject nested serialization stress benchmark", "[core][base_obj][
         const nlohmann::json json = config.toJson();
 
         ComputeNodeConfig restored;
-        return restored.fromJson(json);
+
+        if (!restored.fromJson(json))
+            return std::size_t{0};
+
+        return restored.scalingFactors.size() +
+               restored.auxiliarySensors.size() +
+               restored.threadPoolSize;
     };
 
-    BENCHMARK("Large nested YAML roundtrip")
+    BENCHMARK("Large nested YAML-cpp roundtrip")
     {
         const YAML::Node yaml = config.toYaml();
 
         ComputeNodeConfig restored;
-        return restored.fromYaml(yaml);
+
+        if (!restored.fromYaml(yaml))
+            return std::size_t{0};
+
+        return restored.scalingFactors.size() +
+               restored.auxiliarySensors.size() +
+               restored.threadPoolSize;
+    };
+
+    BENCHMARK("Large nested JobYaml roundtrip")
+    {
+        const job::yaml::YamlNode yaml = config.toJobYaml();
+
+        ComputeNodeConfig restored;
+
+        if (!restored.fromJobYaml(yaml))
+            return std::size_t{0};
+
+        return restored.scalingFactors.size() +
+               restored.auxiliarySensors.size() +
+               restored.threadPoolSize;
     };
 }
 
+TEST_CASE("BaseObject mixed container stress benchmark", "[core][base_obj][benchmark][container][stress]")
+{
+    NestedContainerConfig config;
+
+    for (int i = 0; i < 256; ++i) {
+        SubSensorConfig direct;
+        direct.sensorTag = "optional_" + std::to_string(i);
+        direct.sampleRateHz = static_cast<float>(i + 1);
+        config.optionalSensors.emplace_back(std::move(direct));
+
+        auto shared = std::make_shared<SubSensorConfig>();
+        shared->sensorTag = "shared_" + std::to_string(i);
+        config.sharedSensors.push_back(shared);
+        config.namedSensors.emplace("sensor_" + std::to_string(i), std::move(shared));
+    }
+
+    BENCHMARK("Mixed nested binary roundtrip")
+    {
+        std::vector<std::uint8_t> buffer;
+        config.toBinary(buffer);
+
+        NestedContainerConfig restored;
+        std::span<const std::uint8_t> streamSpan(buffer);
+
+        if (!restored.fromBinary(streamSpan))
+            return std::size_t{0};
+
+        return restored.optionalSensors.size() +
+               restored.sharedSensors.size() +
+               restored.namedSensors.size();
+    };
+
+    BENCHMARK("Mixed nested JSON roundtrip")
+    {
+        const nlohmann::json json = config.toJson();
+
+        NestedContainerConfig restored;
+
+        if (!restored.fromJson(json))
+            return std::size_t{0};
+
+        return restored.optionalSensors.size() +
+               restored.sharedSensors.size() +
+               restored.namedSensors.size();
+    };
+
+    BENCHMARK("Mixed nested YAML-cpp roundtrip")
+    {
+        const YAML::Node yaml = config.toYaml();
+
+        NestedContainerConfig restored;
+
+        if (!restored.fromYaml(yaml))
+            return std::size_t{0};
+
+        return restored.optionalSensors.size() +
+               restored.sharedSensors.size() +
+               restored.namedSensors.size();
+    };
+
+    BENCHMARK("Mixed nested JobYaml roundtrip")
+    {
+        const job::yaml::YamlNode yaml = config.toJobYaml();
+
+        NestedContainerConfig restored;
+
+        if (!restored.fromJobYaml(yaml))
+            return std::size_t{0};
+
+        return restored.optionalSensors.size() +
+               restored.sharedSensors.size() +
+               restored.namedSensors.size();
+    };
+}
 #endif

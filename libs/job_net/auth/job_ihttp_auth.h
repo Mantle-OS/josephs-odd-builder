@@ -28,10 +28,16 @@ public:
     [[nodiscard]] virtual bool isValid() const noexcept = 0;
 
     [[nodiscard]] const std::string &headerName() const noexcept;
-    [[nodiscard]] const std::string &scheme() const noexcept;
+    virtual void setHeaderName(std::string_view headerName);
 
-    [[nodiscard]] const job::crypto::JobSecureMem &token() const noexcept;
+    [[nodiscard]] const std::string &scheme() const noexcept;
+    virtual void setScheme(std::string_view scheme);
+
     [[nodiscard]] bool hasToken() const noexcept;
+    [[nodiscard]] job::crypto::JobSecureMem::Ptr token() const noexcept;
+
+    virtual void setToken(std::string_view token);
+    virtual void setToken(job::crypto::JobSecureMem::Ptr token) noexcept;
 
     virtual void clear() noexcept;
 
@@ -44,17 +50,11 @@ protected:
 
     IJobHttpAuth(std::string_view headerName,
                  std::string_view scheme,
-                 job::crypto::JobSecureMem &&token);
+                 job::crypto::JobSecureMem::Ptr token);
 
-    void setHeaderName(std::string_view headerName);
-    void setScheme(std::string_view scheme);
-
-    void setToken(std::string_view token);
-    void setToken(job::crypto::JobSecureMem &&token) noexcept;
-
-    std::string               m_headerName;
-    std::string               m_scheme;
-    job::crypto::JobSecureMem m_token;
+    std::string                    m_headerName;
+    std::string                    m_scheme;
+    job::crypto::JobSecureMem::Ptr m_token;
 };
 
 } // namespace job::net

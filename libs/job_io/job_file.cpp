@@ -9,10 +9,6 @@
 
 namespace job::io {
 
-//////////////////////////////////////////////////////////
-// Construction
-//////////////////////////////////////////////////////////
-
 JobFile::JobFile(std::filesystem::path path, Access access, OpenMode openMode) :
     m_path(std::move(path)),
     m_access(access),
@@ -52,10 +48,8 @@ JobFile &JobFile::operator=(JobFile &&other) noexcept
     return *this;
 }
 
-//////////////////////////////////////////////////////////
-// IODevice
-//////////////////////////////////////////////////////////
 
+// IODevice
 bool JobFile::openDevice()
 {
     if (isOpen())
@@ -179,10 +173,6 @@ void JobFile::setPermissions(IOPermissions perms)
     IODevice::setPermissions(perms);
 }
 
-//////////////////////////////////////////////////////////
-// File identity
-//////////////////////////////////////////////////////////
-
 const std::filesystem::path &JobFile::path() const noexcept
 {
     return m_path;
@@ -228,9 +218,6 @@ const FILE *JobFile::fp() const noexcept
     return m_fp;
 }
 
-//////////////////////////////////////////////////////////
-// File positioning / size
-//////////////////////////////////////////////////////////
 
 std::size_t JobFile::size() const
 {
@@ -285,10 +272,7 @@ bool JobFile::seek(std::int64_t offset, Seek whence)
     return ::lseek(m_fd, static_cast<off_t>(offset), nativeWhence) >= 0;
 }
 
-//////////////////////////////////////////////////////////
 // Bulk IO
-//////////////////////////////////////////////////////////
-
 ssize_t JobFile::readAll(std::vector<std::uint8_t> &output)
 {
     output.clear();
@@ -367,9 +351,6 @@ ssize_t JobFile::readAll(std::string &output)
     return total;
 }
 
-//////////////////////////////////////////////////////////
-// Open / close
-//////////////////////////////////////////////////////////
 
 bool JobFile::openPath()
 {
@@ -506,10 +487,8 @@ void JobFile::closeFp() noexcept
         ::fclose(m_fp);
 }
 
-//////////////////////////////////////////////////////////
-// POSIX helpers
-//////////////////////////////////////////////////////////
 
+// POSIX helpers
 int JobFile::openFlags() const noexcept
 {
     int flags = 0;
@@ -566,10 +545,8 @@ bool JobFile::updatePermissions() noexcept
     return true;
 }
 
-//////////////////////////////////////////////////////////
-// Shared cleanup / move
-//////////////////////////////////////////////////////////
 
+// Shared cleanup / move
 void JobFile::reset() noexcept
 {
     closeDevice();

@@ -42,6 +42,7 @@ using namespace std::chrono_literals;
 
 struct TestLoop {
     std::shared_ptr<JobIoAsyncThread> loop;
+
     TestLoop()
     {
         job::core::JobLogger::instance().setLevel(job::core::LogLevel::Info);
@@ -52,12 +53,10 @@ struct TestLoop {
 
     ~TestLoop()
     {
-        if(loop->isRunning())
-            loop->stop();
+        loop->stop();
         REQUIRE_FALSE(loop->isRunning());
     }
 };
-
 inline static std::string make_temp_sock_path(const std::string &base)
 {
     std::string path = "/tmp/" + base + "_" + std::to_string(::getpid()) + ".sock";

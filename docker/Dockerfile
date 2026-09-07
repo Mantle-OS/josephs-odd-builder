@@ -10,7 +10,7 @@ RUN apt-get update && \
 ENV LANG=en_US.UTF-8 LANGUAGE=en_US.UTF-8 LC_ALL=en_US.UTF-8
 
 ENV CUDA_HOME=/usr/local/cuda-13.3
-ENV TORCH_CUDA_ARCH_LIST="13.3"
+ENV TORCH_CUDA_ARCH_LIST="12.0"
 
 ENV PATH=${CUDA_HOME}/bin:${PATH}
 ENV LD_LIBRARY_PATH=${CUDA_HOME}/lib64:${LD_LIBRARY_PATH}
@@ -18,7 +18,7 @@ ENV LD_LIBRARY_PATH=${CUDA_HOME}/lib64:${LD_LIBRARY_PATH}
 RUN apt-get update && \
     apt-get install --no-install-recommends -y \
         gcc-16 g++-16 build-essential cargo \
-        chrpath wget curl git wget ca-certificates git cmake ninja-build pkg-config \
+        chrpath wget curl git ca-certificates cmake ninja-build pkg-config \
         glslc libvulkan-dev libvulkan1 spirv-tools spirv-headers mesa-vulkan-drivers \
         libwebp-dev \
         libssl-dev libzstd-dev \
@@ -56,7 +56,8 @@ RUN wget https://developer.download.nvidia.com/compute/cuda/repos/debian12/x86_6
         libcusparse-13-3 libcusparse-dev-13-3  \
         cuda-cudart-13-3 cuda-cudart-dev-13-3 \
         libcurand-13-3 libcurand-dev-13-3 \
-        cuda-opencl-dev-13-3 cuda-opencl-13-3 && \
+        cuda-opencl-dev-13-3 cuda-opencl-13-3 \
+        nvidia-vulkan-icd && \
     rm cuda-keyring_1.1-1_all.deb
 
 RUN update-alternatives --install /usr/bin/nvcc nvcc /usr/local/cuda-13.3/bin/nvcc 100 && \

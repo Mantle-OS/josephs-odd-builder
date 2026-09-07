@@ -6,8 +6,8 @@
 #include <string>
 #include <utility>
 
-#include "obj.h"
-#include "obj_concept.h"
+#include <job_object.h>
+
 
 enum class SomeEnum : std::uint8_t {
     Foo,
@@ -15,7 +15,7 @@ enum class SomeEnum : std::uint8_t {
     Car
 };
 
-class SerNestedObj : public Object
+class SerNestedObj : public job::core::Object
 {
 public:
     using Ptr = std::shared_ptr<SerNestedObj>;

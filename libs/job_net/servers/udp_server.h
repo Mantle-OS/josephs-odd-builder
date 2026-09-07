@@ -20,14 +20,18 @@ public:
     void stop();
     [[nodiscard]] uint16_t port() const noexcept;
     [[nodiscard]] bool isRunning() const noexcept;
-    ssize_t sendTo(const void *buffer, size_t size, const JobIpAddr &dest);
-    MessageCallback onMessage;
-    std::function<void(int)> onError;
+
+    NetIoResult sendTo(const void *buffer, size_t size, const JobIpAddr &dest);
+
+
+    MessageCallback             onMessage;
+    std::function<void(int)>    onError;
+
 private:
     void setupSocketCallbacks();
-    threads::JobIoAsyncThread::Ptr m_loop;
-    UdpSocket::Ptr m_socket;
-    uint16_t m_port{0};
-    std::vector<char> m_readBuffer;
+    threads::JobIoAsyncThread::Ptr  m_loop;
+    UdpSocket::Ptr                  m_socket;
+    uint16_t                        m_port{0};
+    std::vector<char>               m_readBuffer;
 };
 } // namespace job::net

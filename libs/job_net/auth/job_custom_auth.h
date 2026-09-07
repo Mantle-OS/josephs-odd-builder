@@ -25,11 +25,8 @@ public:
 private:
     friend class JobHttpAuthFactory;
 
-    CustomAuth(std::string_view scheme,
-               std::string_view token);
-
-    CustomAuth(std::string_view scheme,
-               job::crypto::JobSecureMem &&token);
+    CustomAuth(std::string_view scheme, std::string_view token);
+    CustomAuth(std::string_view scheme, job::crypto::JobSecureMem::Ptr token);
 };
 
 } // namespace job::net

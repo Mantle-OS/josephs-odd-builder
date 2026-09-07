@@ -1,6 +1,9 @@
 #include "job_serializer_utils.h"
-#include "job_serializer_logger.h"
+
+#include <job_logger.h>
+
 namespace job::serializer {
+
 FieldKind deduceFieldKind(const std::string &type) noexcept
 {
     FieldKind ret = FieldKind::Scalar;
@@ -27,11 +30,10 @@ FieldKind deduceFieldKind(const std::string &type) noexcept
     } else {
         // if language built in type this can trip this up
         // example a bool or a float or a double
-        JOB_SER_WARN("[schema] Unknown field type: {}", type);
+        JOB_LOG_WARN("[schema] Unknown field type: {}", type);
     }
 
     return ret;
 }
 
 } // namespace job::serializer
-

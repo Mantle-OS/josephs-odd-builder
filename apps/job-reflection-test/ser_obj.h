@@ -6,11 +6,10 @@
 #include <utility>
 #include <vector>
 
-#include "obj.h"
-#include "obj_concept.h"
+#include <job_object.h>
 #include "ser_nested_obj.h"
 
-class SerObj : public Object
+class SerObj : public job::core::Object
 {
 public:
     using Ptr = std::shared_ptr<SerObj>;

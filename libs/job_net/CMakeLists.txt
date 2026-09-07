@@ -17,21 +17,18 @@ set(JOBNET_SOURCES
     isocket_io.cpp
 )
 
-
-
 set(JOBNET_AUTH_HEADERS
     auth/job_http_auth_type.h
     auth/job_ihttp_auth.h
-
     auth/job_bearer_auth.h
     auth/job_token_auth.h
     auth/job_api_key_auth.h
     auth/job_basic_auth.h
     auth/job_custom_auth.h
-
     auth/job_aws4_auth.h
-
     auth/job_http_auth_factory.h
+    # utils
+    auth/job_aws4_signer.h
 )
 
 set(JOBNET_AUTH_SOURCES
@@ -44,6 +41,8 @@ set(JOBNET_AUTH_SOURCES
     auth/job_custom_auth.cpp
     auth/job_aws4_auth.cpp
     auth/job_http_auth_factory.cpp
+    # utils
+    auth/job_aws4_signer.cpp
 )
 
 set(JOBNET_HTTP_HEADERS
@@ -94,6 +93,7 @@ endif()
 
 set(JOBNET_SOCKETS_HEADERS
     sockets/job_socket_error.h
+    sockets/job_socket_io_result.h
     sockets/tcp_socket.h
     sockets/udp_socket.h
     sockets/unix_socket.h
@@ -261,7 +261,7 @@ install(FILES ${JOBNET_SOCKETS_HEADERS}     DESTINATION ${CMAKE_INSTALL_INCLUDED
 install(FILES ${JOBNET_CLIENTS_HEADERS}     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobnet/clients )
 install(FILES ${JOBNET_SERVERS_HEADERS}     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobnet/servers )
 install(FILES ${JOBNET_HTTP_HEADERS}        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobnet/http )
-install(FILES ${JOBNET_HTTP_HEADERS}        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobnet/auth )
+install(FILES ${JOBNET_AUTH_HEADERS}        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobnet/auth )
 
 if(JOB_LINUX)
     set(PKGCONFIG_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/pkgconfig")

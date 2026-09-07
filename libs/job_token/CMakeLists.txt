@@ -137,8 +137,18 @@ set_target_properties(JosephsOddBuilder_Token PROPERTIES
     VERSION ${PROJECT_VERSION}
     SOVERSION ${PROJECT_VERSION_MAJOR}
     OUTPUT_NAME "jobtoken"
+    CXX_STANDARD 26
+    CXX_STANDARD_REQUIRED ON
     CXX_VISIBILITY_PRESET hidden
     VISIBILITY_INLINES_HIDDEN ON
+)
+
+target_compile_options(JosephsOddBuilder_Token PRIVATE
+    -freflection
+    -fcontracts)
+
+target_link_options(JosephsOddBuilder_Token PRIVATE
+    -fcontracts
 )
 
 target_include_directories(JosephsOddBuilder_Token PUBLIC

@@ -69,16 +69,22 @@ void TcpClient::disconnect()
     }
 }
 
-ssize_t TcpClient::send(const void *data, size_t size)
+NetIoResult TcpClient::send(const void *data, size_t size)
 {
     if (!m_socket || !isConnected())
-        return -1;
+        return NetIoResult::error();
+
     return m_socket->write(data, size);
 }
 
-ssize_t TcpClient::send(const std::string &data)
+NetIoResult TcpClient::send(const std::string &data)
 {
     return send(data.data(), data.size());
+}
+
+bool TcpClient::setWriteInterest(bool enable)
+{
+    return m_socket && m_socket->setWriteInterest(enable);
 }
 
 bool TcpClient::isConnected() const noexcept
@@ -111,6 +117,7 @@ void TcpClient::setSocket(TcpSocket::Ptr socket)
         // holding a reference to it.
         m_socket->onConnect = nullptr;
         m_socket->onRead = nullptr;
+        m_socket->onWrite = nullptr;
         m_socket->onDisconnect = nullptr;
         m_socket->onError = nullptr;
     }
@@ -139,29 +146,51 @@ void TcpClient::setupSocketCallbacks()
 {
     if (!m_socket)
         return;
+
     m_socket->onConnect = [this]() {
         m_connected.store(true, std::memory_order_relaxed);
         if (onConnect)
             onConnect();
     };
+
     m_socket->onRead = [this]([[maybe_unused]] const char *data, [[maybe_unused]] size_t len) {
-        while(true) {
-            ssize_t n = m_socket->read(m_readBuffer.data(), m_readBuffer.size());
-            if (n > 0) {
+        if (m_readBuffer.empty())
+            return;
+
+        // Drain: edge-triggered readability is reported once, so read until the
+        // transport says there is nothing left.
+        for (;;) {
+            const NetIoResult n = m_socket->read(m_readBuffer.data(), m_readBuffer.size());
+
+            if (n.ok()) {
+                if (n.bytes == 0)
+                    break; // Defensive: a stream read of a non-empty buffer never returns 0.
+
                 if (onMessage)
-                    onMessage(m_readBuffer.data(), n);
-            } else if (n == 0) {
-                break;
-            } else {
-                break;
+                    onMessage(m_readBuffer.data(), n.bytes);
+
+                continue;
             }
+
+            // WouldBlock: drained for now.
+            // Closed: orderly shutdown; TcpSocket::read() already called
+            //         disconnect(), so onDisconnect will follow.
+            // Error:   reported through onError by the socket layer.
+            break;
         }
     };
+
+    m_socket->onWrite = [this](const char *, size_t) {
+        if (onWritable)
+            onWritable();
+    };
+
     m_socket->onDisconnect = [this]() {
         m_connected.store(false, std::memory_order_relaxed);
         if (onDisconnect)
             onDisconnect();
     };
+
     m_socket->onError = [this](int err) {
         m_connected.store(false, std::memory_order_relaxed);
         if (onError)

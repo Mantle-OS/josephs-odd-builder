@@ -91,6 +91,17 @@ set_target_properties(JosephsOddBuilder_TUI PROPERTIES
     VERSION ${PROJECT_VERSION}
     SOVERSION ${PROJECT_VERSION_MAJOR}
     OUTPUT_NAME "jobtui"
+    CXX_STANDARD 26
+    CXX_STANDARD_REQUIRED ON
+)
+
+target_compile_options(JosephsOddBuilder_TUI PRIVATE
+    -freflection
+    -fcontracts
+)
+
+target_link_options(JosephsOddBuilder_TUI PRIVATE
+    -fcontracts
 )
 
 target_include_directories(JosephsOddBuilder_TUI PUBLIC

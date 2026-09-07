@@ -7,6 +7,8 @@
 #include <type_traits>
 #include <utility>
 
+#include "jobcore_export.h"
+
 namespace job::core {
 
 template <typename... Args>
@@ -30,7 +32,7 @@ enum class ConnectionFlag : std::uint8_t {
     return static_cast<ConnectionFlag>(static_cast<Type>(lhs) & static_cast<Type>(rhs));
 }
 
-constexpr ConnectionFlag& operator|=(ConnectionFlag &lhs, ConnectionFlag rhs) noexcept
+constexpr ConnectionFlag &operator|=(ConnectionFlag &lhs, ConnectionFlag rhs) noexcept
 {
     lhs = lhs | rhs;
     return lhs;
@@ -41,105 +43,53 @@ constexpr ConnectionFlag& operator|=(ConnectionFlag &lhs, ConnectionFlag rhs) no
     return (flags & flag) != ConnectionFlag::None;
 }
 
-class Connection {
+class JOBCORE_EXPORT Connection {
 public:
     using ConnectionId = std::uint64_t;
 
-    Connection() = default;
-    ~Connection() = default;
+    Connection();
+    ~Connection();
 
-    Connection(const Connection&) = default;
-    Connection &operator=(const Connection&) = default;
-    Connection(Connection&&) noexcept = default;
-    Connection &operator=(Connection&&) noexcept = default;
+    Connection(const Connection &);
+    Connection &operator=(const Connection &);
+    Connection(Connection &&) noexcept;
+    Connection &operator=(Connection &&) noexcept;
 
-    [[nodiscard]] ConnectionId id() const noexcept
-    {
-        return m_state ? m_state->id : 0;
-    }
+    [[nodiscard]] ConnectionId id() const noexcept;
+    [[nodiscard]] ConnectionFlag flags() const noexcept;
+    [[nodiscard]] bool isUnique() const noexcept;
+    [[nodiscard]] bool isSingleShot() const noexcept;
+    [[nodiscard]] bool connected() const noexcept;
 
-    [[nodiscard]] ConnectionFlag flags() const noexcept
-    {
-        return m_state ? m_state->flags : ConnectionFlag::None;
-    }
+    explicit operator bool() const noexcept;
 
-    [[nodiscard]] bool isUnique() const noexcept
-    {
-        return hasConnectionFlag(flags(), ConnectionFlag::Unique);
-    }
-
-    [[nodiscard]] bool isSingleShot() const noexcept
-    {
-        return hasConnectionFlag(flags(), ConnectionFlag::SingleShot);
-    }
-
-    [[nodiscard]] bool connected() const noexcept
-    {
-        return m_state && m_state->connected.load(std::memory_order_acquire);
-    }
-
-    explicit operator bool() const noexcept
-    {
-        return connected();
-    }
-
-    void disconnect()
-    {
-        if (!m_state)
-            return;
-
-        if (!m_state->connected.load(std::memory_order_acquire))
-            return;
-
-        const auto control = m_state->control.lock();
-
-        if (!control) {
-            m_state->connected.store(false, std::memory_order_release);
-            return;
-        }
-
-        control->disconnect(m_state->id);
-    }
+    void disconnect();
 
 private:
     using DisconnectHandler = std::move_only_function<void(ConnectionId)>;
+
     struct Control {
-        explicit Control(DisconnectHandler handler) :
-            disconnectHandler(std::move(handler))
-        {
-        }
+        explicit Control(DisconnectHandler handler);
+        ~Control();
 
-        ~Control() = default;
+        Control(const Control &) = delete;
+        Control &operator=(const Control &) = delete;
+        Control(Control &&) = delete;
+        Control &operator=(Control &&) = delete;
 
-        Control(const Control&) = delete;
-        Control &operator=(const Control&) = delete;
-        Control(Control&&) = delete;
-        Control &operator=(Control&&) = delete;
-
-        void disconnect(ConnectionId id)
-        {
-            if (disconnectHandler)
-                disconnectHandler(id);
-        }
+        void disconnect(ConnectionId id);
 
         DisconnectHandler disconnectHandler;
     };
 
     struct State {
-        State(ConnectionId connectionId, ConnectionFlag connectionFlags, const std::shared_ptr<Control>& connectionControl) :
-            id(connectionId),
-            flags(connectionFlags),
-            control(connectionControl)
-        {
+        State(ConnectionId connectionId, ConnectionFlag connectionFlags, const std::shared_ptr<Control> &connectionControl);
+        ~State();
 
-        }
-
-        ~State() = default;
-
-        State(const State&) = delete;
-        State& operator=(const State&) = delete;
-        State(State&&) = delete;
-        State& operator=(State&&) = delete;
+        State(const State &) = delete;
+        State &operator=(const State &) = delete;
+        State(State &&) = delete;
+        State &operator=(State &&) = delete;
 
         ConnectionId id{0};
         ConnectionFlag flags{ConnectionFlag::None};
@@ -148,16 +98,9 @@ private:
         std::weak_ptr<Control> control;
     };
 
-    explicit Connection(ConnectionId id, ConnectionFlag flags, const std::shared_ptr<Control>& control) :
-        m_state(std::make_shared<State>(id, flags, control))
-    {
-    }
+    explicit Connection(ConnectionId id, ConnectionFlag flags, const std::shared_ptr<Control> &control);
 
-    void markDisconnected() noexcept
-    {
-        if (m_state)
-            m_state->connected.store(false, std::memory_order_release);
-    }
+    void markDisconnected() noexcept;
 
     template <typename... Args>
     friend class Signal;

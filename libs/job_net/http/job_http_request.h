@@ -1,7 +1,6 @@
 #pragma once
 
 #include <cstddef>
-#include <cstdint>
 #include <memory>
 #include <span>
 #include <string>
@@ -26,14 +25,15 @@ public:
 
     JobHttpRequest() = default;
     explicit JobHttpRequest(const JobUrl &url);
-    JobHttpRequest(JobHttpMethod method, const JobUrl &url);
+
+    JobHttpRequest(HttpMethod method, const JobUrl &url);
     JobHttpRequest(std::string_view customMethod, const JobUrl &url);
     ~JobHttpRequest() = default;
 
     JobHttpRequest(const JobHttpRequest &) = default;
     JobHttpRequest &operator=(const JobHttpRequest &) = default;
-    JobHttpRequest(JobHttpRequest &&) = default;
-    JobHttpRequest &operator=(JobHttpRequest &&) = default;
+    JobHttpRequest(JobHttpRequest &&) noexcept = default;
+    JobHttpRequest &operator=(JobHttpRequest &&) noexcept = default;
 
     [[nodiscard]] static Ptr createShared()
     {
@@ -45,7 +45,7 @@ public:
         return std::make_shared<JobHttpRequest>(url);
     }
 
-    [[nodiscard]] static Ptr createShared(JobHttpMethod method, const JobUrl &url)
+    [[nodiscard]] static Ptr createShared(HttpMethod method, const JobUrl &url)
     {
         return std::make_shared<JobHttpRequest>(method, url);
     }
@@ -65,7 +65,7 @@ public:
         return std::make_unique<JobHttpRequest>(url);
     }
 
-    [[nodiscard]] static UPtr createUniq(JobHttpMethod method, const JobUrl &url)
+    [[nodiscard]] static UPtr createUniq(HttpMethod method, const JobUrl &url)
     {
         return std::make_unique<JobHttpRequest>(method, url);
     }
@@ -75,15 +75,16 @@ public:
         return std::make_unique<JobHttpRequest>(customMethod, url);
     }
 
-    [[nodiscard]] JobHttpMethod method() const noexcept;
+    [[nodiscard]] HttpMethod method() const noexcept;
     [[nodiscard]] std::string_view methodString() const noexcept;
     [[nodiscard]] const std::string &customMethod() const noexcept;
 
-    void setMethod(JobHttpMethod method) noexcept;
+    void setMethod(HttpMethod method) noexcept;
     void setCustomMethod(std::string_view method);
     void clearCustomMethod() noexcept;
 
     [[nodiscard]] const JobUrl &url() const noexcept;
+
     void setUrl(const JobUrl &url);
     void setUrl(JobUrl &&url);
 
@@ -109,11 +110,11 @@ public:
     [[nodiscard]] bool isValid() const noexcept;
 
 private:
-    JobHttpMethod m_method{JobHttpMethod::Get};
-    std::string   m_customMethod;
-    JobUrl        m_url;
-    JobHttpHeader m_headers;
-    Body          m_body;
+    HttpMethod      m_method{HttpMethod::Get};
+    std::string     m_customMethod;
+    JobUrl          m_url;
+    JobHttpHeader   m_headers;
+    Body            m_body;
 };
 
 } // namespace job::net

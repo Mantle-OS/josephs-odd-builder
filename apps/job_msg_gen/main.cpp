@@ -1,113 +1,166 @@
-#include <iostream>
+#include <cerrno>
 #include <filesystem>
+#include <iostream>
 #include <string>
 #include <vector>
 
 #include <job_logger.h>
-#include <schema.h>
 #include <reader.h>
+#include <schema.h>
 #include <writer.h>
-#include <emitters/emitter.h>
+
 #include <job_emitter_msgpack.h>
 
 namespace fs = std::filesystem;
+
 using namespace job::serializer;
 
-struct AppArgs {
-    std::vector<fs::path> schema_files;
-    fs::path out_dir;
+struct AppArgs
+{
+    std::vector<fs::path> schemaFiles;
+    fs::path outDir;
     std::string lang;
+    std::string exportHeader;
+    std::string exportMacro;
 };
 
-bool parse_args( int argc, char *argv[], AppArgs &args )
+bool parseArgs(int argc, char *argv[], AppArgs &args)
 {
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
 
         if (arg == "--schemas") {
             if (++i >= argc) {
-                std::cerr << "ERROR: --schemas requires at least one file." << std::endl;
+                std::cerr << "ERROR: --schemas requires at least one file.\n";
                 return false;
             }
+
             while (i < argc && argv[i][0] != '-')
-                args.schema_files.push_back(argv[i++]);
+                args.schemaFiles.push_back(argv[i++]);
 
             --i;
         } else if (arg == "--out") {
             if (++i >= argc) {
-                std::cerr << "ERROR: --out requires a directory." << std::endl;
+                std::cerr << "ERROR: --out requires a directory.\n";
                 return false;
             }
-            args.out_dir = argv[i];
+
+            args.outDir = argv[i];
         } else if (arg == "--lang" || arg == "-l") {
             if (++i >= argc) {
-                std::cerr << "ERROR: --lang requires a type [cpp,c,java,py, ect] (only cpp is supported at the moment)." << std::endl;
+                std::cerr << "ERROR: --lang requires a type [cpp,c,java,py,etc] "
+                             "(only cpp is supported at the moment).\n";
                 return false;
             }
+
             args.lang = argv[i];
-        }
-        else {
-            std::cerr << "ERROR: Unknown argument: " << arg << std::endl;
+        } else if (arg == "--export-header") {
+            if (++i >= argc) {
+                std::cerr << "ERROR: --export-header requires a header name.\n";
+                return false;
+            }
+
+            args.exportHeader = argv[i];
+        } else if (arg == "--export-macro") {
+            if (++i >= argc) {
+                std::cerr << "ERROR: --export-macro requires a macro name.\n";
+                return false;
+            }
+
+            args.exportMacro = argv[i];
+        } else {
+            std::cerr << "ERROR: Unknown argument: " << arg << '\n';
             return false;
         }
     }
 
-    if (args.schema_files.empty()) {
-        std::cerr << "ERROR: --schemas is required." << std::endl;
+    if (args.schemaFiles.empty()) {
+        std::cerr << "ERROR: --schemas is required.\n";
         return false;
     }
 
-    if (args.out_dir.empty()) {
-        std::cerr << "ERROR: --out is required." << std::endl;
+    if (args.outDir.empty()) {
+        std::cerr << "ERROR: --out is required.\n";
         return false;
     }
 
-    if (args.lang.empty()) {
+    if (args.lang.empty())
         args.lang = "cpp";
+
+    if (args.exportHeader.empty()) {
+        std::cerr << "ERROR: --export-header is required.\n";
+        return false;
+    }
+
+    if (args.exportMacro.empty()) {
+        std::cerr << "ERROR: --export-macro is required.\n";
+        return false;
     }
 
     return true;
 }
 
-int main( int argc, char *argv[])
+int main(int argc, char *argv[])
 {
     AppArgs args;
-    if (!parse_args(argc, argv, args)) {
-        std::cerr << "Usage: " << argv[0] << " --schemas <file1.yml> [file2.yml...] --out <dir>" << std::endl;
+
+    if (!parseArgs(argc, argv, args)) {
+        std::cerr << "Usage: " << argv[0]
+                  << " --schemas <file1.yml> [file2.yml...]"
+                  << " --out <dir>"
+                  << " --export-header <header>"
+                  << " --export-macro <macro>\n";
         return 1;
     }
 
-    job::serializer::msg_pack::JobEmitterMsgPack emitter_plugin;
+    job::serializer::msg_pack::JobEmitterMsgPack emitterPlugin;
+
+    if (args.exportHeader.empty()) {
+        JOB_LOG_ERROR("[job_msg_gen] Export header is empty");
+        return EINVAL;
+    }
+
+    if (args.exportMacro.empty()) {
+        JOB_LOG_ERROR("[job_msg_gen] Export macro is empty");
+        return EINVAL;
+    }
+
+    emitterPlugin.setExportHeader(args.exportHeader);
+    emitterPlugin.setExportMacro(args.exportMacro);
+
     int errors = 0;
-    for (const auto &schema_path : args.schema_files) {
-        JOB_LOG_INFO("[job_msg_gen] Processing schema: {}", schema_path.string());
-        Reader reader(schema_path);
+
+    for (const auto &schemaPath : args.schemaFiles) {
+        JOB_LOG_INFO("[job_msg_gen] Processing schema: {}", schemaPath.string());
+
+        Reader reader(schemaPath);
         Schema schema;
+
         if (!reader.readSchema(schema)) {
-            JOB_LOG_ERROR("[job_msg_gen] FAILED to parse schema: {}", schema_path.string());
-            errors++;
+            JOB_LOG_ERROR("[job_msg_gen] FAILED to parse schema: {}", schemaPath.string());
+            ++errors;
             continue;
         }
-        //NEW
-        if(!schema.isValid()){
-            JOB_LOG_ERROR("[job_msg_gen] Schema: is infalid \n");
+
+        if (!schema.isValid()) {
+            JOB_LOG_ERROR("[job_msg_gen] Schema is invalid");
             schema.dump();
             return EPROTO;
         }
 
+        fs::path headerFile = args.outDir / schema.hdr_name;
+        fs::path sourceFile = args.outDir / schema.src_name;
 
-        fs::path header_file = args.out_dir / schema.hdr_name;
-        fs::path source_file = args.out_dir / schema.src_name;
-        Writer writer(header_file);
+        Writer writer(headerFile);
 
-        if (!writer.writeEmitter(emitter_plugin, schema, header_file, source_file)) {
-            JOB_LOG_ERROR("[job_msg_gen] FAILED to write generated code for: {}", schema_path.string());
-            errors++;
+        if (!writer.writeEmitter(emitterPlugin, schema, headerFile, sourceFile)) {
+            JOB_LOG_ERROR("[job_msg_gen] FAILED to write generated code for: {}", schemaPath.string());
+            ++errors;
             continue;
         }
 
-        JOB_LOG_INFO("[job_msg_gen] Wrote: {}", header_file.string());
-        JOB_LOG_INFO("[job_msg_gen] Wrote: {}", source_file.string());
+        JOB_LOG_INFO("[job_msg_gen] Wrote: {}", headerFile.string());
+        JOB_LOG_INFO("[job_msg_gen] Wrote: {}", sourceFile.string());
     }
 
     if (errors > 0) {
@@ -116,6 +169,6 @@ int main( int argc, char *argv[])
     }
 
     JOB_LOG_INFO("[job_msg_gen] All schemas processed successfully.");
+
     return 0;
 }
-

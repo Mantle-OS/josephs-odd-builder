@@ -21,7 +21,13 @@ add_executable(test_job_threads
     test_branch_and_bound.cpp
 
 )
+target_compile_options(test_job_threads PRIVATE -freflection -fcontracts)
+target_link_options(test_job_threads PRIVATE -fcontracts)
 
+set_target_properties(test_job_threads PROPERTIES
+    CXX_STANDARD 26
+    CXX_STANDARD_REQUIRED ON
+)
 target_link_libraries(test_job_threads PRIVATE
     Threads::Threads
     atomic

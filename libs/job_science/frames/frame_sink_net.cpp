@@ -2,7 +2,8 @@
 
 #include <job_logger.h>
 #include <isocket_io.h>
-
+#include <job_socket_io_result.h>
+#include <poll.h>
 namespace job::science::frames {
 
 using job::net::ISocketIO;
@@ -69,23 +70,48 @@ bool FrameSinkNet::isReady() const noexcept
 }
 
 // Small helper to write all bytes or fail.
-// NOTE: This assumes ISocketIO::write is reasonably POSIX-like:
-//   - returns >0 on bytes written
-//   - returns 0 or <0 on error / closed / would-block
+// Small helper to write all bytes or fail.
 static bool writeAll(ISocketIO &sock, const std::uint8_t *data, std::size_t len)
 {
+    constexpr int kWritableTimeoutMs = 5000;
+
     std::size_t total = 0;
 
     while (total < len) {
-        const auto written = sock.write(data + total, len - total);
-        if (written <= 0)
+        const net::NetIoResult written = sock.write(data + total, len - total);
+
+        if (written.ok()) {
+            // Ok does not mean complete: a short write is normal, resume from
+            // the new offset.
+            total += written.bytes;
+            continue;
+        }
+
+        if (!written.wouldBlock())
             return false;
 
-        total += static_cast<std::size_t>(written);
+        /*
+         * The kernel buffer is full. Wait for writability rather than spinning:
+         * a busy loop would peg a core and, on an edge-triggered fd, would not
+         * make progress anyway. This is why the old `written <= 0` check was
+         * unsafe -- it treated backpressure as a hard failure.
+         */
+        pollfd pfd{};
+        pfd.fd = sock.fd();
+        pfd.events = POLLOUT;
+        pfd.revents = 0;
+
+        const int ready = ::poll(&pfd, 1, kWritableTimeoutMs);
+
+        if (ready <= 0)
+            return false;
+
+        if ((pfd.revents & (POLLERR | POLLHUP | POLLNVAL)) != 0)
+            return false;
     }
+
     return true;
 }
-
 bool FrameSinkNet::writeFrame(const FrameHeader  &header,
                               const std::uint8_t *data,
                               std::size_t         payloadSize)

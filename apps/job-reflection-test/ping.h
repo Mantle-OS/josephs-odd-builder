@@ -2,10 +2,10 @@
 
 #include <iostream>
 #include <string>
-#include "obj.h"
+#include <job_object.h>
 #include "signal.h"
 
-class Ping : public Object
+class Ping : public job::core::Object
 {
 public:
     Ping() = default;

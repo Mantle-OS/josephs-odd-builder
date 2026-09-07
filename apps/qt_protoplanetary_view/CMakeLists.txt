@@ -36,6 +36,21 @@ qt_add_qml_module(appqt_protoplanetary_view
       qppszones.h
 )
 
+
+set_target_properties(appqt_protoplanetary_view PROPERTIES
+    CXX_STANDARD 26
+    CXX_STANDARD_REQUIRED ON
+)
+
+target_compile_options(appqt_protoplanetary_view PRIVATE
+    -freflection
+    -fcontracts
+)
+
+target_link_options(appqt_protoplanetary_view PRIVATE
+    -fcontracts
+)
+
 target_link_libraries(appqt_protoplanetary_view PRIVATE
     Qt6::Core
     Qt6::Gui

@@ -44,6 +44,17 @@ target_link_libraries(test_job_ai PRIVATE
     JosephsOddBuilder_Science
     JosephsOddBuilder_Ai
 )
+
+
+target_compile_options(test_job_ai PRIVATE -freflection -fcontracts)
+target_link_options(test_job_ai PRIVATE -fcontracts)
+
+set_target_properties(test_job_ai PROPERTIES
+    CXX_STANDARD 26
+    CXX_STANDARD_REQUIRED ON
+)
+
+
 target_compile_options(JosephsOddBuilder_Ai PRIVATE ${JOB_CXX_FLAGS} )
 target_include_directories(test_job_ai PRIVATE ${CatchTwo_INCLUDE_DIRS} )
 

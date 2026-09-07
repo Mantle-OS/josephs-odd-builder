@@ -162,10 +162,20 @@ generate_export_header(JosephsOddBuilder_Threads
     EXPORT_FILE_NAME "${JOBTHREADS_EXPORT}"
 )
 
+target_compile_options(JosephsOddBuilder_Threads PRIVATE
+    -freflection
+    -fcontracts)
+
+target_link_options(JosephsOddBuilder_Threads PRIVATE
+    -fcontracts
+)
+
 set_target_properties(JosephsOddBuilder_Threads PROPERTIES
     VERSION ${PROJECT_VERSION}
     SOVERSION ${PROJECT_VERSION_MAJOR}
     OUTPUT_NAME "jobthreads"
+    CXX_STANDARD 26
+    CXX_STANDARD_REQUIRED ON
     CXX_VISIBILITY_PRESET hidden
     VISIBILITY_INLINES_HIDDEN ON
     POSITION_INDEPENDENT_CODE ON

@@ -25,11 +25,11 @@ public:
 private:
     friend class JobHttpAuthFactory;
 
-    ApiKeyAuth(std::string_view token,
-               std::string_view headerName = "X-API-Key");
+    ApiKeyAuth(std::string_view headerName = "X-API-Key",
+               std::string_view token = {});
 
-    ApiKeyAuth(job::crypto::JobSecureMem &&token,
-               std::string_view headerName = "X-API-Key");
+    ApiKeyAuth(std::string_view headerName = "X-API-Key",
+               job::crypto::JobSecureMem::Ptr token = nullptr);
 };
 
 } // namespace job::net

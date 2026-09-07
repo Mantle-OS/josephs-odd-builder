@@ -2,14 +2,12 @@
 
 namespace job::net {
 
-ApiKeyAuth::ApiKeyAuth(std::string_view token,
-                       std::string_view headerName) :
+ApiKeyAuth::ApiKeyAuth(std::string_view headerName, std::string_view token) :
     IJobHttpAuth(headerName, {}, token)
 {
 }
 
-ApiKeyAuth::ApiKeyAuth(job::crypto::JobSecureMem &&token,
-                       std::string_view headerName) :
+ApiKeyAuth::ApiKeyAuth(std::string_view headerName, job::crypto::JobSecureMem::Ptr token) :
     IJobHttpAuth(headerName, {}, std::move(token))
 {
 }

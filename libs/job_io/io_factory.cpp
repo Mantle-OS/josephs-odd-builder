@@ -10,6 +10,8 @@
 #include "file_io.h"
 #include "pty_io.h"
 
+#include "job_file.h"
+
 #include "job_arena_pool.h"
 #include "job_mem_extent.h"
 #include "job_mem_pool.h"
@@ -38,7 +40,12 @@ std::shared_ptr<IODevice> IOFactory::createFromType(FactoryType type, const std:
     case FactoryType::FileName:
         return std::make_shared<FileIO>(target, FileMode::RegularFile, true);
 
-    case FactoryType::JobFile:
+    case FactoryType::JobFileReader:
+        return std::make_shared<JobFile>(target);
+    case FactoryType::JobFileWriter:
+        return std::make_shared<JobFile>(target,
+                                         JobFile::Access::WriteOnly,
+                                         JobFile::OpenMode::Truncate);
     case FactoryType::SharedMemory:
     case FactoryType::Mmap:
         break;
@@ -141,49 +148,49 @@ std::shared_ptr<IODevice> IOFactory::createFromURI(const std::string &uri)
 //     return nullptr;
 // }
 
-// JobRangePool::Ptr IOFactory::createRangePool(std::size_t size)
-// {
-//     return JobRangePool::createShared(size);
-// }
+JobRangePool::Ptr IOFactory::createRangePool(std::size_t size)
+{
+    return JobRangePool::createShared(size);
+}
 
-// JobRangePool::Ptr IOFactory::createRangePool(JobMmap::Ptr mmap)
-// {
-//     return JobRangePool::createShared(std::move(mmap));
-// }
+JobRangePool::Ptr IOFactory::createRangePool(JobMmap::Ptr mmap)
+{
+    return JobRangePool::createShared(std::move(mmap));
+}
 
-// JobPagePool::Ptr IOFactory::createPagePool(std::size_t size, std::size_t pageSize)
-// {
-//     return JobPagePool::createShared(size, pageSize);
-// }
+JobPagePool::Ptr IOFactory::createPagePool(std::size_t size, std::size_t pageSize)
+{
+    return JobPagePool::createShared(size, pageSize);
+}
 
-// JobPagePool::Ptr IOFactory::createPagePool(JobMmap::Ptr mmap, std::size_t pageSize)
-// {
-//     return JobPagePool::createShared(std::move(mmap), pageSize);
-// }
+JobPagePool::Ptr IOFactory::createPagePool(JobMmap::Ptr mmap, std::size_t pageSize)
+{
+    return JobPagePool::createShared(std::move(mmap), pageSize);
+}
 
-// JobPagePool::Ptr IOFactory::createPagePool(JobMemExtent::Ptr extent, std::size_t pageSize)
-// {
-//     return JobPagePool::createShared(std::move(extent), pageSize);
-// }
+JobPagePool::Ptr IOFactory::createPagePool(JobMemExtent::Ptr extent, std::size_t pageSize)
+{
+    return JobPagePool::createShared(std::move(extent), pageSize);
+}
 
-// JobSizePool::Ptr IOFactory::createSizePool(const JobMemSize &sizeClass, JobPagePool::Ptr pagePool)
-// {
-//     return JobSizePool::createShared(sizeClass, std::move(pagePool));
-// }
+JobSizePool::Ptr IOFactory::createSizePool(const JobMemSize &sizeClass, JobPagePool::Ptr pagePool)
+{
+    return JobSizePool::createShared(sizeClass, std::move(pagePool));
+}
 
-// JobArenaPool::Ptr IOFactory::createArenaPool(std::size_t size)
-// {
-//     return JobArenaPool::createShared(size);
-// }
+JobArenaPool::Ptr IOFactory::createArenaPool(std::size_t size)
+{
+    return JobArenaPool::createShared(size);
+}
 
-// JobArenaPool::Ptr IOFactory::createArenaPool(JobMmap::Ptr mmap)
-// {
-//     return JobArenaPool::createShared(std::move(mmap));
-// }
+JobArenaPool::Ptr IOFactory::createArenaPool(JobMmap::Ptr mmap)
+{
+    return JobArenaPool::createShared(std::move(mmap));
+}
 
-// JobArenaPool::Ptr IOFactory::createArenaPool(JobMemExtent::Ptr extent)
-// {
-//     return JobArenaPool::createShared(std::move(extent));
-// }
+JobArenaPool::Ptr IOFactory::createArenaPool(JobMemExtent::Ptr extent)
+{
+    return JobArenaPool::createShared(std::move(extent));
+}
 
 } // namespace job::io

@@ -4,11 +4,12 @@
 #include <cstdint>
 #include <variant>
 #include <string>
+#include <unordered_map>
 
 #include <nlohmann/json.hpp>
 
 #include <yaml-cpp/yaml.h>
-
+#include "jobserializer_export.h"
 namespace job::serializer {
 
 enum class FieldKind : uint8_t {
@@ -20,7 +21,7 @@ enum class FieldKind : uint8_t {
     ListStruct
 };
 
-[[nodiscard]] FieldKind deduceFieldKind(const std::string &type) noexcept;
+[[nodiscard]] JOBSERIALIZER_EXPORT FieldKind deduceFieldKind(const std::string &type) noexcept;
 
 enum class SerializeMode : uint8_t {
     Encode = 0,
@@ -66,10 +67,7 @@ enum class SerializeLicenseType : uint8_t {
     LIC_CUSTOM = 254
 };
 
-
-
-
-struct FieldValue final {
+struct JOBSERIALIZER_EXPORT FieldValue final {
     using Scalar    = std::variant<int32_t, uint32_t, int64_t, uint64_t, float, double, bool, std::string>;
     using Binary    = std::vector<uint8_t>;
     using List      = std::vector<FieldValue>;

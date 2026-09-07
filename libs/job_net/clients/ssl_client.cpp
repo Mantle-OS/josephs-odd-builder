@@ -72,23 +72,28 @@ void SslClient::disconnect()
         m_socket->disconnect();
 }
 
-int64_t SslClient::send(const void *data, size_t size)
+NetIoResult SslClient::send(const void *data, size_t size)
 {
     if (!m_socket || !m_socket->isEncrypted())
-        return -1;
+        return NetIoResult::error();
 
     if (!data && size > 0)
-        return -1;
+        return NetIoResult::error();
 
     if (size == 0)
-        return 0;
+        return NetIoResult::transferred(0);
 
     return m_socket->write(data, size);
 }
 
-int64_t SslClient::send(const std::string &data)
+NetIoResult SslClient::send(const std::string &data)
 {
     return send(data.data(), data.size());
+}
+
+bool SslClient::setWriteInterest(bool enable)
+{
+    return m_socket && m_socket->setWriteInterest(enable);
 }
 
 bool SslClient::isConnected() const noexcept
@@ -245,6 +250,11 @@ void SslClient::setupSocketCallbacks()
         readAvailableData();
     };
 
+    m_socket->onWrite = [this](const char *, size_t) {
+        if (onWritable)
+            onWritable();
+    };
+
     m_socket->onDisconnect = [this]() {
         if (onDisconnect)
             onDisconnect();
@@ -300,14 +310,20 @@ void SslClient::readAvailableData()
     if (!socket)
         return;
 
-    while (socket->isEncrypted()) {
-        const int64_t count = socket->read(m_readBuffer.data(), m_readBuffer.size());
+    if (m_readBuffer.empty())
+        return;
 
-        if (count <= 0)
-            break;
+    while (socket->isEncrypted()) {
+        const NetIoResult count = socket->read(m_readBuffer.data(), m_readBuffer.size());
+
+        if (!count.ok())
+            break; // WouldBlock (drained), Closed (close_notify), or Error.
+
+        if (count.bytes == 0)
+            break; // Defensive: a TLS read of a non-empty buffer never returns 0.
 
         if (onMessage)
-            onMessage(m_readBuffer.data(), static_cast<size_t>(count));
+            onMessage(m_readBuffer.data(), count.bytes);
     }
 }
 

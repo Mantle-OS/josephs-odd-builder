@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <cstring>
 
+#include <poll.h>
+
 // job::core
 #include <job_logger.h>
 
@@ -102,24 +104,58 @@ bool FrameSourceNet::readExact(std::uint8_t *dst, std::size_t size)
     if (!m_socket)
         return false;
 
+    if (size == 0)
+        return true;
+
+    if (!dst)
+        return false;
+
+    constexpr int kReadableTimeoutMs = 5000;
+
     std::size_t total = 0;
 
     while (total < size) {
         const std::size_t want = size - total;
-        const ssize_t n = m_socket->read(dst + total, want);
+        const net::NetIoResult n = m_socket->read(dst + total, want);
 
-        if (n < 0) {
+        if (n.ok()) {
+            // Ok does not mean complete: a short read is normal on a stream.
+            total += n.bytes;
+            continue;
+        }
+
+        if (n.closed()) {
+            // Remote closed; not enough bytes to satisfy the request.
+            JOB_LOG_DEBUG("[FrameSourceNet] peer closed with {} of {} bytes read", total, size);
+            return false;
+        }
+
+        if (n.failed()) {
             JOB_LOG_ERROR("[FrameSourceNet] read() returned error (errno-like: {})",
                           static_cast<int>(m_socket->lastError()));
             return false;
         }
 
-        if (n == 0) {
-            // Remote closed or EOF; not enough bytes to satisfy request.
+        /*
+         * WouldBlock: the socket is non-blocking and the rest of the frame has
+         * not arrived. Wait for readability rather than spinning -- the old
+         * `n == 0` branch treated this as EOF and abandoned a frame that was
+         * merely split across packets.
+         */
+        pollfd pfd{};
+        pfd.fd = m_socket->fd();
+        pfd.events = POLLIN;
+        pfd.revents = 0;
+
+        const int ready = ::poll(&pfd, 1, kReadableTimeoutMs);
+
+        if (ready <= 0) {
+            JOB_LOG_ERROR("[FrameSourceNet] timed out waiting for {} more bytes", size - total);
             return false;
         }
 
-        total += static_cast<std::size_t>(n);
+        if ((pfd.revents & (POLLERR | POLLHUP | POLLNVAL)) != 0)
+            return false;
     }
 
     return true;

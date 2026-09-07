@@ -6,7 +6,13 @@ add_executable(test_job_uart
     test_serial_info.cpp
     test_serial_manager.cpp
 )
+target_compile_options(test_job_uart PRIVATE -freflection -fcontracts)
+target_link_options(test_job_uart PRIVATE -fcontracts)
 
+set_target_properties(test_job_uart PROPERTIES
+    CXX_STANDARD 26
+    CXX_STANDARD_REQUIRED ON
+)
 target_link_libraries(test_job_uart PRIVATE
     Threads::Threads
     ${CatchTwo_LIBRARIES}

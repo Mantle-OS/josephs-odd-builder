@@ -1,152 +1,27 @@
-#include <fstream>
-#include <iostream>
-#include <chrono>
-#include <memory>
 #include <array>
+#include <cassert>
+#include <chrono>
+#include <fstream>
+#include <iomanip>
+#include <iostream>
+#include <memory>
+#include <span>
+#include <vector>
 
-#include <meta>
 #include <contracts>
+#include <meta>
 
-// #include "obj_concept.h"
-
-#include "ping.h"
-#include "pong.h"
-#include "ser_obj.h"
-#include "ser_nested_obj.h"
 #include "tmp_file.h"
+#include "test_loop.h"
 
 #include "packed.h"
 #include "ipc_mmap.h"
 #include "ipc_shm.h"
+// #include "ipc_tcp.h"
+// #include "ipc_unix.h"
+// #include "ipc_ssl.h"
+// #include "ipc_udp.h"
 
-#include "test_loop.h"
-#include "ipc_tcp.h"
-#include "ipc_unix.h"
-#include "ipc_ssl.h"
-#include "ipc_udp.h"
-
-
-#include <iostream>
-#include <iomanip>
-#include <vector>
-#include <span>
-
-#include "ping.h"
-#include "pong.h"
-#include "ser_nested_obj.h"
-#include "ser_obj.h"
-
-#include <cassert>
-#include <chrono>
-#include <iomanip>
-#include <iostream>
-#include <span>
-#include <vector>
-
-#include "ping.h"
-#include "pong.h"
-#include "ser_nested_obj.h"
-#include "ser_obj.h"
-#include "ipc_shm.h"
-
-// =============================================================================
-// 1. Core Signal/Slot & Scope Lifetime Tests
-// =============================================================================
-void runSignalSlotTests() {
-    std::cout << "\n=== 1. Signal / Slot & Lifetime Tests ===\n";
-
-    auto ping = makeUniq<Ping>();
-    auto pong = makeUniq<Pong>();
-
-    std::cout << "Ping UID: " << ping->uid() << " | Pong UID: " << pong->uid() << "\n";
-
-    connect<&Ping::pingChanged, &Pong::handlePing>(*ping, *pong);
-    connect<&Pong::pongChanged, &Ping::handlePong>(*pong, *ping);
-
-    ping->emit(42);
-    pong->emit(84);
-
-    ping->debugJson();
-    pong->debugYaml();
-
-    // Scope disconnection check
-    {
-        auto scopedPong = makeUniq<Pong>();
-        connect<&Ping::pingChanged, &Pong::handlePing>(*ping, *scopedPong);
-        assert(ping->pingChanged.connectionCount() == 2);
-    }
-    assert(ping->pingChanged.connectionCount() == 1);
-    std::cout << "Signal/Slot RAII disconnection verified.\n";
-}
-
-// =============================================================================
-// 2. Reflection Serialization Tests (JSON / YAML / Binary)
-// =============================================================================
-void runSerializationTests() {
-    std::cout << "\n=== 2. Reflection Serialization Tests ===\n";
-
-    auto ser = makeUniq<SerObj>();
-    ser->setName("RootJobEntity");
-    ser->setCount(42);
-    ser->setValue(13.37f);
-    ser->setFloatList({1.0f, 2.5f, 5.25f, 10.125f});
-
-    ser->nestedObject().setName("DirectChild");
-    ser->nestedObject().setId(101);
-    ser->nestedObject().setWeight(75.5f);
-    ser->nestedObject().setEnabled(true);
-    ser->nestedObject().setSomeEnum(SomeEnum::Car);
-
-    auto childA = makeShared<SerNestedObj>();
-    childA->setName("SharedWorker_0");
-    childA->setId(201);
-    childA->setWeight(12.3f);
-    childA->setEnabled(true);
-    childA->setSomeEnum(SomeEnum::Foo);
-
-    auto childB = makeShared<SerNestedObj>();
-    childB->setName("SharedWorker_1");
-    childB->setId(202);
-    childB->setWeight(98.7f);
-    childB->setEnabled(false);
-    childB->setSomeEnum(SomeEnum::Bar);
-
-    ser->nestedObjects().push_back(std::move(childA));
-    ser->nestedObjects().push_back(std::move(childB));
-
-    ser->debugJson();
-    ser->debugYaml();
-
-    std::vector<uint8_t> binaryBuffer;
-    ser->toBinary(binaryBuffer);
-    std::cout << "Packed Binary Size: " << binaryBuffer.size() << " bytes\n";
-
-    auto restored = makeUniq<SerObj>();
-    std::span<const uint8_t> streamSpan(binaryBuffer);
-    const bool ok = restored->fromBinary(streamSpan);
-
-    assert(ok);
-    assert(restored->name() == "RootJobEntity");
-    assert(restored->nestedObjects().size() == 2);
-    assert(restored->nestedObjects()[0]->name() == "SharedWorker_0");
-    std::cout << "In-memory binary roundtrip verified.\n";
-
-}
-
-// =============================================================================
-// Main Entrypoint
-// =============================================================================
-int main() {
-    std::cout << "========================================================\n";
-    std::cout << "     Joseph's Odd Builder - Reflection & IPC Suite     \n";
-    std::cout << "========================================================\n";
-
-    runSignalSlotTests();
-    runSerializationTests();
-
-    std::cout << "\nAll test suites completed successfully!\n";
-    return 0;
-}
 
 
 #ifdef UDP_TEST
@@ -916,81 +791,68 @@ int main()
 }
 #endif
 
+#if  0
+int main()
+{
+    Packed src;
+    src.type = LayerType::Attention;
+    src.activation = ActivationType::GELU;
+    src.inputs = 4096;
+    src.outputs = 4096;
+    src.weightOffset = 128;
+    src.weightCount = 16384;
+    src.biasOffset = 16512;
+    src.biasCount = 4096;
+    src.auxiliaryData = 8;
 
-// int main()
-// {
-//     Packed src;
-//     src.type = LayerType::Attention;
-//     src.activation = ActivationType::GELU;
-//     src.inputs = 4096;
-//     src.outputs = 4096;
-//     src.weightOffset = 128;
-//     src.weightCount = 16384;
-//     src.biasOffset = 16512;
-//     src.biasCount = 4096;
-//     src.auxiliaryData = 8;
+    static_assert(sizeof(Packed) == 32);
+    static_assert(std::is_trivially_copyable_v<Packed>);
+    static_assert(std::is_standard_layout_v<Packed>);
 
-//     static_assert(sizeof(Packed) == 32);
-//     static_assert(std::is_trivially_copyable_v<Packed>);
-//     static_assert(std::is_standard_layout_v<Packed>);
-
-//     const std::string path = "/tmp/job-packed-test.bin";
-//     constexpr int iterations = 100;
+    const std::string path = "/tmp/job-packed-test.bin";
+    constexpr int iterations = 100;
 
 
-//     using Clock = std::chrono::high_resolution_clock;
-//     const auto writeStart = Clock::now();
-//     for (int i = 0; i < iterations; ++i) {
-//         if (!Serializer::save(src, path))
-//             return 1;
-//     }
-//     const auto writeEnd = Clock::now();
-//     Packed dst{};
-//     const auto readStart = Clock::now();
-//     for (int i = 0; i < iterations; ++i)
-//         dst = Serializer::load(path);
-//     const auto readEnd = Clock::now();
+    using Clock = std::chrono::high_resolution_clock;
+    const auto writeStart = Clock::now();
+    for (int i = 0; i < iterations; ++i) {
+        if (!Serializer::save(src, path))
+            return 1;
+    }
+    const auto writeEnd = Clock::now();
+    Packed dst{};
+    const auto readStart = Clock::now();
+    for (int i = 0; i < iterations; ++i)
+        dst = Serializer::load(path);
+    const auto readEnd = Clock::now();
 
-//     contract_assert(dst.type == LayerType::Attention);
-//     contract_assert(dst.activation == ActivationType::GELU);
-//     contract_assert(dst.inputs == 4096);
-//     contract_assert(dst.outputs == 4096);
-//     contract_assert(dst.weightOffset == 128);
-//     contract_assert(dst.weightCount == 16384);
-//     contract_assert(dst.biasOffset == 16512);
-//     contract_assert(dst.biasCount == 4096);
-//     contract_assert(dst.auxiliaryData == 8);
+    contract_assert(dst.type == LayerType::Attention);
+    contract_assert(dst.activation == ActivationType::GELU);
+    contract_assert(dst.inputs == 4096);
+    contract_assert(dst.outputs == 4096);
+    contract_assert(dst.weightOffset == 128);
+    contract_assert(dst.weightCount == 16384);
+    contract_assert(dst.biasOffset == 16512);
+    contract_assert(dst.biasCount == 4096);
+    contract_assert(dst.auxiliaryData == 8);
 
-//     const auto writeUs =
-//         std::chrono::duration_cast<std::chrono::microseconds>(writeEnd - writeStart).count();
+    const auto writeUs =
+        std::chrono::duration_cast<std::chrono::microseconds>(writeEnd - writeStart).count();
 
-//     const auto readUs =
-//         std::chrono::duration_cast<std::chrono::microseconds>(readEnd - readStart).count();
+    const auto readUs =
+        std::chrono::duration_cast<std::chrono::microseconds>(readEnd - readStart).count();
 
-//     std::cout << "structure size: " << sizeof(Packed) << " bytes\n";
-//     std::cout << "100 binary writes: " << writeUs << " us\n";
-//     std::cout << "100 binary reads:  " << readUs << " us\n";
-//     std::cout << "write avg: " << static_cast<double>(writeUs) / iterations << " us\n";
-//     std::cout << "read avg:  " << static_cast<double>(readUs) / iterations << " us\n";
+    std::cout << "structure size: " << sizeof(Packed) << " bytes\n";
+    std::cout << "100 binary writes: " << writeUs << " us\n";
+    std::cout << "100 binary reads:  " << readUs << " us\n";
+    std::cout << "write avg: " << static_cast<double>(writeUs) / iterations << " us\n";
+    std::cout << "read avg:  " << static_cast<double>(readUs) / iterations << " us\n";
 
-//     std::remove(path.c_str());
+    std::remove(path.c_str());
 
-//     return 0;
-// }
-
-// int main()
-// {
-//     Pong pong;
-//     {
-//         Ping ping;
-//         connect<&Ping::pingChanged, &Pong::handlePing>(ping, pong);
-//         for(int i = 0; i <= 10; ++i )
-//             ping.emit(i);
-//     }
-
-//     return 0;
-// }
-// divide(10, 0);
+    return 0;
+}
+#endif
 
 
 

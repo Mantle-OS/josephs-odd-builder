@@ -1,9 +1,9 @@
 #include <catch2/catch_all.hpp>
+
 #include <string>
 
-#include <yaml-cpp/yaml.h>
-
 #include <nlohmann/json.hpp>
+#include <yaml-cpp/yaml.h>
 
 #include <job_serializer_utils.h>
 #include <schema.h>
@@ -11,8 +11,7 @@
 using namespace job::serializer;
 using json = nlohmann::json;
 
-// Helper to create a minimal, valid Schema in YAML format
-const std::string VALID_SCHEMA_YAML = R"(
+static const std::string VALID_SCHEMA_YAML = R"(
 tag: "TestMsg"
 version: 1
 unit: "tests"
@@ -27,11 +26,28 @@ fields:
     type: "bin[32]"
 )";
 
-// Helper to create a minimal, valid Schema in JSON format
-const json VALID_SCHEMA_JSON = json::parse(R"({"tag": "TestMsg", "version": 1, "unit": "tests", "base": "BaseStruct", "c_struct": "TestMsg_t", "include_prefix": "job_tests", "out_base": "test_msg", "fields": [{"name": "count", "type": "u32"}, {"name": "data", "type": "bin[32]"}]})");
+static const json VALID_SCHEMA_JSON = json::parse(R"({
+    "tag": "TestMsg",
+    "version": 1,
+    "unit": "tests",
+    "base": "BaseStruct",
+    "c_struct": "TestMsg_t",
+    "include_prefix": "job_tests",
+    "out_base": "test_msg",
+    "fields": [
+        {
+            "name": "count",
+            "type": "u32"
+        },
+        {
+            "name": "data",
+            "type": "bin[32]"
+        }
+    ]
+})");
 
-
-TEST_CASE("Schema::isValid() correctly validates schema requirements", "[schema]") {
+TEST_CASE("Schema::isValid() correctly validates schema requirements", "[schema]")
+{
     Schema s{};
 
     s.tag = "TestMsg";
@@ -42,44 +58,50 @@ TEST_CASE("Schema::isValid() correctly validates schema requirements", "[schema]
     s.include_prefix = "job_tests";
     s.out_base = "test_msg";
 
-    Field f1;
+    Field f1{};
     f1.name = "field1";
     f1.type = "i32";
     f1.kind = deduceFieldKind(f1.type);
+
     s.fields.push_back(f1);
 
-    SECTION("Valid schema") {
+    SECTION("Valid schema")
+    {
         REQUIRE(s.isValid());
     }
 
-    SECTION("Invalid: Missing Tag") {
-        s.tag = "";
+    SECTION("Invalid: Missing Tag")
+    {
+        s.tag.clear();
         REQUIRE_FALSE(s.isValid());
     }
 
-    SECTION("Invalid: Zero Version") {
-        s.tag = "TestMsg";
+    SECTION("Invalid: Zero Version")
+    {
         s.version = 0;
         REQUIRE_FALSE(s.isValid());
     }
 
-    SECTION("Invalid: Empty Fields") {
-        s.version = 1;
+    SECTION("Invalid: Empty Fields")
+    {
         s.fields.clear();
         REQUIRE_FALSE(s.isValid());
     }
 
-    SECTION("Invalid: Missing C struct name") {
-        s.c_struct = "";
+    SECTION("Invalid: Missing C struct name")
+    {
+        s.c_struct.clear();
         REQUIRE_FALSE(s.isValid());
     }
 }
 
-TEST_CASE("Schema::parse correctly handles YAML input", "[schema][from_yaml]") {
+TEST_CASE("Schema::parse correctly handles YAML input", "[schema][from_yaml]")
+{
     Schema s{};
     YAML::Node root = YAML::Load(VALID_SCHEMA_YAML);
 
-    SECTION("Successful YAML parse") {
+    SECTION("Successful YAML parse")
+    {
         REQUIRE(Schema::parse(root, s));
         REQUIRE(s.isValid());
         REQUIRE(s.tag == "TestMsg");
@@ -88,13 +110,13 @@ TEST_CASE("Schema::parse correctly handles YAML input", "[schema][from_yaml]") {
         REQUIRE(s.fields[1].name == "data");
         REQUIRE(s.fields[1].kind == FieldKind::Bin);
 
-        // Check Smart Defaults for filenames
         REQUIRE(s.hdr_name.string() == "test_msg.hpp");
         REQUIRE(s.src_name.string() == "test_msg.cpp");
     }
 
-    SECTION("YAML parse failure - Missing fields") {
-        std::string bad_yaml = R"(
+    SECTION("YAML parse failure - Missing fields")
+    {
+        const std::string badYaml = R"(
             tag: "TestMsg"
             version: 1
             unit: "tests"
@@ -102,14 +124,16 @@ TEST_CASE("Schema::parse correctly handles YAML input", "[schema][from_yaml]") {
             c_struct: "TestMsg_t"
             include_prefix: "job_tests"
             out_base: "test_msg"
-            # fields: deliberately missing or empty
         )";
-        YAML::Node bad_root = YAML::Load(bad_yaml);
-        REQUIRE_FALSE(Schema::parse(bad_root, s));
+
+        YAML::Node badRoot = YAML::Load(badYaml);
+
+        REQUIRE_FALSE(Schema::parse(badRoot, s));
     }
 
-    SECTION("YAML parse failure - Invalid version") {
-        std::string bad_yaml = R"(
+    SECTION("YAML parse failure - Invalid version")
+    {
+        const std::string badYaml = R"(
             tag: "TestMsg"
             version: 0
             unit: "tests"
@@ -121,15 +145,19 @@ TEST_CASE("Schema::parse correctly handles YAML input", "[schema][from_yaml]") {
               - name: "count"
                 type: "u32"
         )";
-        YAML::Node bad_root = YAML::Load(bad_yaml);
-        REQUIRE_FALSE(Schema::parse(bad_root, s));
+
+        YAML::Node badRoot = YAML::Load(badYaml);
+
+        REQUIRE_FALSE(Schema::parse(badRoot, s));
     }
 }
 
-TEST_CASE("Schema::parse correctly handles JSON input", "[schema][from_json]") {
+TEST_CASE("Schema::parse correctly handles JSON input", "[schema][from_json]")
+{
     Schema s{};
 
-    SECTION("Successful JSON parse (using ADL)") {
+    SECTION("Successful JSON parse (using ADL)")
+    {
         REQUIRE(Schema::parse(VALID_SCHEMA_JSON, s));
         REQUIRE(s.isValid());
         REQUIRE(s.tag == "TestMsg");
@@ -138,67 +166,76 @@ TEST_CASE("Schema::parse correctly handles JSON input", "[schema][from_json]") {
         REQUIRE(s.fields[1].name == "data");
         REQUIRE(s.fields[1].kind == FieldKind::Bin);
 
-        // Check that optional paths default correctly
         REQUIRE(s.hdr_name.string() == "test_msg.hpp");
         REQUIRE(s.src_name.string() == "test_msg.cpp");
     }
 
-    SECTION("JSON parse failure - Missing Field Data") {
-        json bad_json = VALID_SCHEMA_JSON;
-        // Tamper with fields to cause a failure in Field::from_json or validation
-        bad_json["fields"] = json::array({
-            {"name", "f1"} // Missing 'type'
+    SECTION("JSON parse failure - Missing Field Data")
+    {
+        json badJson = VALID_SCHEMA_JSON;
+        badJson["fields"] = json::array({
+            {
+                {"name", "f1"}
+            }
         });
 
-        REQUIRE_FALSE(Schema::parse(bad_json, s));
+        REQUIRE_FALSE(Schema::parse(badJson, s));
     }
 
-    SECTION("JSON parse failure - Invalid version (0)") {
-        json bad_json = VALID_SCHEMA_JSON;
-        bad_json["version"] = 0;
-        REQUIRE_FALSE(Schema::parse(bad_json, s));
+    SECTION("JSON parse failure - Invalid version (0)")
+    {
+        json badJson = VALID_SCHEMA_JSON;
+        badJson["version"] = 0;
+
+        REQUIRE_FALSE(Schema::parse(badJson, s));
     }
 }
 
-TEST_CASE("Schema to/from round trip verification", "[schema][roundtrip]") {
-    Schema s_in{};
+TEST_CASE("Schema to/from round trip verification", "[schema][roundtrip]")
+{
+    Schema sIn{};
     YAML::Node root = YAML::Load(VALID_SCHEMA_YAML);
-    REQUIRE(Schema::parse(root, s_in));
-    s_in.fields.push_back({
+
+    REQUIRE(Schema::parse(root, sIn));
+
+    sIn.fields.push_back({
         .key = 100,
         .name = "nested_struct",
         .type = "struct",
         .kind = FieldKind::Struct,
-        .size = {},
-        .ctype = {},
+        .size{},
+        .ctype{},
         .ref_include = "path/to/other.hpp",
-        .ref_sym = {},
+        .ref_sym{},
         .required = true,
         .comment = "Test comment for roundtrip"
     });
 
-    YAML::Emitter yaml_emitter;
-    Schema::to_yaml(yaml_emitter, s_in);
+    YAML::Emitter yamlEmitter;
+    Schema::to_yaml(yamlEmitter, sIn);
 
     json j;
-    Schema::to_json(j, s_in);
+    Schema::to_json(j, sIn);
 
-    SECTION("Parsers correctly normalize 'ref_sym'") {
-        Schema s_yaml_out{};
-        YAML::Node yaml_roundtrip = YAML::Load(yaml_emitter.c_str());
-        REQUIRE(Schema::parse(yaml_roundtrip, s_yaml_out));
+    SECTION("Parsers correctly normalize 'ref_sym'")
+    {
+        Schema sYamlOut{};
+        YAML::Node yamlRoundtrip = YAML::Load(yamlEmitter.c_str());
 
-        Schema s_json_out{};
-        REQUIRE(Schema::parse(j, s_json_out));
+        REQUIRE(Schema::parse(yamlRoundtrip, sYamlOut));
 
-        const auto& f_yaml = s_yaml_out.fields.back();
-        const auto& f_json = s_json_out.fields.back();
+        Schema sJsonOut{};
+        REQUIRE(Schema::parse(j, sJsonOut));
 
-        REQUIRE(f_yaml.ref_include == "path/to/other.hpp");
-        REQUIRE(f_yaml.ref_sym == "other");
+        const auto &fYaml = sYamlOut.fields.back();
+        const auto &fJson = sJsonOut.fields.back();
 
-        REQUIRE(f_json.ref_include == "path/to/other.hpp");
-        REQUIRE(f_json.ref_sym == "other");
-        REQUIRE(s_yaml_out == s_json_out);
+        REQUIRE(fYaml.ref_include == "path/to/other.hpp");
+        REQUIRE(fYaml.ref_sym == "other");
+
+        REQUIRE(fJson.ref_include == "path/to/other.hpp");
+        REQUIRE(fJson.ref_sym == "other");
+
+        REQUIRE(sYamlOut == sJsonOut);
     }
 }

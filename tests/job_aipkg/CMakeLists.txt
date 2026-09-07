@@ -13,7 +13,13 @@ add_executable(test_job_aipkg
     test_job_aipkg_revocation_index.cpp
     test_job_aipkg_manifest.cpp
 )
+target_compile_options(test_job_aipkg PRIVATE -freflection -fcontracts)
+target_link_options(test_job_aipkg PRIVATE -fcontracts)
 
+set_target_properties(test_job_aipkg PROPERTIES
+    CXX_STANDARD 26
+    CXX_STANDARD_REQUIRED ON
+)
 target_link_libraries(test_job_aipkg
     PRIVATE
         ${CatchTwo_LIBRARIES}

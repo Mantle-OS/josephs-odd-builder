@@ -9,7 +9,7 @@ CustomAuth::CustomAuth(std::string_view scheme, std::string_view token) :
 {
 }
 
-CustomAuth::CustomAuth(std::string_view scheme, job::crypto::JobSecureMem &&token) :
+CustomAuth::CustomAuth(std::string_view scheme, job::crypto::JobSecureMem::Ptr token) :
     IJobHttpAuth("Authorization", scheme, std::move(token))
 {
 }

@@ -59,56 +59,84 @@ TEST_CASE("TcpSocket option toggling works", "[tcp_socket][options]") {
     REQUIRE(sock->option(ISocketIO::SocketOption::KeepAlive));
 }
 
-TEST_CASE("TcpSocket loopback echo (v2.0)", "[tcp_socket][async][echo]") {
+
+TEST_CASE("TcpSocket loopback echo (v2.0)", "[tcp_socket][async][echo]")
+{
     TestLoop loop;
+
     std::atomic<bool> gotEcho{false};
     std::atomic<bool> serverRead{false};
+
     std::shared_ptr<ISocketIO> clientConnection;
+
     auto server = TcpSocket::create(loop.loop);
     auto client = TcpSocket::create(loop.loop);
+
     REQUIRE(server->bind("127.0.0.1", 0));
     REQUIRE(server->listen());
-    uint16_t port = server->localPort();
+
+    const uint16_t port = server->localPort();
     REQUIRE(port > 0);
+
     // Numeric host — same reasoning as the connect-failure test above: no resolver
     // needed or set up here, so connect via JobIpAddr rather than JobUrl.
     JobIpAddr addr("127.0.0.1", port);
+
     server->onConnect = [&]() {
         clientConnection = server->accept();
+
         if (clientConnection) {
-            clientConnection->onRead = [&](const char*, size_t) {
+            clientConnection->onRead = [&](const char *, size_t) {
                 char buf[32]{};
-                ssize_t n = clientConnection->read(buf, sizeof(buf));
-                if (n > 0) {
+
+                const NetIoResult readResult = clientConnection->read(buf, sizeof(buf));
+
+                if (readResult.status == NetIoStatus::Ok && readResult.bytes > 0) {
                     serverRead.store(true);
-                    clientConnection->write(buf, n); // Echo
+
+                    const NetIoResult writeResult = clientConnection->write(buf, readResult.bytes);
+                    REQUIRE(writeResult.status == NetIoStatus::Ok);
+                    REQUIRE(writeResult.bytes == readResult.bytes);
                 }
             };
+
             clientConnection->onDisconnect = [&]() {
                 INFO("[TCP Server:] Client disconnected.");
             };
         }
     };
+
     client->onConnect = [&]() {
-        const char *msg = "Hello";
-        client->write(msg, strlen(msg));
+        constexpr std::string_view msg = "Hello";
+
+        const NetIoResult result = client->write(msg.data(), msg.size());
+        REQUIRE(result.status == NetIoStatus::Ok);
+        REQUIRE(result.bytes == msg.size());
     };
-    client->onRead = [&](const char*, size_t) {
+
+    client->onRead = [&](const char *, size_t) {
         char buf[32]{};
-        ssize_t n = client->read(buf, sizeof(buf));
-        if (n > 0) {
-            if (std::string(buf, n) == "Hello")
+
+        const NetIoResult result = client->read(buf, sizeof(buf));
+
+        if (result.status == NetIoStatus::Ok && result.bytes > 0) {
+            if (std::string_view(buf, result.bytes) == "Hello")
                 gotEcho.store(true);
+
             client->disconnect();
         }
     };
+
     REQUIRE(client->connectToHost(addr));
+
     int retries = 0;
-    while (!gotEcho.load() && retries < 200) { // 200ms timeout
+    while (!gotEcho.load() && retries < 200) {
         std::this_thread::sleep_for(1ms);
-        retries++;
+        ++retries;
     }
-    REQUIRE(serverRead.load() == true);
-    REQUIRE(gotEcho.load() == true);
+
+    REQUIRE(serverRead.load());
+    REQUIRE(gotEcho.load());
+
     server->disconnect();
 }

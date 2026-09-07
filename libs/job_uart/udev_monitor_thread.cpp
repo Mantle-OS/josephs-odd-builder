@@ -56,18 +56,19 @@ bool UdevMonitorThread::start(std::shared_ptr<threads::JobIoAsyncThread> loop, c
 
     return true;
 }
-
 void UdevMonitorThread::stop()
 {
     if (auto loop = m_loop.lock()) {
         if (m_udevFd != -1) {
-            loop->unregisterFD(m_udevFd);
+            if (!loop->unregisterFD(m_udevFd))
+                JOB_LOG_WARN("[UdevMonitorThread] Failed to unregister fd {}", m_udevFd);
+
             m_udevFd = -1;
         }
     }
+
     m_callback = nullptr;
 }
-
 void UdevMonitorThread::onEvents(threads::IOEvent events)
 {
     if (threads::hasEvent(events, threads::IOEvent::Read)) {

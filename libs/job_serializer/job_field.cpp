@@ -1,7 +1,8 @@
 #include "job_field.h"
-#include "job_serializer_logger.h"
+#include <job_logger.h>
+#include <filesystem>
 
-namespace job::serializer{
+namespace job::serializer {
 
 std::optional<int> Field::parseBinSize(const std::string &type) noexcept
 {
@@ -18,7 +19,7 @@ std::optional<int> Field::parseBinSize(const std::string &type) noexcept
             if (v > 0)
                 ret = v;
         } catch (...) {
-            JOB_SER_WARN("[schema] invalid bin size: {}", type);
+            JOB_LOG_WARN("[schema] invalid bin size: {}", type);
         }
 
     } while (0);
@@ -41,7 +42,7 @@ std::optional<int> Field::parseListBinSize(const std::string &type) noexcept
             if (v > 0)
                 ret = v;
         } catch (...) {
-            JOB_SER_WARN("[schema] invalid list<bin[N]> size: {}", type);
+            JOB_LOG_WARN("[schema] invalid list<bin[N]> size: {}", type);
         }
 
     } while (0);
@@ -55,12 +56,12 @@ bool Field::from_yaml(const YAML::Node &n, Field &out) noexcept
 
     do {
         if (!n || !n.IsMap()) {
-            JOB_SER_WARN("[schema] skipping non-map field entry");
+            JOB_LOG_WARN("[schema] skipping non-map field entry");
             break;
         }
 
         if (!n["name"] || !n["type"]) {
-            JOB_SER_ERROR("[schema] field missing 'name' or 'type'");
+            JOB_LOG_ERROR("[schema] field missing 'name' or 'type'");
             break;
         }
         if (n["key"])
@@ -89,7 +90,7 @@ bool Field::from_yaml(const YAML::Node &n, Field &out) noexcept
             out.ref_sym = n["ref_sym"].as<std::string>();
 
         // if ((out.kind == FieldKind::Struct || out.kind == FieldKind::ListStruct) && out.ref_include && !out.ref_sym){
-        //     JOB_SER_ERROR("[schema] Field '{}' is a struct with 'ref_include' but is missing 'ref_sym'", out.name);
+        //     JOB_LOG_ERROR("[schema] Field '{}' is a struct with 'ref_include' but is missing 'ref_sym'", out.name);
         //     break; // Fails the parse
         // }
 
@@ -124,7 +125,7 @@ bool Field::from_yaml(const YAML::Node &node, std::vector<Field> &fields) noexce
 
     do {
         if (!node) {
-            JOB_SER_ERROR("[schema] 'fields' node missing");
+            JOB_LOG_ERROR("[schema] 'fields' node missing");
             break;
         }
 
@@ -132,7 +133,7 @@ bool Field::from_yaml(const YAML::Node &node, std::vector<Field> &fields) noexce
             for (const auto &n : node) {
                 Field f{};
                 if (!Field::from_yaml(n, f)) {
-                    JOB_SER_WARN("[schema] skipping invalid field entry");
+                    JOB_LOG_WARN("[schema] skipping invalid field entry");
                     continue;
                 }
                 fields.push_back(std::move(f));
@@ -147,7 +148,7 @@ bool Field::from_yaml(const YAML::Node &node, std::vector<Field> &fields) noexce
                 try {
                     f.key = static_cast<uint32_t>(std::stoul(keyStr));
                 } catch (...) {
-                    JOB_SER_ERROR("[schema] invalid field key: {}", keyStr);
+                    JOB_LOG_ERROR("[schema] invalid field key: {}", keyStr);
                     break;
                 }
 
@@ -158,7 +159,7 @@ bool Field::from_yaml(const YAML::Node &node, std::vector<Field> &fields) noexce
             }
 
         } else {
-            JOB_SER_ERROR("[schema] 'fields' must be a map or sequence");
+            JOB_LOG_ERROR("[schema] 'fields' must be a map or sequence");
             break;
         }
 
@@ -255,40 +256,40 @@ void Field::from_json(const nlohmann::json &j, Field &f)
 
 void Field::dump() const noexcept
 {
-    JOB_SER_DEBUG("  Field #{}", key);
-    JOB_SER_DEBUG("    name: {}", name);
-    JOB_SER_DEBUG("    type: {}", type);
-    JOB_SER_DEBUG("    kind: {}", static_cast<int>(kind));
+    JOB_LOG_DEBUG("  Field #{}", key);
+    JOB_LOG_DEBUG("    name: {}", name);
+    JOB_LOG_DEBUG("    type: {}", type);
+    JOB_LOG_DEBUG("    kind: {}", static_cast<int>(kind));
 
     if (size)
-        JOB_SER_DEBUG("    size: {}", *size);
+        JOB_LOG_DEBUG("    size: {}", *size);
 
     if (ctype)
-        JOB_SER_DEBUG("    ctype: {}", *ctype);
+        JOB_LOG_DEBUG("    ctype: {}", *ctype);
 
     if (ref_include)
-        JOB_SER_DEBUG("    ref_include: {}", *ref_include);
+        JOB_LOG_DEBUG("    ref_include: {}", *ref_include);
 
     if (ref_sym)
-        JOB_SER_DEBUG("    ref_sym: {}", *ref_sym);
+        JOB_LOG_DEBUG("    ref_sym: {}", *ref_sym);
 
-    JOB_SER_DEBUG("    required: {}", required ? "true" : "false");
+    JOB_LOG_DEBUG("    required: {}", required ? "true" : "false");
 
     if (comment)
-        JOB_SER_DEBUG("    comment: {}", *comment);
+        JOB_LOG_DEBUG("    comment: {}", *comment);
 }
 
 bool Field::isValid(std::vector<Field> fields) noexcept
 {
     for (const auto &f : fields) {
         if (f.name.empty() || f.type.empty()) {
-            JOB_SER_WARN("[schema] Validation failed: Field key {} is missing 'name' or 'type'", f.key);
+            JOB_LOG_WARN("[schema] Validation failed: Field key {} is missing 'name' or 'type'", f.key);
             return false;
         }
 
         if (f.kind == FieldKind::Struct || f.kind == FieldKind::ListStruct) {
             if (!f.ref_sym) {
-                JOB_SER_ERROR("[schema] Validation failed: Field '{}' is a struct but is missing 'ref_sym'", f.name);
+                JOB_LOG_ERROR("[schema] Validation failed: Field '{}' is a struct but is missing 'ref_sym'", f.name);
                 return false;
             }
         }

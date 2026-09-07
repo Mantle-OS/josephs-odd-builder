@@ -26,7 +26,7 @@ private:
     friend class JobHttpAuthFactory;
 
     explicit TokenAuth(std::string_view token);
-    explicit TokenAuth(job::crypto::JobSecureMem &&token);
+    explicit TokenAuth(job::crypto::JobSecureMem::Ptr token);
 };
 
 } // namespace job::net

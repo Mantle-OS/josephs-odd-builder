@@ -69,8 +69,12 @@ public:
 
     ~AudioProcessingManager()
     {
-        if (m_timerId != 0)
-            job::threads::AsyncEventLoop::globalLoop().cancelTimer(m_timerId);
+        if (m_timerId != 0) {
+            if (!job::threads::AsyncEventLoop::globalLoop().cancelTimer(m_timerId))
+                JOB_LOG_WARN("[AudioProcessingManager] Failed to cancel timer {}", m_timerId);
+
+            m_timerId = 0;
+        }
 
         stopCapture();
         stopPlayback();

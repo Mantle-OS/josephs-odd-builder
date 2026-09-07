@@ -2,15 +2,18 @@
 
 #include <cstdint>
 #include <optional>
+#include <filesystem>
+#include <string>
+#include <vector>
 
 #include <nlohmann/json.hpp>
 #include <yaml-cpp/yaml.h>
 
 #include "job_serializer_utils.h"
-
+#include "jobserializer_export.h"
 namespace job::serializer {
 
-struct Field final {
+struct JOBSERIALIZER_EXPORT Field final {
     uint32_t key = 0;
     std::string name;
     std::string type;

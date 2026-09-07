@@ -28,25 +28,25 @@ private:
     struct SignalEntry {
         std::shared_ptr<Connection::State> state;
         Callback callback;
-        const void* receiverIdentity{nullptr};
-        const void* slotIdentity{nullptr};
+        const void *receiverIdentity{nullptr};
+        const void *slotIdentity{nullptr};
     };
 
     using ConnectionList = std::vector<SignalEntry>;
     using Snapshot       = std::shared_ptr<const ConnectionList>;
 
     struct SignalState {
-        SignalState()
-            : connections(std::make_shared<const ConnectionList>())
+        SignalState() :
+            connections(std::make_shared<const ConnectionList>())
         {
         }
 
         ~SignalState() = default;
 
-        SignalState(const SignalState&) = delete;
-        SignalState& operator=(const SignalState&) = delete;
-        SignalState(SignalState&&) = delete;
-        SignalState& operator=(SignalState&&) = delete;
+        SignalState(const SignalState &) = delete;
+        SignalState &operator=(const SignalState &) = delete;
+        SignalState(SignalState &&) = delete;
+        SignalState &operator=(SignalState &&) = delete;
 
         std::atomic<Snapshot> connections;
         std::mutex writeMutex;
@@ -57,13 +57,12 @@ private:
     };
 
 public:
-    Signal()
-        : m_state(std::make_shared<SignalState>()),
-          m_control(std::make_shared<Connection::Control>(
-              [weakState = std::weak_ptr<SignalState>{m_state}](ConnectionId connectionId) {
-                  if (const auto state = weakState.lock())
-                      disconnectState(state, connectionId);
-              }))
+    Signal() :
+        m_state(std::make_shared<SignalState>()),
+        m_control(std::make_shared<Connection::Control>([weakState = std::weak_ptr<SignalState>{m_state}](ConnectionId connectionId) {
+            if (const auto state = weakState.lock())
+                disconnectState(state, connectionId);
+        }))
     {
     }
 
@@ -73,10 +72,10 @@ public:
         m_control.reset();
     }
 
-    Signal(const Signal&) = delete;
-    Signal& operator=(const Signal&) = delete;
-    Signal(Signal&&) = delete;
-    Signal& operator=(Signal&&) = delete;
+    Signal(const Signal &) = delete;
+    Signal &operator=(const Signal &) = delete;
+    Signal(Signal &&) = delete;
+    Signal &operator=(Signal &&) = delete;
 
     [[nodiscard]] Connection connect(Callback callback, ConnectionFlag flags = ConnectionFlag::None)
     {
@@ -88,7 +87,7 @@ public:
         disconnectState(m_state, id);
     }
 
-    void disconnect(const Connection& connection)
+    void disconnect(const Connection &connection)
     {
         disconnect(connection.id());
     }
@@ -109,7 +108,7 @@ public:
         const Snapshot connections = m_state->connections.load(std::memory_order_acquire);
 
         if (m_state->singleShotCount.load(std::memory_order_relaxed) == 0) {
-            for (const auto& entry : *connections) {
+            for (const auto &entry : *connections) {
                 if (entry.callback)
                     entry.callback(args...);
             }
@@ -136,16 +135,15 @@ public:
     }
 
 private:
-    void bindBlockState(const std::atomic<bool>* blockState) noexcept
+    void bindBlockState(const std::atomic<bool> *blockState) noexcept
     {
         m_blockState = blockState;
     }
 
-    [[nodiscard]] Connection connectImpl(
-        Callback callback,
-        ConnectionFlag flags,
-        const void* receiverIdentity,
-        const void* slotIdentity)
+    [[nodiscard]] Connection connectImpl(Callback callback,
+                                         ConnectionFlag flags,
+                                         const void *receiverIdentity,
+                                         const void *slotIdentity)
     {
         std::lock_guard<std::mutex> lock(m_state->writeMutex);
 
@@ -158,13 +156,9 @@ private:
             if (!receiverIdentity || !slotIdentity)
                 return {};
 
-            const auto duplicate = std::find_if(
-                current->begin(),
-                current->end(),
-                [receiverIdentity, slotIdentity](const SignalEntry& entry) {
-                    return entry.receiverIdentity == receiverIdentity &&
-                           entry.slotIdentity == slotIdentity;
-                });
+            const auto duplicate = std::find_if(current->begin(), current->end(), [receiverIdentity, slotIdentity](const SignalEntry &entry) {
+                return entry.receiverIdentity == receiverIdentity && entry.slotIdentity == slotIdentity;
+            });
 
             if (duplicate != current->end())
                 return {};
@@ -191,13 +185,13 @@ private:
         return connection;
     }
 
-    static void publish(const std::shared_ptr<SignalState>& state, std::shared_ptr<ConnectionList> connections)
+    static void publish(const std::shared_ptr<SignalState> &state, std::shared_ptr<ConnectionList> connections)
     {
         Snapshot snapshot = std::move(connections);
         state->connections.store(std::move(snapshot), std::memory_order_release);
     }
 
-    static void disconnectState(const std::shared_ptr<SignalState>& state, ConnectionId id)
+    static void disconnectState(const std::shared_ptr<SignalState> &state, ConnectionId id)
     {
         std::lock_guard<std::mutex> lock(state->writeMutex);
 
@@ -206,7 +200,7 @@ private:
 
         const Snapshot current = state->connections.load(std::memory_order_acquire);
 
-        const auto it = std::find_if(current->begin(), current->end(), [id](const SignalEntry& entry) {
+        const auto it = std::find_if(current->begin(), current->end(), [id](const SignalEntry &entry) {
             return entry.state && entry.state->id == id;
         });
 
@@ -214,14 +208,12 @@ private:
             return;
 
         const auto disconnectedState = it->state;
-        const bool singleShot =
-            disconnectedState &&
-            hasConnectionFlag(disconnectedState->flags, ConnectionFlag::SingleShot);
+        const bool singleShot = disconnectedState && hasConnectionFlag(disconnectedState->flags, ConnectionFlag::SingleShot);
 
         auto next = std::make_shared<ConnectionList>();
         next->reserve(current->size() - 1);
 
-        for (const auto& entry : *current) {
+        for (const auto &entry : *current) {
             if (!entry.state || entry.state->id != id)
                 next->push_back(entry);
         }
@@ -236,7 +228,7 @@ private:
             disconnectedState->connected.store(false, std::memory_order_release);
     }
 
-    static void disconnectAllState(const std::shared_ptr<SignalState>& state)
+    static void disconnectAllState(const std::shared_ptr<SignalState> &state)
     {
         std::lock_guard<std::mutex> lock(state->writeMutex);
 
@@ -252,36 +244,35 @@ private:
         state->connectionCount.store(0, std::memory_order_release);
         state->singleShotCount.store(0, std::memory_order_release);
 
-        for (const auto& entry : *current) {
+        for (const auto &entry : *current) {
             if (entry.state)
                 entry.state->connected.store(false, std::memory_order_release);
         }
     }
 
-    void emitWithSingleShot(const Snapshot& connections, Args... args) const
+    void emitWithSingleShot(const Snapshot &connections, Args... args) const
     {
-        for (const auto& entry : *connections) {
-            if (!entry.callback)
-                continue;
+        for (const auto &entry : *connections) {
+            if (!entry.state || !hasConnectionFlag(entry.state->flags, ConnectionFlag::SingleShot)) {
+                if (entry.callback)
+                    entry.callback(args...);
 
-            if (!entry.state ||
-                !hasConnectionFlag(entry.state->flags, ConnectionFlag::SingleShot)) {
-                entry.callback(args...);
                 continue;
             }
 
             bool expected = false;
 
-            if (!entry.state->singleShotClaimed.compare_exchange_strong(
-                    expected,
-                    true,
-                    std::memory_order_acq_rel,
-                    std::memory_order_relaxed)) {
+            if (!entry.state->singleShotClaimed.compare_exchange_strong(expected,
+                                                                        true,
+                                                                        std::memory_order_acq_rel,
+                                                                        std::memory_order_relaxed)) {
                 continue;
             }
 
             disconnectState(m_state, entry.state->id);
-            entry.callback(args...);
+
+            if (entry.callback)
+                entry.callback(args...);
         }
     }
 
@@ -293,7 +284,7 @@ private:
 
         const Snapshot connections = m_state->connections.load(std::memory_order_acquire);
 
-        for (const auto& entry : *connections) {
+        for (const auto &entry : *connections) {
             if (entry.state)
                 entry.state->connected.store(false, std::memory_order_release);
         }
@@ -308,24 +299,23 @@ private:
 
     std::shared_ptr<SignalState> m_state;
     std::shared_ptr<Connection::Control> m_control;
-    const std::atomic<bool>* m_blockState{nullptr};
+    const std::atomic<bool> *m_blockState{nullptr};
 };
 
 // =============================================================================
-// Reflected Object Connection
+// Object Connection
 // =============================================================================
 
 template <typename... Args>
 struct SignalConnection<Signal<Args...>> {
-    template <auto SlotMember, ObjectType Receiver>
-    [[nodiscard]] static Connection bind(
-        Signal<Args...>& signal,
-        Receiver& receiver,
-        const std::atomic<bool>* blockState,
-        ConnectionFlag flags = ConnectionFlag::None)
+    template <auto SlotMember, SignalObjectType Receiver>
+    [[nodiscard]] static Connection bind(Signal<Args...> &signal,
+                                         Receiver &receiver,
+                                         const std::atomic<bool> *blockState,
+                                         ConnectionFlag flags = ConnectionFlag::None)
     {
         static_assert(std::is_member_function_pointer_v<decltype(SlotMember)>);
-        static_assert(std::is_invocable_v<decltype(SlotMember), Receiver&, Args...>);
+        static_assert(std::is_invocable_v<decltype(SlotMember), Receiver &, Args...>);
 
         static constexpr unsigned char SlotIdentity = 0;
 
@@ -346,11 +336,10 @@ struct SignalConnection<Signal<Args...>> {
     }
 };
 
-template <auto SignalMember, auto SlotMember, ObjectType Sender, ObjectType Receiver>
-[[nodiscard]] Connection connect(
-    Sender& sender,
-    Receiver& receiver,
-    ConnectionFlag flags = ConnectionFlag::None)
+template <auto SignalMember, auto SlotMember, SignalObjectType Sender, SignalObjectType Receiver>
+[[nodiscard]] Connection connect(Sender &sender,
+                                 Receiver &receiver,
+                                 ConnectionFlag flags = ConnectionFlag::None)
 {
     using SignalMemberPointer = decltype(SignalMember);
     using SlotMemberPointer   = decltype(SlotMember);
@@ -358,7 +347,7 @@ template <auto SignalMember, auto SlotMember, ObjectType Sender, ObjectType Rece
     static_assert(std::is_member_object_pointer_v<SignalMemberPointer>);
     static_assert(std::is_member_function_pointer_v<SlotMemberPointer>);
 
-    auto& signal = sender.*SignalMember;
+    auto &signal = sender.*SignalMember;
 
     using ReflectedSignalType = std::remove_cvref_t<decltype(signal)>;
 

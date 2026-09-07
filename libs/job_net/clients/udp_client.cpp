@@ -68,23 +68,29 @@ void UdpClient::disconnect()
     }
 }
 
-ssize_t UdpClient::send(const void *data, size_t size)
+NetIoResult UdpClient::send(const void *data, size_t size)
 {
     if (!m_socket || !isConnected())
-        return -1;
+        return NetIoResult::error();
+
     // "connected" ::send()
     return m_socket->write(data, size);
 }
 
-ssize_t UdpClient::send(const std::string &data)
+NetIoResult UdpClient::send(const std::string &data)
 {
     return send(data.data(), data.size());
 }
 
-ssize_t UdpClient::sendTo(const void *buffer, size_t size, const JobIpAddr &dest)
+bool UdpClient::setWriteInterest(bool enable)
+{
+    return m_socket && m_socket->setWriteInterest(enable);
+}
+
+NetIoResult UdpClient::sendTo(const void *buffer, size_t size, const JobIpAddr &dest)
 {
     if (!m_socket)
-        return -1;
+        return NetIoResult::error();
     return m_socket->sendTo(buffer, size, dest);
 }
 
@@ -118,30 +124,51 @@ void UdpClient::setupSocketCallbacks()
 {
     if (!m_socket)
         return;
+
     m_socket->onConnect = [this]() {
         m_connected.store(true, std::memory_order_relaxed);
         if (onConnect)
             onConnect();
     };
+
     m_socket->onRead = [this]([[maybe_unused]] const char *data, [[maybe_unused]] size_t len) {
+        if (m_readBuffer.empty())
+            return;
+
         // DOWN the "drain"
-        while(true) {
-            ssize_t n = m_socket->read(m_readBuffer.data(), m_readBuffer.size());
-            if (n > 0) {
+        for (;;) {
+            const NetIoResult n = m_socket->read(m_readBuffer.data(), m_readBuffer.size());
+
+            if (n.ok()) {
+                /*
+                 * n.bytes == 0 is a zero-length datagram, which is legal and
+                 * carries no end-of-stream meaning -- deliver it. Each recv()
+                 * consumes one datagram, so the loop still terminates on the
+                 * next WouldBlock.
+                 */
                 if (onMessage)
-                    onMessage(m_readBuffer.data(), n);
-            } else if (n == 0) {
-                break;
-            } else {
-                break;
+                    onMessage(m_readBuffer.data(), n.bytes);
+
+                continue;
             }
+
+            // WouldBlock: no more datagrams queued. A datagram socket never
+            // reports Closed.
+            break;
         }
     };
+
+    m_socket->onWrite = [this](const char *, size_t) {
+        if (onWritable)
+            onWritable();
+    };
+
     m_socket->onDisconnect = [this]() {
         m_connected.store(false, std::memory_order_relaxed);
         if (onDisconnect)
             onDisconnect();
     };
+
     m_socket->onError = [this](int err) {
         if (onError)
             onError(err);

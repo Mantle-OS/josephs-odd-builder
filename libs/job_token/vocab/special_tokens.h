@@ -9,6 +9,7 @@
 
 #include <job_hash_container.h>
 #include <job_logger.h>
+#include <job_contract.h>
 
 #include "job_token_enums.h"
 #include "job_token_types.h"
@@ -76,11 +77,14 @@ public:
             const TokenId oldId = nameIt->second;
 
             if (!m_idToName.remove(oldId)) {
-                JOB_LOG_ASSERT(
-                    "SpecialTokens invariant failure: name '{}' maps to token {}, "
-                    "but reverse token-to-name mapping does not exist",
-                    name,
-                    oldId);
+                // JOB_LOG_ERROR(
+                //     "SpecialTokens invariant failure: name '{}' maps to token {}, "
+                //     "but reverse token-to-name mapping does not exist",
+                //     name,
+                //     oldId);
+                contract_assert(m_idToName.contains(oldId));
+                // contract_assert(false, "SpecialTokens reverse token-to-name mapping invariant failed");
+
                 return;
             }
 
@@ -93,11 +97,13 @@ public:
             const std::string oldName = idIt->second;
 
             if (!m_nameToId.remove(oldName)) {
-                JOB_LOG_ASSERT(
-                    "SpecialTokens invariant failure: token {} maps to name '{}', "
-                    "but reverse name-to-token mapping does not exist",
-                    id,
-                    oldName);
+                // JOB_LOG_ERROR(
+                //     "SpecialTokens invariant failure: token {} maps to name '{}', "
+                //     "but reverse name-to-token mapping does not exist",
+                //     id,
+                //     oldName);
+                contract_assert(m_nameToId.contains(oldName));
+                // contract_assert(false, "SpecialTokens reverse name-to-token mapping invariant failed");
                 return;
             }
         }

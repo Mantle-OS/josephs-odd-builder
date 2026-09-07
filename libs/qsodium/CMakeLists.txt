@@ -16,7 +16,7 @@ set(QSODIUM_HEADERS
     qt-sodium/qsodiumhash.h
     qt-sodium/qsodiumhmacsha256.h
     qt-sodium/qsodium.h
-
+    qt-sodium/qsodiumsha.h
 )
 
 set(QSODIUM_CXX
@@ -29,6 +29,7 @@ set(QSODIUM_CXX
     qt-sodium/qsodiumhash.cpp
     qt-sodium/qsodiumhmacsha256.cpp
     qt-sodium/qsodium.cpp
+    qt-sodium/qsodiumsha.cpp
 )
 
 if(BUILD_SHARED_LIBS)
@@ -105,7 +106,7 @@ set(QDEC_SODIUM_HEADERS
     qml-sodium/qmlsecuremem.h
     qml-sodium/qmlsecurememinput.h
     qml-sodium/qmlsodiumhmacsha256.h
-
+    qml-sodium/qmlsodiumsha.h
 )
 
 set(QDEC_SODIUM_CXX
@@ -117,6 +118,7 @@ set(QDEC_SODIUM_CXX
     qml-sodium/qmlsecuremem.cpp
     qml-sodium/qmlsecurememinput.cpp
     qml-sodium/qmlsodiumhmacsha256.cpp
+    qml-sodium/qmlsodiumsha.cpp
 )
 
 if(BUILD_SHARED_LIBS)
@@ -170,6 +172,7 @@ target_link_libraries(qml-sodium
         JosephsOddBuilder_Crypto
         qt-sodium
         qt-ai-utils
+        qml-ai-utils
     PRIVATE
         Qt6::QuickControls2
         ${LibSodium_LIBRARIES}

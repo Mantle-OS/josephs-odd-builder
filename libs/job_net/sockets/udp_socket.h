@@ -35,9 +35,9 @@ public:
     bool listen([[maybe_unused]] int backlog = 0) override;
     ISocketIO::Ptr accept() override;
     void disconnect() override;
-    ssize_t read(void *buffer, size_t size) override;
-    ssize_t write(const void *buffer, size_t size) override;
-    ssize_t sendTo(const void *buffer, size_t size, const JobIpAddr &dest);
+    NetIoResult read(void *buffer, size_t size) override;
+    NetIoResult write(const void *buffer, size_t size) override;
+    NetIoResult sendTo(const void *buffer, size_t size, const JobIpAddr &dest);
     ssize_t recvFrom(void *buffer, size_t size, JobIpAddr &sender);
     ISocketIO::SocketState state() const noexcept override;
     SocketErrors::SocketErrNo lastError() const noexcept override;

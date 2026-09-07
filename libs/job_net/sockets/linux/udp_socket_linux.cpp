@@ -30,11 +30,14 @@ UdpSocket::~UdpSocket()
 void UdpSocket::closeSocket()
 {
     m_state.store(SocketState::Closed);
+
     if (m_fd < 0)
         return;
 
-    if (auto loop = m_loop.lock())
-        loop->unregisterFD(m_fd);
+    if (auto loop = m_loop.lock()) {
+        if (!loop->unregisterFD(m_fd))
+            JOB_LOG_WARN("[UdpSocket] Failed to unregister fd {}", m_fd);
+    }
 
     ::close(m_fd);
     m_fd = -1;
@@ -214,56 +217,101 @@ void UdpSocket::disconnect()
         onDisconnect();
 }
 
-ssize_t UdpSocket::read(void *buffer, size_t size)
+NetIoResult UdpSocket::read(void *buffer, size_t size)
 {
     if (m_fd < 0)
-        return -1;
+        return NetIoResult::error();
 
-    ssize_t ret = ::recv(m_fd, buffer, size, 0);
+    if (!buffer && size != 0) {
+        m_errors.setError(EFAULT);
+        return NetIoResult::error();
+    }
+
+    /*
+     * No size == 0 shortcut here. On a datagram socket a zero-length recv()
+     * still consumes the pending datagram, so returning early would silently
+     * change what the next call sees.
+     */
+    const ssize_t ret = ::recv(m_fd, buffer, size, 0);
+
     if (ret < 0) {
-        if (errno == EAGAIN || errno == EWOULDBLOCK)
-            return 0; // Not an error, just no data
+        if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR)
+            return NetIoResult::retry();
 
         m_errors.setError(errno);
-        return -1;
+        return NetIoResult::error();
     }
-    return ret;
+
+    /*
+     * ret == 0 is a received zero-length datagram, which is legal and carries
+     * no end-of-stream meaning. A datagram socket never reports Closed.
+     */
+    return NetIoResult::transferred(static_cast<size_t>(ret));
 }
 
-ssize_t UdpSocket::write(const void *buffer, size_t size)
+NetIoResult UdpSocket::write(const void *buffer, size_t size)
 {
     if (m_fd < 0)
-        return -1;
+        return NetIoResult::error();
 
-    ssize_t ret = ::send(m_fd, buffer, size, MSG_NOSIGNAL);
+    if (!buffer && size != 0) {
+        m_errors.setError(EFAULT);
+        return NetIoResult::error();
+    }
+
+    /*
+     * No size == 0 shortcut: send(fd, ..., 0) transmits a zero-length datagram,
+     * which is a real wire event a caller may intend.
+     */
+    const ssize_t ret = ::send(m_fd, buffer, size, MSG_NOSIGNAL);
+
     if (ret < 0) {
-        if (errno == EAGAIN || errno == EWOULDBLOCK)
-            return 0; // Not an error, buffer is full
+        if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR)
+            return NetIoResult::retry();
 
         m_errors.setError(errno);
-        return -1;
+        return NetIoResult::error();
     }
-    return ret;
+
+    return NetIoResult::transferred(static_cast<size_t>(ret));
 }
 
-ssize_t UdpSocket::sendTo(const void *buffer, size_t size, const JobIpAddr &dest)
+NetIoResult UdpSocket::sendTo(const void *buffer, size_t size, const JobIpAddr &dest)
 {
     if (m_fd < 0) {
         m_errors.setError(EBADF);
-        return -1;
+        return NetIoResult::error();
     }
 
-    ssize_t sent = ::sendto(m_fd, buffer, size, 0,
-                            dest.sockAddr(), dest.sockAddrLen());
+    if (size == 0)
+        return NetIoResult::transferred(0);
+
+    if (!buffer) {
+        m_errors.setError(EFAULT);
+        return NetIoResult::error();
+    }
+
+    const ssize_t sent = ::sendto(m_fd,
+                                  buffer,
+                                  size,
+                                  0,
+                                  dest.sockAddr(),
+                                  dest.sockAddrLen());
 
     if (sent < 0) {
-        if (errno == EAGAIN || errno == EWOULDBLOCK)
-            return 0; // Not an error
+        if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR)
+            return NetIoResult::retry();
 
         m_errors.setError(errno);
-        return -1;
+        return NetIoResult::error();
     }
-    return sent;
+
+    if (static_cast<size_t>(sent) != size) {
+        m_errors.setError(EIO);
+        return NetIoResult::error();
+    }
+
+    return NetIoResult::transferred(static_cast<size_t>(sent));
 }
 
 ssize_t UdpSocket::recvFrom(void *buffer, size_t size, JobIpAddr &sender)
@@ -420,6 +468,12 @@ void UdpSocket::onEvents(job::threads::IOEvent events)
             disconnect(); // HUP is more serious
 
         return;
+    }
+
+    if (threads::hasEvent(events, threads::IOEvent::Write)) {
+        if (onWrite)
+            onWrite(nullptr, 0);
+        // Fall through: an edge-triggered event may carry Read as well.
     }
 
     if (job::threads::hasEvent(events, job::threads::IOEvent::Read))

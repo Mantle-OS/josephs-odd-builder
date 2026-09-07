@@ -1,19 +1,22 @@
 #pragma once
 
+#include <cstdint>
 #include <string>
 #include <vector>
 
 #include <pkg/pkg_cache.hpp>
-#include <pkg/pkg_package.hpp>
-#include <pkg/pkg_file.hpp>
 #include <pkg/pkg_depends.hpp>
+#include <pkg/pkg_file.hpp>
+#include <pkg/pkg_package.hpp>
+
+#include "jobaipkg_export.h"
 
 namespace job::aipkg {
 
 using job::serializer::generated::AiPkgCache;
-using job::serializer::generated::AiPkgPackage;
-using job::serializer::generated::AiPkgFile;
 using job::serializer::generated::AiPkgDepends;
+using job::serializer::generated::AiPkgFile;
+using job::serializer::generated::AiPkgPackage;
 
 enum class PackageType : uint32_t
 {
@@ -40,7 +43,7 @@ struct ValidationError
     std::string message; // Specific error string text
 };
 
-class JobAiPkgManifest
+class JOBAIPKG_EXPORT JobAiPkgManifest
 {
 public:
     JobAiPkgManifest() = default;
@@ -53,7 +56,8 @@ public:
 
     [[nodiscard]] static std::vector<ValidationError> validate(const AiPkgCache &cache) noexcept;
     [[nodiscard]] static bool isValid(const AiPkgCache &cache) noexcept;
-    [[nodiscard]] static std::vector<AiPkgPackage> packagesOfType(const AiPkgCache &cache, PackageType type) noexcept;
+    [[nodiscard]] static std::vector<AiPkgPackage> packagesOfType(const AiPkgCache &cache,
+                                                                  PackageType type) noexcept;
 };
 
-} // namespace job::aipkg
+}

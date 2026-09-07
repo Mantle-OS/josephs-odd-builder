@@ -48,16 +48,18 @@ void UnixSocket::unlinkPath()
 void UnixSocket::closeSocket()
 {
     m_state.store(SocketState::Closed);
+
     if (m_fd < 0)
         return;
 
-    if (auto loop = m_loop.lock())
-        loop->unregisterFD(m_fd);
+    if (auto loop = m_loop.lock()) {
+        if (!loop->unregisterFD(m_fd))
+            JOB_LOG_WARN("[UnixSocket] Failed to unregister fd {}", m_fd);
+    }
 
     ::close(m_fd);
     m_fd = -1;
 }
-
 void UnixSocket::disconnect()
 {
     auto expected = SocketState::Connected;
@@ -281,30 +283,62 @@ ISocketIO::Ptr UnixSocket::accept()
 }
 
 
-ssize_t UnixSocket::read(void *buffer, size_t size)
+NetIoResult UnixSocket::read(void *buffer, size_t size)
 {
-    ssize_t n = ::recv(m_fd, buffer, size, 0);
-    if (n < 0) {
-        if (errno == EAGAIN || errno == EWOULDBLOCK)
-            return 0;
-        m_errors.setError(errno);
-        return -1;
+    if (m_fd < 0)
+        return NetIoResult::error();
+
+    if (size == 0)
+        return NetIoResult::transferred(0);
+
+    if (!buffer) {
+        m_errors.setError(EFAULT);
+        return NetIoResult::error();
     }
-    if (n == 0)
+
+    const ssize_t n = ::recv(m_fd, buffer, size, 0);
+
+    if (n < 0) {
+        if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR)
+            return NetIoResult::retry();
+
+        m_errors.setError(errno);
+        return NetIoResult::error();
+    }
+
+    if (n == 0) {
+        // Orderly peer shutdown on a stream socket.
         disconnect();
-    return n;
+        return NetIoResult::eof();
+    }
+
+    return NetIoResult::transferred(static_cast<size_t>(n));
 }
 
-ssize_t UnixSocket::write(const void *buffer, size_t size)
+NetIoResult UnixSocket::write(const void *buffer, size_t size)
 {
-    ssize_t n = ::send(m_fd, buffer, size, MSG_NOSIGNAL);
-    if (n < 0) {
-        if (errno == EAGAIN || errno == EWOULDBLOCK)
-            return 0;
-        m_errors.setError(errno);
-        return -1;
+    if (m_fd < 0)
+        return NetIoResult::error();
+
+    if (size == 0)
+        return NetIoResult::transferred(0);
+
+    if (!buffer) {
+        m_errors.setError(EFAULT);
+        return NetIoResult::error();
     }
-    return n;
+
+    const ssize_t n = ::send(m_fd, buffer, size, MSG_NOSIGNAL);
+
+    if (n < 0) {
+        if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR)
+            return NetIoResult::retry();
+
+        m_errors.setError(errno);
+        return NetIoResult::error();
+    }
+
+    return NetIoResult::transferred(static_cast<size_t>(n));
 }
 
 SocketErrors::SocketErrNo UnixSocket::lastError() const noexcept
@@ -394,7 +428,8 @@ void UnixSocket::dumpState() const
                   );
 }
 
-void UnixSocket::updateLocalInfo() {
+void UnixSocket::updateLocalInfo()
+{
     sockaddr_un sa{};
     socklen_t len = sizeof(sa);
     if (m_fd != -1 && ::getsockname(m_fd, reinterpret_cast<sockaddr*>(&sa), &len) == 0)
@@ -408,7 +443,6 @@ void UnixSocket::onEvents(threads::IOEvent events)
         int error = 0;
         socklen_t len = sizeof(error);
         ::getsockopt(m_fd, SOL_SOCKET, SO_ERROR, &error, &len);
-
         if (error != 0) {
             // A genuine socket error occurred.
             m_errors.setError(error);
@@ -418,12 +452,11 @@ void UnixSocket::onEvents(threads::IOEvent events)
         // else: HangUp with no real SO_ERROR just means the peer closed normally —
         // not an error, don't report one. disconnect() below still fires onDisconnect
         // either way.
-
         disconnect();
         return;
     }
 
-    if ( job::threads::hasEvent(events, threads::IOEvent::Write) && m_state.load() == SocketState::Connecting) {
+    if (threads::hasEvent(events, threads::IOEvent::Write) && m_state.load() == SocketState::Connecting) {
         int error = 0;
         socklen_t len = sizeof(error);
         if (::getsockopt(m_fd, SOL_SOCKET, SO_ERROR, &error, &len) == 0 && error == 0) {
@@ -440,17 +473,26 @@ void UnixSocket::onEvents(threads::IOEvent events)
         return;
     }
 
+    // Writable while already connected: a previously blocked write can resume.
+    // Interest is NOT re-armed here — the caller arms Write via setWriteInterest(true)
+    // when it has pending data and clears it once the buffer drains, so an idle
+    // connection is not woken on every drain.
+    if (threads::hasEvent(events, threads::IOEvent::Write) && m_state.load() == SocketState::Connected) {
+        if (onWrite)
+            onWrite(nullptr, 0);
+
+        // Fall through: an edge-triggered event may carry Read as well.
+    }
+
     // What a PITA
-    if (job::threads::hasEvent(events, threads::IOEvent::Read) && m_state.load() == SocketState::Listening) {
+    if (threads::hasEvent(events, threads::IOEvent::Read) && m_state.load() == SocketState::Listening) {
         while (true) {
             sockaddr_un client{};
             socklen_t len = sizeof(client);
             int cfd = ::accept4(m_fd, reinterpret_cast<sockaddr *>(&client), &len, SOCK_NONBLOCK);
-
             if (cfd < 0) {
                 if (errno == EAGAIN || errno == EWOULDBLOCK)
                     break; // All connections drained
-
                 m_errors.setError(errno);
                 break;
             }
@@ -460,7 +502,6 @@ void UnixSocket::onEvents(threads::IOEvent events)
                 ::close(cfd);
                 continue;
             }
-
             auto sock = UnixSocket::create(loop, cfd, client.sun_path);
             sock->registerEvents(
                 threads::IOEvent::Read |
@@ -474,7 +515,6 @@ void UnixSocket::onEvents(threads::IOEvent events)
                     pfd.fd = cfd;
                     pfd.events = POLLIN;
                     pfd.revents = 0;
-
                     int poll_result = ::poll(&pfd, 1, 0);
                     if (poll_result > 0 && (pfd.revents & POLLIN))
                         sock->onRead(nullptr, 0);
@@ -487,14 +527,9 @@ void UnixSocket::onEvents(threads::IOEvent events)
         return;
     }
 
-    if (job::threads::hasEvent(events, threads::IOEvent::Read) && m_state.load() == SocketState::Connected) {
+    if (threads::hasEvent(events, threads::IOEvent::Read) && m_state.load() == SocketState::Connected) {
         if (onRead)
             onRead(nullptr, 0);
-        return;
-    }
-
-    if (job::threads::hasEvent(events, threads::IOEvent::Write) && m_state.load() == SocketState::Connected) {
-        JOB_LOG_DEBUG("[UnixSocket] Connected socket fd={} got EPOLLOUT", m_fd);
         return;
     }
 }

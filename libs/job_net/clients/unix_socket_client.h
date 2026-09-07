@@ -35,15 +35,16 @@ public:
     bool connectToHost(const JobUrl &url);
 
     void disconnect();
-    ssize_t send(const void *data, size_t size);
-    ssize_t send(const std::string &data);
+    NetIoResult send(const void *data, size_t size);
+    NetIoResult send(const std::string &data);
     [[nodiscard]] bool isConnected() const noexcept;
     [[nodiscard]] SocketErrors::SocketErrNo lastError() const noexcept;
     [[nodiscard]] std::string lastErrorString() const noexcept;
-    std::function<void()> onConnect;
-    std::function<void(const char*, size_t)> onMessage;
-    std::function<void()> onDisconnect;
-    std::function<void(int)> onError;
+    std::function<void()>                       onConnect;
+    std::function<void(const char*, size_t)>    onMessage;
+    std::function<void()>                       onWritable;
+    std::function<void()>                       onDisconnect;
+    std::function<void(int)>                    onError;
     void setSocket(UnixSocket::Ptr socket);
 private:
     void setupSocketCallbacks();

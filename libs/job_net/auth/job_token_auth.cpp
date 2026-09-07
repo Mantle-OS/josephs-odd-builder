@@ -7,7 +7,7 @@ TokenAuth::TokenAuth(std::string_view token) :
 {
 }
 
-TokenAuth::TokenAuth(job::crypto::JobSecureMem &&token) :
+TokenAuth::TokenAuth(job::crypto::JobSecureMem::Ptr token) :
     IJobHttpAuth("Authorization", "Token", std::move(token))
 {
 }

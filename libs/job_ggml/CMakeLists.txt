@@ -317,9 +317,14 @@ set_target_properties(JosephsOddBuilder_Ggml PROPERTIES
     VERSION ${PROJECT_VERSION}
     SOVERSION ${PROJECT_VERSION_MAJOR}
     OUTPUT_NAME "jobggml"
+    CXX_STANDARD 26
+    CXX_STANDARD_REQUIRED ON
     CXX_VISIBILITY_PRESET hidden
     VISIBILITY_INLINES_HIDDEN ON
 )
+
+target_compile_options(JosephsOddBuilder_Ggml PRIVATE -freflection -fcontracts)
+target_link_options(JosephsOddBuilder_Ggml PRIVATE -fcontracts)
 
 target_compile_definitions(JosephsOddBuilder_Ggml PUBLIC
     $<$<BOOL:${GGML_CPU}>:JOB_GGML_CPU>

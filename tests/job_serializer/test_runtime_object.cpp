@@ -1,5 +1,6 @@
 #include <catch2/catch_all.hpp>
 
+#include <cstdint>
 #include <string>
 
 #include <job_serializer_utils.h>
@@ -9,168 +10,183 @@ using namespace job::serializer;
 
 TEST_CASE("FieldValue type checkers (isNull, isScalar, etc.)", "[runtime_object][field_value]")
 {
-    FieldValue fv_null;
-    fv_null.value = std::monostate{};
-    REQUIRE(fv_null.isNull());
-    REQUIRE_FALSE(fv_null.isScalar());
+    FieldValue fvNull;
+    fvNull.value = std::monostate{};
 
-    FieldValue fv_scalar;
-    fv_scalar.value = FieldValue::Scalar{ (uint32_t)123 };
-    REQUIRE(fv_scalar.isScalar());
-    REQUIRE_FALSE(fv_scalar.isNull());
+    REQUIRE(fvNull.isNull());
+    REQUIRE_FALSE(fvNull.isScalar());
 
-    FieldValue fv_bin;
-    fv_bin.value = FieldValue::Binary{ 0xDE, 0xAD };
-    REQUIRE(fv_bin.isBinary());
-    REQUIRE_FALSE(fv_bin.isScalar());
+    FieldValue fvScalar;
+    fvScalar.value = FieldValue::Scalar{static_cast<uint32_t>(123)};
 
-    FieldValue fv_list;
-    fv_list.value = FieldValue::List{};
-    REQUIRE(fv_list.isList());
-    REQUIRE_FALSE(fv_list.isBinary());
+    REQUIRE(fvScalar.isScalar());
+    REQUIRE_FALSE(fvScalar.isNull());
 
-    FieldValue fv_struct;
-    fv_struct.value = FieldValue::Struct{};
-    REQUIRE(fv_struct.isStruct());
-    REQUIRE_FALSE(fv_struct.isList());
+    FieldValue fvBin;
+    fvBin.value = FieldValue::Binary{0xDE, 0xAD};
+
+    REQUIRE(fvBin.isBinary());
+    REQUIRE_FALSE(fvBin.isScalar());
+
+    FieldValue fvList;
+    fvList.value = FieldValue::List{};
+
+    REQUIRE(fvList.isList());
+    REQUIRE_FALSE(fvList.isBinary());
+
+    FieldValue fvStruct;
+    fvStruct.value = FieldValue::Struct{};
+
+    REQUIRE(fvStruct.isStruct());
+    REQUIRE_FALSE(fvStruct.isList());
 }
 
 TEST_CASE("RuntimeObject API (set, get, has, remove)", "[runtime_object]")
 {
     RuntimeObject obj;
 
-    FieldValue val_scalar;
-    val_scalar.value = FieldValue::Scalar{ std::string("hello") };
+    FieldValue valScalar;
+    valScalar.value = FieldValue::Scalar{std::string("hello")};
 
-    FieldValue val_bin;
-    val_bin.value = FieldValue::Binary{ 0x01, 0x02, 0x03 };
+    FieldValue valBin;
+    valBin.value = FieldValue::Binary{0x01, 0x02, 0x03};
 
-    FieldValue val_i32;
-    val_i32.value = FieldValue::Scalar{ (int32_t)-42 };
-
+    FieldValue valI32;
+    valI32.value = FieldValue::Scalar{static_cast<int32_t>(-42)};
 
     SECTION("setField and hasField")
     {
         REQUIRE_FALSE(obj.hasField("scalar_field"));
-        REQUIRE(obj.setField("scalar_field", val_scalar));
+        REQUIRE(obj.setField("scalar_field", valScalar));
         REQUIRE(obj.hasField("scalar_field"));
 
-        REQUIRE(obj.setField("bin_field", val_bin));
+        REQUIRE(obj.setField("bin_field", valBin));
         REQUIRE(obj.hasField("bin_field"));
 
-        REQUIRE_FALSE(obj.setField("", val_scalar));
+        REQUIRE_FALSE(obj.setField("", valScalar));
     }
 
     SECTION("getField")
     {
-        obj.setField("scalar_field", val_scalar);
-        obj.setField("i32_field", val_i32);
+        obj.setField("scalar_field", valScalar);
+        obj.setField("i32_field", valI32);
 
-        auto opt_val = obj.getField("scalar_field");
-        REQUIRE(opt_val.has_value());
-        REQUIRE(opt_val->isScalar());
-        REQUIRE(std::get<FieldValue::Scalar>(opt_val->value) == FieldValue::Scalar{ std::string("hello") });
+        auto optVal = obj.getField("scalar_field");
 
-        auto opt_i32 = obj.getField("i32_field");
-        REQUIRE(opt_i32.has_value());
-        REQUIRE(opt_i32->isScalar());
-        REQUIRE(std::get<FieldValue::Scalar>(opt_i32->value) == FieldValue::Scalar{ (int32_t)-42 });
+        REQUIRE(optVal.has_value());
+        REQUIRE(optVal->isScalar());
+        REQUIRE(std::get<FieldValue::Scalar>(optVal->value) == FieldValue::Scalar{std::string("hello")});
 
-        auto opt_none = obj.getField("no_such_field");
-        REQUIRE_FALSE(opt_none.has_value());
+        auto optI32 = obj.getField("i32_field");
 
-        auto opt_empty = obj.getField("");
-        REQUIRE_FALSE(opt_empty.has_value());
+        REQUIRE(optI32.has_value());
+        REQUIRE(optI32->isScalar());
+        REQUIRE(std::get<FieldValue::Scalar>(optI32->value) == FieldValue::Scalar{static_cast<int32_t>(-42)});
+
+        auto optNone = obj.getField("no_such_field");
+
+        REQUIRE_FALSE(optNone.has_value());
+
+        auto optEmpty = obj.getField("");
+
+        REQUIRE_FALSE(optEmpty.has_value());
     }
 
     SECTION("removeField")
     {
-        obj.setField("scalar_field", val_scalar);
-        REQUIRE(obj.hasField("scalar_field"));
+        obj.setField("scalar_field", valScalar);
 
+        REQUIRE(obj.hasField("scalar_field"));
         REQUIRE(obj.removeField("scalar_field"));
         REQUIRE_FALSE(obj.hasField("scalar_field"));
-
         REQUIRE_FALSE(obj.removeField("scalar_field"));
-
         REQUIRE_FALSE(obj.removeField(""));
     }
 
     SECTION("clear")
     {
-        obj.setField("scalar_field", val_scalar);
-        obj.setField("bin_field", val_bin);
+        obj.setField("scalar_field", valScalar);
+        obj.setField("bin_field", valBin);
+
         REQUIRE(obj.fields().size() == 2);
 
         obj.clear();
+
         REQUIRE(obj.fields().empty());
         REQUIRE_FALSE(obj.hasField("scalar_field"));
     }
 
     SECTION("fields (const and non-const)")
     {
-        obj.setField("field1", val_scalar);
+        obj.setField("field1", valScalar);
 
-        // Test non-const getter
-        obj.fields()["field2"] = val_i32;
+        obj.fields()["field2"] = valI32;
+
         REQUIRE(obj.hasField("field2"));
 
-        // Test const getter
-        const RuntimeObject& const_obj = obj;
-        REQUIRE(const_obj.fields().size() == 2);
-        REQUIRE(const_obj.fields().at("field1").isScalar());
+        const RuntimeObject &constObj = obj;
+
+        REQUIRE(constObj.fields().size() == 2);
+        REQUIRE(constObj.fields().at("field1").isScalar());
     }
 
     SECTION("Recursive Structs and Lists (Complex Test)")
     {
         RuntimeObject root;
 
-        FieldValue nested_struct_val;
-        FieldValue::Struct nested_struct;
+        FieldValue nestedStructVal;
+        FieldValue::Struct nestedStruct;
 
-        FieldValue nested_field_val;
-        nested_field_val.value = FieldValue::Scalar{ (uint64_t)999 };
-        nested_struct["nested_id"] = nested_field_val;
+        FieldValue nestedFieldVal;
+        nestedFieldVal.value = FieldValue::Scalar{static_cast<uint64_t>(999)};
+        nestedStruct["nested_id"] = nestedFieldVal;
 
-        nested_struct_val.value = nested_struct; // Assign map to variant
-        REQUIRE(nested_struct_val.isStruct());
+        nestedStructVal.value = nestedStruct;
 
-        root.setField("my_struct", nested_struct_val);
+        REQUIRE(nestedStructVal.isStruct());
 
-        FieldValue list_val;
-        FieldValue::List scalar_list;
+        root.setField("my_struct", nestedStructVal);
 
-        FieldValue list_item_1;
-        list_item_1.value = FieldValue::Scalar{ std::string("item1") };
-        scalar_list.push_back(list_item_1);
+        FieldValue listVal;
+        FieldValue::List scalarList;
 
-        FieldValue list_item_2;
-        list_item_2.value = FieldValue::Scalar{ std::string("item2") };
-        scalar_list.push_back(list_item_2);
+        FieldValue listItem1;
+        listItem1.value = FieldValue::Scalar{std::string("item1")};
+        scalarList.push_back(listItem1);
 
-        list_val.value = scalar_list; // Assign vector to variant
-        REQUIRE(list_val.isList());
+        FieldValue listItem2;
+        listItem2.value = FieldValue::Scalar{std::string("item2")};
+        scalarList.push_back(listItem2);
 
-        root.setField("my_list", list_val);
+        listVal.value = scalarList;
+
+        REQUIRE(listVal.isList());
+
+        root.setField("my_list", listVal);
 
         REQUIRE(root.hasField("my_struct"));
         REQUIRE(root.hasField("my_list"));
 
-        auto opt_struct = root.getField("my_struct");
-        REQUIRE(opt_struct.has_value());
-        REQUIRE(opt_struct->isStruct());
+        auto optStruct = root.getField("my_struct");
 
-        auto& retrieved_struct_map = std::get<FieldValue::Struct>(opt_struct->value);
-        REQUIRE(retrieved_struct_map.count("nested_id") == 1);
-        REQUIRE(retrieved_struct_map.at("nested_id").isScalar());
+        REQUIRE(optStruct.has_value());
+        REQUIRE(optStruct->isStruct());
 
-        auto opt_list = root.getField("my_list");
-        REQUIRE(opt_list.has_value());
-        REQUIRE(opt_list->isList());
+        auto &retrievedStructMap = std::get<FieldValue::Struct>(optStruct->value);
 
-        auto& retrieved_list_vec = std::get<FieldValue::List>(opt_list->value);
-        REQUIRE(retrieved_list_vec.size() == 2);
-        REQUIRE(retrieved_list_vec[0].isScalar());
-        REQUIRE(std::get<FieldValue::Scalar>(retrieved_list_vec[1].value) == FieldValue::Scalar{ std::string("item2") });
+        REQUIRE(retrievedStructMap.count("nested_id") == 1);
+        REQUIRE(retrievedStructMap.at("nested_id").isScalar());
+
+        auto optList = root.getField("my_list");
+
+        REQUIRE(optList.has_value());
+        REQUIRE(optList->isList());
+
+        auto &retrievedListVec = std::get<FieldValue::List>(optList->value);
+
+        REQUIRE(retrievedListVec.size() == 2);
+        REQUIRE(retrievedListVec[0].isScalar());
+        REQUIRE(std::get<FieldValue::Scalar>(retrievedListVec[1].value) ==
+                FieldValue::Scalar{std::string("item2")});
     }
 }

@@ -60,8 +60,19 @@ set_target_properties(JosephsOddBuilder_Simd PROPERTIES
     VERSION ${PROJECT_VERSION}
     SOVERSION ${PROJECT_VERSION_MAJOR}
     OUTPUT_NAME "jobsimd"
+    CXX_STANDARD 26
+    CXX_STANDARD_REQUIRED ON
     CXX_VISIBILITY_PRESET hidden
     VISIBILITY_INLINES_HIDDEN ON
+)
+
+target_compile_options(JosephsOddBuilder_Simd PRIVATE
+    -freflection
+    -fcontracts
+)
+
+target_link_options(JosephsOddBuilder_Simd PRIVATE
+    -fcontracts
 )
 
 target_include_directories(JosephsOddBuilder_Simd PUBLIC

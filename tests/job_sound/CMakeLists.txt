@@ -10,7 +10,13 @@ add_executable(test_job_sound
     test_codecs.cpp
     ../transient_test_file.h
 )
+target_compile_options(test_job_sound PRIVATE -freflection -fcontracts)
+target_link_options(test_job_sound PRIVATE -fcontracts)
 
+set_target_properties(test_job_sound PROPERTIES
+    CXX_STANDARD 26
+    CXX_STANDARD_REQUIRED ON
+)
 target_link_libraries(test_job_sound PRIVATE
     Threads::Threads
     atomic

@@ -9,20 +9,20 @@ Aws4Auth::Aws4Auth(std::string_view accessKeyId,
                    std::string_view region,
                    std::string_view service) :
     IJobHttpAuth("Authorization", "AWS4-HMAC-SHA256", secretAccessKey),
-    m_accessKeyId(accessKeyId),
-    m_region(region),
-    m_service(service)
+    m_accessKeyId{accessKeyId},
+    m_region{region},
+    m_service{service}
 {
 }
 
 Aws4Auth::Aws4Auth(std::string_view accessKeyId,
-                   job::crypto::JobSecureMem &&secretAccessKey,
+                   job::crypto::JobSecureMem::Ptr secretAccessKey,
                    std::string_view region,
                    std::string_view service) :
     IJobHttpAuth("Authorization", "AWS4-HMAC-SHA256", std::move(secretAccessKey)),
-    m_accessKeyId(accessKeyId),
-    m_region(region),
-    m_service(service)
+    m_accessKeyId{accessKeyId},
+    m_region{region},
+    m_service{service}
 {
 }
 
@@ -32,23 +32,23 @@ Aws4Auth::Aws4Auth(std::string_view accessKeyId,
                    std::string_view region,
                    std::string_view service) :
     IJobHttpAuth("Authorization", "AWS4-HMAC-SHA256", secretAccessKey),
-    m_accessKeyId(accessKeyId),
-    m_region(region),
-    m_service(service)
+    m_accessKeyId{accessKeyId},
+    m_region{region},
+    m_service{service}
 {
     setSessionToken(sessionToken);
 }
 
 Aws4Auth::Aws4Auth(std::string_view accessKeyId,
-                   job::crypto::JobSecureMem &&secretAccessKey,
-                   job::crypto::JobSecureMem &&sessionToken,
+                   job::crypto::JobSecureMem::Ptr secretAccessKey,
+                   job::crypto::JobSecureMem::Ptr sessionToken,
                    std::string_view region,
                    std::string_view service) :
     IJobHttpAuth("Authorization", "AWS4-HMAC-SHA256", std::move(secretAccessKey)),
-    m_accessKeyId(accessKeyId),
-    m_region(region),
-    m_service(service),
-    m_sessionToken(std::move(sessionToken))
+    m_accessKeyId{accessKeyId},
+    m_region{region},
+    m_service{service},
+    m_sessionToken{std::move(sessionToken)}
 {
 }
 
@@ -80,14 +80,14 @@ const std::string &Aws4Auth::service() const noexcept
     return m_service;
 }
 
-const job::crypto::JobSecureMem &Aws4Auth::sessionToken() const noexcept
+job::crypto::JobSecureMem::Ptr Aws4Auth::sessionToken() const noexcept
 {
     return m_sessionToken;
 }
 
 bool Aws4Auth::hasSessionToken() const noexcept
 {
-    return !m_sessionToken.empty();
+    return m_sessionToken && !m_sessionToken->empty();
 }
 
 void Aws4Auth::clear() noexcept
@@ -97,25 +97,35 @@ void Aws4Auth::clear() noexcept
     m_accessKeyId.clear();
     m_region.clear();
     m_service.clear();
-    m_sessionToken.clear();
+
+    if (m_sessionToken)
+        m_sessionToken->clear();
+
+    m_sessionToken.reset();
 }
 
 void Aws4Auth::setSessionToken(std::string_view token)
 {
     if (token.empty()) {
-        m_sessionToken.clear();
+        if (m_sessionToken)
+            m_sessionToken->clear();
+
+        m_sessionToken.reset();
         return;
     }
 
-    if (!m_sessionToken.allocate(token.size())) {
-        m_sessionToken.clear();
+    auto secureToken = job::crypto::JobSecureMem::createShared(token.size());
+
+    if (!secureToken || secureToken->empty()) {
+        m_sessionToken.reset();
         return;
     }
 
-    m_sessionToken.copyFrom(token.data(), token.size());
+    secureToken->copyFrom(token.data(), token.size());
+    m_sessionToken = std::move(secureToken);
 }
 
-void Aws4Auth::setSessionToken(job::crypto::JobSecureMem &&token) noexcept
+void Aws4Auth::setSessionToken(job::crypto::JobSecureMem::Ptr token) noexcept
 {
     m_sessionToken = std::move(token);
 }

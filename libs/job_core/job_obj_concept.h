@@ -1,25 +1,54 @@
 #pragma once
 
+#include <array>
 #include <concepts>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <map>
 #include <memory>
 #include <meta>
 #include <optional>
+#include <set>
 #include <span>
 #include <string>
 #include <string_view>
 #include <type_traits>
+#include <unordered_map>
+#include <unordered_set>
+#include <utility>
 #include <vector>
 
 namespace job::core {
 
 class BaseObject;
+class LightObject;
 class Object;
 
 template <typename... Args>
 class Signal;
+
+// =============================================================================
+// General Type Helpers
+// =============================================================================
+
+template <typename T>
+inline constexpr bool dependentFalseV = false;
+
+// =============================================================================
+// Light Object Type Requirements
+// =============================================================================
+
+template <typename T>
+concept LightObjectType =
+    std::is_class_v<T> &&
+    std::derived_from<T, LightObject> &&
+    std::default_initializable<T> &&
+    std::destructible<T> &&
+    !std::copy_constructible<T> &&
+    !std::is_copy_assignable_v<T> &&
+    !std::move_constructible<T> &&
+    !std::is_move_assignable_v<T>;
 
 // =============================================================================
 // Object Type Requirements
@@ -58,23 +87,162 @@ template <typename T>
 concept OptionalType = isOptionalTypeV<T>;
 
 // =============================================================================
+// Smart Pointer Traits & Concepts
+// =============================================================================
+
+// Broad smart-pointer shape. Kept because some generic code only needs to know
+// that a type is dereferenceable and nullable.
+template <typename T>
+concept SmartPointer = requires(T p) {
+    typename T::element_type;
+    p.get();
+    static_cast<bool>(p);
+    *p;
+};
+
+template <typename T>
+struct IsSharedPointer : std::false_type {};
+
+template <typename T>
+struct IsSharedPointer<std::shared_ptr<T>> : std::true_type {};
+
+template <typename T>
+inline constexpr bool isSharedPointerV = IsSharedPointer<std::remove_cvref_t<T>>::value;
+
+template <typename T>
+concept SharedPointer = isSharedPointerV<T>;
+
+template <typename T>
+struct IsUniquePointer : std::false_type {};
+
+template <typename T, typename Deleter>
+struct IsUniquePointer<std::unique_ptr<T, Deleter>> : std::true_type {};
+
+template <typename T>
+inline constexpr bool isUniquePointerV = IsUniquePointer<std::remove_cvref_t<T>>::value;
+
+template <typename T>
+concept UniquePointer = isUniquePointerV<T>;
+
+template <typename T>
+struct IsWeakPointer : std::false_type {};
+
+template <typename T>
+struct IsWeakPointer<std::weak_ptr<T>> : std::true_type {};
+
+template <typename T>
+inline constexpr bool isWeakPointerV = IsWeakPointer<std::remove_cvref_t<T>>::value;
+
+template <typename T>
+concept WeakPointer = isWeakPointerV<T>;
+
+template <typename T>
+concept OwningSmartPointer = SharedPointer<T> || UniquePointer<T>;
+
+template <typename T>
+concept UnsupportedPersistentPointer =
+    std::is_pointer_v<std::remove_cvref_t<T>> || WeakPointer<T>;
+
+// =============================================================================
+// Extended Character Types
+// =============================================================================
+
+template <typename T>
+concept ExtendedCharType =
+    std::same_as<std::remove_cvref_t<T>, wchar_t>  ||
+    std::same_as<std::remove_cvref_t<T>, char8_t>  ||
+    std::same_as<std::remove_cvref_t<T>, char16_t> ||
+    std::same_as<std::remove_cvref_t<T>, char32_t>;
+
+// =============================================================================
+// Fixed-Size Array Traits & Concept
+// =============================================================================
+
+template <typename T>
+struct IsStdArray : std::false_type {};
+
+template <typename T, std::size_t Size>
+struct IsStdArray<std::array<T, Size>> : std::true_type {};
+
+template <typename T>
+inline constexpr bool isStdArrayV = IsStdArray<std::remove_cvref_t<T>>::value;
+
+template <typename T>
+concept StdArrayType = isStdArrayV<T>;
+
+template <StdArrayType T>
+inline constexpr std::size_t stdArraySizeV = std::tuple_size_v<std::remove_cvref_t<T>>;
+
+// =============================================================================
 // Container Concepts
 // =============================================================================
 
+// Broad container classification used by existing code.
 template <typename T>
 concept ReflectableContainer = requires(T a) {
     typename T::value_type;
     a.begin();
     a.end();
-} && !std::same_as<std::remove_cvref_t<T>, std::string> && !OptionalType<T>;
+} &&
+                               !std::same_as<std::remove_cvref_t<T>, std::string> &&
+                               !OptionalType<T>;
 
+// Associative key/value container.
 template <typename T>
 concept MapContainer = requires(T a) {
     typename T::key_type;
     typename T::mapped_type;
+    typename T::value_type;
     a.begin();
     a.end();
-};
+} &&
+                       ReflectableContainer<T>;
+
+// Associative single-value container such as std::set / std::unordered_set.
+template <typename T>
+concept SetContainer = requires(T a) {
+    typename T::key_type;
+    typename T::value_type;
+    a.begin();
+    a.end();
+} &&
+                       ReflectableContainer<T> &&
+                       !MapContainer<T>;
+
+// Fixed-size sequence container.
+template <typename T>
+concept FixedSequenceContainer = StdArrayType<T>;
+
+// Mutable sequence container supporting clear + push_back.
+template <typename T>
+concept PushBackSequenceContainer =
+    ReflectableContainer<T> &&
+    !MapContainer<T> &&
+    !SetContainer<T> &&
+    !FixedSequenceContainer<T> &&
+    requires(T a, typename T::value_type value) {
+        a.clear();
+        a.push_back(std::move(value));
+    };
+
+// Mutable sequence container supporting clear + insert.
+template <typename T>
+concept InsertSequenceContainer =
+    ReflectableContainer<T> &&
+    !MapContainer<T> &&
+    !FixedSequenceContainer<T> &&
+    requires(T a, typename T::value_type value) {
+        a.clear();
+        a.insert(std::move(value));
+    };
+
+// Any container category for which generic persistence reconstruction is known.
+template <typename T>
+concept PersistentContainer =
+    MapContainer<T> ||
+    FixedSequenceContainer<T> ||
+    PushBackSequenceContainer<T> ||
+    InsertSequenceContainer<T>;
 
 // =============================================================================
 // Signal Traits & Concept
@@ -91,6 +259,9 @@ inline constexpr bool isSignalTypeV = IsSignal<std::remove_cvref_t<T>>::value;
 
 template <typename T>
 concept SignalType = isSignalTypeV<T>;
+
+template <typename T>
+concept SignalObjectType = LightObjectType<T> || ObjectType<T>;
 
 // =============================================================================
 // Member Pointer Traits

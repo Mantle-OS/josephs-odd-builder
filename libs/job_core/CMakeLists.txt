@@ -5,18 +5,28 @@ project(JosephOddBuild_Core
 )
 
 set(JOBCORE_SOURCES
+    job_contract.cpp
     job_logger.cpp
     job_timer.cpp
     job_siphash.cpp
+
+
+    #  new
+    job_base_obj.cpp
+    job_connection.cpp
+    job_light_object.cpp
+    job_object.cpp
 )
 
 set(JOBCORE_HEADERS
     crc32.h
     endian_utils.h
     real_type.h
+
+    job_contract.h
     job_logger.h
+
     job_timer.h
-    job_assert.h
     split_mix64.h
     aligned_allocator.h
 
@@ -34,12 +44,21 @@ set(JOBCORE_HEADERS
     job_signal.h
     job_obj_annotation.h
 
+    job_light_object.h
     job_object.h
 )
 
-add_library(JosephsOddBuilder_Core SHARED
-    ${JOBCORE_HEADERS}  ${JOBCORE_SOURCES}
-)
+
+if(BUILD_SHARED_LIBS)
+    add_library(JosephsOddBuilder_Core SHARED
+        ${JOBCORE_HEADERS}  ${JOBCORE_SOURCES}
+    )
+else()
+    add_library(JosephsOddBuilder_Core STATIC
+        ${JOBCORE_HEADERS}  ${JOBCORE_SOURCES}
+    )
+    target_compile_definitions(JosephsOddBuilder_Core PUBLIC JOBCORE_STATIC_DEFINE)
+endif()
 
 set(JOBCORE_EXPORT ${CMAKE_CURRENT_BINARY_DIR}/jobcore_export.h)
 generate_export_header(JosephsOddBuilder_Core
@@ -76,6 +95,7 @@ target_include_directories(JosephsOddBuilder_Core PUBLIC
 target_link_libraries(JosephsOddBuilder_Core PUBLIC
     ${YAMLCpp_LIBRARIES}
     JosephsOddBuilder_Simd
+    JosephsOddBuilder_Yaml
 )
 
 if(JOB_WINDOWS)

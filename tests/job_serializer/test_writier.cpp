@@ -1,136 +1,132 @@
 #include <catch2/catch_all.hpp>
 
+#include <cstdint>
 #include <string>
-#include <filesystem>
-
 
 #include <job_logger.h>
-#include <schema.h>
+#include <job_tmp_file.h>
+#include <iserializer.h>
 #include <reader.h>
 #include <runtime_object.h>
-#include <iserializer.h>
-
+#include <schema.h>
 #include <writer.h>
+
 #include "test_emitter.h"
 
 using namespace job::serializer;
-namespace fs = std::filesystem;
 
-TEST_CASE("Writer::writeSchema round-trip", "[job_writer]"){
-    Schema s_in = TestEmitter::getEmitterTestSchema();
-    const fs::path yamlPath = "test_writer_schema.yaml";
-    const fs::path jsonPath = "test_writer_schema.json";
+TEST_CASE("Writer::writeSchema round-trip", "[job_writer]")
+{
+    Schema sIn = TestEmitter::getEmitterTestSchema();
 
-    fs::remove(yamlPath);
-    fs::remove(jsonPath);
+    SECTION("YAML round-trip")
+    {
+        job::io::JobTmpFile tmpFile("test_writer_schema.yaml");
 
-    SECTION("YAML round-trip"){
-        {
-            Writer w(yamlPath);
-            REQUIRE(w.writeSchema(s_in)); // Let writeSchema auto-detect format
-            w.closeDevice();
-            w.flush();
-        }
-        REQUIRE(fs::exists(yamlPath));
+        Writer writer(tmpFile.path());
+        REQUIRE(writer.writeSchema(sIn));
 
-        Schema s_out{};
-        Reader r(yamlPath);
-        REQUIRE(r.readSchema(s_out)); // Let readSchema auto-detect format
+        Schema sOut{};
+        Reader reader(tmpFile.path());
 
-        REQUIRE(s_in == s_out);
+        REQUIRE(reader.readSchema(sOut));
+        REQUIRE(sIn == sOut);
     }
 
-    SECTION("JSON round-trip") {
-        {
-            Writer w(jsonPath);
-            REQUIRE(w.writeSchema(s_in));
-        }
-        REQUIRE(fs::exists(jsonPath));
-        Schema s_out{};
-        Reader r(jsonPath);
-        REQUIRE(r.readSchema(s_out));
-        REQUIRE(s_in == s_out);
+    SECTION("JSON round-trip")
+    {
+        job::io::JobTmpFile tmpFile("test_writer_schema.json");
+
+        Writer writer(tmpFile.path());
+        REQUIRE(writer.writeSchema(sIn));
+
+        Schema sOut{};
+        Reader reader(tmpFile.path());
+
+        REQUIRE(reader.readSchema(sOut));
+        REQUIRE(sIn == sOut);
     }
 
-    SECTION("Write failure on invalid schema") {
-        Schema s_invalid{};
-        REQUIRE_FALSE(s_invalid.isValid());
-        Writer w("invalid_schema.yaml");
-        REQUIRE_FALSE(w.writeSchema(s_invalid));
-    }
+    SECTION("Write failure on invalid schema")
+    {
+        job::io::JobTmpFile tmpFile("invalid_schema.yaml");
 
-    fs::remove(yamlPath);
-    fs::remove(jsonPath);
+        Schema invalidSchema{};
+
+        REQUIRE_FALSE(invalidSchema.isValid());
+
+        Writer writer(tmpFile.path());
+
+        REQUIRE_FALSE(writer.writeSchema(invalidSchema));
+    }
 }
 
-TEST_CASE("Writer::writeEmitter writes generated code to files", "[job_writer]"){
+TEST_CASE("Writer::writeEmitter writes generated code to files", "[job_writer]")
+{
     Schema s = TestEmitter::getEmitterTestSchema();
     TestEmitter emitter{};
 
-    const fs::path hdrPath = s.out_base + ".hpp";
-    const fs::path srcPath = s.out_base + ".cpp";
-
-    fs::remove(hdrPath);
-    fs::remove(srcPath);
+    job::io::JobTmpFile headerFile(s.out_base + ".hpp");
+    job::io::JobTmpFile sourceFile(s.out_base + ".cpp");
 
     auto [expectedHeader, expectedSource] = emitter.render(s);
+
     REQUIRE_FALSE(expectedHeader.empty());
     REQUIRE_FALSE(expectedSource.empty());
-    {
-        Writer w("emitter_writer.tmp");
-        REQUIRE(w.writeEmitter(emitter, s, hdrPath, srcPath));
-    }
 
-    REQUIRE(fs::exists(hdrPath));
-    REQUIRE(fs::exists(srcPath));
-    std::string hdrContent;
-    {
-        Reader r(hdrPath);
-        hdrContent = r.readAll();
-    }
+    Writer writer("emitter_writer.tmp");
 
-    std::string srcContent;
-    {
-        Reader r(srcPath);
-        srcContent = r.readAll();
-    }
+    REQUIRE(writer.writeEmitter(emitter,
+                                s,
+                                headerFile.path(),
+                                sourceFile.path()));
 
-    REQUIRE(hdrContent == expectedHeader);
-    REQUIRE(srcContent == expectedSource);
+    Reader headerReader(headerFile.path());
+    Reader sourceReader(sourceFile.path());
 
-    fs::remove(hdrPath);
-    fs::remove(srcPath);
+    const std::string headerContent = headerReader.readAll();
+    const std::string sourceContent = sourceReader.readAll();
+
+    REQUIRE(headerContent == expectedHeader);
+    REQUIRE(sourceContent == expectedSource);
 }
 
-TEST_CASE("Writer::writeRuntime round-trip (JSON)", "[job_writer]") {
+TEST_CASE("Writer::writeRuntime round-trip (JSON)", "[job_writer]")
+{
     Schema s = TestEmitter::getEmitterTestSchema();
     ISerializer ser{};
-    RuntimeObject obj_in{}; // Use the real RuntimeObject
+    RuntimeObject objIn{};
 
-    obj_in.setField("count", FieldValue{ .value = FieldValue::Scalar{(uint32_t)42} });
-    obj_in.setField("data", FieldValue{ .value = FieldValue::Scalar{std::string("test_data")} });
+    objIn.setField("count", FieldValue{
+                                .value = FieldValue::Scalar{static_cast<uint32_t>(42)}
+                            });
 
-    const fs::path jsonPath = "test_writer_runtime.json";
-    fs::remove(jsonPath);
+    objIn.setField("data", FieldValue{
+                               .value = FieldValue::Scalar{std::string("test_data")}
+                           });
 
-    {
-        Writer w(jsonPath);
-        REQUIRE(w.writeRuntime(ser, s, obj_in, SerializeFormat::Json));
-    }
-    REQUIRE(fs::exists(jsonPath));
+    job::io::JobTmpFile tmpFile("test_writer_runtime.json");
 
-    RuntimeObject obj_out{};
-    Reader r(jsonPath);
+    Writer writer(tmpFile.path());
 
-    REQUIRE(r.readRuntime(ser, s, obj_out, SerializeFormat::Json));
-    REQUIRE(obj_out.hasField("count"));
-    REQUIRE(obj_out.hasField("data"));
+    REQUIRE(writer.writeRuntime(ser, s, objIn, SerializeFormat::Json));
 
-    auto countVal = obj_out.getField("count");
-    auto dataVal = obj_out.getField("data");
+    RuntimeObject objOut{};
+    Reader reader(tmpFile.path());
 
-    REQUIRE(std::get<FieldValue::Scalar>(countVal->value) == FieldValue::Scalar{(int64_t)42});
-    REQUIRE(std::get<FieldValue::Scalar>(dataVal->value) == FieldValue::Scalar{std::string("test_data")});
+    REQUIRE(reader.readRuntime(ser, s, objOut, SerializeFormat::Json));
+    REQUIRE(objOut.hasField("count"));
+    REQUIRE(objOut.hasField("data"));
 
-    fs::remove(jsonPath);
+    auto countVal = objOut.getField("count");
+    auto dataVal = objOut.getField("data");
+
+    REQUIRE(countVal.has_value());
+    REQUIRE(dataVal.has_value());
+
+    REQUIRE(std::get<FieldValue::Scalar>(countVal->value) ==
+            FieldValue::Scalar{static_cast<int64_t>(42)});
+
+    REQUIRE(std::get<FieldValue::Scalar>(dataVal->value) ==
+            FieldValue::Scalar{std::string("test_data")});
 }

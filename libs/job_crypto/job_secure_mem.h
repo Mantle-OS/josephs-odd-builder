@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <cstddef>
 #include <string>
 #include <sodium/utils.h>
@@ -10,7 +11,20 @@ namespace job::crypto {
 class JOBCRYPTO_EXPORT JobSecureMem
 {
 public:
-    explicit JobSecureMem(size_t size = 0);
+    using Ptr  = std::shared_ptr<JobSecureMem>;
+    using UPtr = std::unique_ptr<JobSecureMem>;
+
+    explicit JobSecureMem(size_t size = 0);    
+    [[nodiscard]] static Ptr createShared(size_t size = 0)
+    {
+        return std::make_shared<JobSecureMem>(size);
+    }
+
+    [[nodiscard]] static UPtr createUniq(size_t size = 0)
+    {
+        return std::make_unique<JobSecureMem>(size);
+    }
+
     JobSecureMem(const JobSecureMem &other);
     JobSecureMem &operator=(const JobSecureMem &other);
     JobSecureMem(JobSecureMem &&other) noexcept;

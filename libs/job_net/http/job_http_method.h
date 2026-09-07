@@ -6,7 +6,7 @@
 
 namespace job::net {
 
-enum class JobHttpMethod : std::uint8_t
+enum class HttpMethod : std::uint8_t
 {
     Get = 0,
     Head,
@@ -20,66 +20,78 @@ enum class JobHttpMethod : std::uint8_t
     Custom
 };
 
-[[nodiscard]] constexpr std::string_view toString(JobHttpMethod method) noexcept
+class JobHttpMethod
 {
-    switch (method) {
-    case JobHttpMethod::Get:
-        return "GET";
-    case JobHttpMethod::Head:
-        return "HEAD";
-    case JobHttpMethod::Post:
-        return "POST";
-    case JobHttpMethod::Put:
-        return "PUT";
-    case JobHttpMethod::Delete:
-        return "DELETE";
-    case JobHttpMethod::Patch:
-        return "PATCH";
-    case JobHttpMethod::Options:
-        return "OPTIONS";
-    case JobHttpMethod::Connect:
-        return "CONNECT";
-    case JobHttpMethod::Trace:
-        return "TRACE";
-    case JobHttpMethod::Custom:
+public:
+    JobHttpMethod() = delete;
+    ~JobHttpMethod() = delete;
+
+    JobHttpMethod(const JobHttpMethod &) = delete;
+    JobHttpMethod &operator=(const JobHttpMethod &) = delete;
+    JobHttpMethod(JobHttpMethod &&) = delete;
+    JobHttpMethod &operator=(JobHttpMethod &&) = delete;
+
+    [[nodiscard]] static constexpr std::string_view toString(HttpMethod method) noexcept
+    {
+        switch (method) {
+        case HttpMethod::Get:
+            return "GET";
+        case HttpMethod::Head:
+            return "HEAD";
+        case HttpMethod::Post:
+            return "POST";
+        case HttpMethod::Put:
+            return "PUT";
+        case HttpMethod::Delete:
+            return "DELETE";
+        case HttpMethod::Patch:
+            return "PATCH";
+        case HttpMethod::Options:
+            return "OPTIONS";
+        case HttpMethod::Connect:
+            return "CONNECT";
+        case HttpMethod::Trace:
+            return "TRACE";
+        case HttpMethod::Custom:
+            return {};
+        }
+
         return {};
     }
 
-    return {};
-}
+    [[nodiscard]] static std::string toStdString(HttpMethod method)
+    {
+        return std::string{toString(method)};
+    }
 
-[[nodiscard]] inline std::string toStdString(JobHttpMethod method)
-{
-    return std::string{toString(method)};
-}
+    [[nodiscard]] static constexpr HttpMethod toMethod(std::string_view method) noexcept
+    {
+        if (method == "GET")
+            return HttpMethod::Get;
+        if (method == "HEAD")
+            return HttpMethod::Head;
+        if (method == "POST")
+            return HttpMethod::Post;
+        if (method == "PUT")
+            return HttpMethod::Put;
+        if (method == "DELETE")
+            return HttpMethod::Delete;
+        if (method == "PATCH")
+            return HttpMethod::Patch;
+        if (method == "OPTIONS")
+            return HttpMethod::Options;
+        if (method == "CONNECT")
+            return HttpMethod::Connect;
+        if (method == "TRACE")
+            return HttpMethod::Trace;
 
-[[nodiscard]] constexpr JobHttpMethod toMethod(std::string_view method) noexcept
-{
-    if (method == "GET")
-        return JobHttpMethod::Get;
-    if (method == "HEAD")
-        return JobHttpMethod::Head;
-    if (method == "POST")
-        return JobHttpMethod::Post;
-    if (method == "PUT")
-        return JobHttpMethod::Put;
-    if (method == "DELETE")
-        return JobHttpMethod::Delete;
-    if (method == "PATCH")
-        return JobHttpMethod::Patch;
-    if (method == "OPTIONS")
-        return JobHttpMethod::Options;
-    if (method == "CONNECT")
-        return JobHttpMethod::Connect;
-    if (method == "TRACE")
-        return JobHttpMethod::Trace;
+        return HttpMethod::Custom;
+    }
 
-    return JobHttpMethod::Custom;
-}
-
-[[nodiscard]] constexpr JobHttpMethod toMethod(const std::string &method) noexcept
-{
-    return toMethod(std::string_view{method});
-}
+    [[nodiscard]] static constexpr HttpMethod toMethodStd(const std::string &method) noexcept
+    {
+        return toMethod(std::string_view{method});
+    }
+};
 
 } // namespace job::net

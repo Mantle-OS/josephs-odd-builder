@@ -5,13 +5,30 @@ project(JosephOddBuild_IO
 )
 
 set(JOBIO_SOURCES
+    pty_env.cpp
+    pty_env_posix.cpp
+    pty_env_xdg.cpp
+    pty_dot.cpp
+    pty_environ.cpp
     pty_io.cpp
+    job_process.cpp
+
+    job_ini.cpp
+
+    job_xdg_paths.cpp
+    job_xdg_entry.cpp
+    job_xdg.cpp
+
     file_io.cpp
     mock_io.cpp
     io_factory.cpp
 
     job_shared_memory.cpp
+
+    job_syslink.cpp
+    job_dir.cpp
     job_file.cpp
+
     job_mem_lock.cpp
     job_mmap.cpp
     job_range_pool.cpp
@@ -22,14 +39,35 @@ set(JOBIO_SOURCES
 )
 set(JOBIO_HEADERS
     io_base.h
-    job_permissions.h
+
+    pty_env.h
+    pty_env_posix.h #  POSIX.1-2017
+
+    pty_dot.h
+    pty_environ.h ## extern char **environ;
     pty_io.h
+
+    job_ini.h
+
+    pty_env_xdg.h   #  https://specifications.freedesktop.org/basedir/latest/#variables
+    job_xdg_paths.h
+    job_xdg_exec.h
+    job_xdg_entry.h
+    job_xdg_desktop_entry.h
+    job_xdg.h           # parser and owns lists and all this is the MVC and helpers
+
+    job_process.h # the wrapper around pty_io.h
+
     file_io.h
     mock_io.h
     job_shared_memory_header.h
     job_shared_memory.h
     io_factory.h
 
+    job_permissions.h
+    job_dir.h
+    job_tmp_dir.h
+    job_syslink.h
     job_file.h
     job_tmp_file.h
 
@@ -81,6 +119,7 @@ target_include_directories(JosephsOddBuilder_IO PUBLIC
 target_link_libraries(JosephsOddBuilder_IO PRIVATE
     JosephsOddBuilder_Core
     JosephsOddBuilder_Threads
+    JosephsOddBuilder_Crypto
 )
 
 install(TARGETS JosephsOddBuilder_IO

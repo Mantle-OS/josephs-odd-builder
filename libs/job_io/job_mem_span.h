@@ -13,23 +13,23 @@
 namespace job::io {
 
 // One contiguous run of allocator pages within a JobMemExtent.
-//
+
 // JobMemSpan is a descriptor only. It does not allocate memory, own pages,
 // maintain free lists, or know about JobPagePool policy.
-//
+
 // Both page and byte geometry use half-open ranges:
-//
+
 //     pages: [firstPageIndex, endPageIndex)
 //     bytes: [range().first(), range().last())
-//
+
 // The byte range uses the same backing-relative coordinate system as
 // JobMemExtent and JobMemPage.
-//
+
 // JobMemSpan::pageSize() refers to allocator page size. It is intentionally
 // independent of JobMmap::pageSize(), which describes the OS mapping page size.
-//
+
 // Intrinsic invariants:
-//
+
 //     pageCount > 0
 //     pageSize > 0
 //     firstPageIndex + pageCount does not overflow

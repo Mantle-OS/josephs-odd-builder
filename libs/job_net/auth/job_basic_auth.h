@@ -31,7 +31,7 @@ private:
     friend class JobHttpAuthFactory;
 
     BasicAuth(std::string_view username, std::string_view password);
-    BasicAuth(std::string_view username, job::crypto::JobSecureMem &&password);
+    BasicAuth(std::string_view username, job::crypto::JobSecureMem::Ptr password);
 
     std::string m_username;
 };

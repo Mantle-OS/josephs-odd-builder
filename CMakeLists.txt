@@ -19,6 +19,7 @@ include(cmake/build_deps.cmake)
 ## function for the massagepack generator
 if(JOB_BUILD_SERIALIZER_MSGPACK)
     include(cmake/job_msgpack_gen_lib.cmake)
+    add_subdirectory(apps/job_msg_gen)
 endif()
 
 if(JOB_QT)

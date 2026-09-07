@@ -24,10 +24,20 @@ add_library(JosephsOddBuilder_Uart SHARED
     ${JOBUART_SOURCES}
 )
 
+target_compile_options(JosephsOddBuilder_Uart PRIVATE
+    -freflection
+    -fcontracts)
+
+target_link_options(JosephsOddBuilder_Uart PRIVATE
+    -fcontracts
+)
+
 set_target_properties(JosephsOddBuilder_Uart PROPERTIES
     VERSION ${PROJECT_VERSION}
     SOVERSION ${PROJECT_VERSION_MAJOR}
     OUTPUT_NAME "jobuart"
+    CXX_STANDARD 26
+    CXX_STANDARD_REQUIRED ON
 )
 
 target_include_directories(JosephsOddBuilder_Uart PUBLIC

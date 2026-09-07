@@ -1,109 +1,171 @@
 #pragma once
 
-#include <cctype>
+#include <cstddef>
+#include <cstdint>
+#include <string>
 #include <string_view>
-#include <unordered_map>
-#include <algorithm>
-#include <forward_list>
 #include <vector>
 
 #include "job_iana.h"
 #include "jobnet_export.h"
+
 namespace job::net {
+
 
 class JOBNET_EXPORT JobHttpHeader {
 public:
+    struct Field {
+        std::string name;           // normalized (lowercase) used for "all" lookups
+        std::string displayName;    // as supplied by the caller / as received
+        std::string value;          // OWS-trimmed
+        [[nodiscard]] bool operator==(const Field &) const = default;
+    };
+
+    using FieldList = std::vector<Field>;
+
+    static constexpr std::size_t npos = static_cast<std::size_t>(-1);
 
     JobHttpHeader();
     JobHttpHeader(std::string_view name, std::string_view value);
     JobHttpHeader(const JobHttpHeader &other);
+    JobHttpHeader(JobHttpHeader &&other) noexcept;
     ~JobHttpHeader();
-    static std::string normalizeKey(const std::string_view &input)
-    {
-        std::string key(input);
-        std::transform(key.begin(), key.end(), key.begin(),
-                       [](unsigned char c) { return std::tolower(c); });
-        return key;
-    }
+
+    JobHttpHeader &operator=(const JobHttpHeader &other);
+    JobHttpHeader &operator=(JobHttpHeader &&other) noexcept;
+
+    [[nodiscard]] static std::string normalizeKey(std::string_view input);
+    [[nodiscard]] static bool equalsIgnoreCase(std::string_view a, std::string_view b) noexcept;
+
+    [[nodiscard]] static bool isValidFieldName(std::string_view name) noexcept;
+
+    [[nodiscard]] static bool isValidFieldValue(std::string_view value) noexcept;
+
+    [[nodiscard]] static bool isCombinable(std::string_view name) noexcept;
 
     [[nodiscard]] std::string toString() const;
 
-    [[nodiscard]] bool contains(std::string_view name) const;
-    [[nodiscard]] bool contains(JobIana::IanaHeaders name) const;
+    [[nodiscard]] bool contains(std::string_view name) const noexcept;
+    [[nodiscard]] bool contains(JobIana::IanaHeaders name) const noexcept;
 
-    [[nodiscard]] bool append(std::string_view  name, std::string_view value);
+    [[nodiscard]] std::size_t indexOf(std::string_view name) const noexcept;
+    [[nodiscard]] std::size_t lastIndexOf(std::string_view name) const noexcept;
+
+    [[nodiscard]] std::size_t count(std::string_view name) const noexcept;
+    [[nodiscard]] std::size_t count(JobIana::IanaHeaders name) const noexcept;
+
+    // Value of the FIRST field line with this name.
+    // Joseph Note that when the name is repeated this is only part of the picture !!
+    // use values() or joinedValue() when repetition is meaningful.
+    [[nodiscard]] std::string_view value(std::string_view name, std::string_view defaultVal = {}) const noexcept;
+    [[nodiscard]] std::string_view value(JobIana::IanaHeaders name, std::string_view defaultVal = {}) const noexcept;
+
+    [[nodiscard]] std::string_view lastValue(std::string_view name, std::string_view defaultVal = {}) const noexcept;
+    [[nodiscard]] std::string_view lastValue(JobIana::IanaHeaders name, std::string_view defaultVal = {}) const noexcept;
+
+
+    [[nodiscard]] std::vector<std::string_view> values(std::string_view name) const;
+    [[nodiscard]] std::vector<std::string_view> values(JobIana::IanaHeaders name) const;
+
+
+    [[nodiscard]] std::string joinedValue(std::string_view name, std::string_view sep = ", ") const;
+    [[nodiscard]] std::string joinedValue(JobIana::IanaHeaders name, std::string_view sep = ", ") const;
+
+    [[nodiscard]] std::vector<std::string_view> listMembers(std::string_view name) const;
+    [[nodiscard]] std::vector<std::string_view> listMembers(JobIana::IanaHeaders name) const;
+
+
+    [[nodiscard]] const Field *fieldAt(std::size_t pos) const noexcept;
+    [[nodiscard]] std::string_view nameAt(std::size_t pos) const noexcept;
+    [[nodiscard]] std::string_view valueAt(std::size_t pos) const noexcept;
+
+    // Adds a NEW field line, even if the name is already present.
+    [[nodiscard]] bool append(std::string_view name, std::string_view value);
     [[nodiscard]] bool append(JobIana::IanaHeaders name, std::string_view value);
 
-    [[nodiscard]] bool prepend(std::string_view  name, std::string_view value);
+    // Adds a NEW field line at the front.
+    [[nodiscard]] bool prepend(std::string_view name, std::string_view value);
     [[nodiscard]] bool prepend(JobIana::IanaHeaders name, std::string_view value);
 
-    [[nodiscard]] bool insert(std::string_view name, std::string_view value, uint16_t pos);
-    [[nodiscard]] bool insert(JobIana::IanaHeaders name, std::string_view value, uint16_t pos);
+    // Adds a NEW field line at pos (clamped to size()).
+    [[nodiscard]] bool insert(std::string_view name, std::string_view value, std::size_t pos);
+    [[nodiscard]] bool insert(JobIana::IanaHeaders name, std::string_view value, std::size_t pos);
 
-    [[nodiscard]] bool replace(size_t pos, std::string_view name, std::string_view val);
-    [[nodiscard]] bool replace(size_t pos, JobIana::IanaHeaders name, std::string_view val);
+    [[nodiscard]] bool set(std::string_view name, std::string_view value);
+    [[nodiscard]] bool set(JobIana::IanaHeaders name, std::string_view value);
 
-    void removeAt(uint16_t pos);
-    void removeAll(std::string_view name);
-    void removeAll(JobIana::IanaHeaders name);
+    // RFC 9110 5.3 list append: extends the LAST field line with this name
+    // as "old, new", or creates the line if absent.
+    // Returns false for non-combinable names (Set-Cookie) ->  use append().
+    [[nodiscard]] bool appendToList(std::string_view name, std::string_view value);
+    [[nodiscard]] bool appendToList(JobIana::IanaHeaders name, std::string_view value);
+
+    // Overwrites the field line at pos.
+    [[nodiscard]] bool replace(std::size_t pos, std::string_view name, std::string_view value);
+    [[nodiscard]] bool replace(std::size_t pos, JobIana::IanaHeaders name, std::string_view value);
+
+    bool removeAt(std::size_t pos);
+
+    // Removes every field line with this name; returns how many were removed.
+    std::size_t removeAll(std::string_view name);
+    std::size_t removeAll(JobIana::IanaHeaders name);
+
+    void clear() noexcept;
+    void reserve(std::size_t n);
 
     [[nodiscard]] bool isEmpty() const noexcept;
-    [[nodiscard]] size_t size()  const noexcept;
-    [[nodiscard]] size_t count() const noexcept;
+    [[nodiscard]] std::size_t size() const noexcept;
+    [[nodiscard]] std::size_t count() const noexcept; // compat
 
-    void clear();
-
-    [[nodiscard]] std::string_view value(std::string_view name, std::string_view defaultVal = {}) const;
-    [[nodiscard]] std::string_view value(JobIana::IanaHeaders name, std::string_view defaultVal = {}) const;
-    [[nodiscard]] std::string_view valueAt(size_t pos) const;
-    [[nodiscard]] std::forward_list<std::string_view> values(std::string_view name) const;
-
-    JobHttpHeader &operator=(JobHttpHeader &&other);
-    JobHttpHeader &operator=(const JobHttpHeader &other);
-    [[nodiscard]] bool operator==(const JobHttpHeader &other) const noexcept
+    [[nodiscard]] bool operator==(const JobHttpHeader &other) const
     {
-        return m_header_list == other.m_header_list;
+        return m_fields == other.m_fields;
     }
-
-    [[nodiscard]] bool operator!=(const JobHttpHeader &other) const noexcept
+    [[nodiscard]] bool operator!=(const JobHttpHeader &other) const
     {
         return !(*this == other);
     }
 
-    [[nodiscard]] auto begin() noexcept
+    [[nodiscard]] auto begin() noexcept         { return m_fields.begin();  }
+    [[nodiscard]] auto end() noexcept           { return m_fields.end();    }
+    [[nodiscard]] auto begin() const noexcept   { return m_fields.begin();  }
+    [[nodiscard]] auto end() const noexcept     { return m_fields.end();    }
+    [[nodiscard]] auto cbegin() const noexcept  { return m_fields.cbegin(); }
+    [[nodiscard]] auto cend() const noexcept    { return m_fields.cend();   }
+
+    // maybe private we will have to see.
+    [[nodiscard]] static constexpr bool isTChar(unsigned char c) noexcept
     {
-        return m_header_list.begin();
+        return (c >= 'a' && c <= 'z') ||
+               (c >= 'A' && c <= 'Z') ||
+               (c >= '0' && c <= '9') ||
+               c == '!' ||
+               c == '#' ||
+               c == '$' ||
+               c == '%' ||
+               c == '&' ||
+               c == '\'' ||
+               c == '*' ||
+               c == '+' ||
+               c == '-' ||
+               c == '.' ||
+               c == '^' ||
+               c == '_' ||
+               c == '`' ||
+               c == '|' ||
+               c == '~';
     }
-    [[nodiscard]] auto end() noexcept
+
+    [[nodiscard]] static constexpr char lowerAscii(char c) noexcept
     {
-        return m_header_list.end();
-    }
-    [[nodiscard]] auto begin() const noexcept
-    {
-        return m_header_list.begin();
-    }
-    [[nodiscard]] auto end() const noexcept
-    {
-        return m_header_list.end();
-    }
-    [[nodiscard]] auto cbegin() const noexcept
-    {
-        return m_header_list.cbegin();
-    }
-    [[nodiscard]] auto cend() const noexcept
-    {
-        return m_header_list.cend();
+        return (c >= 'A' && c <= 'Z') ? static_cast<char>(c - 'A' + 'a') : c;
     }
 
 private:
-    struct HeaderValue {
-        std::string displayKey;
-        std::string value;
-        [[nodiscard]] bool operator==(const HeaderValue &) const noexcept = default;
-    };
+    [[nodiscard]] static std::string_view trimOws(std::string_view v) noexcept;
+    [[nodiscard]] bool makeField(std::string_view name, std::string_view value, Field &out) const;
 
-    std::vector<std::pair<std::string, HeaderValue>> m_header_list;
-    std::unordered_map<std::string, size_t> m_index;
+    FieldList m_fields;
 };
-} // job::net
 
+} // namespace job::net

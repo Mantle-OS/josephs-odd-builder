@@ -33,10 +33,12 @@ enum class IOPermissions : PermissionBits
 
     ReadUser            = S_IRUSR,                                                      // 0400
     ReadWriteUser       = S_IRUSR | S_IWUSR,                                            // 0600
+    PrivateDirectory    = S_IRWXU,                                                       // 0700
     ReadWriteAll        = S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH,    // 0666
     DefaultFile         = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH,                        // 0644
     DefaultDirectory    = S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH,              // 0755
-    BadIdeas            = S_IRWXU | S_IRWXG | S_IRWXO,                                  // 0777 the what the fuck are you doing mode
+    BadIdeas            = S_IRWXU | S_IRWXG | S_IRWXO,                                  // 0777
+
     ReadWrite           = ReadWriteAll
 };
 
@@ -44,6 +46,23 @@ enum class IOPermissions : PermissionBits
 {
     return static_cast<PermissionBits>(perms);
 }
+
+[[nodiscard]] constexpr IOPermissions operator|(IOPermissions lhs, IOPermissions rhs) noexcept
+{
+    return static_cast<IOPermissions>(toMode(lhs) | toMode(rhs));
+}
+
+[[nodiscard]] constexpr IOPermissions operator&(IOPermissions lhs, IOPermissions rhs) noexcept
+{
+    return static_cast<IOPermissions>(toMode(lhs) & toMode(rhs));
+}
+
+constexpr IOPermissions &operator|=(IOPermissions &lhs, IOPermissions rhs) noexcept
+{
+    lhs = lhs | rhs;
+    return lhs;
+}
+
 
 enum class PermissionStringType : uint8_t
 {
@@ -163,9 +182,7 @@ inline constexpr auto kPermissionStrings = makePermissionStringTable();
 // OctalOnly: "0755"
 // NoOctal:   "rwxr-xr-x"
 // Both:      "0755 rwxr-xr-x"
-[[nodiscard]] constexpr std::string_view toStringView(
-    IOPermissions perms,
-    PermissionStringType type = PermissionStringType::OctalOnly) noexcept
+[[nodiscard]] constexpr std::string_view toStringView(IOPermissions perms, PermissionStringType type = PermissionStringType::OctalOnly) noexcept
 {
     const auto &entry = permissions::kPermissionStrings[permissions::index(perms)];
 
@@ -203,6 +220,9 @@ inline constexpr auto kPermissionStrings = makePermissionStringTable();
 
     case IOPermissions::ReadWriteUser:
         return "ReadWriteUser";
+
+    case IOPermissions::PrivateDirectory:
+        return "PrivateDirectory";
 
     case IOPermissions::ReadWriteAll:
         return "ReadWriteAll";

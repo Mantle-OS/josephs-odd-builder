@@ -237,6 +237,7 @@ void SslServer::detachClientCallbacks(const SslClient::Ptr &client) noexcept
     client->onConnect = nullptr;
     client->onEncrypted = nullptr;
     client->onMessage = nullptr;
+    // client->onWrite = nullptr;
     client->onDisconnect = nullptr;
     client->onSocketError = nullptr;
     client->onSslError = nullptr;

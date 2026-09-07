@@ -1,17 +1,16 @@
-#include <catch2/catch_template_test_macros.hpp>
+#include <catch2/catch_all.hpp>
 
+#include <cstdint>
 #include <string>
+#include <vector>
 
-// base serializer lib
-#include <schema.h>
-#include <job_serializer_utils.h>
-#include <job_field.h>
-#include <runtime_object.h>
-
-// message pack plugin lib
 #include <job_emitter_msgpack.h>
+#include <job_field.h>
 #include <job_serializer_msgpack.h>
+#include <job_serializer_utils.h>
 #include <job_util_msgpack.h>
+#include <runtime_object.h>
+#include <schema.h>
 
 #include "../job_serializer/test_emitter.h"
 
@@ -22,57 +21,94 @@ TEST_CASE("JobSerializerMsgPack (Runtime) encode/decode round-trip", "[job_seria
 {
     JobMsgPackSerializer ser{};
     Schema s = TestEmitter::getEmitterTestSchema();
+
     REQUIRE(s.isValid());
 
-    RuntimeObject obj_in{};
-    obj_in.setField("count", FieldValue{ .value = FieldValue::Scalar{ (uint32_t)123 } });
+    RuntimeObject objIn{};
 
-    FieldValue::Binary bin_data = { 0x01, 0x02, 0x03, 0x04 };
-    obj_in.setField("data", FieldValue{ .value = bin_data });
+    objIn.setField("count", FieldValue{
+                                .value = FieldValue::Scalar{static_cast<uint32_t>(123)}
+                            });
 
-    FieldValue::Struct sub_item;
-    sub_item["id"] = FieldValue{ .value = FieldValue::Scalar{ (int64_t)42 } };
-    sub_item["name"] = FieldValue{ .value = FieldValue::Scalar{ std::string("test") } };
+    FieldValue::Binary binData = {0x01, 0x02, 0x03, 0x04};
 
-    FieldValue::List item_list;
-    item_list.push_back(FieldValue{ .value = sub_item });
+    objIn.setField("data", FieldValue{
+                               .value = binData
+                           });
 
-    obj_in.setField("items", FieldValue{ .value = item_list });
+    FieldValue::Struct subItem;
+
+    subItem["id"] = FieldValue{
+        .value = FieldValue::Scalar{static_cast<int64_t>(42)}
+    };
+
+    subItem["name"] = FieldValue{
+        .value = FieldValue::Scalar{std::string("test")}
+    };
+
+    FieldValue::List itemList;
+    itemList.push_back(FieldValue{.value = subItem});
+
+    objIn.setField("items", FieldValue{
+                                .value = itemList
+                            });
 
     std::vector<uint8_t> buffer;
-    REQUIRE(ser.encode(s, obj_in, buffer, SerializeFormat::Binary));
+
+    REQUIRE(ser.encode(s, objIn, buffer, SerializeFormat::Binary));
     REQUIRE_FALSE(buffer.empty());
 
-    RuntimeObject obj_out{};
-    REQUIRE(ser.decode(s, obj_out, buffer, SerializeFormat::Binary));
+    RuntimeObject objOut{};
 
-    SECTION("Verify decoded data"){
-        REQUIRE(obj_out.hasField("count"));
-        auto count_val = obj_out.getField("count");
-        REQUIRE(count_val->isScalar());
-        REQUIRE(std::get<FieldValue::Scalar>(count_val->value) == FieldValue::Scalar{(uint64_t)123});
+    REQUIRE(ser.decode(s, objOut, buffer, SerializeFormat::Binary));
 
-        REQUIRE(obj_out.hasField("data"));
-        auto data_val = obj_out.getField("data");
-        REQUIRE(data_val->isBinary());
-        REQUIRE(std::get<FieldValue::Binary>(data_val->value) == bin_data);
+    SECTION("Verify decoded data")
+    {
+        REQUIRE(objOut.hasField("count"));
 
-        REQUIRE(obj_out.hasField("names"));
-        REQUIRE(obj_out.getField("names")->isNull());
+        auto countVal = objOut.getField("count");
 
-        REQUIRE(obj_out.hasField("items"));
-        auto items_val = obj_out.getField("items");
-        REQUIRE(items_val->isList());
+        REQUIRE(countVal.has_value());
+        REQUIRE(countVal->isScalar());
+        REQUIRE(std::get<FieldValue::Scalar>(countVal->value) ==
+                FieldValue::Scalar{static_cast<uint64_t>(123)});
 
-        const auto &list = std::get<FieldValue::List>(items_val->value);
+        REQUIRE(objOut.hasField("data"));
+
+        auto dataVal = objOut.getField("data");
+
+        REQUIRE(dataVal.has_value());
+        REQUIRE(dataVal->isBinary());
+        REQUIRE(std::get<FieldValue::Binary>(dataVal->value) == binData);
+
+        REQUIRE(objOut.hasField("names"));
+
+        auto namesVal = objOut.getField("names");
+
+        REQUIRE(namesVal.has_value());
+        REQUIRE(namesVal->isNull());
+
+        REQUIRE(objOut.hasField("items"));
+
+        auto itemsVal = objOut.getField("items");
+
+        REQUIRE(itemsVal.has_value());
+        REQUIRE(itemsVal->isList());
+
+        const auto &list = std::get<FieldValue::List>(itemsVal->value);
+
         REQUIRE(list.size() == 1);
         REQUIRE(list[0].isStruct());
 
         const auto &map = std::get<FieldValue::Struct>(list[0].value);
+
         REQUIRE(map.at("id").isScalar());
         REQUIRE(map.at("name").isScalar());
 
-        REQUIRE(std::get<FieldValue::Scalar>(map.at("id").value) == FieldValue::Scalar{(uint64_t)42});
-        REQUIRE(std::get<FieldValue::Scalar>(map.at("name").value) == FieldValue::Scalar{std::string("test")});
+        REQUIRE(std::get<FieldValue::Scalar>(map.at("id").value) ==
+                FieldValue::Scalar{static_cast<uint64_t>(42)});
+
+        REQUIRE(std::get<FieldValue::Scalar>(map.at("name").value) ==
+                FieldValue::Scalar{std::string("test")});
     }
 }

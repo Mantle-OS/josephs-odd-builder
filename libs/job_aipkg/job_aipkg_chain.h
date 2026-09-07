@@ -1,13 +1,15 @@
 #pragma once
 
-#include "job_aipkg_utils.h"
 #include <aipkg_ledger/ledger_block.hpp>
+
+#include "job_aipkg_utils.h"
+#include "jobaipkg_export.h"
 
 namespace job::aipkg {
 
 using job::serializer::generated::AiPkgBlock;
 
-class JobAiPkgChain
+class JOBAIPKG_EXPORT JobAiPkgChain
 {
 public:
     JobAiPkgChain() = delete;
@@ -20,7 +22,8 @@ public:
     // This is what child blocks must store in their 'prev' field to link the chain securely.
     [[nodiscard]] static Hash32 hashFullBlock(const AiPkgBlock &block) noexcept;
 
-    [[nodiscard]] static bool verifyLinkage(const AiPkgBlock &newBlock, const AiPkgBlock &previousBlock) noexcept;
+    [[nodiscard]] static bool verifyLinkage(const AiPkgBlock &newBlock,
+                                            const AiPkgBlock &previousBlock) noexcept;
 };
 
-} // namespace job::aipkg
+}

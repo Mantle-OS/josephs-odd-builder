@@ -10,10 +10,11 @@
 #include <yaml-cpp/yaml.h>
 
 #include "job_field.h"
+#include "jobserializer_export.h"
 
 namespace job::serializer {
 
-struct Schema final {
+struct JOBSERIALIZER_EXPORT Schema final {
     std::string tag;
     int version = 0;
     std::string unit;
@@ -21,11 +22,13 @@ struct Schema final {
     std::string c_struct;
     std::string include_prefix;
     std::string out_base;
+
     std::vector<Field> fields;
 
     std::filesystem::path hdr_name;
     std::filesystem::path src_name;
-    std::filesystem::path schema_path;
+    std::filesystem::path schema_path;    
+
 
     // JSON
     [[nodiscard]] static bool parse(const nlohmann::json &root, Schema &out);

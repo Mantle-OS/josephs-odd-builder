@@ -167,7 +167,9 @@ struct LocalIdentity {
     receivedPayload.reserve(payload.size());
 
     server->onClientMessage = [&](const SslClient::Ptr &connectedClient, const char *data, size_t size) {
-        if (connectedClient->send(data, size) != static_cast<int64_t>(size))
+        const NetIoResult result = connectedClient->send(data, size);
+
+        if (result.status != NetIoStatus::Ok || result.bytes != size)
             socketError.store(true, std::memory_order_relaxed);
     };
 
@@ -192,7 +194,9 @@ struct LocalIdentity {
         if (!current)
             return;
 
-        if (current->send(payload) != static_cast<int64_t>(payload.size()))
+        const NetIoResult result = current->send(payload);
+
+        if (result.status != NetIoStatus::Ok || result.bytes != payload.size())
             socketError.store(true, std::memory_order_relaxed);
     };
 
@@ -272,6 +276,7 @@ struct LocalIdentity {
 
     client->onEncrypted = nullptr;
     client->onMessage = nullptr;
+    client->onWritable = nullptr;
     client->onDisconnect = nullptr;
     client->onSocketError = nullptr;
     client->onSslError = nullptr;
@@ -346,7 +351,9 @@ TEST_CASE("SslClient and SslServer Full Echo Test", "[ssl_client_server][async][
 
         serverGotMessage.store(true, std::memory_order_relaxed);
 
-        if (client->send(data, size) != static_cast<int64_t>(size))
+        const NetIoResult result = client->send(data, size);
+
+        if (result.status != NetIoStatus::Ok || result.bytes != size)
             socketError.store(true, std::memory_order_relaxed);
     };
 
@@ -387,7 +394,9 @@ TEST_CASE("SslClient and SslServer Full Echo Test", "[ssl_client_server][async][
 
         clientEncrypted.store(true, std::memory_order_relaxed);
 
-        if (current->send(testMessage) != static_cast<int64_t>(testMessage.size()))
+        const NetIoResult result = current->send(testMessage);
+
+        if (result.status != NetIoStatus::Ok || result.bytes != testMessage.size())
             socketError.store(true, std::memory_order_relaxed);
     };
 
@@ -471,6 +480,7 @@ TEST_CASE("SslClient and SslServer Full Echo Test", "[ssl_client_server][async][
     client->onConnect = nullptr;
     client->onEncrypted = nullptr;
     client->onMessage = nullptr;
+    client->onWritable = nullptr;
     client->onDisconnect = nullptr;
     client->onSocketError = nullptr;
     client->onSslError = nullptr;
@@ -516,9 +526,13 @@ TEST_CASE("SslClient rejects sends before encryption", "[job_net][ssl_client][ed
 
     REQUIRE_FALSE(client.isConnected());
     REQUIRE_FALSE(client.isEncrypted());
-    REQUIRE(client.send("not connected") == -1);
-    REQUIRE(client.send(nullptr, 1) == -1);
-    REQUIRE(client.send(nullptr, 0) == -1);
+    const NetIoResult textResult = client.send("not connected");
+    const NetIoResult nullResult = client.send(nullptr, 1);
+    const NetIoResult zeroResult = client.send(nullptr, 0);
+
+    REQUIRE(textResult.status == NetIoStatus::Error);
+    REQUIRE(nullResult.status == NetIoStatus::Error);
+    REQUIRE(zeroResult.status == NetIoStatus::Error);
 }
 
 TEST_CASE("SslServer cannot start without an SSL context", "[job_net][ssl_server][edge][context]")

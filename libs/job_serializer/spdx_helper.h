@@ -4,13 +4,23 @@
 #include <cstdint>
 #include <string>
 #include <unordered_map>
-
-namespace job::core {
-
-class SpdxHelper {
+#include "jobserializer_export.h"
+namespace job::serializer {
+// LATER:
+// ○ enum naming cleanup
+// ○ replace giant unordered_map
+// ○ string_view conversions
+// ○ reflection-generated mapping
+// ○ general SPDX redesign
+class JOBSERIALIZER_EXPORT SpdxHelper {
 public:
-    SpdxHelper() = delete;
-    ~SpdxHelper() = delete;
+    SpdxHelper() = default;
+    ~SpdxHelper() = default;
+
+    SpdxHelper(const SpdxHelper &) = default;
+    SpdxHelper &operator=(const SpdxHelper &) = default;
+    SpdxHelper(SpdxHelper &&) noexcept = default;
+    SpdxHelper &operator=(SpdxHelper &&) noexcept = default;
 
     // FIXME make the  enums
     enum class SPDX_License : uint32_t {
@@ -1396,5 +1406,5 @@ inline const std::unordered_map<SpdxHelper::SPDX_License, std::string> SpdxHelpe
         { SPDX_License::Zope_Public_License_2_0                                                               , "ZPL-2.0" },
         { SPDX_License::Zope_Public_License_2_1                                                               , "ZPL-2.1" }
 };
-} // namespace job::core
+} // namespace job::serializer
 

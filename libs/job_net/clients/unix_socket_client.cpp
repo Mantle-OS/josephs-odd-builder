@@ -55,14 +55,14 @@ void UnixClient::disconnect()
     }
 }
 
-ssize_t UnixClient::send(const void *data, size_t size)
+NetIoResult UnixClient::send(const void *data, size_t size)
 {
     if (!m_socket || !isConnected())
-        return -1;
+        return NetIoResult::error();
     return m_socket->write(data, size);
 }
 
-ssize_t UnixClient::send(const std::string &data)
+NetIoResult UnixClient::send(const std::string &data)
 {
     return send(data.data(), data.size());
 }
@@ -116,34 +116,49 @@ void UnixClient::setupSocketCallbacks()
 {
     if (!m_socket)
         return;
+
     m_socket->onConnect = [this]() {
         m_connected.store(true, std::memory_order_relaxed);
         if (onConnect)
             onConnect();
     };
+
     m_socket->onRead = [this]([[maybe_unused]] const char *data, [[maybe_unused]] size_t len) {
-        while(true) {
-            ssize_t n = m_socket->read(m_readBuffer.data(), m_readBuffer.size());
-            if (n > 0) {
+        if (m_readBuffer.empty())
+            return;
+
+        for (;;) {
+            const NetIoResult n = m_socket->read(m_readBuffer.data(), m_readBuffer.size());
+
+            if (n.ok()) {
+                if (n.bytes == 0)
+                    break; // Defensive: a stream read of a non-empty buffer never returns 0.
+
                 if (onMessage)
-                    onMessage(m_readBuffer.data(), n);
-            } else if (n == 0) {
-                break;
-            } else {
-                break;
+                    onMessage(m_readBuffer.data(), n.bytes);
+
+                continue;
             }
+
+            break; // WouldBlock (drained), Closed (disconnect already fired), or Error.
         }
     };
+
+    m_socket->onWrite = [this](const char *, size_t) {
+        if (onWritable)
+            onWritable();
+    };
+
     m_socket->onDisconnect = [this]() {
         m_connected.store(false, std::memory_order_relaxed);
         if (onDisconnect)
             onDisconnect();
     };
+
     m_socket->onError = [this](int err) {
         m_connected.store(false, std::memory_order_relaxed);
         if (onError)
             onError(err);
     };
 }
-
 } // namespace job::net

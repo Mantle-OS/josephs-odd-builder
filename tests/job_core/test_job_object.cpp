@@ -8,6 +8,8 @@
 #include <memory>
 #include <type_traits>
 
+#include <nlohmann/json.hpp>
+
 #include "test_job_object_fixtures.h"
 
 using namespace job::core;
@@ -94,6 +96,50 @@ TEST_CASE("Object: Multiple senders can connect to one receiver", "[core][object
     CHECK(controller->lastValue == 20.0);
     CHECK(controller->invocationCount == 2);
     CHECK(controller->isValid());
+}
+
+
+TEST_CASE("Object: Object combines persistent BaseObject state with runtime signal state", "[core][object][example][persistence]")
+{
+    SensorNode sensor;
+    sensor.sensorName = "persistent-sensor";
+
+    ControllerNode controller;
+    const auto connection =
+        connect<&SensorNode::readingEmitted, &ControllerNode::handleReading>(
+            sensor,
+            controller);
+
+    REQUIRE(connection);
+    REQUIRE(sensor.readingEmitted.connectionCount() == 1);
+    REQUIRE(controller.connectionCount() == 1);
+
+    const auto uid = sensor.uid();
+    const nlohmann::json serialized = sensor.toJson();
+
+    REQUIRE(serialized.is_object());
+    REQUIRE(serialized.contains("sensorName"));
+    CHECK(serialized["sensorName"] == "persistent-sensor");
+
+    CHECK_FALSE(serialized.contains("m_uid"));
+    CHECK_FALSE(serialized.contains("m_signalsBlocked"));
+    CHECK_FALSE(serialized.contains("m_connMutex"));
+    CHECK_FALSE(serialized.contains("m_connections"));
+    CHECK_FALSE(serialized.contains("readingEmitted"));
+    CHECK_FALSE(serialized.contains("statusEmitted"));
+
+    SensorNode restored;
+    const auto restoredUid = restored.uid();
+
+    REQUIRE(restored.fromJson(serialized));
+
+    CHECK(restored.sensorName == "persistent-sensor");
+    CHECK(restored.uid() == restoredUid);
+    CHECK(restored.uid() != uid);
+    CHECK_FALSE(restored.signalsBlocked());
+    CHECK(restored.connectionCount() == 0);
+    CHECK(restored.readingEmitted.empty());
+    CHECK(restored.statusEmitted.empty());
 }
 
 // =============================================================================
@@ -848,6 +894,102 @@ TEST_CASE("Object: Reflected Unique and SingleShot flags compose", "[core][objec
     CHECK(controller.connectionCount() == 0);
 }
 
+
+// =============================================================================
+// Block 2: BaseObject Persistence Boundary
+// =============================================================================
+
+TEST_CASE("Object: Runtime identity is preserved across JSON deserialization", "[core][object][persistence][json][runtime_state]")
+{
+    SensorNode source;
+    source.sensorName = "source-sensor";
+
+    SensorNode restored;
+    restored.sensorName = "before";
+    const auto uid = restored.uid();
+
+    CHECK_FALSE(restored.signalsBlocked());
+    REQUIRE(restored.blockSignals(true) == false);
+
+    const nlohmann::json serialized = source.toJson();
+    REQUIRE(restored.fromJson(serialized));
+
+    CHECK(restored.sensorName == "source-sensor");
+    CHECK(restored.uid() == uid);
+    CHECK(restored.signalsBlocked());
+
+    CHECK(restored.blockSignals(false));
+}
+
+TEST_CASE("Object: Runtime connections survive JSON deserialization", "[core][object][persistence][json][connection]")
+{
+    SensorNode sensor;
+    ControllerNode controller;
+
+    auto connection =
+        connect<&SensorNode::readingEmitted, &ControllerNode::handleReading>(
+            sensor,
+            controller);
+
+    REQUIRE(connection);
+    REQUIRE(sensor.readingEmitted.connectionCount() == 1);
+    REQUIRE(controller.connectionCount() == 1);
+
+    SensorNode serializedSource;
+    serializedSource.sensorName = "deserialized-name";
+
+    const nlohmann::json serialized = serializedSource.toJson();
+
+    REQUIRE(sensor.fromJson(serialized));
+
+    CHECK(sensor.sensorName == "deserialized-name");
+    CHECK(connection.connected());
+    CHECK(sensor.readingEmitted.connectionCount() == 1);
+    CHECK(controller.connectionCount() == 1);
+
+    sensor.emitReading(7, 77.0);
+
+    CHECK(controller.invocationCount == 1);
+    CHECK(controller.lastChannel == 7);
+    CHECK(controller.lastValue == 77.0);
+}
+
+TEST_CASE("Object: Runtime state is excluded from YAML and binary persistence", "[core][object][persistence][runtime_state]")
+{
+    SensorNode sensor;
+    sensor.sensorName = "persistent";
+    REQUIRE_FALSE(sensor.signalsBlocked());
+    CHECK_FALSE(sensor.blockSignals(true));
+
+    SECTION("YAML")
+    {
+        const YAML::Node serialized = sensor.toYaml();
+
+        REQUIRE(serialized.IsMap());
+        CHECK(static_cast<bool>(serialized["sensorName"]));
+        CHECK_FALSE(static_cast<bool>(serialized["m_uid"]));
+        CHECK_FALSE(static_cast<bool>(serialized["m_signalsBlocked"]));
+        CHECK_FALSE(static_cast<bool>(serialized["m_connMutex"]));
+        CHECK_FALSE(static_cast<bool>(serialized["m_connections"]));
+        CHECK_FALSE(static_cast<bool>(serialized["readingEmitted"]));
+        CHECK_FALSE(static_cast<bool>(serialized["statusEmitted"]));
+    }
+
+    SECTION("Binary")
+    {
+        SensorNode otherwiseIdentical;
+        otherwiseIdentical.sensorName = "persistent";
+
+        std::vector<std::uint8_t> blockedBuffer;
+        std::vector<std::uint8_t> unblockedBuffer;
+
+        sensor.toBinary(blockedBuffer);
+        otherwiseIdentical.toBinary(unblockedBuffer);
+
+        CHECK(blockedBuffer == unblockedBuffer);
+    }
+}
+
 // =============================================================================
 // Block 2: UID & Type Invariants
 // =============================================================================
@@ -904,6 +1046,11 @@ TEST_CASE("Object: Concept and address-pinned invariants", "[core][object][conce
     STATIC_CHECK(BaseObjectType<SensorNode>);
     STATIC_CHECK(BaseObjectType<ControllerNode>);
 
+
+    STATIC_CHECK(std::same_as<Object::Ptr, std::shared_ptr<Object>>);
+    STATIC_CHECK(std::same_as<Object::WPtr, std::weak_ptr<Object>>);
+    STATIC_CHECK(std::same_as<Object::UPtr, std::unique_ptr<Object>>);
+
     STATIC_CHECK(std::default_initializable<SensorNode>);
     STATIC_CHECK(std::destructible<SensorNode>);
 
@@ -919,6 +1066,25 @@ TEST_CASE("Object: Concept and address-pinned invariants", "[core][object][conce
     STATIC_CHECK_FALSE(std::is_copy_assignable_v<ControllerNode>);
     STATIC_CHECK_FALSE(std::move_constructible<ControllerNode>);
     STATIC_CHECK_FALSE(std::is_move_assignable_v<ControllerNode>);
+}
+
+
+TEST_CASE("Object: Static JOB factories create the requested concrete type", "[core][object][factory][static]")
+{
+    auto uniqueSensor = Object::createUniq<SensorNode>();
+    auto sharedSensor = Object::createShared<SensorNode>();
+
+    STATIC_CHECK(std::same_as<decltype(uniqueSensor), std::unique_ptr<SensorNode>>);
+    STATIC_CHECK(std::same_as<decltype(sharedSensor), std::shared_ptr<SensorNode>>);
+
+    REQUIRE(uniqueSensor);
+    REQUIRE(sharedSensor);
+
+    CHECK(uniqueSensor->isValid());
+    CHECK(sharedSensor->isValid());
+    CHECK(uniqueSensor->uid() != 0);
+    CHECK(sharedSensor->uid() != 0);
+    CHECK(uniqueSensor->uid() != sharedSensor->uid());
 }
 
 TEST_CASE("Object: Factory helpers create the requested concrete type", "[core][object][factory][edge_cases]")
@@ -964,21 +1130,6 @@ TEST_CASE("Object benchmarks", "[core][object][benchmark]")
         return controller->invocationCount;
     };
 
-    BENCHMARK("Object isValid - valid SensorNode")
-    {
-        benchmarkEscape(*sensor);
-        return sensor->isValid();
-    };
-
-    SensorNode invalidSensor;
-    invalidSensor.sensorName.clear();
-
-    BENCHMARK("Object isValid - invalid SensorNode")
-    {
-        benchmarkEscape(invalidSensor);
-        return invalidSensor.isValid();
-    };
-
     BENCHMARK("Object connectionCount - one live connection")
     {
         return controller->connectionCount();
@@ -993,6 +1144,18 @@ TEST_CASE("Object benchmarks", "[core][object][benchmark]")
     {
         const bool previous = sensor->blockSignals(!sensor->signalsBlocked());
         return previous;
+    };
+
+    BENCHMARK("Object::createUniq allocation and destruction")
+    {
+        auto object = Object::createUniq<SensorNode>();
+        return object->uid();
+    };
+
+    BENCHMARK("Object::createShared allocation and destruction")
+    {
+        auto object = Object::createShared<SensorNode>();
+        return object->uid();
     };
 
     BENCHMARK("Object makeUniq allocation and destruction")

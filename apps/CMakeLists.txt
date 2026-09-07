@@ -1,5 +1,4 @@
 if(JOB_BUILD_SERIALIZER_MSGPACK)
-    add_subdirectory(job_msg_gen)
     add_subdirectory(job_msg_gen_example)
 endif()
 

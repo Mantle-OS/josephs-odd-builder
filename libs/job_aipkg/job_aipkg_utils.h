@@ -8,12 +8,13 @@
 #include <aipkg_ledger/ledger_attestation.hpp>
 #include <aipkg_ledger/ledger_delegate.hpp>
 #include <aipkg_ledger/ledger_tx.hpp>
+#include "jobaipkg_export.h"
 
 namespace job::aipkg {
 
 using Hash32 = std::array<uint8_t, 32>;
 
-[[nodiscard]] size_t largestPowerOfTwoLessThan(size_t n) noexcept;
+[[nodiscard]] JOBAIPKG_EXPORT size_t largestPowerOfTwoLessThan(size_t n) noexcept;
 
 // Generic, compile-time checked payload encoder.
 // Clears BOTH the signature and public key slots to ensure signing and

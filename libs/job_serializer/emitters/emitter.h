@@ -1,45 +1,44 @@
 #pragma once
 
-#include <string>
+#include <memory>
 #include <set>
+#include <string>
+#include <utility>
 
+#include "jobserializer_export.h"
 #include "schema.h"
 
 namespace job::serializer {
 
-class Emitter {
-
+class JOBSERIALIZER_EXPORT Emitter
+{
 public:
+    using Ptr  = std::shared_ptr<Emitter>;
+    using WPtr = std::weak_ptr<Emitter>;
+    using UPtr = std::unique_ptr<Emitter>;
 
-    Emitter(){}
-    ~Emitter();
+    Emitter() = default;
+    virtual ~Emitter() = default;
 
     Emitter(const Emitter &) = delete;
     Emitter &operator=(const Emitter &) = delete;
+    Emitter(Emitter &&) noexcept = default;
+    Emitter &operator=(Emitter &&) noexcept = default;
 
-    // Used when we generate c++, c etc where there are imply & decl
     [[nodiscard]] std::pair<std::string, std::string> render(const Schema &schema) noexcept;
-
-    // Used when generating things like py, java, ect where there is only decl
     [[nodiscard]] std::string renderSingle(const Schema &schema) noexcept;
 
-    // Here is where the language emitter overrides (or well statrts to)
     [[nodiscard]] virtual std::string renderDecl(const Schema &schema) = 0;
     [[nodiscard]] virtual std::string renderImply(const Schema &schema) = 0;
-
-    // Language must fill this out. noexcept ? Static ?
     [[nodiscard]] virtual std::string languageType(const Field &field) = 0;
 
-    // The cachhed last schema
-    Schema lastSchema() const;
+    [[nodiscard]] Schema lastSchema() const;
 
-    // imports, #includes etc
     void appendIncludes(const std::string &in);
-    std::set<std::string>  getIncludes() const;
+    [[nodiscard]] std::set<std::string> getIncludes() const;
 
-    // Simple place to setup the programming language
-    SerializeLanguage language() const;
-    void setLanguage(SerializeLanguage newLanguage);
+    [[nodiscard]] SerializeLanguage language() const noexcept;
+    void setLanguage(SerializeLanguage newLanguage) noexcept;
 
 protected:
     Schema                  m_lastSchema;
@@ -48,4 +47,3 @@ protected:
 };
 
 } // namespace job::serializer
-

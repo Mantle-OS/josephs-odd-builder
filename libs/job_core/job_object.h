@@ -1,6 +1,5 @@
 #pragma once
 
-#include <algorithm>
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
@@ -13,109 +12,57 @@
 #include "job_connection.h"
 #include "job_obj_annotation.h"
 #include "job_obj_concept.h"
-
 #include "jobcore_export.h"
 
 namespace job::core {
 
-class JOBCORE_EXPORT Object : public BaseObject {
+class JOBCORE_EXPORT Object : public BaseObject
+{
 public:
+    using Ptr      = std::shared_ptr<Object>;
+    using WPtr     = std::weak_ptr<Object>;
+    using UPtr     = std::unique_ptr<Object>;
     using ObjectId = std::uint64_t;
 
-    Object()
-        : m_uid(++s_nextObjectId)
+    Object();
+    virtual ~Object();
+
+    Object(const Object &) = delete;
+    Object &operator=(const Object &) = delete;
+    Object(Object &&) = delete;
+    Object &operator=(Object &&) = delete;
+
+    template <typename T = Object, typename... Args>
+        requires std::derived_from<T, Object> && std::constructible_from<T, Args...>
+    [[nodiscard]] static std::shared_ptr<T> createShared(Args &&...args)
     {
+        return std::make_shared<T>(std::forward<Args>(args)...);
     }
 
-    virtual ~Object()
+    template <typename T = Object, typename... Args>
+        requires std::derived_from<T, Object> && std::constructible_from<T, Args...>
+    [[nodiscard]] static std::unique_ptr<T> createUniq(Args &&...args)
     {
-        disconnectAll();
+        return std::make_unique<T>(std::forward<Args>(args)...);
     }
 
-    Object(const Object&) = delete;
-    Object& operator=(const Object&) = delete;
-    Object(Object&&) = delete;
-    Object& operator=(Object&&) = delete;
+    [[nodiscard]] ObjectId uid() const noexcept;
 
-    [[nodiscard]] ObjectId uid() const noexcept
-    {
-        return m_uid;
-    }
+    [[nodiscard]] bool blockSignals(bool block) noexcept;
+    [[nodiscard]] bool signalsBlocked() const noexcept;
 
-    [[nodiscard]] virtual bool isValid() const noexcept = 0;
+    void registerConnection(const Connection &connection);
+    void registerConnection(Connection &&connection);
+    void disconnectAll();
 
-    [[nodiscard]] bool blockSignals(bool block) noexcept
-    {
-        return m_signalsBlocked.exchange(block, std::memory_order_acq_rel);
-    }
+    [[nodiscard]] std::size_t connectionCount() const;
 
-    [[nodiscard]] bool signalsBlocked() const noexcept
-    {
-        return m_signalsBlocked.load(std::memory_order_acquire);
-    }
-
-    void registerConnection(const Connection& connection)
-    {
-        if (!connection)
-            return;
-
-        std::lock_guard<std::mutex> lock(m_connMutex);
-
-        pruneConnectionsLocked();
-        m_connections.push_back(connection);
-    }
-
-    void registerConnection(Connection&& connection)
-    {
-        if (!connection)
-            return;
-
-        std::lock_guard<std::mutex> lock(m_connMutex);
-
-        pruneConnectionsLocked();
-        m_connections.push_back(std::move(connection));
-    }
-
-    void disconnectAll()
-    {
-        std::vector<Connection> connections;
-
-        {
-            std::lock_guard<std::mutex> lock(m_connMutex);
-            connections.swap(m_connections);
-        }
-
-        for (auto& connection : connections)
-            connection.disconnect();
-    }
-
-    [[nodiscard]] std::size_t connectionCount() const
-    {
-        std::lock_guard<std::mutex> lock(m_connMutex);
-
-        return static_cast<std::size_t>(
-            std::count_if(
-                m_connections.begin(),
-                m_connections.end(),
-                [](const Connection& connection) {
-                    return connection.connected();
-                }));
-    }
-
-    [[nodiscard]] const std::atomic<bool>* signalBlockState() const noexcept
-    {
-        return &m_signalsBlocked;
-    }
+    [[nodiscard]] const std::atomic<bool> *signalBlockState() const noexcept;
 
 private:
-    void pruneConnectionsLocked()
-    {
-        std::erase_if(m_connections, [](const Connection& connection) {
-            return !connection.connected();
-        });
-    }
+    void pruneConnectionsLocked();
 
-    inline static std::atomic<ObjectId> s_nextObjectId{0};
+    static std::atomic<ObjectId> s_nextObjectId;
 
     [[=NoSerialize{}]]
         [[=NoReset{}]]
@@ -139,13 +86,13 @@ private:
 // =============================================================================
 
 template <ObjectType T, typename... Args>
-[[nodiscard]] std::shared_ptr<T> makeShared(Args&&... args)
+[[nodiscard]] std::shared_ptr<T> makeShared(Args &&...args)
 {
     return std::make_shared<T>(std::forward<Args>(args)...);
 }
 
 template <ObjectType T, typename... Args>
-[[nodiscard]] std::unique_ptr<T> makeUniq(Args&&... args)
+[[nodiscard]] std::unique_ptr<T> makeUniq(Args &&...args)
 {
     return std::make_unique<T>(std::forward<Args>(args)...);
 }

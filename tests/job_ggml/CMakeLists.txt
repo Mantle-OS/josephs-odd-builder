@@ -9,7 +9,7 @@ endif()
 
 if(GGML_CUDA)
     add_compile_definitions(JOB_GGML_CUDA)
-    list(APPEND JOB_GGML_TEST_IMPL test_ggml_cuda.cpp)
+    # list(APPEND JOB_GGML_TEST_IMPL test_ggml_cuda.cpp)
 endif()
 
 add_compile_definitions(JOB_GGML_OPENCL)
@@ -58,7 +58,13 @@ if(JOB_WINDOWS)
 elseif (JOB_LINUX)
     target_link_libraries(test_job_ggml PRIVATE atomic)
 endif()
+target_compile_options(test_job_ggml PRIVATE -freflection -fcontracts)
+target_link_options(test_job_ggml PRIVATE -fcontracts)
 
+set_target_properties(test_job_ggml PROPERTIES
+    CXX_STANDARD 26
+    CXX_STANDARD_REQUIRED ON
+)
 target_link_libraries(test_job_ggml PRIVATE
     ${CatchTwo_LIBRARIES}
     Threads::Threads

@@ -7,7 +7,7 @@ BearerAuth::BearerAuth(std::string_view token) :
 {
 }
 
-BearerAuth::BearerAuth(job::crypto::JobSecureMem &&token) :
+BearerAuth::BearerAuth(job::crypto::JobSecureMem::Ptr token) :
     IJobHttpAuth("Authorization", "Bearer", std::move(token))
 {
 }

@@ -42,8 +42,10 @@ public:
 
     void disconnect();
 
-    [[nodiscard]] int64_t send(const void *data, size_t size);
-    [[nodiscard]] int64_t send(const std::string &data);
+    [[nodiscard]] NetIoResult send(const void *data, size_t size);
+    [[nodiscard]] NetIoResult send(const std::string &data);
+    [[nodiscard]] bool setWriteInterest(bool enable);
+
 
     /*
      * SslClient is application-ready only after the TLS handshake completes.
@@ -63,12 +65,13 @@ public:
     [[nodiscard]] SslSocket::Ptr socket() const noexcept;
     [[nodiscard]] JobSslContext::Ptr context() const noexcept;
 
-    std::function<void()>                     onConnect;
-    std::function<void()>                     onEncrypted;
-    std::function<void(const char *, size_t)> onMessage;
-    std::function<void()>                     onDisconnect;
-    std::function<void(int)>                  onSocketError;
-    JobSslError::ErrorCallback                onSslError;
+    std::function<void()>                       onConnect;
+    std::function<void()>                       onEncrypted;
+    std::function<void(const char *, size_t)>   onMessage;
+    std::function<void()>                       onWritable;
+    std::function<void()>                       onDisconnect;
+    std::function<void(int)>                    onSocketError;
+    JobSslError::ErrorCallback                  onSslError;
 
 private:
     [[nodiscard]] bool createSocket();

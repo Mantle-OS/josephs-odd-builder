@@ -1,94 +1,83 @@
 #pragma once
 
+#include <atomic>
+#include <cstdint>
+#include <format>
 #include <mutex>
 #include <string>
-#include <atomic>
-#include <format>
+#include <string_view>
+#include <utility>
 
+#include "job_contract.h"
 #include "jobcore_export.h"
+
 namespace job::core {
 
-enum class LogLevel : uint8_t {
+enum class LogLevel : std::uint8_t {
     Error = 0,
     Warn,
     Info,
-    Debug,
-    Assert
+    Debug
 };
 
-class JOBCORE_EXPORT JobLogger final {
+class JOBCORE_EXPORT JobLogger final
+{
 public:
     static JobLogger &instance() noexcept;
 
     void setLevel(LogLevel level) noexcept;
     [[nodiscard]] LogLevel level() const noexcept;
 
-    void log(LogLevel lvl, const std::string &msg) noexcept;
+    void log(LogLevel level, const std::string &message) noexcept;
+
+    static void contractViolation(const ContractViolation &violation) noexcept;
+    void logContractViolation(const ContractViolation &violation) noexcept;
 
 private:
-    JobLogger() = default;
+    JobLogger() noexcept;
     ~JobLogger() = default;
+
     JobLogger(const JobLogger &) = delete;
     JobLogger &operator=(const JobLogger &) = delete;
+    JobLogger(JobLogger &&) = delete;
+    JobLogger &operator=(JobLogger &&) = delete;
 
     [[nodiscard]] std::string timestamp() const;
 
-private:
     std::atomic<LogLevel> m_level{LogLevel::Info};
-    mutable std::mutex m_mutex;
+    mutable std::mutex    m_mutex;
 };
+
+namespace detail {
+
+template <typename... Args>
+[[nodiscard]] inline std::string formatLog(std::format_string<Args...> fmt, Args&&... args)
+{
+    return std::format(fmt, std::forward<Args>(args)...);
+}
+
+} // namespace detail
 
 } // namespace job::core
 
-// FIXME (BACKLOG) we should have a bit of better messaging. example adding categories
-// Also build time checking is not working. changing this would be something that is
-// needed
-namespace job::core::detail {
-template <typename... Args>
-inline std::string format_log(std::string_view fmt, Args&&... args)
-{
-    if constexpr (sizeof...(args) == 0) {
-        return std::string(fmt);
-    } else {
-        auto tuple = std::make_tuple(std::forward<Args>(args)...);
-        return std::apply([&](auto&... unpacked) {
-            return std::vformat(fmt, std::make_format_args(unpacked...));
-        }, tuple);
-    }
-}
-
-
-
-// Helper macros
 #define JOB_LOG_ERROR(fmt, ...) \
 ::job::core::JobLogger::instance().log( \
-    ::job::core::LogLevel::Error, \
-    ::job::core::detail::format_log(fmt, ##__VA_ARGS__) \
-)
+                                        ::job::core::LogLevel::Error, \
+                                        ::job::core::detail::formatLog(fmt __VA_OPT__(,) __VA_ARGS__))
 
 #define JOB_LOG_WARN(fmt, ...) \
-::job::core::JobLogger::instance().log( \
-          ::job::core::LogLevel::Warn, \
-          ::job::core::detail::format_log(fmt, ##__VA_ARGS__) \
-)
+    ::job::core::JobLogger::instance().log( \
+              ::job::core::LogLevel::Warn, \
+              ::job::core::detail::formatLog(fmt __VA_OPT__(,) __VA_ARGS__))
 
 #define JOB_LOG_INFO(fmt, ...) \
-::job::core::JobLogger::instance().log( \
-          ::job::core::LogLevel::Info, \
-          ::job::core::detail::format_log(fmt, ##__VA_ARGS__) \
-)
+    ::job::core::JobLogger::instance().log( \
+              ::job::core::LogLevel::Info, \
+              ::job::core::detail::formatLog(fmt __VA_OPT__(,) __VA_ARGS__))
 
 #define JOB_LOG_DEBUG(fmt, ...) \
-::job::core::JobLogger::instance().log( \
-          ::job::core::LogLevel::Debug, \
-          ::job::core::detail::format_log(fmt, ##__VA_ARGS__) \
-)
+    ::job::core::JobLogger::instance().log( \
+              ::job::core::LogLevel::Debug, \
+              ::job::core::detail::formatLog(fmt __VA_OPT__(,) __VA_ARGS__))
 
-#define JOB_LOG_ASSERT(fmt, ...) \
-::job::core::JobLogger::instance().log( \
-          ::job::core::LogLevel::Assert, \
-          ::job::core::detail::format_log(fmt, ##__VA_ARGS__) \
-)
-
-} // job::core::detail
 

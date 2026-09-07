@@ -246,14 +246,19 @@ bool SslSocket::verifyPeer()
     return true;
 }
 
-int64_t SslSocket::read(void *buffer, size_t size)
+NetIoResult SslSocket::read(void *buffer, size_t size)
 {
-    if (!buffer || size == 0)
-        return 0;
+    if (size == 0)
+        return NetIoResult::transferred(0);
+
+    if (!buffer) {
+        recordSslError(JobSslError::SslErrNo::InvalidState, "SSL read requires a destination buffer");
+        return NetIoResult::error();
+    }
 
     if (state() != State::Encrypted || !m_impl || !m_impl->ssl) {
         recordSslError(JobSslError::SslErrNo::InvalidState, "SSL read requires an encrypted connection");
-        return -1;
+        return NetIoResult::error();
     }
 
     std::lock_guard<std::mutex> lock(m_readMutex);
@@ -264,50 +269,67 @@ int64_t SslSocket::read(void *buffer, size_t size)
      * acquiring m_readMutex.
      */
     if (state() != State::Encrypted || !m_impl->ssl)
-        return -1;
+        return NetIoResult::error();
 
     ::ERR_clear_error();
 
     const int result = ::SSL_read(m_impl->ssl, buffer, static_cast<int>(size));
 
     if (result > 0)
-        return result;
+        return NetIoResult::transferred(static_cast<size_t>(result));
 
+    /*
+     * processSslError() returns true only for WANT_READ/WANT_WRITE/WANT_CONNECT/
+     * WANT_ACCEPT, and only when it managed to arm the matching event. All four
+     * mean "retry after the event fires" -- including WANT_WRITE, which a read
+     * can raise during renegotiation. A false return covers both "not a retry
+     * case" and "could not arm events", and neither is retryable.
+     */
     if (processSslError(result))
-        return 0;
+        return NetIoResult::retry();
 
+    // close_notify: the orderly TLS end-of-stream, distinct from "no data yet".
     if (m_errors.lastError() == JobSslError::SslErrNo::ZeroReturn)
-        return 0;
+        return NetIoResult::eof();
 
-    return -1;
+    return NetIoResult::error();
 }
 
-int64_t SslSocket::write(const void *buffer, size_t size)
+NetIoResult SslSocket::write(const void *buffer, size_t size)
 {
-    if (!buffer || size == 0)
-        return 0;
+    if (size == 0)
+        return NetIoResult::transferred(0);
+
+    if (!buffer) {
+        recordSslError(JobSslError::SslErrNo::InvalidState, "SSL write requires a source buffer");
+        return NetIoResult::error();
+    }
 
     if (state() != State::Encrypted || !m_impl || !m_impl->ssl) {
         recordSslError(JobSslError::SslErrNo::InvalidState, "SSL write requires an encrypted connection");
-        return -1;
+        return NetIoResult::error();
     }
 
     std::lock_guard<std::mutex> lock(m_writeMutex);
 
     if (state() != State::Encrypted || !m_impl->ssl)
-        return -1;
+        return NetIoResult::error();
 
     ::ERR_clear_error();
 
     const int result = ::SSL_write(m_impl->ssl, buffer, static_cast<int>(size));
 
     if (result > 0)
-        return result;
+        return NetIoResult::transferred(static_cast<size_t>(result));
 
     if (processSslError(result))
-        return 0;
+        return NetIoResult::retry();
 
-    return -1;
+    // The peer sent close_notify: the session is finished, not merely failed.
+    if (m_errors.lastError() == JobSslError::SslErrNo::ZeroReturn)
+        return NetIoResult::eof();
+
+    return NetIoResult::error();
 }
 
 void SslSocket::disconnect()
@@ -364,11 +386,6 @@ void SslSocket::shutdownSsl() noexcept
         return;
     }
 
-    /*
-     * The first successful SSL_shutdown() call normally returns zero after
-     * sending close_notify. Wait for the peer's close_notify and call
-     * SSL_shutdown() again from the next readable event.
-     */
     if (result == 0) {
         if (!updateEvents(JobSslError::SslErrNo::WantRead)) {
             releaseSsl();

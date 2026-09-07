@@ -410,7 +410,27 @@ TEST_CASE("JobThreadGraph fan-in waits for all prerequisites", "[threading][grap
 
 * It’s acceptable for tests to contain more narrative comments than production code.
 
+JOB_CI_BUILD is here as well to help so that things dont run on the auto builder that saturate things.
+
+example 
+```
+#ifdef JOB_CI_BUILD
+//  we are running the unit tests on the ci/cd
+#endif 
+
+
+* Common tools. 
+  * tests-fast-math-workaround.h  Job is compiled with fastmath so this is your workarounds. 
+  * transient_test_file.h this is used if you are below job_io and can not link to it, example job_core or job_threads or job_yaml its used as reading a writng to temp files
+  * test_spin_till.h does what it sounds like... 
+
+Newish (needs speeling and cleanup)
+* Common approches
+  * Utils methods stay in a function file this makes it so when the test harnes is done one can look for common traits that might make it back into the libraries api (heavey reusage), this also stops me or whomever from making anayomous functions that do the same thing
+  * Fixture members. All fixture members should live in one file for the same reason as the util methods. This also keeps the tests clean of classes or whatever 
+
 ---
+
 
 ## 12. Comments and Naming for Intent
 

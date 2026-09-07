@@ -12,12 +12,12 @@ namespace job::io {
 class JobArenaPool;
 class JobMemExtent;
 class JobMemPool;
+
 class JobMemSize;
 class JobMmap;
 class JobPagePool;
 class JobRangePool;
 class JobSizePool;
-
 enum class FactoryType : std::uint8_t
 {
     Pty,
@@ -25,7 +25,8 @@ enum class FactoryType : std::uint8_t
     FileStdOut,
     FileStdErr,
     FileName,
-    JobFile,
+    JobFileReader,
+    JobFileWriter,
     SharedMemory,
     Mmap
 };
@@ -43,6 +44,12 @@ public:
 
     [[nodiscard]] static std::shared_ptr<IODevice> createFromType(FactoryType type, const std::string &target);
     [[nodiscard]] static std::shared_ptr<IODevice> createFromURI(const std::string &uri);
+
+
+    // [[nodiscard]] static std::shared_ptr<JobMemPool>    createMemPool(JobMemPool::Type type, std::size_t size);
+    // [[nodiscard]] static std::shared_ptr<JobMemPool>    createMemPool(JobMemPool::Type type, JobMmap::Ptr mmap);
+    // [[nodiscard]] static std::shared_ptr<JobMemPool>    createMemPool(JobMemPool::Type type, JobMemExtent::Ptr extent);
+
 
     [[nodiscard]] static std::shared_ptr<JobRangePool> createRangePool(std::size_t size);
     [[nodiscard]] static std::shared_ptr<JobRangePool> createRangePool(std::shared_ptr<JobMmap> mmap);

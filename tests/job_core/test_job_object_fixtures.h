@@ -1,15 +1,20 @@
 #pragma once
 
+#include <array>
 #include <concepts>
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
 #include <map>
 #include <memory>
+#include <optional>
+#include <set>
 #include <string>
 #include <vector>
 
 #include <job_base_obj.h>
+#include <job_light_object.h>
+#include <job_obj_annotation.h>
 #include <job_obj_concept.h>
 #include <job_object.h>
 #include <job_signal.h>
@@ -31,10 +36,10 @@ public:
     SensorNode() = default;
     ~SensorNode() override = default;
 
-    SensorNode(const SensorNode&) = delete;
-    SensorNode& operator=(const SensorNode&) = delete;
-    SensorNode(SensorNode&&) = delete;
-    SensorNode& operator=(SensorNode&&) = delete;
+    SensorNode(const SensorNode &) = delete;
+    SensorNode &operator=(const SensorNode &) = delete;
+    SensorNode(SensorNode &&) = delete;
+    SensorNode &operator=(SensorNode &&) = delete;
 
     void emitReading(int channel, double value)
     {
@@ -46,7 +51,7 @@ public:
         statusEmitted.emit(status);
     }
 
-    [[nodiscard]] bool isValid() const noexcept override
+    [[nodiscard]] bool isValid() const noexcept
     {
         return !sensorName.empty();
     }
@@ -62,10 +67,10 @@ public:
     ControllerNode() = default;
     ~ControllerNode() override = default;
 
-    ControllerNode(const ControllerNode&) = delete;
-    ControllerNode& operator=(const ControllerNode&) = delete;
-    ControllerNode(ControllerNode&&) = delete;
-    ControllerNode& operator=(ControllerNode&&) = delete;
+    ControllerNode(const ControllerNode &) = delete;
+    ControllerNode &operator=(const ControllerNode &) = delete;
+    ControllerNode(ControllerNode &&) = delete;
+    ControllerNode &operator=(ControllerNode &&) = delete;
 
     void handleReading(int channel, double value)
     {
@@ -87,7 +92,7 @@ public:
         ++statusInvocationCount;
     }
 
-    [[nodiscard]] bool isValid() const noexcept override
+    [[nodiscard]] bool isValid() const noexcept
     {
         return lastChannel >= 0 && invocationCount > 0;
     }
@@ -104,17 +109,44 @@ public:
     int statusInvocationCount{0};
 };
 
+class LightSensorNode : public LightObject {
+public:
+    LightSensorNode() = default;
+    ~LightSensorNode() override = default;
+
+    LightSensorNode(const LightSensorNode &) = delete;
+    LightSensorNode &operator=(const LightSensorNode &) = delete;
+    LightSensorNode(LightSensorNode &&) = delete;
+    LightSensorNode &operator=(LightSensorNode &&) = delete;
+
+    [[nodiscard]] bool isValid() const noexcept
+    {
+        return enabled;
+    }
+
+    bool enabled{true};
+    Signal<int> readingEmitted;
+};
+
 static_assert(ObjectType<SensorNode>);
 static_assert(ObjectType<ControllerNode>);
+static_assert(LightObjectType<LightSensorNode>);
 
 static_assert(BaseObjectType<SensorNode>);
 static_assert(BaseObjectType<ControllerNode>);
+static_assert(!BaseObjectType<LightSensorNode>);
 
 static_assert(std::derived_from<SensorNode, Object>);
 static_assert(std::derived_from<ControllerNode, Object>);
+static_assert(std::derived_from<LightSensorNode, LightObject>);
 
 static_assert(std::same_as<decltype(makeUniq<SensorNode>()), std::unique_ptr<SensorNode>>);
 static_assert(std::same_as<decltype(makeShared<SensorNode>()), std::shared_ptr<SensorNode>>);
+
+static_assert(std::same_as<decltype(Object::createUniq<SensorNode>()), std::unique_ptr<SensorNode>>);
+static_assert(std::same_as<decltype(Object::createShared<SensorNode>()), std::shared_ptr<SensorNode>>);
+static_assert(std::same_as<decltype(LightObject::createUniq<LightSensorNode>()), std::unique_ptr<LightSensorNode>>);
+static_assert(std::same_as<decltype(LightObject::createShared<LightSensorNode>()), std::shared_ptr<LightSensorNode>>);
 
 // =============================================================================
 // BaseObject Serialization Fixtures
@@ -167,11 +199,62 @@ public:
     std::vector<std::string> names;
 };
 
-// Map support is currently exercised only through the binary serializer.
-// JSON/YAML map behavior remains a separate implementation decision.
 class BinaryMapConfig : public BaseObject {
 public:
     std::map<std::uint32_t, std::string> entries;
+};
+
+class OptionalConfig : public BaseObject {
+public:
+    std::optional<std::int32_t> optionalValue;
+    std::optional<std::string> optionalName;
+    std::optional<SubSensorConfig> optionalSensor;
+    std::optional<std::shared_ptr<SubSensorConfig>> optionalSharedSensor;
+};
+
+class PointerConfig : public BaseObject {
+public:
+    std::shared_ptr<SubSensorConfig> sharedSensor;
+    std::unique_ptr<SubSensorConfig> uniqueSensor;
+};
+
+class FixedContainerConfig : public BaseObject {
+public:
+    std::array<std::int32_t, 4> values{1, 2, 3, 4};
+};
+
+class SetConfig : public BaseObject {
+public:
+    std::set<std::int32_t> values;
+    std::set<std::string> names;
+};
+
+class MapConfig : public BaseObject {
+public:
+    std::map<std::uint32_t, std::string> entries;
+    std::map<std::string, SubSensorConfig> sensors;
+};
+
+class NestedContainerConfig : public BaseObject {
+public:
+    std::vector<std::optional<SubSensorConfig>> optionalSensors;
+    std::vector<std::shared_ptr<SubSensorConfig>> sharedSensors;
+    std::map<std::string, std::shared_ptr<SubSensorConfig>> namedSensors;
+};
+
+class AnnotationConfig : public BaseObject {
+public:
+    std::string serializedValue{"serialized"};
+
+    [[=NoSerialize{}]]
+        std::string transientValue{"transient"};
+
+    [[=NoReset{}]]
+        std::string noResetValue{"no-reset"};
+
+    [[=NoSerialize{}]]
+        [[=NoReset{}]]
+        std::string runtimeValue{"runtime"};
 };
 
 static_assert(BaseObjectType<SubSensorConfig>);
@@ -180,25 +263,86 @@ static_assert(BaseObjectType<PrimitiveConfig>);
 static_assert(BaseObjectType<ErrorStateConfig>);
 static_assert(BaseObjectType<ContainerConfig>);
 static_assert(BaseObjectType<BinaryMapConfig>);
+static_assert(BaseObjectType<OptionalConfig>);
+static_assert(BaseObjectType<PointerConfig>);
+static_assert(BaseObjectType<FixedContainerConfig>);
+static_assert(BaseObjectType<SetConfig>);
+static_assert(BaseObjectType<MapConfig>);
+static_assert(BaseObjectType<NestedContainerConfig>);
+static_assert(BaseObjectType<AnnotationConfig>);
 
 static_assert(!BaseObjectType<int>);
 static_assert(!BaseObjectType<std::string>);
+
+// =============================================================================
+// Pointer Concept Coverage
+// =============================================================================
 
 static_assert(SmartPointer<std::shared_ptr<SubSensorConfig>>);
 static_assert(SmartPointer<std::unique_ptr<SubSensorConfig>>);
 static_assert(!SmartPointer<int>);
 
+static_assert(SharedPointer<std::shared_ptr<SubSensorConfig>>);
+static_assert(!SharedPointer<std::unique_ptr<SubSensorConfig>>);
+
+static_assert(UniquePointer<std::unique_ptr<SubSensorConfig>>);
+static_assert(!UniquePointer<std::shared_ptr<SubSensorConfig>>);
+
+static_assert(WeakPointer<std::weak_ptr<SubSensorConfig>>);
+static_assert(!WeakPointer<std::shared_ptr<SubSensorConfig>>);
+
+static_assert(OwningSmartPointer<std::shared_ptr<SubSensorConfig>>);
+static_assert(OwningSmartPointer<std::unique_ptr<SubSensorConfig>>);
+static_assert(!OwningSmartPointer<std::weak_ptr<SubSensorConfig>>);
+
+static_assert(UnsupportedPersistentPointer<SubSensorConfig *>);
+static_assert(UnsupportedPersistentPointer<std::weak_ptr<SubSensorConfig>>);
+static_assert(!UnsupportedPersistentPointer<std::shared_ptr<SubSensorConfig>>);
+
+// =============================================================================
+// Optional / Container Concept Coverage
+// =============================================================================
+
+static_assert(OptionalType<std::optional<int>>);
+static_assert(!OptionalType<int>);
+
 static_assert(ReflectableContainer<std::vector<int>>);
+static_assert(ReflectableContainer<std::array<int, 4>>);
+static_assert(ReflectableContainer<std::set<int>>);
+static_assert(ReflectableContainer<std::map<int, int>>);
 static_assert(!ReflectableContainer<std::string>);
 
 static_assert(MapContainer<std::map<int, int>>);
 static_assert(!MapContainer<std::vector<int>>);
 
+static_assert(SetContainer<std::set<int>>);
+static_assert(!SetContainer<std::vector<int>>);
+static_assert(!SetContainer<std::map<int, int>>);
+
+static_assert(StdArrayType<std::array<int, 4>>);
+static_assert(FixedSequenceContainer<std::array<int, 4>>);
+static_assert(stdArraySizeV<std::array<int, 4>> == 4);
+
+static_assert(PushBackSequenceContainer<std::vector<int>>);
+static_assert(!PushBackSequenceContainer<std::array<int, 4>>);
+static_assert(!PushBackSequenceContainer<std::set<int>>);
+static_assert(!PushBackSequenceContainer<std::map<int, int>>);
+
+static_assert(InsertSequenceContainer<std::set<int>>);
+static_assert(!InsertSequenceContainer<std::vector<int>>);
+static_assert(!InsertSequenceContainer<std::array<int, 4>>);
+static_assert(!InsertSequenceContainer<std::map<int, int>>);
+
+static_assert(PersistentContainer<std::vector<int>>);
+static_assert(PersistentContainer<std::array<int, 4>>);
+static_assert(PersistentContainer<std::set<int>>);
+static_assert(PersistentContainer<std::map<int, int>>);
+
 // =============================================================================
 // Test Utilities
 // =============================================================================
 
-inline std::filesystem::path tempFilePath(const std::string& name)
+inline std::filesystem::path tempFilePath(const std::string &name)
 {
     return std::filesystem::temp_directory_path() / name;
 }
@@ -211,7 +355,7 @@ struct TestReceiver {
     int receivedInt{0};
     std::string receivedStr;
 
-    void handleEvent(int val, const std::string& str)
+    void handleEvent(int val, const std::string &str)
     {
         receivedInt = val;
         receivedStr = str;

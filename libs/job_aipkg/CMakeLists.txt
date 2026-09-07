@@ -1,13 +1,17 @@
 cmake_minimum_required(VERSION 3.16)
+
 project(JosephsOddBuilder_AiPkg
     VERSION 0.1
     LANGUAGES CXX
 )
 
-cmake_policy(SET CMP0167 NEW) # crazy boost stuff
+include(GNUInstallDirs)
+include(GenerateExportHeader)
+
+cmake_policy(SET CMP0167 NEW)
+
+find_package(Boost REQUIRED)
 find_package(msgpack-cxx REQUIRED)
-get_target_property(MSGPACK_CXX_INCLUDE_DIRS msgpack-cxx INTERFACE_INCLUDE_DIRECTORIES)
-get_target_property(BOOST_LIBS Boost::boost INTERFACE_LINK_LIBRARIES)
 
 set(JOBAIPKG_HEADERS
     job_aipkg_utils.h
@@ -33,57 +37,104 @@ set(JOBAIPKG_SOURCES
     job_aipkg_manifest.cpp
 )
 
-add_library(JosephsOddBuilder_AiPkg SHARED
-    ${JOBAIPKG_HEADERS}
-    ${JOBAIPKG_SOURCES}
+if(BUILD_SHARED_LIBS)
+    add_library(JosephsOddBuilder_AiPkg SHARED
+        ${JOBAIPKG_HEADERS}
+        ${JOBAIPKG_SOURCES}
+    )
+else()
+    add_library(JosephsOddBuilder_AiPkg STATIC
+        ${JOBAIPKG_HEADERS}
+        ${JOBAIPKG_SOURCES}
+    )
+
+    target_compile_definitions(JosephsOddBuilder_AiPkg
+        PUBLIC JOBAIPKG_STATIC_DEFINE
+    )
+endif()
+
+set(JOBAIPKG_EXPORT ${CMAKE_CURRENT_BINARY_DIR}/jobaipkg_export.h)
+generate_export_header(JosephsOddBuilder_AiPkg
+    BASE_NAME JOBAIPKG
+    EXPORT_FILE_NAME "${JOBAIPKG_EXPORT}"
 )
 
 set_target_properties(JosephsOddBuilder_AiPkg PROPERTIES
     VERSION ${PROJECT_VERSION}
     SOVERSION ${PROJECT_VERSION_MAJOR}
-    OUTPUT_NAME "jobsdaipkg"
+    OUTPUT_NAME "jobaipkg"
+
+    CXX_STANDARD 26
+    CXX_STANDARD_REQUIRED ON
+    CXX_EXTENSIONS OFF
+
+    CXX_VISIBILITY_PRESET hidden
+    VISIBILITY_INLINES_HIDDEN YES
 )
 
-get_target_property(AIPKG_LEDGER_INCLUDES aipkg_ledger_lib INTERFACE_INCLUDE_DIRECTORIES)
-get_target_property(PKG_LIB_INCLUDES pkg_lib INTERFACE_INCLUDE_DIRECTORIES)
+target_compile_options(JosephsOddBuilder_AiPkg
+    PRIVATE
+        -freflection
+        -fcontracts
+)
 
-target_include_directories(JosephsOddBuilder_AiPkg PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/>
-    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobaipkg>
-    $<BUILD_INTERFACE:${AIPKG_LEDGER_INCLUDES}>
-    $<BUILD_INTERFACE:${PKG_LIB_INCLUDES}>
+target_include_directories(JosephsOddBuilder_AiPkg
+    PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobaipkg>
+
+        ## export file
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
 )
 
 target_link_libraries(JosephsOddBuilder_AiPkg
     PUBLIC
+        JosephsOddBuilder_Core
+        JosephsOddBuilder_Crypto
+        JosephsOddBuilder_Zstd
+
+        $<BUILD_INTERFACE:aipkg_ledger_lib>
+        $<BUILD_INTERFACE:pkg_lib>
+
         ${YAMLCpp_LIBRARIES}
         msgpack-cxx
         Boost::boost
-        JosephsOddBuilder_Core
-        ${LibSodium_LIBRARIES} JosephsOddBuilder_Crypto
-        ${LibZstd_LIBRARIES} JosephsOddBuilder_Zstd
+
     PRIVATE
-        aipkg_ledger_lib
-        pkg_lib
+        JosephsOddBuilder_IO
+        ${LibSodium_LIBRARIES}
+        ${LibZstd_LIBRARIES}
 )
 
 install(TARGETS JosephsOddBuilder_AiPkg
-    EXPORT      JosephsOddBuilderAiPkgTargets
-    LIBRARY     DESTINATION ${CMAKE_INSTALL_LIBDIR}
-    ARCHIVE     DESTINATION ${CMAKE_INSTALL_LIBDIR}
-    RUNTIME     DESTINATION ${CMAKE_INSTALL_BINDIR}
-    INCLUDES    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    EXPORT JosephsOddBuilderAiPkgTargets
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobaipkg
 )
+
+install(FILES ${JOBAIPKG_EXPORT}  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobaipkg)
 install(FILES ${JOBAIPKG_HEADERS} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobaipkg)
 
-## PKGCONFIG
-set(PKGCONFIG_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/pkgconfig")
-set(PKGCONFIG_FILE "${CMAKE_CURRENT_BINARY_DIR}/jobaipkg.pc")
-configure_file("${CMAKE_CURRENT_SOURCE_DIR}/jobaipkg.pc.in" "${PKGCONFIG_FILE}" @ONLY)
-
-install(FILES "${PKGCONFIG_FILE}" DESTINATION "${PKGCONFIG_INSTALL_DIR}")
 install(EXPORT JosephsOddBuilderAiPkgTargets
     FILE JosephsOddBuilderAiPkgTargets.cmake
     NAMESPACE JOB::
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/JosephsOddBuilderAiPkg
 )
+
+if(JOB_LINUX)
+    set(PKGCONFIG_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/pkgconfig")
+    set(PKGCONFIG_FILE "${CMAKE_CURRENT_BINARY_DIR}/jobaipkg.pc")
+
+    configure_file(
+        "${CMAKE_CURRENT_SOURCE_DIR}/jobaipkg.pc.in"
+        "${PKGCONFIG_FILE}"
+        @ONLY
+    )
+
+    install(
+        FILES "${PKGCONFIG_FILE}"
+        DESTINATION "${PKGCONFIG_INSTALL_DIR}"
+    )
+endif()

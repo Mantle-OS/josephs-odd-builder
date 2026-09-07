@@ -1,14 +1,41 @@
 #pragma once
 
+#include <memory>
+#include <sstream>
+#include <string>
+
+#include <emitters/cpp_emitter.h>
 #include <job_serializer_utils.h>
 #include <schema.h>
-#include <emitters/cpp_emitter.h>
 
 using namespace job::serializer;
+
 class TestEmitter final : public CppEmitter
 {
 public:
-    [[nodiscard]] std::string appendDecl( const Schema &schema) noexcept override
+    using Ptr  = std::shared_ptr<TestEmitter>;
+    using WPtr = std::weak_ptr<TestEmitter>;
+    using UPtr = std::unique_ptr<TestEmitter>;
+
+    TestEmitter() = default;
+    ~TestEmitter() override = default;
+
+    TestEmitter(const TestEmitter &) = delete;
+    TestEmitter &operator=(const TestEmitter &) = delete;
+    TestEmitter(TestEmitter &&) noexcept = default;
+    TestEmitter &operator=(TestEmitter &&) noexcept = default;
+
+    [[nodiscard]] static Ptr createShared()
+    {
+        return std::make_shared<TestEmitter>();
+    }
+
+    [[nodiscard]] static UPtr createUniq()
+    {
+        return std::make_unique<TestEmitter>();
+    }
+
+    [[nodiscard]] std::string appendDecl(const Schema &schema) noexcept override
     {
         std::ostringstream ss;
         ss << "\n    // --- Appended Header (TestEmitter) --- \n";
@@ -16,7 +43,7 @@ public:
         return ss.str();
     }
 
-    [[nodiscard]] std::string appendImply( const Schema &schema) noexcept override
+    [[nodiscard]] std::string appendImply(const Schema &schema) noexcept override
     {
         std::ostringstream ss;
         ss << "\n// --- Appended Source (TestEmitter) --- \n";
@@ -24,7 +51,6 @@ public:
         ss << "{\n";
         ss << "    std::cout << \"" << schema.c_struct << "{\\n\";\n";
 
-        // This is the implementation for our generated print function
         for (const auto &f : schema.fields)
             ss << "    std::cout << \"  " << f.name << ": \" << /* TODO: serialize field */ \"...\" << \"\\n\";\n";
 
@@ -33,7 +59,7 @@ public:
         return ss.str();
     }
 
-    static Schema getEmitterTestSchema()
+    [[nodiscard]] static Schema getEmitterTestSchema()
     {
         Schema s{};
         s.tag = "EmitterTest";
@@ -47,7 +73,7 @@ public:
         s.hdr_name = s.out_base + ".hpp";
         s.src_name = s.out_base + ".cpp";
 
-        //  Scalar
+        // Scalar
         s.fields.push_back({
             .key = 1,
             .name = "count",
@@ -130,12 +156,12 @@ public:
             .required = false,
             .comment{}
         });
+
         return s;
     }
 };
 
-static inline bool stringContains(const std::string& haystack, const std::string& needle)
+static inline bool stringContains(const std::string &haystack, const std::string &needle)
 {
     return haystack.find(needle) != std::string::npos;
 }
-

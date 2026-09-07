@@ -19,6 +19,7 @@ ApplicationWindow {
         TabButton{ text: qsTr("Keys") }
         TabButton{ text: qsTr("Password Utils") }
         TabButton{ text: qsTr("HMac Sha 256") }
+        TabButton{ text: qsTr("Sha Utils") }
     }    
     StackLayout{
         currentIndex: tb.currentIndex
@@ -29,5 +30,6 @@ ApplicationWindow {
         KeyManager{}
         PasswordUtils{}
         HMacSha256{}
+        ShaView{}
     }
 }

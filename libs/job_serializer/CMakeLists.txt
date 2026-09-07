@@ -7,7 +7,7 @@ project(JosephsOddBuilder_Serializer
 
 
 set(JOBSER_SOURCES
-    job_serializer_logger.cpp
+    # job_serializer_logger.cpp
     job_serializer_utils.cpp
     job_field.cpp
     schema.cpp
@@ -22,7 +22,7 @@ set(JOBSER_SOURCES
 
 
 set(JOBSER_HEADERS
-    job_serializer_logger.h
+    # job_serializer_logger.h
     spdx_helper.h
     job_serializer_utils.h
     job_field.h
@@ -44,20 +44,43 @@ if(JOB_BUILD_SERIALIZER_FLATBUFFERS)
     add_subdirectory(job_flatbuffers)
 endif()
 
-add_library(JosephsOddBuilder_Serializer SHARED
-    ${JOBSER_HEADERS}
-    ${JOBSER_SOURCES}
+
+if(BUILD_SHARED_LIBS)
+    add_library(JosephsOddBuilder_Serializer SHARED ${JOBSER_HEADERS} ${JOBSER_SOURCES} )
+else()
+    add_library(JosephsOddBuilder_Serializer STATIC ${JOBSER_HEADERS} ${JOBSER_SOURCES} )
+    target_compile_definitions(JosephsOddBuilder_Serializer PUBLIC JOBSERIALIZER_STATIC_DEFINE)
+endif()
+
+set(JOBSERIALIZER_EXPORT ${CMAKE_CURRENT_BINARY_DIR}/jobserializer_export.h)
+generate_export_header(JosephsOddBuilder_Serializer
+    BASE_NAME JOBSERIALIZER
+    EXPORT_FILE_NAME "${JOBSERIALIZER_EXPORT}"
+)
+target_compile_options(JosephsOddBuilder_Serializer PRIVATE
+    -freflection
+    -fcontracts)
+
+target_link_options(JosephsOddBuilder_Serializer PRIVATE
+    -fcontracts
 )
 
 set_target_properties(JosephsOddBuilder_Serializer PROPERTIES
     VERSION ${PROJECT_VERSION}
     SOVERSION ${PROJECT_VERSION_MAJOR}
     OUTPUT_NAME "jobserializer"
+    CXX_STANDARD 26
+    CXX_STANDARD_REQUIRED ON
+    CXX_EXTENSIONS OFF
+    CXX_VISIBILITY_PRESET hidden
+    VISIBILITY_INLINES_HIDDEN ON
 )
 
 target_include_directories(JosephsOddBuilder_Serializer PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/>
-    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobserializer>
+    ## export file
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
 )
 
 target_include_directories(JosephsOddBuilder_Serializer PRIVATE
@@ -67,6 +90,8 @@ target_include_directories(JosephsOddBuilder_Serializer PRIVATE
 
 target_link_libraries(JosephsOddBuilder_Serializer PRIVATE
     ${YAMLCpp_LIBRARIES}
+    JosephsOddBuilder_Core
+    JosephsOddBuilder_IO
 )
 
 install(TARGETS JosephsOddBuilder_Serializer
@@ -77,19 +102,19 @@ install(TARGETS JosephsOddBuilder_Serializer
     INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 )
 
-install(FILES ${JOBSER_HEADERS}
-    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobserializer
-)
+install(FILES ${JOBSER_HEADERS} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobserializer)
 
-set(PKGCONFIG_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/pkgconfig")
-set(PKGCONFIG_FILE "${CMAKE_CURRENT_BINARY_DIR}/jobserializer.pc")
-configure_file(
-    "${CMAKE_CURRENT_SOURCE_DIR}/jobserializer.pc.in"
-    "${PKGCONFIG_FILE}"
-    @ONLY
-)
+if(JOB_LINUX)
+    set(PKGCONFIG_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/pkgconfig")
+    set(PKGCONFIG_FILE "${CMAKE_CURRENT_BINARY_DIR}/jobserializer.pc")
+    configure_file(
+        "${CMAKE_CURRENT_SOURCE_DIR}/jobserializer.pc.in"
+        "${PKGCONFIG_FILE}"
+        @ONLY
+    )
+    install(FILES "${PKGCONFIG_FILE}" DESTINATION "${PKGCONFIG_INSTALL_DIR}")
+endif()
 
-install(FILES "${PKGCONFIG_FILE}" DESTINATION "${PKGCONFIG_INSTALL_DIR}")
 install(EXPORT JosephsOddBuilderSerializerTargets
     FILE JosephsOddBuilderSerializerTargets.cmake
     NAMESPACE JOB::

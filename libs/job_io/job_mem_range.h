@@ -9,14 +9,14 @@
 namespace job::io {
 
 // Half-open byte range: [first, last)
-//
+
 // JobMemRange describes byte geometry only. It has no backing-memory identity
 // and does not know about JobMmap, extents, pages, spans, pools, or allocation
 // state.
-//
+
 // Invariant:
 //     first <= last
-//
+
 // Empty ranges are valid:
 //     [N, N)
 struct JobMemRange final

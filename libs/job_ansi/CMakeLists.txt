@@ -83,6 +83,17 @@ set_target_properties(JosephsOddBuilder_Ansi PROPERTIES
     VERSION ${PROJECT_VERSION}
     SOVERSION ${PROJECT_VERSION_MAJOR}
     OUTPUT_NAME "jobansi"
+    CXX_STANDARD 26
+    CXX_STANDARD_REQUIRED ON
+)
+
+target_compile_options(JosephsOddBuilder_Ansi PRIVATE
+    -freflection
+    -fcontracts
+)
+
+target_link_options(JosephsOddBuilder_Ansi PRIVATE
+    -fcontracts
 )
 
 target_include_directories(JosephsOddBuilder_Ansi PUBLIC

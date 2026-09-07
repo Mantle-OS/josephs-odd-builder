@@ -316,6 +316,17 @@ set_target_properties(JosephsOddBuilder_Ai PROPERTIES
     VERSION ${PROJECT_VERSION}
     SOVERSION ${PROJECT_VERSION_MAJOR}
     OUTPUT_NAME "jobai"
+    CXX_STANDARD 26
+    CXX_STANDARD_REQUIRED ON
+)
+
+target_compile_options(JosephsOddBuilder_Ai PRIVATE
+    -freflection
+    -fcontracts
+)
+
+target_link_options(JosephsOddBuilder_Ai PRIVATE
+    -fcontracts
 )
 
 target_link_libraries(JosephsOddBuilder_Ai PUBLIC

@@ -18,6 +18,38 @@
 using namespace job::core;
 using namespace job::core::tests;
 
+
+namespace job::core::tests {
+
+class SignalLightReceiver : public LightObject {
+public:
+    SignalLightReceiver() = default;
+    ~SignalLightReceiver() override = default;
+
+    SignalLightReceiver(const SignalLightReceiver &) = delete;
+    SignalLightReceiver &operator=(const SignalLightReceiver &) = delete;
+    SignalLightReceiver(SignalLightReceiver &&) = delete;
+    SignalLightReceiver &operator=(SignalLightReceiver &&) = delete;
+
+    void handleReading(int value)
+    {
+        lastValue = value;
+        ++invocationCount;
+    }
+
+    [[nodiscard]] bool isValid() const noexcept
+    {
+        return invocationCount > 0;
+    }
+
+    int lastValue{0};
+    int invocationCount{0};
+};
+
+static_assert(LightObjectType<SignalLightReceiver>);
+
+} // namespace job::core::tests
+
 // =============================================================================
 // Block 1: Usage / Examples
 // =============================================================================
@@ -173,9 +205,40 @@ TEST_CASE("Signal: Const reference arguments fan out without changing the source
     CHECK(second == "shared-reference");
 }
 
+
+TEST_CASE("Signal: Reflected connect supports LightObject sender and receiver", "[core][signal][example][light_object]")
+{
+    LightSensorNode sensor;
+    SignalLightReceiver receiver;
+
+    auto connection =
+        connect<&LightSensorNode::readingEmitted, &SignalLightReceiver::handleReading>(
+            sensor,
+            receiver);
+
+    REQUIRE(connection);
+    CHECK(sensor.readingEmitted.connectionCount() == 1);
+    CHECK(receiver.connectionCount() == 1);
+
+    sensor.readingEmitted.emit(42);
+
+    CHECK(receiver.invocationCount == 1);
+    CHECK(receiver.lastValue == 42);
+    CHECK(receiver.isValid());
+}
+
 // =============================================================================
 // Block 2: Connection Handle Semantics
 // =============================================================================
+
+
+TEST_CASE("Signal: Signal type is pinned and noncopyable", "[core][signal][connection][type_semantics]")
+{
+    STATIC_REQUIRE_FALSE(std::copy_constructible<Signal<int>>);
+    STATIC_REQUIRE_FALSE(std::is_copy_assignable_v<Signal<int>>);
+    STATIC_REQUIRE_FALSE(std::move_constructible<Signal<int>>);
+    STATIC_REQUIRE_FALSE(std::is_move_assignable_v<Signal<int>>);
+}
 
 TEST_CASE("Signal: Default Connection is disconnected and harmless", "[core][signal][connection][edge_cases]")
 {
@@ -280,6 +343,30 @@ TEST_CASE("Signal: Copied Connection handles reference the same connection", "[c
     CHECK_FALSE(first);
     CHECK_FALSE(second);
 
+    CHECK(signal.empty());
+}
+
+
+TEST_CASE("Signal: Moved Connection handle preserves shared connection state", "[core][signal][connection][move]")
+{
+    Signal<int> signal;
+
+    auto source = signal.connect([](int) {});
+    REQUIRE(source);
+
+    const auto id = source.id();
+    Connection moved = std::move(source);
+
+    CHECK_FALSE(source);
+    CHECK(source.id() == 0);
+    REQUIRE(moved);
+    CHECK(moved.id() == id);
+    CHECK(moved.connected());
+    CHECK(signal.connectionCount() == 1);
+
+    moved.disconnect();
+
+    CHECK_FALSE(moved);
     CHECK(signal.empty());
 }
 
@@ -401,6 +488,55 @@ TEST_CASE("Signal: Connection remains safe after sender destruction", "[core][si
 
     REQUIRE_NOTHROW(connection.disconnect());
     REQUIRE_NOTHROW(connection.disconnect());
+}
+
+
+TEST_CASE("Signal: Destroying Object receiver disconnects registered connection", "[core][signal][connection][lifetime][receiver][object]")
+{
+    SensorNode sensor;
+    Connection connection;
+
+    {
+        auto receiver = std::make_unique<ControllerNode>();
+
+        connection =
+            connect<&SensorNode::readingEmitted, &ControllerNode::handleReading>(
+                sensor,
+                *receiver);
+
+        REQUIRE(connection);
+        REQUIRE(sensor.readingEmitted.connectionCount() == 1);
+        REQUIRE(receiver->connectionCount() == 1);
+    }
+
+    CHECK_FALSE(connection);
+    CHECK_FALSE(connection.connected());
+    CHECK(sensor.readingEmitted.empty());
+    CHECK(sensor.readingEmitted.connectionCount() == 0);
+}
+
+TEST_CASE("Signal: Destroying LightObject receiver disconnects registered connection", "[core][signal][connection][lifetime][receiver][light_object]")
+{
+    LightSensorNode sensor;
+    Connection connection;
+
+    {
+        auto receiver = std::make_unique<SignalLightReceiver>();
+
+        connection =
+            connect<&LightSensorNode::readingEmitted, &SignalLightReceiver::handleReading>(
+                sensor,
+                *receiver);
+
+        REQUIRE(connection);
+        REQUIRE(sensor.readingEmitted.connectionCount() == 1);
+        REQUIRE(receiver->connectionCount() == 1);
+    }
+
+    CHECK_FALSE(connection);
+    CHECK_FALSE(connection.connected());
+    CHECK(sensor.readingEmitted.empty());
+    CHECK(sensor.readingEmitted.connectionCount() == 0);
 }
 
 TEST_CASE("Signal: Concurrent disconnect and sender destruction are safe", "[core][signal][connection][lifetime][concurrency]")
@@ -717,6 +853,26 @@ TEST_CASE("Signal: Multiple SingleShot callbacks each execute once", "[core][sig
     CHECK(thirdCalls == 1);
 }
 
+
+TEST_CASE("Signal: Empty SingleShot connection is consumed by first emission", "[core][signal][single_shot][empty_callback]")
+{
+    Signal<int> signal;
+
+    Signal<int>::Callback callback;
+    auto connection = signal.connect(std::move(callback), ConnectionFlag::SingleShot);
+
+    REQUIRE(connection);
+    REQUIRE(connection.connected());
+    REQUIRE(signal.connectionCount() == 1);
+
+    signal.emit(1);
+
+    CHECK_FALSE(connection);
+    CHECK_FALSE(connection.connected());
+    CHECK(signal.empty());
+    CHECK(signal.connectionCount() == 0);
+}
+
 TEST_CASE("Signal: Explicitly disconnected SingleShot never executes", "[core][signal][single_shot][disconnect]")
 {
     Signal<> signal;
@@ -910,6 +1066,78 @@ TEST_CASE("Signal: Empty and disconnected signals are safe", "[core][signal][edg
         CHECK_FALSE(connection);
         CHECK(signal.empty());
     }
+}
+
+
+TEST_CASE("Signal: Object blockSignals suppresses reflected signal emission", "[core][signal][edge_cases][blocking][object]")
+{
+    SensorNode sensor;
+    ControllerNode controller;
+
+    const auto connection =
+        connect<&SensorNode::readingEmitted, &ControllerNode::handleReading>(
+            sensor,
+            controller);
+
+    REQUIRE(connection);
+
+    CHECK_FALSE(sensor.signalsBlocked());
+    CHECK_FALSE(sensor.blockSignals(true));
+    CHECK(sensor.signalsBlocked());
+
+    sensor.emitReading(1, 10.0);
+
+    CHECK(controller.invocationCount == 0);
+    CHECK(controller.lastChannel == -1);
+
+    CHECK(sensor.blockSignals(false));
+    CHECK_FALSE(sensor.signalsBlocked());
+
+    sensor.emitReading(2, 20.0);
+
+    CHECK(controller.invocationCount == 1);
+    CHECK(controller.lastChannel == 2);
+    CHECK(controller.lastValue == 20.0);
+}
+
+TEST_CASE("Signal: LightObject blockSignals suppresses reflected signal emission", "[core][signal][edge_cases][blocking][light_object]")
+{
+    LightSensorNode sensor;
+    SignalLightReceiver receiver;
+
+    const auto connection =
+        connect<&LightSensorNode::readingEmitted, &SignalLightReceiver::handleReading>(
+            sensor,
+            receiver);
+
+    REQUIRE(connection);
+
+    CHECK_FALSE(sensor.signalsBlocked());
+    CHECK_FALSE(sensor.blockSignals(true));
+    CHECK(sensor.signalsBlocked());
+
+    sensor.readingEmitted.emit(11);
+
+    CHECK(receiver.invocationCount == 0);
+
+    CHECK(sensor.blockSignals(false));
+    CHECK_FALSE(sensor.signalsBlocked());
+
+    sensor.readingEmitted.emit(22);
+
+    CHECK(receiver.invocationCount == 1);
+    CHECK(receiver.lastValue == 22);
+}
+
+TEST_CASE("Signal: blockSignals returns the previous state", "[core][signal][edge_cases][blocking]")
+{
+    SensorNode sensor;
+
+    CHECK_FALSE(sensor.blockSignals(false));
+    CHECK_FALSE(sensor.blockSignals(true));
+    CHECK(sensor.blockSignals(true));
+    CHECK(sensor.blockSignals(false));
+    CHECK_FALSE(sensor.signalsBlocked());
 }
 
 TEST_CASE("Signal: Connection IDs are nonzero and unique", "[core][signal][edge_cases][connection_id]")

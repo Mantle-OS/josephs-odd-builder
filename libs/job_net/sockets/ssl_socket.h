@@ -124,8 +124,14 @@ public:
 
     void disconnect();
 
-    [[nodiscard]] int64_t read(void *buffer, size_t size);
-    [[nodiscard]] int64_t write(const void *buffer, size_t size);
+    [[nodiscard]] NetIoResult read(void *buffer, size_t size);
+    [[nodiscard]] NetIoResult write(const void *buffer, size_t size);
+    [[nodiscard]] bool setWriteInterest(bool enable)
+    {
+        return m_socket && m_socket->setWriteInterest(enable);
+    }
+
+
 
     [[nodiscard]] State state() const noexcept
     {
@@ -398,6 +404,7 @@ private:
             return false;
 
         threads::IOEvent events =
+            threads::IOEvent::Read |
             threads::IOEvent::Error |
             threads::IOEvent::HangUp |
             threads::IOEvent::EdgeTriggered;
@@ -405,7 +412,7 @@ private:
         switch (error) {
         case JobSslError::SslErrNo::WantRead:
         case JobSslError::SslErrNo::WantAccept:
-            events |= threads::IOEvent::Read;
+            // Read is already in the base set.
             break;
 
         case JobSslError::SslErrNo::WantWrite:
