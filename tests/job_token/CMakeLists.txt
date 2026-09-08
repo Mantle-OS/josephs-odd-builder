@@ -24,16 +24,8 @@ set(JOBTOKEN_TESTS
     test_jinja_vm.cpp
 
     test_job_token.cpp
+    test_tokenizer_shm.cpp
 )
-
-
-#  test_token_shm.cpp       // JOB_LINUX
-
-
-
-if(JOB_LINUX)
-    list(APPEND JOBTOKEN_TESTS test_tokenizer_shm.cpp)
-endif()
 
 add_executable(test_job_token
     main.cpp
@@ -57,26 +49,19 @@ set_target_properties(test_job_token PROPERTIES
     CXX_STANDARD 26
     CXX_STANDARD_REQUIRED ON
 )
-target_link_libraries(test_job_token PRIVATE
-    JosephsOddBuilder_Core
-    JosephsOddBuilder_Simd
-    JosephsOddBuilder_Threads
-    JosephsOddBuilder_Ggml
-    JosephsOddBuilder_Token
-    Threads::Threads
-    $<BUILD_INTERFACE:ggml>
-    ${CatchTwo_LIBRARIES}
+target_link_libraries(test_job_token
+    PUBLIC
+      atomic
+    PRIVATE
+      JosephsOddBuilder_Core
+      JosephsOddBuilder_Threads
+      JosephsOddBuilder_IO
+      JosephsOddBuilder_Ggml
+      JosephsOddBuilder_Token
+      Threads::Threads
+      $<BUILD_INTERFACE:ggml>
+      ${CatchTwo_LIBRARIES}
 )
 
-if(JOB_LINUX)
-    target_link_libraries(test_job_token PUBLIC atomic)
-    target_link_libraries(test_job_token PRIVATE JosephsOddBuilder_IO)
-elseif(JOB_WINDOWS)
-    target_compile_options(test_job_token PRIVATE /wd4251)
-endif()
-
-target_include_directories(test_job_token PRIVATE
-    ${CatchTwo_INCLUDE_DIRS}
-)
-
+target_include_directories(test_job_token PRIVATE ${CatchTwo_INCLUDE_DIRS})
 add_test(NAME job_token COMMAND test_job_token)

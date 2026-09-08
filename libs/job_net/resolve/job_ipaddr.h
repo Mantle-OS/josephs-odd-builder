@@ -7,28 +7,19 @@
 #include <cstring>
 #include <string_view>
 
-#if defined(JOB_WINDOWS)
-    #include <winsock2.h>
-    #include <ws2tcpip.h>
-    #include <afunix.h>   // sockaddr_un, Win10 1803+
-#else
-    #include <sys/socket.h>
-    #include <netinet/in.h>
-    #include <sys/un.h>
-    #include <arpa/inet.h>
-    #include <netdb.h>
-    #include <unistd.h>
-#endif
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <sys/un.h>
+#include <arpa/inet.h>
+#include <netdb.h>
+#include <unistd.h>
 
 #include "jobnet_export.h"
 
 namespace job::net {
 
-#if defined(JOB_WINDOWS)
-    using JobSockLen = int;
-#else
-    using JobSockLen = socklen_t;
-#endif
+using JobSockLen = socklen_t;
+
 
 class JOBNET_EXPORT JobIpAddr {
 public:
@@ -39,12 +30,7 @@ public:
         IPv6,
         Unix
     };
-#if defined(JOB_LINUX)
     constexpr JobIpAddr() noexcept = default;
-#else
-    JobIpAddr() noexcept = default;
-#endif
-
     explicit JobIpAddr(const std::string &addr, uint16_t port = 0)
     {
         (void)setAddress(addr, port);

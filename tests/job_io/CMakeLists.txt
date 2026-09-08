@@ -70,10 +70,10 @@ set_target_properties(test_job_io PROPERTIES
 target_link_libraries(test_job_io PRIVATE
     Threads::Threads
     ${CatchTwo_LIBRARIES}
-    JosephsOddBuilder_Threads
-    JosephsOddBuilder_IO
     JosephsOddBuilder_Core
+    JosephsOddBuilder_Threads
     JosephsOddBuilder_Crypto
+    JosephsOddBuilder_IO
 )
 
 target_include_directories(test_job_io PRIVATE

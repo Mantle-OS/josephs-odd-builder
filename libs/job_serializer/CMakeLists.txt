@@ -104,16 +104,16 @@ install(TARGETS JosephsOddBuilder_Serializer
 
 install(FILES ${JOBSER_HEADERS} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobserializer)
 
-if(JOB_LINUX)
-    set(PKGCONFIG_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/pkgconfig")
-    set(PKGCONFIG_FILE "${CMAKE_CURRENT_BINARY_DIR}/jobserializer.pc")
-    configure_file(
-        "${CMAKE_CURRENT_SOURCE_DIR}/jobserializer.pc.in"
-        "${PKGCONFIG_FILE}"
-        @ONLY
-    )
-    install(FILES "${PKGCONFIG_FILE}" DESTINATION "${PKGCONFIG_INSTALL_DIR}")
-endif()
+
+set(PKGCONFIG_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/pkgconfig")
+set(PKGCONFIG_FILE "${CMAKE_CURRENT_BINARY_DIR}/jobserializer.pc")
+configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/jobserializer.pc.in"
+    "${PKGCONFIG_FILE}"
+    @ONLY
+)
+install(FILES "${PKGCONFIG_FILE}" DESTINATION "${PKGCONFIG_INSTALL_DIR}")
+
 
 install(EXPORT JosephsOddBuilderSerializerTargets
     FILE JosephsOddBuilderSerializerTargets.cmake

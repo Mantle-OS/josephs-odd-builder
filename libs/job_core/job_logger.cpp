@@ -148,12 +148,7 @@ std::string JobLogger::timestamp() const
     const auto milliseconds = duration_cast<std::chrono::milliseconds>(now.time_since_epoch()) % 1000;
 
     std::tm localTime{};
-
-#if defined(_WIN32)
-    localtime_s(&localTime, &time);
-#else
     localtime_r(&time, &localTime);
-#endif
 
     std::ostringstream stream;
     stream << std::put_time(&localTime, "%H:%M:%S") << '.' << std::setfill('0') << std::setw(3) << milliseconds.count();

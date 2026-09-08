@@ -37,23 +37,6 @@ add_custom_target(JOB_AI_Documentation SOURCES
     job/ai/cache.md
 )
 
-add_custom_target(QTAI_Documentation SOURCES
-    qtai/qtai.md
-    qtai/qt-ai-utils.md
-    qtai/qml-ai-utils.md
-    qtai/qsodium.md    ## been upgraded
-    qtai/qml-sodium.md ## been upgraded
-    qtai/qzstd.md
-    qtai/qml-zstd.md
-    qtai/qhuggingface.md
-    qtai/qllama.md
-    qtai/qstable-diffusion.md
-    qtai/qai-schema.md
-    qtai/qai-schema/aisession.md
-    qtai/qai-schema/ailedger.md
-    qtai/qai-schema/aipkg.md
-)
-
 add_custom_target(JOBGGML_Documentation SOURCES
     job_ggml/overview.md
     job_ggml/devices.md
@@ -68,7 +51,6 @@ add_custom_target(JOBGGML_Documentation SOURCES
     job_ggml/misc.md  # this is enums & type_traits and abort callback threadpool stuff;
 )
 
-
 add_custom_target(JOBSCHEMA_Documentation SOURCES
     job_schema/design/intro.md
     job_schema/design/job_schema_design.md
@@ -77,17 +59,3 @@ add_custom_target(JOBSCHEMA_Documentation SOURCES
     job_schema/design/test_job_schema_design.md
     job_schema/design/job_schema_design_deps.md
 )
-
-add_custom_target(JOBYML_Documentation SOURCES
-    job_yaml/design/intro.md
-    job_yaml/design/job_yaml_design.md
-    job_yaml/design/job_yaml_parser_design.md
-    job_yaml/design/job_yaml_emitter_design.md
-    job_yaml/design/test_job_yaml_design.md
-    job_yaml/design/job_yaml_design_deps.md
-)
-
-
-
-
-

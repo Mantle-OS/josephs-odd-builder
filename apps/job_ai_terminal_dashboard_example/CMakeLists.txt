@@ -26,7 +26,6 @@ target_link_libraries(job-ai-terminal-dashboard-example PRIVATE
     Threads::Threads
     atomic
     JosephsOddBuilder_Core
-    JosephsOddBuilder_Simd
     JosephsOddBuilder_Ansi
     JosephsOddBuilder_IO
     JosephsOddBuilder_Threads

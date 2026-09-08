@@ -18,10 +18,6 @@ enum class IOEvent : std::uint32_t {
     Write         = 1u << 1,
     Error         = 1u << 2,
     HangUp        = 1u << 3,
-    // Advisory: honored by the posix/epoll backend, silently not
-    // translated by the win32/WSAPoll backend (WSAPoll is always
-    // level-triggered -- see job_io_async_thread_win32.cpp for why
-    // that's compatible with existing drain-until-EAGAIN call sites).
     EdgeTriggered = 1u << 4,
 };
 

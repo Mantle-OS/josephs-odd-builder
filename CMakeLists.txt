@@ -22,7 +22,7 @@ if(JOB_BUILD_SERIALIZER_MSGPACK)
     add_subdirectory(apps/job_msg_gen)
 endif()
 
-if(JOB_QT)
+if(JOB_CUDA)
     ## Order matters here. stable diffusion cpp MUST come before Llama as stable diffusion cpp builds GGML which llama depends on
     include(cmake/cmake_stable_diffusion_cpp_build_flags.cmake)
     include(cmake/cmake_llama_cpp_build_flags.cmake)
@@ -36,12 +36,10 @@ add_subdirectory(tests)
 
 add_subdirectory(docs)
 
-
 add_custom_target(github_docker_ci SOURCES
     docker/Dockerfile
     docker/entrypoint.sh
 )
-
 
 add_custom_target(github_ci SOURCES
     .github/workflows/publish_builder.yml

@@ -25,7 +25,6 @@ include(GNUInstallDirs)
 find_package(Threads REQUIRED)
 find_package(PkgConfig REQUIRED)
 
-## FIXME much latyer add a section for JOB_WINDOWS
 
 ## CRYPTO
 pkg_check_modules(LibOpenSSL REQUIRED libssl)
@@ -73,32 +72,6 @@ if(JOB_CUDA)
 
 endif()
 
-## we build this now
-# pkg_check_modules(LibGgml REQUIRED ggml)
-# find_library(LibGgmlBase NAMES libggml-base ggml-base)
-# if(LibGgmlBase)
-#     message(STATUS "Found GGML Base: ${LibGgmlBase}")
-# else()
-#     message(FATAL_ERROR "LibGgmlBase not found!")
-# endif()
-
 ## Tests
 pkg_check_modules(CatchTwo REQUIRED catch2-with-main)
 
-if(JOB_QT)
-    find_package(Qt6 6.2 COMPONENTS
-        Core
-        Gui
-        Network
-        Concurrent
-        Qml
-        Quick
-        QuickControls2
-        REQUIRED
-    )
-
-    set(QML_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/qt6/qml")
-
-    # qt_policy(SET QTP0001 NEW)
-    # qt_policy(SET QTP0004 NEW)
-endif()

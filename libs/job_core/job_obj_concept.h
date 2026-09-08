@@ -183,9 +183,7 @@ concept ReflectableContainer = requires(T a) {
     typename T::value_type;
     a.begin();
     a.end();
-} &&
-                               !std::same_as<std::remove_cvref_t<T>, std::string> &&
-                               !OptionalType<T>;
+} && !std::same_as<std::remove_cvref_t<T>, std::string> && !OptionalType<T>;
 
 // Associative key/value container.
 template <typename T>
@@ -195,8 +193,7 @@ concept MapContainer = requires(T a) {
     typename T::value_type;
     a.begin();
     a.end();
-} &&
-                       ReflectableContainer<T>;
+} && ReflectableContainer<T>;
 
 // Associative single-value container such as std::set / std::unordered_set.
 template <typename T>
@@ -205,9 +202,7 @@ concept SetContainer = requires(T a) {
     typename T::value_type;
     a.begin();
     a.end();
-} &&
-                       ReflectableContainer<T> &&
-                       !MapContainer<T>;
+} && ReflectableContainer<T> && !MapContainer<T>;
 
 // Fixed-size sequence container.
 template <typename T>
@@ -238,11 +233,7 @@ concept InsertSequenceContainer =
 
 // Any container category for which generic persistence reconstruction is known.
 template <typename T>
-concept PersistentContainer =
-    MapContainer<T> ||
-    FixedSequenceContainer<T> ||
-    PushBackSequenceContainer<T> ||
-    InsertSequenceContainer<T>;
+concept PersistentContainer = MapContainer<T> || FixedSequenceContainer<T> || PushBackSequenceContainer<T> || InsertSequenceContainer<T>;
 
 // =============================================================================
 // Signal Traits & Concept
@@ -307,8 +298,7 @@ struct MemberFunctionPointerTraits<Return (Owner::*)(Args...) const noexcept> {
 // Reflection Helpers
 // =============================================================================
 
-consteval void appendReflectedDataMembers(std::vector<std::meta::info> &members,
-                                          std::meta::info type)
+consteval void appendReflectedDataMembers(std::vector<std::meta::info> &members, std::meta::info type)
 {
     constexpr auto ctx = std::meta::access_context::unchecked();
 
@@ -330,8 +320,7 @@ consteval auto getReflectedDataMembers()
 template <typename T>
 inline constexpr auto reflectedDataMembersV = getReflectedDataMembers<T>();
 
-consteval void appendReflectedMembers(std::vector<std::meta::info> &members,
-                                      std::meta::info type)
+consteval void appendReflectedMembers(std::vector<std::meta::info> &members, std::meta::info type)
 {
     constexpr auto ctx = std::meta::access_context::unchecked();
 

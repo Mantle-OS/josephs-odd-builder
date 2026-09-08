@@ -61,6 +61,7 @@ set(JOBTOKEN_TOKEN_HEADERS
     token/hf_token.h
     token/binary_token.h
     token/token_factory.h
+    ipc/token_shm.h
 )
 
 set(JOBTOKEN_TOKEN_SOURCES
@@ -68,15 +69,8 @@ set(JOBTOKEN_TOKEN_SOURCES
     token/binary_token.cpp
     token/gguf_token.cpp
     token/token_factory.cpp
+    ipc/token_shm.cpp
 )
-
-## the first transport layer could live in a differnt folder but there are enough folders at moment
-## install section and JOBTOKEN_COMPILE_THIS proves this
-if(JOB_LINUX)
-    list(APPEND JOBTOKEN_IPC_HEADERS ipc/token_shm.h)
-    list(APPEND JOBTOKEN_IPC_SOURCES ipc/token_shm.cpp)
-endif()
-
 
 ## optinal chat templete so we dont have to pass in |imuser| or whatever...
 set(JOBTOKEN_CHAT_HEADERS
@@ -182,20 +176,13 @@ target_include_directories(JosephsOddBuilder_Token PUBLIC
 
 target_link_libraries(JosephsOddBuilder_Token PRIVATE
     JosephsOddBuilder_Core
-    JosephsOddBuilder_Simd
     JosephsOddBuilder_Threads
     JosephsOddBuilder_Ggml
+    JosephsOddBuilder_IO
+    atomic
     Threads::Threads
     $<BUILD_INTERFACE:ggml>
 )
-
-if(JOB_LINUX)
-    target_link_libraries(JosephsOddBuilder_Token PUBLIC atomic)
-    target_link_libraries(JosephsOddBuilder_Token PRIVATE JosephsOddBuilder_IO)
-elseif(JOB_WINDOWS)
-    target_compile_options(JosephsOddBuilder_Token PRIVATE /wd4251)
-endif()
-
 
 install(TARGETS JosephsOddBuilder_Token
     EXPORT JosephsOddBuilderTokenTargets
@@ -215,17 +202,16 @@ install(FILES ${JOBTOKEN_CHAT_HEADERS}      DESTINATION ${CMAKE_INSTALL_INCLUDED
 install(FILES ${JOBTOKEN_VOCAB_HEADERS}     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobtoken/vocab)
 install(FILES ${JOBTOKEN_ENCODER_HEADERS}   DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobtoken/encoder)
 
-if(JOB_LINUX)
-    set(PKGCONFIG_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/pkgconfig")
-    set(PKGCONFIG_FILE "${CMAKE_CURRENT_BINARY_DIR}/jobtoken.pc")
-    configure_file(
-        "${CMAKE_CURRENT_SOURCE_DIR}/jobtoken.pc.in"
-        "${PKGCONFIG_FILE}"
-        @ONLY
-    )
+set(PKGCONFIG_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/pkgconfig")
+set(PKGCONFIG_FILE "${CMAKE_CURRENT_BINARY_DIR}/jobtoken.pc")
+configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/jobtoken.pc.in"
+    "${PKGCONFIG_FILE}"
+    @ONLY
+)
 
-    install(FILES "${PKGCONFIG_FILE}" DESTINATION "${PKGCONFIG_INSTALL_DIR}" )
-endif()
+install(FILES "${PKGCONFIG_FILE}" DESTINATION "${PKGCONFIG_INSTALL_DIR}" )
+
 
 install(EXPORT JosephsOddBuilderTokenTargets
     FILE JosephsOddBuilderTokenTargets.cmake

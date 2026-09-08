@@ -112,7 +112,7 @@ set_target_properties(test_job_yaml PROPERTIES
 
 target_link_libraries(test_job_yaml PRIVATE
     ${CatchTwo_LIBRARIES}
-    JosephsOddBuilder_Yaml
+    JosephsOddBuilder_Core
 )
 
 target_include_directories(test_job_yaml PRIVATE

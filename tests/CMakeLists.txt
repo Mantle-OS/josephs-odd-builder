@@ -1,12 +1,7 @@
-if(JOB_BUILD_SIMD)
-    add_subdirectory(job_simd)
-endif()
-
-if(JOB_BUILD_YAML)
-    add_subdirectory(job_yaml)
-endif()
-
 if(JOB_BUILD_CORE)
+    add_subdirectory(job_simd)
+    add_subdirectory(job_yaml)
+    add_subdirectory(job_json)
     add_subdirectory(job_core)
 endif()
 
@@ -27,13 +22,12 @@ if(JOB_BUILD_ZSTD)
     add_subdirectory(job_zstd)
 endif()
 
-if(JOB_LINUX)
-    if(JOB_BUILD_IO)
-        add_subdirectory(job_io)
-    endif()
-    if(JOB_BUILD_UART)
-        add_subdirectory(job_uart)
-    endif()
+if(JOB_BUILD_IO)
+    add_subdirectory(job_io)
+endif()
+
+if(JOB_BUILD_UART)
+    add_subdirectory(job_uart)
 endif()
 
 if(JOB_BUILD_NET)

@@ -374,18 +374,16 @@ target_include_directories(JosephsOddBuilder_Ggml PUBLIC
 target_link_libraries(JosephsOddBuilder_Ggml
     PUBLIC
         Threads::Threads
+        atomic
         $<BUILD_INTERFACE:ggml>
         JosephsOddBuilder_Core
 )
 
-if(JOB_LINUX)
-    target_link_libraries(JosephsOddBuilder_Ggml PUBLIC atomic)
-elseif(JOB_WINDOWS)
-    target_compile_options(JosephsOddBuilder_Ggml PRIVATE /wd4251)
-endif()
-
 if(GGML_CUDA)
-    target_link_libraries(JosephsOddBuilder_Ggml PUBLIC ${JOB_CUDA_LIBS})
+    target_link_libraries(JosephsOddBuilder_Ggml
+        PUBLIC
+          ${JOB_CUDA_LIBS}
+      )
 endif()
 
 install(TARGETS JosephsOddBuilder_Ggml
@@ -410,16 +408,16 @@ install(FILES ${JOBGGML_GGUF_HEADERS}           DESTINATION ${CMAKE_INSTALL_INCL
 install(FILES ${JOBGGML_OPTIMIZER_HEADERS}      DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobggml/opt )
 install(FILES ${JOBGGML_QUANTIZATION_HEADERS}   DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobggml/quant)
 
-if(JOB_LINUX)
-    set(PKGCONFIG_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/pkgconfig")
-    set(PKGCONFIG_FILE "${CMAKE_CURRENT_BINARY_DIR}/jobggml.pc")
-    configure_file(
-        "${CMAKE_CURRENT_SOURCE_DIR}/jobggml.pc.in"
-        "${PKGCONFIG_FILE}"
-        @ONLY
-    )
-    install(FILES "${PKGCONFIG_FILE}" DESTINATION "${PKGCONFIG_INSTALL_DIR}" )
-endif()
+
+set(PKGCONFIG_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/pkgconfig")
+set(PKGCONFIG_FILE "${CMAKE_CURRENT_BINARY_DIR}/jobggml.pc")
+configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/jobggml.pc.in"
+    "${PKGCONFIG_FILE}"
+    @ONLY
+)
+install(FILES "${PKGCONFIG_FILE}" DESTINATION "${PKGCONFIG_INSTALL_DIR}" )
+
 
 install(EXPORT JosephsOddBuilderGgmlTargets
     FILE JosephsOddBuilderGgmlTargets.cmake

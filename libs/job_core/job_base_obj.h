@@ -13,10 +13,11 @@
 #include <vector>
 
 #include <nlohmann/json.hpp>
+#include <job_json.h>
+
 
 #include <yaml-cpp/yaml.h>
 #include <job_yaml.h>
-
 
 #include "jobcore_export.h"
 #include "job_obj_annotation.h"
@@ -109,7 +110,60 @@ public:
     // missing saveToJobYamnFile
     // missing loadFromJobYamlFile
 
+    // =========================================================================
+    // JOB JSON Serialization
+    // =========================================================================
+    template <typename Self>
+    bool toJobJson(this const Self &self, std::string &json)
+    {
+        json.clear();
+        json.push_back('{');
 
+        bool first = true;
+
+        template for (constexpr auto member : reflectedDataMembersV<Self>) {
+            using MemberType = typename[:std::meta::type_of(member):];
+
+            if constexpr (!SignalType<MemberType> && !hasNoSerializeAnnotation(member)) {
+                if (!first)
+                    json.push_back(',');
+
+                constexpr std::string_view name = std::meta::identifier_of(member);
+
+                if (!job::json::JsonEmitter::emit(name, json))
+                    return false;
+
+                json.push_back(':');
+
+                const std::string value = serializeJobJsonValue(self.[:member:]);
+                json.append(value);
+
+                first = false;
+            }
+        }
+
+        json.push_back('}');
+        return true;
+    }
+
+    template <typename Self>
+    bool fromJobJson(this Self &self, std::string_view json)
+    {
+        try {
+            job::json::JsonParser parser{json};
+
+            if (!parser.parse(self)) {
+                const auto &diagnostic = parser.diagnostic();
+                self.lastErrorString = std::string{diagnostic.comment()};
+                return false;
+            }
+
+            return true;
+        } catch (const std::exception &e) {
+            self.lastErrorString = e.what();
+            return false;
+        }
+    }
 
     // =========================================================================
     // JSON Serialization
@@ -614,13 +668,136 @@ private:
     }
 
 
+    // =========================================================================
+    // JOB JSON Helpers
+    // =========================================================================
 
+    template <typename T>
+    static std::string serializeJobJsonValue(const T &val)
+    {
+        using V = std::remove_cvref_t<T>;
 
+        std::string json;
 
+        if constexpr (std::is_enum_v<V>) {
+            if (!job::json::JsonEmitter::emit(static_cast<std::underlying_type_t<V>>(val), json))
+                throw std::runtime_error("Failed serializing JOB JSON enum value");
+        } else if constexpr (std::same_as<V, std::byte>) {
+            if (!job::json::JsonEmitter::emit(static_cast<uint8_t>(val), json))
+                throw std::runtime_error("Failed serializing JOB JSON byte value");
+        } else if constexpr (ExtendedCharType<V>) {
+            if (!job::json::JsonEmitter::emit(static_cast<uint32_t>(val), json))
+                throw std::runtime_error("Failed serializing JOB JSON character value");
+        } else if constexpr (OptionalType<V>) {
+            if (!val)
+                return "null";
 
+            return serializeJobJsonValue(*val);
+        } else if constexpr (OwningSmartPointer<V>) {
+            if (!val)
+                return "null";
 
+            return serializeJobJsonValue(*val);
+        } else if constexpr (UnsupportedPersistentPointer<V>) {
+            static_assert(dependentFalseV<V>, "Raw and weak pointers cannot be serialized");
+        } else if constexpr (MapContainer<V>) {
+            if (!job::json::JsonEmitter::emit(val, json))
+                throw std::runtime_error("Failed serializing JOB JSON map value");
+        } else if constexpr (PersistentContainer<V>) {
+            if (!job::json::JsonEmitter::emit(val, json))
+                throw std::runtime_error("Failed serializing JOB JSON container value");
+        } else if constexpr (ReflectableContainer<V>) {
+            static_assert(dependentFalseV<V>, "Unsupported container type in JOB JSON serialization");
+        } else if constexpr (BaseObjectType<V>) {
+            if (!job::json::JsonEmitter::emit(val, json))
+                throw std::runtime_error("Failed serializing nested JOB JSON object");
+        } else {
+            if (!job::json::JsonEmitter::emit(val, json))
+                throw std::runtime_error("Failed serializing JOB JSON value");
+        }
 
+        return json;
+    }
 
+    template <typename T>
+    static void deserializeJobJsonValue(std::string_view json, T &val)
+    {
+        using V = std::remove_cvref_t<T>;
+
+        if constexpr (std::is_enum_v<V>) {
+            std::underlying_type_t<V> value{};
+            job::json::JsonParser parser{json};
+
+            if (!parser.parse(value))
+                throw std::runtime_error("Invalid JOB JSON enum value");
+
+            val = static_cast<V>(value);
+        } else if constexpr (std::same_as<V, std::byte>) {
+            uint8_t value{};
+            job::json::JsonParser parser{json};
+
+            if (!parser.parse(value))
+                throw std::runtime_error("Invalid JOB JSON byte value");
+
+            val = static_cast<std::byte>(value);
+        } else if constexpr (ExtendedCharType<V>) {
+            uint32_t value{};
+            job::json::JsonParser parser{json};
+
+            if (!parser.parse(value))
+                throw std::runtime_error("Invalid JOB JSON character value");
+
+            val = static_cast<V>(value);
+        } else if constexpr (OptionalType<V>) {
+            if (json == "null") {
+                val.reset();
+            } else {
+                val.emplace();
+                deserializeJobJsonValue(json, *val);
+            }
+        } else if constexpr (OwningSmartPointer<V>) {
+            if (json == "null") {
+                val.reset();
+            } else {
+                constructPointer(val);
+                deserializeJobJsonValue(json, *val);
+            }
+        } else if constexpr (UnsupportedPersistentPointer<V>) {
+            static_assert(dependentFalseV<V>, "Raw and weak pointers cannot be deserialized");
+        } else if constexpr (MapContainer<V>) {
+            job::json::JsonParser parser{json};
+
+            if (!parser.parse(val))
+                throw std::runtime_error("Invalid JOB JSON map value");
+        } else if constexpr (FixedSequenceContainer<V>) {
+            job::json::JsonParser parser{json};
+
+            if (!parser.parse(val))
+                throw std::runtime_error("Invalid JOB JSON fixed array value");
+        } else if constexpr (PushBackSequenceContainer<V>) {
+            job::json::JsonParser parser{json};
+
+            if (!parser.parse(val))
+                throw std::runtime_error("Invalid JOB JSON container value");
+        } else if constexpr (InsertSequenceContainer<V>) {
+            job::json::JsonParser parser{json};
+
+            if (!parser.parse(val))
+                throw std::runtime_error("Invalid JOB JSON container value");
+        } else if constexpr (ReflectableContainer<V>) {
+            static_assert(dependentFalseV<V>, "Unsupported container type in JOB JSON deserialization");
+        } else if constexpr (BaseObjectType<V>) {
+            job::json::JsonParser parser{json};
+
+            if (!parser.parse(val))
+                throw std::runtime_error("Nested JOB JSON deserialization failed");
+        } else {
+            job::json::JsonParser parser{json};
+
+            if (!parser.parse(val))
+                throw std::runtime_error("Invalid JOB JSON value");
+        }
+    }
 
 
     // =========================================================================

@@ -15,21 +15,9 @@ set(JOBTHREADS_HEADERS
 set(JOBTHREADS_SOURCES
     job_thread_pool.cpp
     job_thread_watcher.cpp
+    job_thread.cpp
+    job_semaphore.cpp
 )
-if(JOB_WINDOWS)
-    set(OPAQUE_THREAD_PROVIDER
-        win32/job_thread_win32.cpp
-        win32/job_semaphore_win32.cpp
-    )
-elseif(JOB_LINUX)
-    set(OPAQUE_THREAD_PROVIDER
-        linux/job_thread_linux.cpp
-        linux/job_semaphore_linux.cpp
-    )
-else()
-    message(FATAL_ERROR "JobThreads can not be built with out a OPAQUE_THREAD_PROVIDER, Must be on Linux or Windows for now Apple and BSD are not yet supported")
-endif()
-list(APPEND JOBTHREADS_SOURCES ${OPAQUE_THREAD_PROVIDER})
 
 # UTILS
 set(JOBTHREADS_UTILS_HEADERS
@@ -106,23 +94,9 @@ set(JOBTHREADS_IO_HEADERS
 )
 set(JOBTHREADS_IO_SOURCES
     io/job_async_event_loop.cpp
-    # io/job_io_async_thread.cpp TODO remove this file as it is not needed any more and is handled with below.
-)
+    io/job_io_async_thread.cpp
 
-# ASYNC WINDOWS
-if(JOB_WINDOWS)
-    list(APPEND JOBTHREADS_IO_HEADERS
-        win32/win_fd_reg.h
-    )
-    list(APPEND JOBTHREADS_IO_SOURCES
-        win32/win_fd_reg.cpp
-        win32/job_io_async_thread_win32.cpp
-    )
-elseif(JOB_LINUX)
-    list(APPEND JOBTHREADS_IO_SOURCES
-        linux/job_io_async_thread_linux.cpp
-    )
-endif()
+)
 
 # Api The Simple I just want to use threads.
 set(JOBTHREADS_CTX_HEADERS
@@ -181,16 +155,10 @@ set_target_properties(JosephsOddBuilder_Threads PROPERTIES
     POSITION_INDEPENDENT_CODE ON
 )
 
-if(JOB_WINDOWS)
-    target_link_libraries(JosephsOddBuilder_Threads PUBLIC ws2_32)
-elseif(JOB_LINUX)
-    target_link_libraries(JosephsOddBuilder_Threads PUBLIC atomic)
-endif()
-
 target_link_libraries(JosephsOddBuilder_Threads PUBLIC
+    atomic
     Threads::Threads
     JosephsOddBuilder_Core
-    JosephsOddBuilder_Simd
 )
 
 target_include_directories(JosephsOddBuilder_Threads PUBLIC
@@ -213,13 +181,6 @@ target_include_directories(JosephsOddBuilder_Threads PUBLIC
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobthreads/ctx>
 )
 
-if(JOB_WINDOWS)
-    target_include_directories(JosephsOddBuilder_Threads PUBLIC
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/win32>
-    )
-# linux does not have extra headers
-endif()
-
 install(TARGETS JosephsOddBuilder_Threads
     EXPORT JosephsOddBuilderThreadsTargets
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
@@ -237,16 +198,16 @@ install(FILES ${JOBTHREADS_DESCR_HEADERS}   DESTINATION ${CMAKE_INSTALL_INCLUDED
 install(FILES ${JOBTHREADS_IO_HEADERS}      DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobthreads/io )
 install(FILES ${JOBTHREADS_CTX_HEADERS}     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobthreads/ctx )
 
-if(JOB_LINUX)
-    set(PKGCONFIG_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/pkgconfig")
-    set(PKGCONFIG_FILE "${CMAKE_CURRENT_BINARY_DIR}/jobthreads.pc")
-    configure_file(
-        "${CMAKE_CURRENT_SOURCE_DIR}/jobthreads.pc.in"
-        "${PKGCONFIG_FILE}"
-        @ONLY
-    )
-    install(FILES "${PKGCONFIG_FILE}" DESTINATION "${PKGCONFIG_INSTALL_DIR}")
-endif()
+
+set(PKGCONFIG_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/pkgconfig")
+set(PKGCONFIG_FILE "${CMAKE_CURRENT_BINARY_DIR}/jobthreads.pc")
+configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/jobthreads.pc.in"
+    "${PKGCONFIG_FILE}"
+    @ONLY
+)
+install(FILES "${PKGCONFIG_FILE}" DESTINATION "${PKGCONFIG_INSTALL_DIR}")
+
 
 install(EXPORT JosephsOddBuilderThreadsTargets
     FILE JosephsOddBuilderThreadsTargets.cmake

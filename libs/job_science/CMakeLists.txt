@@ -154,7 +154,6 @@ target_link_libraries(JosephsOddBuilder_Science PUBLIC
     JosephsOddBuilder_IO
     JosephsOddBuilder_Net
     JosephsOddBuilder_Crypto
-    JosephsOddBuilder_Simd
 )
 target_include_directories(JosephsOddBuilder_Science PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/>

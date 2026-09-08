@@ -71,20 +71,11 @@ template<typename Predicate>
 }
 
 struct LocalIdentity {
-#if defined(JOB_WINDOWS)
-    TransientTestFile identity;
-#else
     TransientTestFile certificate;
     TransientTestFile privateKey;
-#endif
-
-    LocalIdentity()
-#if defined(JOB_WINDOWS)
-        : identity(transientPath("identity.p12"))
-#else
-        : certificate(transientPath("certificate.pem")),
+    LocalIdentity() :
+        certificate(transientPath("certificate.pem")),
         privateKey(transientPath("private_key.pem"))
-#endif
     {
     }
 };
@@ -101,18 +92,9 @@ struct LocalIdentity {
     options.setCountry("US");
     options.setDnsNames({"localhost"});
     options.setIpAddresses({"127.0.0.1", "::1"});
-
-#if defined(JOB_WINDOWS)
-    options.setEncoding(JobSslOptions::Encoding::PKCS12);
-
-    JobSecureMem passphrase;
-
-    return JobX509Generator::generate(options, identity.identity.path(), passphrase);
-#else
     options.setEncoding(JobSslOptions::Encoding::PEM);
 
     return JobX509Generator::generate(options, identity.certificate.path(), identity.privateKey.path());
-#endif
 }
 
 [[nodiscard]] JobSslContext::Ptr createServerContext(const LocalIdentity &identity)
@@ -123,21 +105,12 @@ struct LocalIdentity {
         return {};
 
     context->setVerifyMode(JobSslContext::VerifyMode::None);
-
-#if defined(JOB_WINDOWS)
-    if (!context->loadIdentityFile(identity.identity.path(), {}))
-        return {};
-#else
     if (!context->loadCertificateFile(identity.certificate.path(), JobSslContext::EncodingType::PEM))
-    {
         return {};
-    }
 
     if (!context->loadPrivateKeyFile(identity.privateKey.path(), JobSslContext::EncodingType::PEM, {}))
-    {
         return {};
-    }
-#endif
+
 
     return context;
 }

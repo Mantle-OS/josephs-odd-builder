@@ -19,7 +19,6 @@ add_executable(test_job_science
     solvers/test_euler.cpp
     solvers/test_fmm.cpp
 
-
     engine/test_engine.cpp
 
 )
@@ -31,12 +30,12 @@ set_target_properties(test_job_science PROPERTIES
     CXX_STANDARD_REQUIRED ON
 )
 target_link_libraries(test_job_science PRIVATE
-    JosephsOddBuilder_Threads
     ${CatchTwo_LIBRARIES}
     Threads::Threads
+    JosephsOddBuilder_Core
+    JosephsOddBuilder_Threads
     JosephsOddBuilder_Science
     JosephsOddBuilder_IO
-    JosephsOddBuilder_Simd
 )
 
 target_include_directories(test_job_science PRIVATE

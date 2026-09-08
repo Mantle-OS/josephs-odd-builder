@@ -335,7 +335,6 @@ target_link_libraries(JosephsOddBuilder_Ai PUBLIC
     JosephsOddBuilder_Core
     JosephsOddBuilder_Ansi
     JosephsOddBuilder_Threads
-    JosephsOddBuilder_Simd
     JosephsOddBuilder_Crypto
     JosephsOddBuilder_Net
     JosephsOddBuilder_Science

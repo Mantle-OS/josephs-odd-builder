@@ -20,25 +20,28 @@ add_executable(test_job_zstd
     test_job_zstd_sign.cpp
     test_job_zstd.cpp
 )
-if(JOB_LINUX)
-    target_link_libraries(test_job_zstd PRIVATE atomic)
-endif()
 
-target_compile_options(test_job_zstd PRIVATE -freflection -fcontracts)
+target_compile_options(test_job_zstd
+    PRIVATE
+      -freflection
+      -fcontracts
+)
 target_link_options(test_job_zstd PRIVATE -fcontracts)
 
 set_target_properties(test_job_zstd PROPERTIES
     CXX_STANDARD 26
     CXX_STANDARD_REQUIRED ON
 )
-target_link_libraries(test_job_zstd PRIVATE
-    Threads::Threads
-    JosephsOddBuilder_Core
-    ${LibSodium_LIBRARIES}
-    JosephsOddBuilder_Crypto
-    ${LibZstd_LIBRARIES}
-    JosephsOddBuilder_Zstd
-    ${CatchTwo_LIBRARIES}
+target_link_libraries(test_job_zstd
+    PRIVATE
+      Threads::Threads
+      atomic
+      JosephsOddBuilder_Core
+      ${LibSodium_LIBRARIES}
+      JosephsOddBuilder_Crypto
+      ${LibZstd_LIBRARIES}
+      JosephsOddBuilder_Zstd
+      ${CatchTwo_LIBRARIES}
 )
 
 target_include_directories(test_job_zstd PRIVATE

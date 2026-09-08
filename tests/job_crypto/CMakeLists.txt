@@ -17,22 +17,11 @@ add_executable(test_job_crypto
     test_job_sha.cpp
 )
 
-if(JOB_WINDOWS)
-    target_link_libraries(test_job_crypto PRIVATE
-        crypt32
-        ncrypt
-        bcrypt
-    )
-elseif(JOB_LINUX)
-    target_link_libraries(test_job_crypto PUBLIC
-        atomic
-        ${LibCrypto_LIBRARIES}
-    )
-else()
-    message(FATAL_ERROR "OS not supported yet")
-endif()
-
-target_compile_options(test_job_crypto PRIVATE -freflection -fcontracts)
+target_compile_options(test_job_crypto
+    PRIVATE
+      -freflection
+      -fcontracts
+)
 target_link_options(test_job_crypto PRIVATE -fcontracts)
 
 set_target_properties(test_job_crypto PROPERTIES
@@ -40,10 +29,12 @@ set_target_properties(test_job_crypto PROPERTIES
     CXX_STANDARD_REQUIRED ON
 )
 target_link_libraries(test_job_crypto PRIVATE
+    ${CatchTwo_LIBRARIES}
+    atomic
     Threads::Threads
     ${LibSodium_LIBRARIES}
+    ${LibCrypto_LIBRARIES}
     JosephsOddBuilder_Crypto
-    ${CatchTwo_LIBRARIES}
 )
 
 target_include_directories(test_job_crypto PRIVATE

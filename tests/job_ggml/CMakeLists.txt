@@ -52,12 +52,6 @@ if(NOT JOB_CI_BUILD)
     )
 endif()
 
-
-if(JOB_WINDOWS)
-    target_compile_options(test_job_ggml PRIVATE /wd4251)
-elseif (JOB_LINUX)
-    target_link_libraries(test_job_ggml PRIVATE atomic)
-endif()
 target_compile_options(test_job_ggml PRIVATE -freflection -fcontracts)
 target_link_options(test_job_ggml PRIVATE -fcontracts)
 
@@ -68,6 +62,7 @@ set_target_properties(test_job_ggml PROPERTIES
 target_link_libraries(test_job_ggml PRIVATE
     ${CatchTwo_LIBRARIES}
     Threads::Threads
+    atomic
     $<BUILD_INTERFACE:ggml>
     JosephsOddBuilder_Core
     JosephsOddBuilder_Threads

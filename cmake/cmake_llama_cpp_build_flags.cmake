@@ -43,11 +43,7 @@ if (LLAMA_LLGUIDANCE)
     # Cargo tracks CARGO_BUILD_FLAGS in Debug, it will build into target/debug. ...
     set(LLGUIDANCE_PATH "${LLGUIDANCE_SRC}/target/${LLGUIDING_CONFIG_DIR}" CACHE INTERNAL "Forced Submodule Path")
 
-    if (WIN32)
-        set(LLGUIDANCE_LIB_NAME "llguidance.lib" CACHE INTERNAL "")
-    else()
-        set(LLGUIDANCE_LIB_NAME "libllguidance.a" CACHE INTERNAL "")
-    endif()
+    set(LLGUIDANCE_LIB_NAME "libllguidance.a" CACHE INTERNAL "")
 
     # THE TRIPLE LOCK lol : Force Ninja to trace the rule chain through llama's core components
     if (TARGET llama-common AND TARGET llguidance_ext)

@@ -109,18 +109,17 @@ install(EXPORT JosephsOddBuilderSerializerMsgPackTargets
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/JosephsOddBuilderSerializerMsgPack
 )
 
-if(JOB_LINUX)
-    set(PKGCONFIG_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/pkgconfig")
-    set(PKGCONFIG_FILE "${CMAKE_CURRENT_BINARY_DIR}/jobserializermsgpack.pc")
 
-    configure_file(
-        "${CMAKE_CURRENT_SOURCE_DIR}/jobserializermsgpack.pc.in"
-        "${PKGCONFIG_FILE}"
-        @ONLY
-    )
+set(PKGCONFIG_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/pkgconfig")
+set(PKGCONFIG_FILE "${CMAKE_CURRENT_BINARY_DIR}/jobserializermsgpack.pc")
 
-    install(
-        FILES "${PKGCONFIG_FILE}"
-        DESTINATION "${PKGCONFIG_INSTALL_DIR}"
-    )
-endif()
+configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/jobserializermsgpack.pc.in"
+    "${PKGCONFIG_FILE}"
+    @ONLY
+)
+
+install(
+    FILES "${PKGCONFIG_FILE}"
+    DESTINATION "${PKGCONFIG_INSTALL_DIR}"
+)

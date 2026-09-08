@@ -1,2 +1,0 @@
-#include "qsdpmparams.h"
-

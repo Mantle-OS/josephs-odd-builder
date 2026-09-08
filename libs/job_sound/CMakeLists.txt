@@ -224,10 +224,10 @@ target_include_directories(JosephsOddBuilder_Sound PUBLIC
     ${LibWirePlumber_INCLUDE_DIRS}
 )
 
-
 target_link_libraries(JosephsOddBuilder_Sound PRIVATE
+    Threads::Threads
+    atomic
     JosephsOddBuilder_Core
-    JosephsOddBuilder_Simd
     JosephsOddBuilder_Threads
     ${LibAlsa_LIBRARIES}
     ${LibSPA_LIBRARIES}
@@ -239,13 +239,6 @@ target_link_libraries(JosephsOddBuilder_Sound PRIVATE
     ${LibVorbis_LIBRARIES}
     ${LibWavPack_LIBRARIES}
 )
-
-if(JOB_LINUX)
-    target_link_libraries(JosephsOddBuilder_Sound PUBLIC atomic)
-elseif(JOB_WINDOWS)
-    target_compile_options(JosephsOddBuilder_Sound PRIVATE /wd4251)
-endif()
-
 
 install(TARGETS JosephsOddBuilder_Sound
     EXPORT JosephsOddBuilderSoundTargets
@@ -265,17 +258,17 @@ install(FILES ${JOBSOUND_CODECS_PCM_HEADERS}        DESTINATION ${CMAKE_INSTALL_
 install(FILES ${JOBSOUND_CODECS_OPUS_HEADERS}       DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobsound/codecs/opus)
 install(FILES ${JOBSOUND_CODECS_FLAC_HEADERS}       DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobsound/codecs/flac)
 
-if(JOB_LINUX)
-    set(PKGCONFIG_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/pkgconfig")
-    set(PKGCONFIG_FILE "${CMAKE_CURRENT_BINARY_DIR}/jobsound.pc")
-    configure_file(
-        "${CMAKE_CURRENT_SOURCE_DIR}/jobsound.pc.in"
-        "${PKGCONFIG_FILE}"
-        @ONLY
-    )
 
-    install(FILES "${PKGCONFIG_FILE}" DESTINATION "${PKGCONFIG_INSTALL_DIR}" )
-endif()
+set(PKGCONFIG_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/pkgconfig")
+set(PKGCONFIG_FILE "${CMAKE_CURRENT_BINARY_DIR}/jobsound.pc")
+configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/jobsound.pc.in"
+    "${PKGCONFIG_FILE}"
+    @ONLY
+)
+
+install(FILES "${PKGCONFIG_FILE}" DESTINATION "${PKGCONFIG_INSTALL_DIR}" )
+
 
 install(EXPORT JosephsOddBuilderSoundTargets
     FILE JosephsOddBuilderSoundTargets.cmake

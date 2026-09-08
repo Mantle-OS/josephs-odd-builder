@@ -2,36 +2,9 @@ include(CheckCXXCompilerFlag)
 include(CheckSourceCompiles)
 include(CheckIPOSupported)
 
-set(JOB_WINDOWS  OFF)
-set(JOB_LINUX    OFF)
-set(JOB_OSX      OFF)
-set(JOB_FREE_BSD OFF)
+
+include(cmake/check_hardware_linux.cmake)
 set(JOB_CXX_FLAGS)
-
-if(WIN32)
-    # add checks to make sure it is msvc
-    set(JOB_WINDOWS ON)
-    add_compile_definitions(JOB_WINDOWS)
-    include(cmake/win32/check_hardware_win32.cmake)
-elseif(APPLE)
-    set(JOB_OSX ON)
-    add_compile_definitions(JOB_OSX)
-    include(cmake/osx/check_hardware_osx.cmake)
-elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-    set(JOB_LINUX ON)
-    add_compile_definitions(JOB_LINUX)
-    include(cmake/linux/check_hardware_linux.cmake)  ## HERE this is new
-elseif(CMAKE_SYSTEM_NAME MATCHES "FreeBSD")
-    set(JOB_FREE_BSD ON)
-    add_compile_definitions(JOB_FREE_BSD)
-    include(cmake/bsd/check_hardware_bsd.cmake)
-elseif(CMAKE_SYSTEM_NAME MATCHES "^(OpenBSD|NetBSD|DragonFly)$")
-    message(FATAL_ERROR "${CMAKE_SYSTEM_NAME} is currently not supported due to developer effort."
-        "However, pull requests are welcome and there is a porting guide located in the docs/job/bsd.md file.")
-else()
-    message(FATAL_ERROR "Unsupported target operating system: ${CMAKE_SYSTEM_NAME}")
-endif()
-
 
 check_ipo_supported(RESULT has_ipo OUTPUT output)
 if(has_ipo)

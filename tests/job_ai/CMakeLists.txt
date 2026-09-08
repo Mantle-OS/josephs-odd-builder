@@ -36,7 +36,6 @@ target_link_libraries(test_job_ai PRIVATE
     atomic
     JosephsOddBuilder_Core
     JosephsOddBuilder_Ansi
-    JosephsOddBuilder_Simd
     JosephsOddBuilder_Threads
     JosephsOddBuilder_IO
     JosephsOddBuilder_Crypto

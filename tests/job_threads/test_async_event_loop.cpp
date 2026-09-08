@@ -8,8 +8,6 @@
 using namespace job::threads;
 using namespace std::chrono_literals;
 
-
-#ifdef JOB_LINUX
 #include <catch2/catch_test_macros.hpp>
 
 #include <atomic>
@@ -21,9 +19,6 @@ using namespace std::chrono_literals;
 #include <job_io_async_thread.h>
 
 #include "../test_spin_till.h"
-
-using namespace job::threads;
-using namespace std::chrono_literals;
 
 namespace {
 class SocketPair final {
@@ -146,9 +141,6 @@ TEST_CASE("JobIoAsyncThread modifyFD rejects unregistered fd", "[threading][io_a
     REQUIRE_FALSE(loop.modifyFD(sockets.first(), IOEvent::Read));
     loop.stop();
 }
-
-#endif
-
 
 TEST_CASE("AsyncEventLoop post and stop", "[threading][async_loop]")
 {

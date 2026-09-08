@@ -1,16 +1,7 @@
 #include "job_siphash.h"
 
-#if JOB_LINUX
 #include <errno.h>
 #include <sys/random.h>
-#elif JOB_OSX || JOB_FreeBSD
-#include <stdlib.h>
-#elif JOB_WINDOWS
-#include <bcrypt.h>
-#else
-#include "job_assert.h"
-#endif
-
 namespace job::core {
 
 std::size_t JobSipHash::operator()(std::string_view s) const noexcept
@@ -37,18 +28,6 @@ bool JobSipHash::seed() noexcept
 
     return true;
 }
-// uint64_t JobSipHash::hash(std::string_view s) const noexcept
-// {
-//     const auto chars = std::span<const char>(s.data(), s.size());
-
-//     // Automatically fast-path 16-byte fixed UIDs through AVX when enabled
-//     if (m_useAvx && s.size() == 16) {
-//         return hash128(reinterpret_cast<const uint64_t *>(s.data()));
-//     }
-
-//     // Quiet, zero-overhead scalar fallback for all other string sizes
-//     return siphash24Key(std::as_bytes(chars), m_k0, m_k1);
-// }
 
 uint64_t JobSipHash::hash(std::string_view s) const noexcept
 {
@@ -77,8 +56,6 @@ bool JobSipHash::seed(uint64_t *k0, uint64_t *k1) noexcept
 
     uint64_t seeds[2] = { 0, 0 };
 
-#if JOB_LINUX
-
     std::byte *buffer = reinterpret_cast<std::byte *>(seeds);
     std::size_t remaining = sizeof(seeds);
     std::size_t offset = 0;
@@ -101,27 +78,6 @@ bool JobSipHash::seed(uint64_t *k0, uint64_t *k1) noexcept
 
         return false;
     }
-
-#elif JOB_OSX || JOB_FreeBSD
-    arc4random_buf(seeds, sizeof(seeds));
-
-#elif JOB_WINDOWS
-
-    const NTSTATUS status = BCryptGenRandom(
-        nullptr,
-        reinterpret_cast<PUCHAR>(seeds),
-        static_cast<ULONG>(sizeof(seeds)),
-        BCRYPT_USE_SYSTEM_PREFERRED_RNG
-        );
-
-    if (status < 0)
-        return false;
-
-#else
-    JOB_ASSERT("OS Platform not supported. std::abort incoming")
-    return false;
-
-#endif
 
     *k0 = seeds[0];
     *k1 = seeds[1];

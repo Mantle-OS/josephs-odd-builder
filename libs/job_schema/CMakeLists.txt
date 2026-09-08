@@ -85,16 +85,15 @@ install(TARGETS JosephsOddBuilder_Schema
 install(FILES ${JOBSCHEMA_EXPORT}       DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/job_schema)
 install(FILES ${JOB_SCHEMA_HEADERS}     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/job_schema)
 
-if(JOB_LINUX)
-    set(PKGCONFIG_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/pkgconfig")
-    set(PKGCONFIG_FILE "${CMAKE_CURRENT_BINARY_DIR}/job_schema.pc")
-    configure_file(
-        "${CMAKE_CURRENT_SOURCE_DIR}/jobschema.pc.in"
-        "${PKGCONFIG_FILE}"
-        @ONLY
-    )
-    install(FILES "${PKGCONFIG_FILE}" DESTINATION "${PKGCONFIG_INSTALL_DIR}")
-endif()
+set(PKGCONFIG_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/pkgconfig")
+set(PKGCONFIG_FILE "${CMAKE_CURRENT_BINARY_DIR}/job_schema.pc")
+configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/jobschema.pc.in"
+    "${PKGCONFIG_FILE}"
+    @ONLY
+)
+install(FILES "${PKGCONFIG_FILE}" DESTINATION "${PKGCONFIG_INSTALL_DIR}")
+
 
 install(EXPORT JosephsOddBuilderSchemaTargets
     FILE JosephsOddBuilderSchemaTargets.cmake

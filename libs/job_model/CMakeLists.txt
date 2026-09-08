@@ -224,22 +224,15 @@ target_include_directories(JosephsOddBuilder_Model PUBLIC
 )
 
 target_link_libraries(JosephsOddBuilder_Model PRIVATE
+    Threads::Threads
+    atomic
+    $<BUILD_INTERFACE:ggml>
+    ${YAMLCpp_LIBRARIES}
     JosephsOddBuilder_Core
-    JosephsOddBuilder_Simd
     JosephsOddBuilder_Threads
     JosephsOddBuilder_Ggml
     JosephsOddBuilder_Token
-    Threads::Threads
-    $<BUILD_INTERFACE:ggml>
-    ${YAMLCpp_LIBRARIES}
 )
-
-if(JOB_LINUX)
-    target_link_libraries(JosephsOddBuilder_Model PUBLIC atomic)
-elseif(JOB_WINDOWS)
-    target_compile_options(JosephsOddBuilder_Model PRIVATE /wd4251)
-endif()
-
 
 install(TARGETS JosephsOddBuilder_Model
     EXPORT JosephsOddBuilderModelTargets
@@ -260,17 +253,17 @@ install(FILES ${JOBMODEL_GRAPH_ARCH_HEADERS}   DESTINATION ${CMAKE_INSTALL_INCLU
 install(FILES ${JOBMODEL_SAMPLE_HEADERS}       DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobmodel/sample)
 # install(FILES ${JOBMODEL_CTX_HEADERS}          DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobmodel/ctx)
 
-if(JOB_LINUX)
-    set(PKGCONFIG_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/pkgconfig")
-    set(PKGCONFIG_FILE "${CMAKE_CURRENT_BINARY_DIR}/jobmodel.pc")
-    configure_file(
-        "${CMAKE_CURRENT_SOURCE_DIR}/jobmodel.pc.in"
-        "${PKGCONFIG_FILE}"
-        @ONLY
-    )
 
-    install(FILES "${PKGCONFIG_FILE}" DESTINATION "${PKGCONFIG_INSTALL_DIR}" )
-endif()
+set(PKGCONFIG_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/pkgconfig")
+set(PKGCONFIG_FILE "${CMAKE_CURRENT_BINARY_DIR}/jobmodel.pc")
+configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/jobmodel.pc.in"
+    "${PKGCONFIG_FILE}"
+    @ONLY
+)
+
+install(FILES "${PKGCONFIG_FILE}" DESTINATION "${PKGCONFIG_INSTALL_DIR}" )
+
 
 install(EXPORT JosephsOddBuilderModelTargets
     FILE JosephsOddBuilderModelTargets.cmake

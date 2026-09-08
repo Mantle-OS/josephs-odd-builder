@@ -12,7 +12,7 @@ set(JOB_CORE_TEST_OBJECTS
 
 if(JOB_QT)
     set(CMAKE_AUTOMOC ON)
-    list(APPEND JOB_CORE_TEST_OBJECTS
+    list(APPEND JOB_CORE_TEST_OBJECTSz
         q_test_base.h
         q_test_base.cpp
         test_q_object.cpp
@@ -44,7 +44,6 @@ set_target_properties(test_job_core PROPERTIES
 
 target_link_libraries(test_job_core PRIVATE
     ${CatchTwo_LIBRARIES}
-    JosephsOddBuilder_Simd
     JosephsOddBuilder_Core
     JosephsOddBuilder_Threads
 )

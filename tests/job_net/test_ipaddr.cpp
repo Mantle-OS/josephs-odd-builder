@@ -5,22 +5,14 @@
 #include <cstdio>
 #include <string>
 
-#if defined(JOB_WINDOWS)
-#include <windows.h>
-#else
+
 #include <sys/socket.h>
 #include <sys/un.h>
-#endif
 
 using namespace job::net;
 TEST_CASE("JobIpAddr UNIX socket parsing", "[job_ipaddr][unix]") {
     std::string path = "/tmp/test_ipaddr_" + std::to_string(::getpid()) + ".sock";
 
-#if defined(JOB_WINDOWS)
-    HANDLE h = ::CreateFileA(path.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
-    REQUIRE(h != INVALID_HANDLE_VALUE);
-    ::CloseHandle(h);
-#else
     ::unlink(path.c_str());
     int fd = ::socket(AF_UNIX, SOCK_STREAM, 0);
     REQUIRE(fd >= 0);
@@ -28,7 +20,6 @@ TEST_CASE("JobIpAddr UNIX socket parsing", "[job_ipaddr][unix]") {
     un.sun_family = AF_UNIX;
     std::snprintf(un.sun_path, sizeof(un.sun_path), "%s", path.c_str());
     REQUIRE(::bind(fd, reinterpret_cast<sockaddr *>(&un), sizeof(un)) == 0);
-#endif
 
     JobIpAddr addr(path);
     REQUIRE(addr.isValid());
@@ -37,12 +28,8 @@ TEST_CASE("JobIpAddr UNIX socket parsing", "[job_ipaddr][unix]") {
     REQUIRE(addr.isLocal());
     REQUIRE(addr.isUnixPermitted());
 
-#if defined(JOB_WINDOWS)
-    ::DeleteFileA(path.c_str());
-#else
     ::close(fd);
     ::unlink(path.c_str());
-#endif
 }
 
 

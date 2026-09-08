@@ -1,9 +1,3 @@
-
-if(JOB_BUILD_SIMD)
-    add_subdirectory(job_simd)
-endif()
-
-
 if(JOB_BUILD_CORE)
     add_subdirectory(job_core)
 endif()
@@ -24,10 +18,6 @@ if(JOB_BUILD_ZSTD)
     add_subdirectory(job_zstd)
 endif()
 
-if(JOB_BUILD_YAML)
-    add_subdirectory(job_yaml)
-endif()
-
 if(JOB_CUDA)
     # add_subdirectory(job_cuda)  ## OLD me learning cuda can be deleted
     if(JOB_BUILD_GGML)
@@ -43,15 +33,14 @@ if(JOB_CUDA)
 endif()
 
 
-if(JOB_LINUX)
-    if(JOB_BUILD_IO)
-        add_subdirectory(job_io)
-    endif()
-
-    if(JOB_BUILD_UART)
-        add_subdirectory(job_uart)
-    endif()
+if(JOB_BUILD_IO)
+    add_subdirectory(job_io)
 endif()
+
+if(JOB_BUILD_UART)
+    add_subdirectory(job_uart)
+endif()
+
 
 if(JOB_BUILD_SCHEMA)
     add_subdirectory(job_schema)
@@ -92,31 +81,3 @@ if(JOB_BUILD_SOUND)
     add_subdirectory(job_sound)
 endif()
 
-
-if(JOB_QT)
-
-    if(JOB_BUILD_QAIUTILS)
-        add_subdirectory(qaiutils)
-    endif()
-
-    if(JOB_BUILD_CRYPTO AND JOB_BUILD_QSODIUM)
-        add_subdirectory(qsodium)
-    endif()
-    add_subdirectory(qzstd)
-
-    if(JOB_BUILD_QSD)
-        add_subdirectory(qsd)
-    endif()
-
-    if(JOB_BUILD_QLLAMA)
-        add_subdirectory(qllama)
-    endif()
-
-    if(JOB_BUILD_QHF)
-        add_subdirectory(qhf)                 # Depends on session manager
-    endif()
-
-    if(JOB_BUILD_QSESSIONMANAGER)
-        # add_subdirectory(qsessionmanager)     # Depends on qaipkg which depends on job_aipkg which depends on job_net
-    endif()
-endif()

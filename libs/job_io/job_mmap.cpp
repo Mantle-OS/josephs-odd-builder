@@ -370,7 +370,6 @@ bool JobMmap::grow(std::size_t newSize)
             return false;
     }
 
-#ifdef __linux__
     void *newAddr = ::mremap(m_addr, m_mapLength, newSize, MREMAP_MAYMOVE);
 
     if (newAddr == MAP_FAILED) {
@@ -379,9 +378,6 @@ bool JobMmap::grow(std::size_t newSize)
 
         return false;
     }
-#else
-    return false;
-#endif
 
     m_addr = newAddr;
     m_mapLength = newSize;

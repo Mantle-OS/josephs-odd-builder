@@ -45,6 +45,7 @@ set(JOBCRYPTO_SOURCES
 
     job_hash.cpp
     job_hmac_sha256.cpp
+    job_x509_generator.cpp
     job_sha256.cpp
     job_sha512.cpp
     job_sha3.cpp
@@ -55,18 +56,7 @@ set(JOBCRYPTO_SOURCES
     job_sha.cpp
 )
 
-if(JOB_WINDOWS)
-    list(APPEND JOBCRYPTO_SOURCES win32/job_x509_generator_win32.cpp )
-elseif(JOB_LINUX)
-    list(APPEND JOBCRYPTO_SOURCES linux/job_x509_generator_linux.cpp )
-else()
-    message(FATAL_ERROR "OSX and FreeBSD as currently unsupported atm libcrypto should work on both platforms. Merge requests welcome")
-endif()
-
-add_library(JosephsOddBuilder_Crypto SHARED
-   ${JOBCRYPTO_HEADERS}
-   ${JOBCRYPTO_SOURCES}
-)
+add_library(JosephsOddBuilder_Crypto SHARED ${JOBCRYPTO_HEADERS} ${JOBCRYPTO_SOURCES})
 
 set(JOBCRYPTO_EXPORT ${CMAKE_CURRENT_BINARY_DIR}/jobcrypto_export.h)
 generate_export_header(JosephsOddBuilder_Crypto
@@ -93,31 +83,22 @@ set_target_properties(JosephsOddBuilder_Crypto PROPERTIES
     VISIBILITY_INLINES_HIDDEN ON
 )
 
-if(JOB_WINDOWS)
-    target_link_libraries(JosephsOddBuilder_Crypto PRIVATE
-        crypt32
-        ncrypt
-        bcrypt
-    )
-elseif(JOB_LINUX)
-    target_link_libraries(JosephsOddBuilder_Crypto PUBLIC
-        atomic
-        ${LibCrypto_LIBRARIES}
-    )
-endif()
-
-target_link_libraries(JosephsOddBuilder_Crypto PUBLIC
-    Threads::Threads
-    ${LibSodium_LIBRARIES}
-    JosephsOddBuilder_Core
+target_link_libraries(JosephsOddBuilder_Crypto
+    PUBLIC
+      Threads::Threads
+      atomic
+      ${LibSodium_LIBRARIES}
+      ${LibCrypto_LIBRARIES}
+      JosephsOddBuilder_Core
 )
 
 target_include_directories(JosephsOddBuilder_Crypto PUBLIC
     ${LibSodium_INCLUDE_DIRS}
 )
+
 target_include_directories(JosephsOddBuilder_Crypto PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/>
-    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobcrypto>
     ## export file
     $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
 )
@@ -133,16 +114,16 @@ install(TARGETS JosephsOddBuilder_Crypto
 install(FILES ${JOBCRYPTO_EXPORT}   DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobcrypto )
 install(FILES ${JOBCRYPTO_HEADERS}  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobcrypto )
 
-if(JOB_LINUX)
-    set(PKGCONFIG_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/pkgconfig")
-    set(PKGCONFIG_FILE "${CMAKE_CURRENT_BINARY_DIR}/jobcrypto.pc")
-    configure_file(
-        "${CMAKE_CURRENT_SOURCE_DIR}/jobcrypto.pc.in"
-        "${PKGCONFIG_FILE}"
-        @ONLY
-    )
-    install(FILES "${PKGCONFIG_FILE}" DESTINATION "${PKGCONFIG_INSTALL_DIR}")
-endif()
+
+set(PKGCONFIG_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/pkgconfig")
+set(PKGCONFIG_FILE "${CMAKE_CURRENT_BINARY_DIR}/jobcrypto.pc")
+configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/jobcrypto.pc.in"
+    "${PKGCONFIG_FILE}"
+    @ONLY
+)
+install(FILES "${PKGCONFIG_FILE}" DESTINATION "${PKGCONFIG_INSTALL_DIR}")
+
 
 install(EXPORT JosephsOddBuilderCryptoTargets
     FILE JosephsOddBuilderCryptoTargets.cmake

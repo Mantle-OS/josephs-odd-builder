@@ -1798,11 +1798,64 @@ TEST_CASE("BaseObject: JobYaml non-mapping root fails gracefully",
     CHECK_THAT(restored.lastErrorString, Catch::Matchers::ContainsSubstring("mapping"));
 }
 
+TEST_CASE("BaseObject: JobJson serialization roundtrip with nested objects and smart pointers",
+          "[core][base_obj][job_json][example]")
+{
+    ComputeNodeConfig config;
+    config.nodeName = "edge-inference-01";
+    config.threadPoolSize = 32;
+    config.memoryBudgetGb = 64.0;
+    config.scalingFactors = {1.25f, 2.5f, 5.0f};
+
+    config.primarySensor.sensorTag = "core_temp";
+    config.primarySensor.sampleRateHz = 250.0f;
+    config.primarySensor.calibrateOnBoot = false;
+    config.primarySensor.initialMode = DeviceMode::Compute;
+
+    auto aux1 = std::make_shared<SubSensorConfig>();
+    aux1->sensorTag = "ambient_0";
+    aux1->sampleRateHz = 10.0f;
+    aux1->initialMode = DeviceMode::Idle;
+
+    auto aux2 = std::make_shared<SubSensorConfig>();
+    aux2->sensorTag = "vram_hotspot";
+    aux2->sampleRateHz = 500.0f;
+    aux2->initialMode = DeviceMode::Compute;
+
+    config.auxiliarySensors.push_back(aux1);
+    config.auxiliarySensors.push_back(aux2);
+
+    std::string serializedJson;
+    REQUIRE(config.toJobJson(serializedJson));
+    REQUIRE_FALSE(serializedJson.empty());
+
+    ComputeNodeConfig restored;
+    REQUIRE(restored.fromJobJson(serializedJson));
+
+    CHECK(restored.nodeName == "edge-inference-01");
+    CHECK(restored.threadPoolSize == 32);
+    CHECK(restored.memoryBudgetGb == 64.0);
+    CHECK(restored.scalingFactors == std::vector<float>{1.25f, 2.5f, 5.0f});
+    CHECK(restored.primarySensor.sensorTag == "core_temp");
+    CHECK(restored.primarySensor.sampleRateHz == 250.0f);
+    CHECK(restored.primarySensor.calibrateOnBoot == false);
+    CHECK(restored.primarySensor.initialMode == DeviceMode::Compute);
+
+    REQUIRE(restored.auxiliarySensors.size() == 2);
+    REQUIRE(restored.auxiliarySensors[0] != nullptr);
+    CHECK(restored.auxiliarySensors[0]->sensorTag == "ambient_0");
+    CHECK(restored.auxiliarySensors[0]->sampleRateHz == 10.0f);
+    REQUIRE(restored.auxiliarySensors[1] != nullptr);
+    CHECK(restored.auxiliarySensors[1]->sensorTag == "vram_hotspot");
+    CHECK(restored.auxiliarySensors[1]->sampleRateHz == 500.0f);
+}
+
+
+
 
 // =============================================================================
 // Block 3: Benchmarks / Stress
 // =============================================================================
-
 #ifdef JOB_TEST_BENCHMARKS
 
 TEST_CASE("BaseObject serialization benchmarks", "[core][base_obj][benchmark]")
@@ -1823,7 +1876,9 @@ TEST_CASE("BaseObject serialization benchmarks", "[core][base_obj][benchmark]")
     std::vector<std::uint8_t> binaryBuffer;
     config.toBinary(binaryBuffer);
 
-    const nlohmann::json jsonPayload = config.toJson();
+    std::string jsonPayload;
+    REQUIRE(config.toJobJson(jsonPayload));
+
     const YAML::Node yamlPayload = config.toYaml();
     const job::yaml::YamlNode jobYamlPayload = config.toJobYaml();
 
@@ -1847,17 +1902,34 @@ TEST_CASE("BaseObject serialization benchmarks", "[core][base_obj][benchmark]")
                restored.threadPoolSize;
     };
 
-    BENCHMARK("JSON Serialization (toJson)")
+    BENCHMARK("nlohmann JSON Serialization")
     {
-        return config.toJson();
+        return config.toJson().dump();
     };
 
-    BENCHMARK("JSON Deserialization (fromJson)")
+    BENCHMARK("nlohmann JSON Deserialization")
+    {
+        const nlohmann::json json = nlohmann::json::parse(jsonPayload);
+
+        ComputeNodeConfig restored;
+        restored.fromJson(json);
+
+        return restored.scalingFactors.size() +
+               restored.auxiliarySensors.size() +
+               restored.threadPoolSize;
+    };
+
+    BENCHMARK("JobJson Serialization")
+    {
+        std::string output;
+        config.toJobJson(output);
+        return output;
+    };
+
+    BENCHMARK("JobJson Deserialization")
     {
         ComputeNodeConfig restored;
-
-        if (!restored.fromJson(jsonPayload))
-            return std::size_t{0};
+        restored.fromJobJson(jsonPayload);
 
         return restored.scalingFactors.size() +
                restored.auxiliarySensors.size() +
@@ -1898,6 +1970,7 @@ TEST_CASE("BaseObject serialization benchmarks", "[core][base_obj][benchmark]")
                restored.threadPoolSize;
     };
 }
+
 TEST_CASE("BaseObject nested serialization stress benchmark", "[core][base_obj][benchmark][stress]")
 {
     ComputeNodeConfig config;
@@ -1931,14 +2004,27 @@ TEST_CASE("BaseObject nested serialization stress benchmark", "[core][base_obj][
                restored.threadPoolSize;
     };
 
-    BENCHMARK("Large nested JSON roundtrip")
+    BENCHMARK("Nlohmann Large nested JSON roundtrip")
     {
-        const nlohmann::json json = config.toJson();
+        const std::string json = config.toJson().dump();
+
+        const nlohmann::json parsed = nlohmann::json::parse(json);
 
         ComputeNodeConfig restored;
+        restored.fromJson(parsed);
 
-        if (!restored.fromJson(json))
-            return std::size_t{0};
+        return restored.scalingFactors.size() +
+               restored.auxiliarySensors.size() +
+               restored.threadPoolSize;
+    };
+
+    BENCHMARK("JobJson Large nested JSON roundtrip")
+    {
+        std::string json;
+        config.toJobJson(json);
+
+        ComputeNodeConfig restored;
+        restored.fromJobJson(json);
 
         return restored.scalingFactors.size() +
                restored.auxiliarySensors.size() +
@@ -2006,14 +2092,26 @@ TEST_CASE("BaseObject mixed container stress benchmark", "[core][base_obj][bench
                restored.namedSensors.size();
     };
 
-    BENCHMARK("Mixed nested JSON roundtrip")
+    BENCHMARK("Nlohmann Mixed nested JSON roundtrip")
     {
-        const nlohmann::json json = config.toJson();
+        const std::string json = config.toJson().dump();
+        const nlohmann::json parsed = nlohmann::json::parse(json);
 
         NestedContainerConfig restored;
+        restored.fromJson(parsed);
 
-        if (!restored.fromJson(json))
-            return std::size_t{0};
+        return restored.optionalSensors.size() +
+               restored.sharedSensors.size() +
+               restored.namedSensors.size();
+    };
+
+    BENCHMARK("JobJson Mixed nested JSON roundtrip")
+    {
+        std::string json;
+        config.toJobJson(json);
+
+        NestedContainerConfig restored;
+        restored.fromJobJson(json);
 
         return restored.optionalSensors.size() +
                restored.sharedSensors.size() +
@@ -2048,4 +2146,258 @@ TEST_CASE("BaseObject mixed container stress benchmark", "[core][base_obj][bench
                restored.namedSensors.size();
     };
 }
+
 #endif
+
+
+
+
+
+// // =============================================================================
+// // Block 3: Benchmarks / Stress
+// // =============================================================================
+// #ifdef JOB_TEST_BENCHMARKS
+// TEST_CASE("BaseObject serialization benchmarks", "[core][base_obj][benchmark]")
+// {
+//     ComputeNodeConfig config;
+//     config.nodeName = "benchmark-compute-node";
+//     config.threadPoolSize = 64;
+//     config.memoryBudgetGb = 128.0;
+//     config.scalingFactors.resize(256, 1.0f);
+
+//     for (int i = 0; i < 16; ++i) {
+//         auto sensor = std::make_shared<SubSensorConfig>();
+//         sensor->sensorTag = "sensor_channel_" + std::to_string(i);
+//         sensor->sampleRateHz = static_cast<float>(1000.0 / (i + 1));
+//         config.auxiliarySensors.push_back(std::move(sensor));
+//     }
+
+//     std::vector<std::uint8_t> binaryBuffer;
+//     config.toBinary(binaryBuffer);
+
+//     const nlohmann::json jsonPayload = config.toJson();
+//     const YAML::Node yamlPayload = config.toYaml();
+//     const job::yaml::YamlNode jobYamlPayload = config.toJobYaml();
+
+//     BENCHMARK("Binary Serialization (toBinary)")
+//     {
+//         std::vector<std::uint8_t> buf;
+//         config.toBinary(buf);
+//         return buf.size();
+//     };
+
+//     BENCHMARK("Binary Deserialization (fromBinary)")
+//     {
+//         ComputeNodeConfig restored;
+//         std::span<const std::uint8_t> span(binaryBuffer);
+
+//         if (!restored.fromBinary(span))
+//             return std::size_t{0};
+
+//         return restored.scalingFactors.size() +
+//                restored.auxiliarySensors.size() +
+//                restored.threadPoolSize;
+//     };
+
+//     BENCHMARK("JSON Serialization (toJson)")
+//     {
+//         return config.toJson();
+//     };
+
+//     BENCHMARK("JSON Deserialization (fromJson)")
+//     {
+//         ComputeNodeConfig restored;
+
+//         if (!restored.fromJson(jsonPayload))
+//             return std::size_t{0};
+
+//         return restored.scalingFactors.size() +
+//                restored.auxiliarySensors.size() +
+//                restored.threadPoolSize;
+//     };
+
+//     BENCHMARK("YAML-cpp Serialization (toYaml)")
+//     {
+//         return config.toYaml();
+//     };
+
+//     BENCHMARK("YAML-cpp Deserialization (fromYaml)")
+//     {
+//         ComputeNodeConfig restored;
+
+//         if (!restored.fromYaml(yamlPayload))
+//             return std::size_t{0};
+
+//         return restored.scalingFactors.size() +
+//                restored.auxiliarySensors.size() +
+//                restored.threadPoolSize;
+//     };
+
+//     BENCHMARK("JobYaml Serialization (toJobYaml)")
+//     {
+//         return config.toJobYaml();
+//     };
+
+//     BENCHMARK("JobYaml Deserialization (fromJobYaml)")
+//     {
+//         ComputeNodeConfig restored;
+
+//         if (!restored.fromJobYaml(jobYamlPayload))
+//             return std::size_t{0};
+
+//         return restored.scalingFactors.size() +
+//                restored.auxiliarySensors.size() +
+//                restored.threadPoolSize;
+//     };
+// }
+// TEST_CASE("BaseObject nested serialization stress benchmark", "[core][base_obj][benchmark][stress]")
+// {
+//     ComputeNodeConfig config;
+//     config.nodeName = "nested-stress-node";
+//     config.threadPoolSize = 128;
+//     config.memoryBudgetGb = 256.0;
+//     config.scalingFactors.resize(4096, 0.5f);
+
+//     for (int i = 0; i < 256; ++i) {
+//         auto sensor = std::make_shared<SubSensorConfig>();
+//         sensor->sensorTag = "stress_sensor_" + std::to_string(i);
+//         sensor->sampleRateHz = static_cast<float>(i + 1);
+//         sensor->calibrateOnBoot = (i % 2) == 0;
+//         sensor->initialMode = (i % 3) == 0 ? DeviceMode::Compute : DeviceMode::Idle;
+//         config.auxiliarySensors.push_back(std::move(sensor));
+//     }
+
+//     BENCHMARK("Large nested binary roundtrip")
+//     {
+//         std::vector<std::uint8_t> buffer;
+//         config.toBinary(buffer);
+
+//         ComputeNodeConfig restored;
+//         std::span<const std::uint8_t> streamSpan(buffer);
+
+//         if (!restored.fromBinary(streamSpan))
+//             return std::size_t{0};
+
+//         return restored.scalingFactors.size() +
+//                restored.auxiliarySensors.size() +
+//                restored.threadPoolSize;
+//     };
+
+//     BENCHMARK("Large nested JSON roundtrip")
+//     {
+//         const nlohmann::json json = config.toJson();
+
+//         ComputeNodeConfig restored;
+
+//         if (!restored.fromJson(json))
+//             return std::size_t{0};
+
+//         return restored.scalingFactors.size() +
+//                restored.auxiliarySensors.size() +
+//                restored.threadPoolSize;
+//     };
+
+//     BENCHMARK("Large nested YAML-cpp roundtrip")
+//     {
+//         const YAML::Node yaml = config.toYaml();
+
+//         ComputeNodeConfig restored;
+
+//         if (!restored.fromYaml(yaml))
+//             return std::size_t{0};
+
+//         return restored.scalingFactors.size() +
+//                restored.auxiliarySensors.size() +
+//                restored.threadPoolSize;
+//     };
+
+//     BENCHMARK("Large nested JobYaml roundtrip")
+//     {
+//         const job::yaml::YamlNode yaml = config.toJobYaml();
+
+//         ComputeNodeConfig restored;
+
+//         if (!restored.fromJobYaml(yaml))
+//             return std::size_t{0};
+
+//         return restored.scalingFactors.size() +
+//                restored.auxiliarySensors.size() +
+//                restored.threadPoolSize;
+//     };
+// }
+
+// TEST_CASE("BaseObject mixed container stress benchmark", "[core][base_obj][benchmark][container][stress]")
+// {
+//     NestedContainerConfig config;
+
+//     for (int i = 0; i < 256; ++i) {
+//         SubSensorConfig direct;
+//         direct.sensorTag = "optional_" + std::to_string(i);
+//         direct.sampleRateHz = static_cast<float>(i + 1);
+//         config.optionalSensors.emplace_back(std::move(direct));
+
+//         auto shared = std::make_shared<SubSensorConfig>();
+//         shared->sensorTag = "shared_" + std::to_string(i);
+//         config.sharedSensors.push_back(shared);
+//         config.namedSensors.emplace("sensor_" + std::to_string(i), std::move(shared));
+//     }
+
+//     BENCHMARK("Mixed nested binary roundtrip")
+//     {
+//         std::vector<std::uint8_t> buffer;
+//         config.toBinary(buffer);
+
+//         NestedContainerConfig restored;
+//         std::span<const std::uint8_t> streamSpan(buffer);
+
+//         if (!restored.fromBinary(streamSpan))
+//             return std::size_t{0};
+
+//         return restored.optionalSensors.size() +
+//                restored.sharedSensors.size() +
+//                restored.namedSensors.size();
+//     };
+
+//     BENCHMARK("Mixed nested JSON roundtrip")
+//     {
+//         const nlohmann::json json = config.toJson();
+
+//         NestedContainerConfig restored;
+
+//         if (!restored.fromJson(json))
+//             return std::size_t{0};
+
+//         return restored.optionalSensors.size() +
+//                restored.sharedSensors.size() +
+//                restored.namedSensors.size();
+//     };
+
+//     BENCHMARK("Mixed nested YAML-cpp roundtrip")
+//     {
+//         const YAML::Node yaml = config.toYaml();
+
+//         NestedContainerConfig restored;
+
+//         if (!restored.fromYaml(yaml))
+//             return std::size_t{0};
+
+//         return restored.optionalSensors.size() +
+//                restored.sharedSensors.size() +
+//                restored.namedSensors.size();
+//     };
+
+//     BENCHMARK("Mixed nested JobYaml roundtrip")
+//     {
+//         const job::yaml::YamlNode yaml = config.toJobYaml();
+
+//         NestedContainerConfig restored;
+
+//         if (!restored.fromJobYaml(yaml))
+//             return std::size_t{0};
+
+//         return restored.optionalSensors.size() +
+//                restored.sharedSensors.size() +
+//                restored.namedSensors.size();
+//     };
+// }
+// #endif

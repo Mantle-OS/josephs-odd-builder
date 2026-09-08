@@ -9,11 +9,6 @@ add_executable(test_job_simd
     test_job_simd_transpose.cpp
 )
 
-if(JOB_LINUX)
-    target_link_libraries(JosephsOddBuilder_Threads PUBLIC atomic)
-elseif(JOB_WINDOWS)
-    target_link_libraries(JosephsOddBuilder_Threads PUBLIC ws2_32)
-endif()
 target_compile_options(test_job_simd PRIVATE -freflection -fcontracts)
 target_link_options(test_job_simd PRIVATE -fcontracts)
 
@@ -23,7 +18,8 @@ set_target_properties(test_job_simd PROPERTIES
 )
 target_link_libraries(test_job_simd PRIVATE
     ${CatchTwo_LIBRARIES}
-    JosephsOddBuilder_Simd
+    atomic
+    Threads::Threads
     JosephsOddBuilder_Core
     JosephsOddBuilder_Threads
 )

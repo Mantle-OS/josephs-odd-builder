@@ -38,13 +38,11 @@ set(JOBZSTD_SOURCES
 
 if(BUILD_SHARED_LIBS)
     add_library(JosephsOddBuilder_Zstd SHARED
-       ${JOBZSTD_HEADERS}
-       ${JOBZSTD_SOURCES}
+       ${JOBZSTD_HEADERS} ${JOBZSTD_SOURCES}
     )
 else()
     add_library(JosephsOddBuilder_Zstd STATIC
-       ${JOBZSTD_HEADERS}
-       ${JOBZSTD_SOURCES}
+       ${JOBZSTD_HEADERS} ${JOBZSTD_SOURCES}
     )
 endif()
 
@@ -70,18 +68,13 @@ target_include_directories(JosephsOddBuilder_Zstd PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
 )
 
-if(JOB_LINUX)
-    target_link_libraries(JosephsOddBuilder_Zstd PUBLIC atomic)
-elseif(JOB_WINDOWS)
-    target_compile_options(JosephsOddBuilder_Zstd PRIVATE /wd4251)
-endif()
-
 target_link_libraries(JosephsOddBuilder_Zstd PUBLIC
     Threads::Threads
-    JosephsOddBuilder_Core
+    atomic
     ${LibSodium_LIBRARIES}
-    JosephsOddBuilder_Crypto
     ${LibZstd_LIBRARIES}
+    JosephsOddBuilder_Core
+    JosephsOddBuilder_Crypto
 )
 
 install(TARGETS JosephsOddBuilder_Zstd
@@ -95,16 +88,15 @@ install(TARGETS JosephsOddBuilder_Zstd
 install(FILES ${JOBZSTD_EXPORT}     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobzstd)
 install(FILES ${JOBZSTD_HEADERS}    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobzstd)
 
-if(JOB_LINUX)
-    set(PKGCONFIG_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/pkgconfig")
-    set(PKGCONFIG_FILE "${CMAKE_CURRENT_BINARY_DIR}/jobzstd.pc")
-    configure_file(
-        "${CMAKE_CURRENT_SOURCE_DIR}/jobzstd.pc.in"
-        "${PKGCONFIG_FILE}"
-        @ONLY
-    )
-    install(FILES "${PKGCONFIG_FILE}" DESTINATION "${PKGCONFIG_INSTALL_DIR}")
-endif()
+set(PKGCONFIG_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/pkgconfig")
+set(PKGCONFIG_FILE "${CMAKE_CURRENT_BINARY_DIR}/jobzstd.pc")
+configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/jobzstd.pc.in"
+    "${PKGCONFIG_FILE}"
+    @ONLY
+)
+install(FILES "${PKGCONFIG_FILE}" DESTINATION "${PKGCONFIG_INSTALL_DIR}")
+
 
 install(EXPORT JosephsOddBuilderZstdTargets
     FILE JosephsOddBuilderZStdTargets.cmake

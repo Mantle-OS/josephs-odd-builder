@@ -18,11 +18,7 @@ set_target_properties(test_job_serializer PROPERTIES
     CXX_EXTENSIONS OFF
 )
 
-target_compile_options(test_job_serializer
-    PRIVATE
-        -freflection
-        -fcontracts
-)
+target_compile_options(test_job_serializer PRIVATE -freflection -fcontracts)
 
 target_link_libraries(test_job_serializer PRIVATE
     ${CatchTwo_LIBRARIES}
