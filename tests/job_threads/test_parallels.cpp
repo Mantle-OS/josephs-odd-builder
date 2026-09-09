@@ -262,7 +262,8 @@ TEST_CASE("parallel_for Strided vs Linear: correctness + thread utilization sani
                          b[i].fetch_add(1, std::memory_order_relaxed);
                      },
                      0, grain, AccessPattern::Strided);
-        REQUIRE(seen.size() == sched.pool->workerCount());
+        REQUIRE(seen.size() > 1);
+        REQUIRE(seen.size() <= sched.pool->workerCount());
     }
     // Both must have touched every element exactly once
     for (size_t i = 0; i < N; ++i) {

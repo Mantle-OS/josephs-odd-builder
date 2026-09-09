@@ -9,7 +9,7 @@ endif()
 
 if(GGML_CUDA)
     add_compile_definitions(JOB_GGML_CUDA)
-    # list(APPEND JOB_GGML_TEST_IMPL test_ggml_cuda.cpp)
+    list(APPEND JOB_GGML_TEST_IMPL test_ggml_cuda.cpp)
 endif()
 
 add_compile_definitions(JOB_GGML_OPENCL)
@@ -42,7 +42,7 @@ add_executable(test_job_ggml
     test_ggml_tensor_op_graph.cpp       # 16) expression DAG construction and forward graph expansion
     test_ggml_quant.cpp
     test_ggml.cpp
-    # ${JOB_GGML_TEST_IMPL}               # the devices special tests
+    ${JOB_GGML_TEST_IMPL}               # the devices special tests
 )
 
 # test_ggml_tensor_op_for_science.cpp # fun side quest

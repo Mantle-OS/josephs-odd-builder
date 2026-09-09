@@ -185,7 +185,7 @@ template <Weight W, typename Visitor>
         WeightTraits<W>::inf(),
         std::numeric_limits<std::size_t>::max()
     };
-
+    // BOOM ! is not using the whole grain vs whatever
     parallel_for(pool, size_t{0}, n, [&](size_t i) {
         nodes[i].store(init_val, std::memory_order_relaxed);
     });
