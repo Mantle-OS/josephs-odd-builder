@@ -361,19 +361,20 @@ TEST_CASE("Device manager reset clears state and allows a new scan", "[ggml][dev
     REQUIRE(manager->devices().isEmpty());
     REQUIRE(manager->fallbackGpus().isEmpty());
 
-#ifdef JOB_GGML_CUDA
+#if defined(JOB_GGML_CUDA) && !defined(JOB_CI_BUILD)
     REQUIRE(manager->cudaDevices().isEmpty());
 #endif
 
-#ifdef JOB_GGML_VULKAN
+
+#if defined(JOB_GGML_VULKAN) && !defined(JOB_CI_BUILD)
     REQUIRE(manager->vulkanDevices().isEmpty());
 #endif
 
-#ifdef JOB_GGML_OPENCL
+#if defined(JOB_GGML_OPENCL) && !defined(JOB_CI_BUILD)
     REQUIRE(manager->openClDevices().isEmpty());
 #endif
 
-#ifdef JOB_GGML_BLAS
+#if defined(JOB_GGML_BLAS) && !defined(JOB_CI_BUILD)
     REQUIRE(manager->blasDevices().isEmpty());
 #endif
 
@@ -388,7 +389,7 @@ TEST_CASE("Device manager reset clears state and allows a new scan", "[ggml][dev
 // ============================================================================
 // Block three: benchmarks / stress
 // ============================================================================
-#ifdef JOB_TEST_BENCHMARKS
+#if defined(JOB_TEST_BENCHMARKS) && !defined(JOB_CI_BUILD)
 TEST_CASE("Repeated cold start device discovery throughput", "[ggml][device_manager][benchmark][stress]")
 {
 

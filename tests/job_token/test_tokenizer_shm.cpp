@@ -288,9 +288,7 @@ TEST_CASE("TokenShm readTokens rejects insufficient caller storage", "[token][ip
 //
 // Block 3: benchmarks
 //
-
-#ifdef JOB_TEST_BENCHMARKS
-
+#if defined(JOB_TEST_BENCHMARKS) && !defined(JOB_CI_BUILD)
 TEST_CASE("Benchmark TokenShm throughput and IPC latency", "[token][ipc][shm][benchmark]")
 {
     const std::string shmKey = "/job_token_bench_shm";

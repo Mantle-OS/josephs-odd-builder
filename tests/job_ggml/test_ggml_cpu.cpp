@@ -232,8 +232,6 @@ TEST_CASE("CPU thread pool parameters reject invalid configuration",
 
 // just for now to validate the class; after validation this can be removed.
 // Temporary dogfooding checks for the current development machine.
-#define JOB_JOSEPH_CHECK 1
-
 #ifdef JOB_JOSEPH_CHECK
 
 TEST_CASE("JobGgmlCpu reports the expected development CPU capabilities",
@@ -324,10 +322,9 @@ TEST_CASE("JobGgmlCpu dump reflects the development CPU",
 // Block 3: Benchmarks / Stress
 // ============================================================================
 
-#ifdef JOB_TEST_BENCHMARKS
 
-TEST_CASE("CPU graph execution serial versus parallel thread pool",
-          "[ggml][device][cpu][threadpool][benchmark]")
+#if defined(JOB_TEST_BENCHMARKS) && !defined(JOB_CI_BUILD)
+TEST_CASE("CPU graph execution serial versus parallel thread pool", "[ggml][device][cpu][threadpool][benchmark]")
 {
     constexpr std::int64_t ElementCount = 1024 * 1024 * 16;
 

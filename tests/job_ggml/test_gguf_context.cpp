@@ -661,8 +661,8 @@ TEST_CASE("Invalid GGUF context inspection returns neutral values", "[gguf][cont
 }
 
 // Block three: benchmarks / stress
-#ifdef JOB_TEST_BENCHMARKS
 
+#if defined(JOB_TEST_BENCHMARKS) && !defined(JOB_CI_BUILD)
 TEST_CASE("GGUF context key insertion performance", "[gguf][context][benchmark][kv][insert]")
 {
     BENCHMARK("insert 1024 GGUF key values") {
@@ -756,7 +756,7 @@ TEST_CASE( "GGUF context reset performance", "[gguf][context][benchmark][reset]"
 {
     BENCHMARK( "create and reset one GGUF context" ) {
         JobGgufContext context;
-        context.setKeyValue( JobGgufKv{ "job.value", std::uint32_t{42} } );
+        context.setKeyValue(JobGgufKv{ "job.value", std::uint32_t{42} } );
         gguf_context *replacement = gguf_init_empty();
         context.reset(replacement);
         return context.isValid();

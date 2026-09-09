@@ -910,8 +910,8 @@ TEST_CASE("JobGguf clearError clears subsystem error state", "[gguf][edge][error
 
 
 // Block three: benchmarks / stress
-#ifdef JOB_TEST_BENCHMARKS
 
+#if defined(JOB_TEST_BENCHMARKS) && !defined(JOB_CI_BUILD)
 TEST_CASE("GGUF key lookup performance", "[gguf][benchmark][lookup]")
 {
     JobGguf gguf;

@@ -491,8 +491,7 @@ TEST_CASE("GGUF tensor info may be reused after reset", "[gguf][tensor_info][edg
 }
 
 // Block three: benchmarks / stress
-#ifdef JOB_TEST_BENCHMARKS
-
+#if defined(JOB_TEST_BENCHMARKS) && !defined(JOB_CI_BUILD)
 TEST_CASE("GGUF tensor info construction performance", "[gguf][tensor_info][benchmark][construction]")
 {
     auto context = JobGgmlContext::createUniqMetadata(1);

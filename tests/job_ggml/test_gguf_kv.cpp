@@ -484,7 +484,8 @@ TEST_CASE("GGUF key value handles numeric boundary values", "[gguf][kv][edge][nu
 
 
 // Block three: benchmarks / stress
-#ifdef JOB_TEST_BENCHMARKS
+
+#if defined(JOB_TEST_BENCHMARKS) && !defined(JOB_CI_BUILD)
 TEST_CASE("GGUF scalar key value construction performance", "[gguf][kv][benchmark][construction][scalar]")
 {
     BENCHMARK("construct one uint64 GGUF value") {
