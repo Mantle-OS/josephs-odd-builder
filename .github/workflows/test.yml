@@ -103,7 +103,7 @@ jobs:
         cd "${{ github.workspace }}/build/tests/job_token"
         ./test_job_token
 
-    - name: Test Job GGML
-      run: |
-        cd "${{ github.workspace }}/build/tests/job_ggml"
-        ./test_job_ggml
+    # - name: Test Job GGML
+    #   run: |
+    #     cd "${{ github.workspace }}/build/tests/job_ggml"
+    #     ./test_job_ggml

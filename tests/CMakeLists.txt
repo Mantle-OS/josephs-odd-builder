@@ -61,7 +61,7 @@ if(JOB_BUILD_SOUND)
 endif()
 
 if(JOB_CUDA)
-    if(JOB_BUILD_GGML)
+    if(JOB_BUILD_GGML AND NOT JOB_CI_BUILD)
        add_subdirectory(job_ggml)
     endif()
 

@@ -48,15 +48,14 @@ static inline void maskedStore(float* ptr, f32 val, int count) {
 }
 
 template <typename OP, bool UseBias>
-inline void microKernel1xXMasked(
-    int K,
-    const float* __restrict__ A,                // Single row of A
-    const float* __restrict__ W, int ldw,       // W ptr
-    const float* __restrict__ B,                // Bias ptr
-    float* __restrict__ O,                      // Single row output
-    float actAlpha,
-    int maskWidth = SIMD::width()               // If < 8, use masked load/store
-    ) {
+inline void microKernel1xXMasked(int K,
+                                 const float* __restrict__ A,                // Single row of A
+                                 const float* __restrict__ W, int ldw,       // W ptr
+                                 const float* __restrict__ B,                // Bias ptr
+                                 float* __restrict__ O,                      // Single row output
+                                 float actAlpha,
+                                 int maskWidth = SIMD::width())
+{
     f32 acc;
 
     // accumulator
@@ -78,7 +77,7 @@ inline void microKernel1xXMasked(
     // store
     maskedStore(O, acc, maskWidth);
 }
-#if defined(__AVX512F__)
+#if defined(HAS_AVX_512)  || defined(HAS_AVX_512_VNNI)
 template <typename OP, bool UseBias>
 __attribute__((always_inline))
 inline void microKernel16xX(int K,
@@ -147,7 +146,7 @@ inline void microKernel16xX(int K,
     SIMD::mov(O + 14 * ldo, OP::apply(acc14, actAlpha));
     SIMD::mov(O + 15 * ldo, OP::apply(acc15, actAlpha));
 }
-#elif defined(__AVX2__) || defined(__ARM_NEON) || defined(__aarch64__) || defined(__AVX512F__)
+#elif defined(HAS_AVX_VNNI) || defined(HAS_NEON) || defined(HAS_AVX_TWO) || defined(HAS_AVX)
 template <typename OP, bool UseBias>
 __attribute__((always_inline))
 inline void microKernel8xX(int K,
@@ -201,15 +200,14 @@ inline void microKernel8xX(int K,
 
 
 template <typename OP, bool UseBias>
-void fusedDenseKernel(
-    const float* __restrict__ A,
-    const float* __restrict__ W,
-    const float* __restrict__ B,
-    float* __restrict__ O,
-    int rows,
-    int inFeatures,
-    int outFeatures,
-    float alpha )
+void fusedDenseKernel(const float* __restrict__ A,
+                      const float* __restrict__ W,
+                      const float* __restrict__ B,
+                      float* __restrict__ O,
+                      int rows,
+                      int inFeatures,
+                      int outFeatures,
+                      float alpha)
 {
     constexpr int VECLEN = SIMD::width();   // 8 on AVX2, 16 on AVX512
     constexpr int MR = 8;                   // Row Blocking Factor  8
@@ -281,15 +279,14 @@ void fusedDenseKernel(
 }
 
 template<bool T_ESTRIN>
-inline void activateDense(
-    const float* __restrict__ A,
-    const float* __restrict__ W,
-    const float* __restrict__ B,
-    float* __restrict__ O,
-    int rows, int in, int out,
-    ActivationType type,
-    bool useBias,
-    float alpha = 1.0f)
+inline void activateDense(const float* __restrict__ A,
+                          const float* __restrict__ W,
+                          const float* __restrict__ B,
+                          float* __restrict__ O,
+                          int rows, int in, int out,
+                          ActivationType type,
+                          bool useBias,
+                          float alpha = 1.0f)
 {
     // Helper to instantiate the correct kernel template
     auto dispatch = [&](auto tag_bias) {
@@ -358,16 +355,15 @@ inline void activateDense(
 
 // Parallel Wrapper: Chunks the rows and dispatches
 template<bool T_ESTRIN>
-inline void activateDenseParallel(
-    job::threads::ThreadPool &pool,
-    const float* __restrict__ A,
-    const float* __restrict__ W,
-    const float* __restrict__ B,
-    float* __restrict__ O,
-    int rows, int in, int out,
-    ActivationType type,
-    bool useBias,
-    float alpha = 1.0f)
+inline void activateDenseParallel(job::threads::ThreadPool &pool,
+                                  const float* __restrict__ A,
+                                  const float* __restrict__ W,
+                                  const float* __restrict__ B,
+                                  float* __restrict__ O,
+                                  int rows, int in, int out,
+                                  ActivationType type,
+                                  bool useBias,
+                                  float alpha = 1.0f)
 {
     // Heuristic: Ensure each thread gets enough work (e.g. 16 rows)
     constexpr int kMinRowsPerThread = 16;
