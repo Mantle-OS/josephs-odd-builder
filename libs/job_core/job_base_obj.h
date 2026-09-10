@@ -12,12 +12,14 @@
 #include <utility>
 #include <vector>
 
-#include <nlohmann/json.hpp>
 #include <job_json.h>
-
-
-#include <yaml-cpp/yaml.h>
 #include <job_yaml.h>
+#include <job_binary.h>
+
+
+
+#include <nlohmann/json.hpp>
+#include <yaml-cpp/yaml.h>
 
 #include "jobcore_export.h"
 #include "job_obj_annotation.h"
@@ -45,128 +47,236 @@ public:
         std::string lastErrorString;
 
 
-
     // =========================================================================
     // JOB YAML Serialization
     // =========================================================================
-
     template <typename Self>
-    job::yaml::YamlNode toJobYaml(this const Self &self)
+    bool toJobYaml(this const Self &self, std::string &yaml)
     {
-        job::yaml::YamlNode node;
-
-        if (!job::yaml::JobYaml::mapping(node))
-            throw std::runtime_error("Failed constructing JOB YAML mapping");
-
-        template for (constexpr auto member : reflectedDataMembersV<Self>) {
-            using MemberType = typename[:std::meta::type_of(member):];
-
-            if constexpr (!SignalType<MemberType> && !hasNoSerializeAnnotation(member)) {
-                constexpr std::string_view name = std::meta::identifier_of(member);
-
-                if (!job::yaml::JobYaml::node(node, name, serializeJobYamlValue(self.[:member:])))
-                    throw std::runtime_error(std::string{name} + ": Failed constructing JOB YAML member");
-            }
-        }
-
-        return node;
+        return job::yaml::JobYaml::toString(self, yaml);
     }
 
-
     template <typename Self>
-    bool fromJobYaml(this Self &self, const job::yaml::YamlNode &node)
+    bool fromJobYaml(this Self &self, std::string_view yaml)
     {
-        try {
-            if (!node.isMapping()) {
-                self.lastErrorString = "JOB YAML node is not a mapping";
-                return false;
-            }
-
-            template for (constexpr auto member : reflectedDataMembersV<Self>) {
-                using MemberType = typename[:std::meta::type_of(member):];
-
-                if constexpr (!SignalType<MemberType> && !hasNoSerializeAnnotation(member)) {
-                    constexpr std::string_view name = std::meta::identifier_of(member);
-
-                    if (const auto *value = node.member(name)) {
-                        try {
-                            deserializeJobYamlValue(*value, self.[:member:]);
-                        } catch (const std::exception &e) {
-                            throw std::runtime_error(std::string{name} + ": " + e.what());
-                        }
-                    }
-                }
-            }
-
+        if (job::yaml::JobYaml::fromString(yaml, self))
             return true;
-        } catch (const std::exception &e) {
-            self.lastErrorString = e.what();
+
+        self.lastErrorString = "Failed parsing JOB YAML";
+        return false;
+    }
+    template <typename Self>
+    bool saveToJobYamlFile(this const Self &self, const std::string &fileName)
+    {
+        std::string yaml;
+
+        if (!self.toJobYaml(yaml)) {
+            const_cast<Self &>(self).lastErrorString = "Failed serializing JOB YAML";
             return false;
         }
+
+        std::ofstream file(fileName);
+
+        if (!file.is_open()) {
+            const_cast<Self &>(self).lastErrorString = "Failed writing file: " + fileName;
+            return false;
+        }
+
+        file << yaml;
+
+        if (!file.good()) {
+            const_cast<Self &>(self).lastErrorString = "Failed writing file: " + fileName;
+            return false;
+        }
+
+        return true;
     }
 
-    // ADD MISSING
-    // missing debugJobYaml
-    // missing saveToJobYamnFile
-    // missing loadFromJobYamlFile
+    template <typename Self>
+    bool loadFromJobYamlFile(this Self &self, const std::string &fileName)
+    {
+        std::ifstream file(fileName);
 
+        if (!file.is_open()) {
+            self.lastErrorString = "Failed reading file: " + fileName;
+            return false;
+        }
+
+        const std::string yaml{
+            std::istreambuf_iterator<char>{file},
+            std::istreambuf_iterator<char>{}
+        };
+
+        return self.fromJobYaml(yaml);
+    }
+    template <typename Self>
+    void debugJobYaml(this const Self &self)
+    {
+        std::string yaml;
+
+        if (self.toJobYaml(yaml))
+            std::cout << "[JOB YAML]\n" << yaml << std::endl;
+    }
     // =========================================================================
     // JOB JSON Serialization
     // =========================================================================
+
     template <typename Self>
     bool toJobJson(this const Self &self, std::string &json)
     {
-        json.clear();
-        json.push_back('{');
-
-        bool first = true;
-
-        template for (constexpr auto member : reflectedDataMembersV<Self>) {
-            using MemberType = typename[:std::meta::type_of(member):];
-
-            if constexpr (!SignalType<MemberType> && !hasNoSerializeAnnotation(member)) {
-                if (!first)
-                    json.push_back(',');
-
-                constexpr std::string_view name = std::meta::identifier_of(member);
-
-                if (!job::json::JsonEmitter::emit(name, json))
-                    return false;
-
-                json.push_back(':');
-
-                const std::string value = serializeJobJsonValue(self.[:member:]);
-                json.append(value);
-
-                first = false;
-            }
-        }
-
-        json.push_back('}');
-        return true;
+        return job::json::JobJson::toJson(self, json);
     }
 
     template <typename Self>
     bool fromJobJson(this Self &self, std::string_view json)
     {
-        try {
-            job::json::JsonParser parser{json};
+        job::json::JsonDiagnostic diagnostic;
 
-            if (!parser.parse(self)) {
-                const auto &diagnostic = parser.diagnostic();
-                self.lastErrorString = std::string{diagnostic.comment()};
-                return false;
-            }
-
+        if (job::json::JobJson::fromJson(json, self, diagnostic))
             return true;
-        } catch (const std::exception &e) {
-            self.lastErrorString = e.what();
+
+        self.lastErrorString = std::string{diagnostic.comment()};
+        return false;
+    }
+    template <typename Self>
+    bool saveToJobJsonFile(this const Self &self, const std::string &fileName)
+    {
+        std::string json;
+
+        if (!self.toJobJson(json)) {
+            const_cast<Self &>(self).lastErrorString = "Failed serializing JOB JSON";
             return false;
         }
+
+        std::ofstream file(fileName);
+
+        if (!file.is_open()) {
+            const_cast<Self &>(self).lastErrorString = "Failed writing file: " + fileName;
+            return false;
+        }
+
+        file << json;
+
+        if (!file.good()) {
+            const_cast<Self &>(self).lastErrorString = "Failed writing file: " + fileName;
+            return false;
+        }
+
+        return true;
     }
 
+    template <typename Self>
+    bool loadFromJobJsonFile(this Self &self, const std::string &fileName)
+    {
+        std::ifstream file(fileName);
+
+        if (!file.is_open()) {
+            self.lastErrorString = "Failed reading file: " + fileName;
+            return false;
+        }
+
+        const std::string json{
+            std::istreambuf_iterator<char>{file},
+            std::istreambuf_iterator<char>{}
+        };
+
+        return self.fromJobJson(json);
+    }
+
+    template <typename Self>
+    void debugJobJson(this const Self &self)
+    {
+        std::string json;
+
+        if (self.toJobJson(json))
+            std::cout << "[JOB JSON]\n" << json << std::endl;
+    }
+
+
     // =========================================================================
-    // JSON Serialization
+    // JOB Binary Serialization
+    // =========================================================================
+
+    template <typename Self>
+    bool toBinary(this const Self &self, std::vector<std::uint8_t> &buffer)
+    {
+        return job::binary::JobBinary::toBytes(self, buffer);
+    }
+
+    template <typename Self>
+    bool fromBinary(this Self &self, std::span<const std::uint8_t> streamSpan)
+    {
+        if (job::binary::JobBinary::fromBytes(streamSpan, self))
+            return true;
+
+        self.lastErrorString = "Failed parsing JOB binary data";
+        return false;
+    }
+    template <typename Self>
+    bool saveToBinaryFile(this const Self &self, const std::string &fileName)
+    {
+        std::vector<std::uint8_t> buffer;
+
+        if (!self.toBinary(buffer)) {
+            const_cast<Self &>(self).lastErrorString = "Failed serializing JOB binary";
+            return false;
+        }
+
+        std::ofstream file(fileName, std::ios::binary);
+
+        if (!file.is_open()) {
+            const_cast<Self &>(self).lastErrorString = "Failed opening binary file: " + fileName;
+            return false;
+        }
+
+        file.write(reinterpret_cast<const char *>(buffer.data()),
+                   static_cast<std::streamsize>(buffer.size()));
+
+        if (!file.good()) {
+            const_cast<Self &>(self).lastErrorString = "Failed writing binary file: " + fileName;
+            return false;
+        }
+
+        return true;
+    }
+
+    template <typename Self>
+    bool loadFromBinaryFile(this Self &self, const std::string &fileName)
+    {
+        std::ifstream file(fileName, std::ios::binary | std::ios::ate);
+
+        if (!file.is_open()) {
+            self.lastErrorString = "Failed opening binary file: " + fileName;
+            return false;
+        }
+
+        const std::streamsize size = file.tellg();
+
+        if (size < 0) {
+            self.lastErrorString = "Failed determining binary file size: " + fileName;
+            return false;
+        }
+
+        file.seekg(0, std::ios::beg);
+
+        std::vector<std::uint8_t> buffer(static_cast<std::size_t>(size));
+
+        if (size > 0 &&
+            !file.read(reinterpret_cast<char *>(buffer.data()), size)) {
+            self.lastErrorString = "Failed reading binary file stream";
+            return false;
+        }
+
+        return self.fromBinary(std::span<const std::uint8_t>{buffer});
+    }
+
+
+    // ====================================
+    // START 3rd party
+
+
+    // =========================================================================
+    // nlohmann JSON Serialization
     // =========================================================================
 
     template <typename Self>
@@ -357,91 +467,91 @@ public:
         }
     }
 
-    // =========================================================================
-    // Binary Serialization
-    // =========================================================================
+    // // =========================================================================
+    // // Binary Serialization
+    // // =========================================================================
 
-    template <typename Self>
-    void toBinary(this const Self &self, std::vector<uint8_t> &buffer)
-    {
-        template for (constexpr auto member : reflectedDataMembersV<Self>) {
-            using MemberType = typename[:std::meta::type_of(member):];
+    // template <typename Self>
+    // void toBinary(this const Self &self, std::vector<uint8_t> &buffer)
+    // {
+    //     template for (constexpr auto member : reflectedDataMembersV<Self>) {
+    //         using MemberType = typename[:std::meta::type_of(member):];
 
-            if constexpr (!SignalType<MemberType> && !hasNoSerializeAnnotation(member))
-                writeBinary(buffer, self.[:member:]);
-        }
-    }
+    //         if constexpr (!SignalType<MemberType> && !hasNoSerializeAnnotation(member))
+    //             writeBinary(buffer, self.[:member:]);
+    //     }
+    // }
 
-    template <typename Self>
-    bool fromBinary(this Self &self, std::span<const uint8_t> &streamSpan)
-    {
-        try {
-            template for (constexpr auto member : reflectedDataMembersV<Self>) {
-                using MemberType = typename[:std::meta::type_of(member):];
+    // template <typename Self>
+    // bool fromBinary(this Self &self, std::span<const uint8_t> &streamSpan)
+    // {
+    //     try {
+    //         template for (constexpr auto member : reflectedDataMembersV<Self>) {
+    //             using MemberType = typename[:std::meta::type_of(member):];
 
-                if constexpr (!SignalType<MemberType> && !hasNoSerializeAnnotation(member))
-                    readBinary(streamSpan, self.[:member:]);
-            }
+    //             if constexpr (!SignalType<MemberType> && !hasNoSerializeAnnotation(member))
+    //                 readBinary(streamSpan, self.[:member:]);
+    //         }
 
-            return true;
-        } catch (const std::exception &e) {
-            self.lastErrorString = e.what();
-            return false;
-        }
-    }
+    //         return true;
+    //     } catch (const std::exception &e) {
+    //         self.lastErrorString = e.what();
+    //         return false;
+    //     }
+    // }
 
-    template <typename Self>
-    bool saveToBinaryFile(this const Self &self, const std::string &fileName)
-    {
-        std::vector<uint8_t> buffer;
-        self.toBinary(buffer);
+    // template <typename Self>
+    // bool saveToBinaryFile(this const Self &self, const std::string &fileName)
+    // {
+    //     std::vector<uint8_t> buffer;
+    //     self.toBinary(buffer);
 
-        std::ofstream file(fileName, std::ios::binary);
+    //     std::ofstream file(fileName, std::ios::binary);
 
-        if (!file.is_open()) {
-            const_cast<Self &>(self).lastErrorString = "Failed opening binary file: " + fileName;
-            return false;
-        }
+    //     if (!file.is_open()) {
+    //         const_cast<Self &>(self).lastErrorString = "Failed opening binary file: " + fileName;
+    //         return false;
+    //     }
 
-        file.write(reinterpret_cast<const char *>(buffer.data()), static_cast<std::streamsize>(buffer.size()));
+    //     file.write(reinterpret_cast<const char *>(buffer.data()), static_cast<std::streamsize>(buffer.size()));
 
-        if (!file.good()) {
-            const_cast<Self &>(self).lastErrorString = "Failed writing binary file: " + fileName;
-            return false;
-        }
+    //     if (!file.good()) {
+    //         const_cast<Self &>(self).lastErrorString = "Failed writing binary file: " + fileName;
+    //         return false;
+    //     }
 
-        return true;
-    }
+    //     return true;
+    // }
 
-    template <typename Self>
-    bool loadFromBinaryFile(this Self &self, const std::string &fileName)
-    {
-        std::ifstream file(fileName, std::ios::binary | std::ios::ate);
+    // template <typename Self>
+    // bool loadFromBinaryFile(this Self &self, const std::string &fileName)
+    // {
+    //     std::ifstream file(fileName, std::ios::binary | std::ios::ate);
 
-        if (!file.is_open()) {
-            self.lastErrorString = "Failed opening binary file: " + fileName;
-            return false;
-        }
+    //     if (!file.is_open()) {
+    //         self.lastErrorString = "Failed opening binary file: " + fileName;
+    //         return false;
+    //     }
 
-        const std::streamsize size = file.tellg();
+    //     const std::streamsize size = file.tellg();
 
-        if (size < 0) {
-            self.lastErrorString = "Failed determining binary file size: " + fileName;
-            return false;
-        }
+    //     if (size < 0) {
+    //         self.lastErrorString = "Failed determining binary file size: " + fileName;
+    //         return false;
+    //     }
 
-        file.seekg(0, std::ios::beg);
+    //     file.seekg(0, std::ios::beg);
 
-        std::vector<uint8_t> buffer(static_cast<std::size_t>(size));
+    //     std::vector<uint8_t> buffer(static_cast<std::size_t>(size));
 
-        if (size > 0 && !file.read(reinterpret_cast<char *>(buffer.data()), size)) {
-            self.lastErrorString = "Failed reading binary file stream";
-            return false;
-        }
+    //     if (size > 0 && !file.read(reinterpret_cast<char *>(buffer.data()), size)) {
+    //         self.lastErrorString = "Failed reading binary file stream";
+    //         return false;
+    //     }
 
-        std::span<const uint8_t> span(buffer);
-        return self.fromBinary(span);
-    }
+    //     std::span<const uint8_t> span(buffer);
+    //     return self.fromBinary(span);
+    // }
 
 private:
     template <OwningSmartPointer Pointer>
@@ -470,6 +580,7 @@ private:
     // =========================================================================
     // JOB YAML Helpers
     // =========================================================================
+#if 0
     template <typename T>
     static job::yaml::YamlNode serializeJobYamlValue(const T &val)
     {
@@ -798,6 +909,154 @@ private:
                 throw std::runtime_error("Invalid JOB JSON value");
         }
     }
+    // =========================================================================
+    // Binary Helpers
+    // =========================================================================
+    template <typename T>
+    static void writeBinary(std::vector<uint8_t> &buf, const T &val)
+    {
+        using V = std::remove_cvref_t<T>;
+
+        if constexpr (OptionalType<V>) {
+            const bool present = val.has_value();
+            writeBinary(buf, present);
+
+            if (present)
+                writeBinary(buf, *val);
+        } else if constexpr (OwningSmartPointer<V>) {
+            const bool present = static_cast<bool>(val);
+            writeBinary(buf, present);
+
+            if (present)
+                writeBinary(buf, *val);
+        } else if constexpr (UnsupportedPersistentPointer<V>) {
+            static_assert(dependentFalseV<V>, "Raw and weak pointers cannot be serialized");
+        } else if constexpr (std::same_as<V, std::string>) {
+            const uint64_t len = val.size();
+            writeBinary(buf, len);
+            buf.insert(buf.end(), val.data(), val.data() + val.size());
+        } else if constexpr (MapContainer<V>) {
+            const uint64_t count = val.size();
+            writeBinary(buf, count);
+
+            for (const auto &[key, value] : val) {
+                writeBinary(buf, key);
+                writeBinary(buf, value);
+            }
+        } else if constexpr (PersistentContainer<V>) {
+            const uint64_t count = val.size();
+            writeBinary(buf, count);
+
+            for (const auto &item : val)
+                writeBinary(buf, item);
+        } else if constexpr (ReflectableContainer<V>) {
+            static_assert(dependentFalseV<V>, "Unsupported container type in binary serialization");
+        } else if constexpr (BaseObjectType<V>) {
+            val.toBinary(buf);
+        } else if constexpr (std::is_trivially_copyable_v<V>) {
+            const auto *ptr = reinterpret_cast<const uint8_t *>(&val);
+            buf.insert(buf.end(), ptr, ptr + sizeof(V));
+        } else {
+            static_assert(dependentFalseV<V>, "Unsupported type in binary serialization");
+        }
+    }
+
+    template <typename T>
+    static void readBinary(std::span<const uint8_t> &streamSpan, T &val)
+    {
+        using V = std::remove_cvref_t<T>;
+
+        if constexpr (OptionalType<V>) {
+            bool present = false;
+            readBinary(streamSpan, present);
+
+            if (present) {
+                val.emplace();
+                readBinary(streamSpan, *val);
+            } else {
+                val.reset();
+            }
+        } else if constexpr (OwningSmartPointer<V>) {
+            bool present = false;
+            readBinary(streamSpan, present);
+
+            if (present) {
+                constructPointer(val);
+                readBinary(streamSpan, *val);
+            } else {
+                val.reset();
+            }
+        } else if constexpr (UnsupportedPersistentPointer<V>) {
+            static_assert(dependentFalseV<V>, "Raw and weak pointers cannot be deserialized");
+        } else if constexpr (std::same_as<V, std::string>) {
+            uint64_t len = 0;
+            readBinary(streamSpan, len);
+
+            if (streamSpan.size() < len)
+                throw std::runtime_error("Unexpected buffer EOF reading string");
+
+            val.assign(reinterpret_cast<const char *>(streamSpan.data()), static_cast<std::size_t>(len));
+            streamSpan = streamSpan.subspan(static_cast<std::size_t>(len));
+        } else if constexpr (MapContainer<V>) {
+            uint64_t count = 0;
+            readBinary(streamSpan, count);
+            val.clear();
+
+            for (uint64_t i = 0; i < count; ++i) {
+                typename V::key_type key{};
+                typename V::mapped_type value{};
+                readBinary(streamSpan, key);
+                readBinary(streamSpan, value);
+                val.emplace(std::move(key), std::move(value));
+            }
+        } else if constexpr (FixedSequenceContainer<V>) {
+            uint64_t count = 0;
+            readBinary(streamSpan, count);
+
+            if (count != val.size())
+                throw std::runtime_error("Binary fixed array size mismatch");
+
+            for (auto &item : val)
+                readBinary(streamSpan, item);
+        } else if constexpr (PushBackSequenceContainer<V>) {
+            uint64_t count = 0;
+            readBinary(streamSpan, count);
+            val.clear();
+
+            for (uint64_t i = 0; i < count; ++i) {
+                typename V::value_type item{};
+                readBinary(streamSpan, item);
+                val.push_back(std::move(item));
+            }
+        } else if constexpr (InsertSequenceContainer<V>) {
+            uint64_t count = 0;
+            readBinary(streamSpan, count);
+            val.clear();
+
+            for (uint64_t i = 0; i < count; ++i) {
+                typename V::value_type item{};
+                readBinary(streamSpan, item);
+                val.insert(std::move(item));
+            }
+        } else if constexpr (ReflectableContainer<V>) {
+            static_assert(dependentFalseV<V>, "Unsupported container type in binary deserialization");
+        } else if constexpr (BaseObjectType<V>) {
+            if (!val.fromBinary(streamSpan))
+                throw std::runtime_error(val.lastErrorString.empty() ? "Nested binary deserialization failed" : val.lastErrorString);
+        } else if constexpr (std::is_trivially_copyable_v<V>) {
+            if (streamSpan.size() < sizeof(V))
+                throw std::runtime_error("Unexpected buffer EOF in binary stream");
+
+            std::memcpy(&val, streamSpan.data(), sizeof(V));
+            streamSpan = streamSpan.subspan(sizeof(V));
+        } else {
+            static_assert(dependentFalseV<V>, "Unsupported type in binary deserialization");
+        }
+    }
+#endif
+
+
+    // 3rd party
 
 
     // =========================================================================
@@ -1081,152 +1340,6 @@ private:
                 throw std::runtime_error(val.lastErrorString.empty() ? "Nested YAML deserialization failed" : val.lastErrorString);
         } else {
             val = node.template as<V>();
-        }
-    }
-
-    // =========================================================================
-    // Binary Helpers
-    // =========================================================================
-
-    template <typename T>
-    static void writeBinary(std::vector<uint8_t> &buf, const T &val)
-    {
-        using V = std::remove_cvref_t<T>;
-
-        if constexpr (OptionalType<V>) {
-            const bool present = val.has_value();
-            writeBinary(buf, present);
-
-            if (present)
-                writeBinary(buf, *val);
-        } else if constexpr (OwningSmartPointer<V>) {
-            const bool present = static_cast<bool>(val);
-            writeBinary(buf, present);
-
-            if (present)
-                writeBinary(buf, *val);
-        } else if constexpr (UnsupportedPersistentPointer<V>) {
-            static_assert(dependentFalseV<V>, "Raw and weak pointers cannot be serialized");
-        } else if constexpr (std::same_as<V, std::string>) {
-            const uint64_t len = val.size();
-            writeBinary(buf, len);
-            buf.insert(buf.end(), val.data(), val.data() + val.size());
-        } else if constexpr (MapContainer<V>) {
-            const uint64_t count = val.size();
-            writeBinary(buf, count);
-
-            for (const auto &[key, value] : val) {
-                writeBinary(buf, key);
-                writeBinary(buf, value);
-            }
-        } else if constexpr (PersistentContainer<V>) {
-            const uint64_t count = val.size();
-            writeBinary(buf, count);
-
-            for (const auto &item : val)
-                writeBinary(buf, item);
-        } else if constexpr (ReflectableContainer<V>) {
-            static_assert(dependentFalseV<V>, "Unsupported container type in binary serialization");
-        } else if constexpr (BaseObjectType<V>) {
-            val.toBinary(buf);
-        } else if constexpr (std::is_trivially_copyable_v<V>) {
-            const auto *ptr = reinterpret_cast<const uint8_t *>(&val);
-            buf.insert(buf.end(), ptr, ptr + sizeof(V));
-        } else {
-            static_assert(dependentFalseV<V>, "Unsupported type in binary serialization");
-        }
-    }
-
-    template <typename T>
-    static void readBinary(std::span<const uint8_t> &streamSpan, T &val)
-    {
-        using V = std::remove_cvref_t<T>;
-
-        if constexpr (OptionalType<V>) {
-            bool present = false;
-            readBinary(streamSpan, present);
-
-            if (present) {
-                val.emplace();
-                readBinary(streamSpan, *val);
-            } else {
-                val.reset();
-            }
-        } else if constexpr (OwningSmartPointer<V>) {
-            bool present = false;
-            readBinary(streamSpan, present);
-
-            if (present) {
-                constructPointer(val);
-                readBinary(streamSpan, *val);
-            } else {
-                val.reset();
-            }
-        } else if constexpr (UnsupportedPersistentPointer<V>) {
-            static_assert(dependentFalseV<V>, "Raw and weak pointers cannot be deserialized");
-        } else if constexpr (std::same_as<V, std::string>) {
-            uint64_t len = 0;
-            readBinary(streamSpan, len);
-
-            if (streamSpan.size() < len)
-                throw std::runtime_error("Unexpected buffer EOF reading string");
-
-            val.assign(reinterpret_cast<const char *>(streamSpan.data()), static_cast<std::size_t>(len));
-            streamSpan = streamSpan.subspan(static_cast<std::size_t>(len));
-        } else if constexpr (MapContainer<V>) {
-            uint64_t count = 0;
-            readBinary(streamSpan, count);
-            val.clear();
-
-            for (uint64_t i = 0; i < count; ++i) {
-                typename V::key_type key{};
-                typename V::mapped_type value{};
-                readBinary(streamSpan, key);
-                readBinary(streamSpan, value);
-                val.emplace(std::move(key), std::move(value));
-            }
-        } else if constexpr (FixedSequenceContainer<V>) {
-            uint64_t count = 0;
-            readBinary(streamSpan, count);
-
-            if (count != val.size())
-                throw std::runtime_error("Binary fixed array size mismatch");
-
-            for (auto &item : val)
-                readBinary(streamSpan, item);
-        } else if constexpr (PushBackSequenceContainer<V>) {
-            uint64_t count = 0;
-            readBinary(streamSpan, count);
-            val.clear();
-
-            for (uint64_t i = 0; i < count; ++i) {
-                typename V::value_type item{};
-                readBinary(streamSpan, item);
-                val.push_back(std::move(item));
-            }
-        } else if constexpr (InsertSequenceContainer<V>) {
-            uint64_t count = 0;
-            readBinary(streamSpan, count);
-            val.clear();
-
-            for (uint64_t i = 0; i < count; ++i) {
-                typename V::value_type item{};
-                readBinary(streamSpan, item);
-                val.insert(std::move(item));
-            }
-        } else if constexpr (ReflectableContainer<V>) {
-            static_assert(dependentFalseV<V>, "Unsupported container type in binary deserialization");
-        } else if constexpr (BaseObjectType<V>) {
-            if (!val.fromBinary(streamSpan))
-                throw std::runtime_error(val.lastErrorString.empty() ? "Nested binary deserialization failed" : val.lastErrorString);
-        } else if constexpr (std::is_trivially_copyable_v<V>) {
-            if (streamSpan.size() < sizeof(V))
-                throw std::runtime_error("Unexpected buffer EOF in binary stream");
-
-            std::memcpy(&val, streamSpan.data(), sizeof(V));
-            streamSpan = streamSpan.subspan(sizeof(V));
-        } else {
-            static_assert(dependentFalseV<V>, "Unsupported type in binary deserialization");
         }
     }
 };

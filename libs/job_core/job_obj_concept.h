@@ -18,7 +18,7 @@
 #include <unordered_set>
 #include <utility>
 #include <vector>
-
+#include "job_obj_annotation.h"
 namespace job::core {
 
 class BaseObject;
@@ -389,5 +389,16 @@ consteval std::size_t slotCount()
 
     return count;
 }
+
+// Less boiler plate
+template <std::meta::info Member>
+[[nodiscard]] consteval bool isSerializableMember()
+{
+    using MemberType = typename[:std::meta::type_of(Member):];
+
+    return !SignalType<MemberType> &&
+           !hasNoSerializeAnnotation(Member);
+}
+
 
 } // namespace job::core

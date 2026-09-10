@@ -3,6 +3,10 @@
 #include <meta>
 #include <string_view>
 #include <utility>
+#include <type_traits>
+
+#include "job_obj_annotation.h"
+#include "job_obj_concept.h"
 
 namespace job::yaml {
 
@@ -12,11 +16,15 @@ public:
     template <typename T, typename F>
     static constexpr bool dispatch(std::string_view key, F &&function)
     {
-        template for (constexpr auto member :
-                      std::define_static_array(
-                          std::meta::nonstatic_data_members_of(
-                              ^^T,
-                              std::meta::access_context::current()))) {
+        using ObjectType = std::remove_cvref_t<T>;
+
+        template for (constexpr auto member : job::core::reflectedDataMembersV<ObjectType>) {
+            using MemberType = typename[:std::meta::type_of(member):];
+
+            if constexpr (job::core::SignalType<MemberType> ||
+                          job::core::hasNoSerializeAnnotation(member))
+                continue;
+
             constexpr std::string_view name = std::meta::identifier_of(member);
 
             if (key == name) {

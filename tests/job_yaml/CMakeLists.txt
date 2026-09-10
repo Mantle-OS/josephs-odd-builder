@@ -67,6 +67,7 @@ set(JOB_YAML_TEST_FILES
 
     test_job_yaml.cpp
     test_job_yaml_v1.cpp
+    test_job_yaml_v2.cpp # NEW to,from string tests
 )
 
 if(JOB_YAML_CPP_BENCH AND NOT JOB_CI_BUILD)

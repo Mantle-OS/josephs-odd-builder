@@ -10,11 +10,15 @@
 #include <string_view>
 #include <type_traits>
 
-#include "job_json_concepts.h"
+#include "job_json_concepts.h"  // keep for now [[JOSEPH]] merge into job_obj_concept.h maybe after shape and alpha->beta time
+#include "job_obj_annotation.h"
+#include "job_obj_concept.h"
+
+#include "jobcore_export.h"
 
 namespace job::json {
 
-class JsonEmitter
+class JOBCORE_EXPORT JsonEmitter
 {
 public:
     JsonEmitter() = delete;
@@ -83,6 +87,7 @@ private:
             return false;
         }
     }
+
     template <typename T, JsonOutputSink Sink>
     [[nodiscard]] static bool emitNumber(const T &value, Sink &sink)
     {
@@ -119,27 +124,6 @@ private:
         append(sink, text);
         return true;
     }
-    // template <typename T, JsonOutputSink Sink>
-    // [[nodiscard]] static bool emitNumber(const T &value, Sink &sink)
-    // {
-    //     if constexpr (std::floating_point<T>) {
-    //         if (!std::isfinite(value))
-    //             return false;
-    //     }
-
-    //     char buffer[64];
-
-    //     const auto result = std::to_chars(buffer,
-    //                                       buffer + sizeof(buffer),
-    //                                       value);
-
-    //     if (result.ec != std::errc{})
-    //         return false;
-
-    //     append(sink, std::string_view{ buffer, static_cast<std::size_t>(result.ptr - buffer)});
-
-    //     return true;
-    // }
 
     template <JsonOutputSink Sink>
     [[nodiscard]] static bool emitString(std::string_view value, Sink &sink)
@@ -202,10 +186,12 @@ private:
         bool first = true;
         bool success = true;
 
-        template for (constexpr auto member : std::define_static_array(
-                          std::meta::nonstatic_data_members_of(
-                              ^^ObjectType,
-                              std::meta::access_context::current()))) {
+        template for (constexpr auto member : job::core::reflectedDataMembersV<ObjectType>) {
+            using MemberType = typename[:std::meta::type_of(member):];
+
+            if constexpr (job::core::SignalType<MemberType> || job::core::hasNoSerializeAnnotation(member))
+                continue;
+
             if (!success)
                 continue;
 
@@ -280,6 +266,7 @@ private:
         }
 
         append(sink, "]");
+
         return true;
     }
 
@@ -308,4 +295,3 @@ private:
 };
 
 } // namespace job::json
-

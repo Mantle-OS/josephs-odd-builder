@@ -3,11 +3,11 @@
 #include <string>
 #include <string_view>
 #include <utility>
+#include <meta>
 
 #include "job_yaml_concepts.h"
 #include "job_yaml_key_dispatch.h"
 #include "job_yaml_scalar_kernel.h"
-
 namespace job::yaml {
 
 class YamlValidateSink
@@ -35,13 +35,12 @@ public:
     }
 
     template <typename T>
-    static constexpr bool member(std::string_view key,
-                                 std::string_view value) noexcept
+    static constexpr bool member(std::string_view key, std::string_view value) noexcept
     {
         bool valid = false;
 
         const bool matched = YamlKeyDispatch::dispatch<T>(key, [&]<auto member> {
-            using MemberType = YamlType<decltype(std::declval<T &>().[:member:])>;
+            using MemberType = YamlType<typename[:std::meta::type_of(member):]>;
             valid = scalar<MemberType>(value);
         });
 

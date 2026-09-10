@@ -1,8 +1,9 @@
 cmake_minimum_required(VERSION 3.16)
 
-
+option(JOB_QT_COMPARE "Link and bring in QtCore to test against sgnals and its meta system" OFF)
 
 set(JOB_CORE_TEST_OBJECTS
+    test_job_binary.cpp
     test_job_object_fixtures.h
     test_job_base_obj.cpp
     test_job_signal.cpp
@@ -10,9 +11,11 @@ set(JOB_CORE_TEST_OBJECTS
     test_job_light_object.cpp
 )
 
-if(JOB_QT)
+## TODO remove me we beat this horse to death later Not now
+if(JOB_QT_COMPARE)
     set(CMAKE_AUTOMOC ON)
-    list(APPEND JOB_CORE_TEST_OBJECTSz
+    find_package(Qt6 6.2 COMPONENTS Core REQUIRED)
+    list(APPEND JOB_CORE_TEST_OBJECTS
         q_test_base.h
         q_test_base.cpp
         test_q_object.cpp
@@ -20,20 +23,22 @@ if(JOB_QT)
 endif()
 
 
+option(JOB_CORE_TEST_CONTAINERS "Test the job_core containers stack. Note this saturates the machine or trys to" OFF)
+if(JOB_CORE_TEST_CONTAINERS)
+    list(APPEND JOB_CORE_TEST_OBJECTS
+        test_job_list.cpp
+        test_job_hash.cpp
+        test_job_map.cpp
+        test_job_obj_hash.cpp
+    )
+endif()
 add_executable(test_job_core
     ../test_spin_till.h
     main.cpp
-    ## Just for right now as they test saturatyion and what not
-    # test_timer.cpp
-    # test_logger.cpp
-    # test_job_siphash.cpp
-    # test_job_list.cpp
-    # test_job_hash.cpp
-    # test_job_map.cpp
-    # test_job_obj_hash.cpp
-
+    test_job_siphash.cpp
+    test_timer.cpp
+    test_logger.cpp
     ${JOB_CORE_TEST_OBJECTS}
-
 )
 target_compile_options(test_job_core PRIVATE -freflection -fcontracts)
 target_link_options(test_job_core PRIVATE -fcontracts)
@@ -48,11 +53,9 @@ target_link_libraries(test_job_core PRIVATE
     JosephsOddBuilder_Threads
 )
 
-
-if(JOB_QT)
-    target_link_libraries(test_job_core PRIVATE
-        Qt6::Core
-    )
+## TODO remove me later
+if(JOB_QT_COMPARE)
+    target_link_libraries(test_job_core PRIVATE Qt6::Core)
 endif()
 
 target_include_directories(test_job_core PRIVATE

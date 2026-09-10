@@ -8,56 +8,65 @@
 #include <type_traits>
 #include <utility>
 
-    namespace job::json {
+#include "job_obj_annotation.h"
+#include "job_obj_concept.h"
 
-    enum class JsonKeyDispatchResult : std::uint8_t
+namespace job::json {
+
+enum class JsonKeyDispatchResult : std::uint8_t
+{
+    NotFound = 0,
+    Accepted,
+    Rejected,
+};
+
+class JsonKeyDispatch
+{
+public:
+    JsonKeyDispatch() = delete;
+    ~JsonKeyDispatch() = delete;
+
+    JsonKeyDispatch(const JsonKeyDispatch &) = delete;
+    JsonKeyDispatch &operator=(const JsonKeyDispatch &) = delete;
+    JsonKeyDispatch(JsonKeyDispatch &&) = delete;
+    JsonKeyDispatch &operator=(JsonKeyDispatch &&) = delete;
+
+    template <typename T, typename Function>
+    [[nodiscard]] static constexpr JsonKeyDispatchResult dispatch(T &object, std::string_view key, Function &&function)
     {
-        NotFound = 0,
-        Accepted,
-        Rejected,
-    };
+        using ObjectType = std::remove_cvref_t<T>;
 
-    class JsonKeyDispatch
-    {
-    public:
-        template <typename T, typename Function>
-        [[nodiscard]] static constexpr JsonKeyDispatchResult dispatch(
-            T &object,
-            std::string_view key,
-            Function &&function)
-        {
-            using ObjectType = std::remove_cvref_t<T>;
+        JsonKeyDispatchResult result = JsonKeyDispatchResult::NotFound;
 
-            JsonKeyDispatchResult result = JsonKeyDispatchResult::NotFound;
+        template for (constexpr auto member : job::core::reflectedDataMembersV<ObjectType>) {
+            using MemberType = typename[:std::meta::type_of(member):];
 
-            template for (constexpr auto member : std::define_static_array(
-                              std::meta::nonstatic_data_members_of(
-                                  ^^ObjectType,
-                                  std::meta::access_context::current()))) {
-                if (result != JsonKeyDispatchResult::NotFound)
-                    continue;
+            if constexpr (job::core::SignalType<MemberType> || job::core::hasNoSerializeAnnotation(member))
+                continue;
 
-                constexpr std::string_view name = std::meta::identifier_of(member);
+            if (result != JsonKeyDispatchResult::NotFound)
+                continue;
 
-                if (key != name)
-                    continue;
+            constexpr std::string_view name = std::meta::identifier_of(member);
 
-                using MemberReference = decltype((object.[:member:]));
-                using ResultType = std::invoke_result_t<Function &, MemberReference>;
+            if (key != name)
+                continue;
 
-                if constexpr (std::convertible_to<ResultType, bool>) {
-                    result = std::invoke(function, object.[:member:]) ?
-                                 JsonKeyDispatchResult::Accepted :
-                                 JsonKeyDispatchResult::Rejected;
-                } else {
-                    std::invoke(function, object.[:member:]);
-                    result = JsonKeyDispatchResult::Accepted;
-                }
+            using MemberReference = decltype((object.[:member:]));
+            using ResultType = std::invoke_result_t<Function &, MemberReference>;
+
+            if constexpr (std::convertible_to<ResultType, bool>) {
+                result = std::invoke(function, object.[:member:]) ?
+                             JsonKeyDispatchResult::Accepted :
+                             JsonKeyDispatchResult::Rejected;
+            } else {
+                std::invoke(function, object.[:member:]);
+                result = JsonKeyDispatchResult::Accepted;
             }
-
-            return result;
         }
-    };
+
+        return result;
+    }
+};
 
 } // namespace job::json
-

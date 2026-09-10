@@ -11,6 +11,9 @@
 #include "job_yaml_concepts.h"
 #include "job_yaml_node.h"
 
+#include "job_obj_annotation.h"
+#include "job_obj_concept.h"
+
 namespace job::yaml {
 
 class YamlEmitter
@@ -19,14 +22,17 @@ public:
     template <typename T, YamlOutputSink Sink>
     static constexpr bool emitObject(const T &object, Sink &sink)
     {
+        using ObjectType = YamlType<T>;
+
         bool success = true;
 
-        template for (constexpr auto member : std::define_static_array(
-                          std::meta::nonstatic_data_members_of(^^T, std::meta::access_context::current()))) {
-            using MemberType = std::remove_cvref_t<decltype(object.[:member:])>;
+        template for (constexpr auto member : job::core::reflectedDataMembersV<ObjectType>) {
+            using MemberType = typename[:std::meta::type_of(member):];
 
-            static_assert(isSupportedValue<MemberType>(),
-                          "YamlEmitter encountered unsupported member type");
+            if constexpr (job::core::SignalType<MemberType> || job::core::hasNoSerializeAnnotation(member))
+                continue;
+
+            static_assert(isSupportedValue<MemberType>(), "YamlEmitter encountered unsupported member type");
 
             if (!success)
                 continue;
@@ -108,6 +114,13 @@ private:
             return isSupportedValue<typename ValueType::value_type>();
         } else if constexpr (YamlPointer<ValueType>) {
             return isSupportedValue<typename ValueType::element_type>();
+        } else if constexpr (YamlMap<ValueType>) {
+            return isSupportedValue<typename ValueType::key_type>() &&
+                   isSupportedValue<typename ValueType::mapped_type>();
+        } else if constexpr (YamlSequence<ValueType>) {
+            return isSupportedValue<typename ValueType::value_type>();
+        } else if constexpr (job::core::BaseObjectType<ValueType>) {
+            return true;
         } else {
             return YamlScalar<ValueType>;
         }
@@ -140,6 +153,7 @@ private:
         return false;
     }
 
+
     template <YamlOutputSink Sink>
     static constexpr bool emitMapping(const YamlNode::Mapping &mapping, Sink &sink, std::size_t indent)
     {
@@ -151,12 +165,24 @@ private:
         for (const auto &entry : mapping) {
             appendIndent(sink, indent);
 
-            if (!emitString(entry.key, sink))
+            if (isPlainMappingKey(entry.key)) {
+                sink.append(entry.key);
+            } else if (!emitString(entry.key, sink)) {
                 return false;
+            }
 
             sink.push_back(':');
 
-            if (entry.value.isScalar() || entry.value.isNull()) {
+            const bool emptyMapping =
+                entry.value.isMapping() && entry.value.mapping().empty();
+
+            const bool emptySequence =
+                entry.value.isSequence() && entry.value.sequence().empty();
+
+            if (entry.value.isScalar() ||
+                entry.value.isNull() ||
+                emptyMapping ||
+                emptySequence) {
                 sink.push_back(' ');
 
                 if (!emitNode(entry.value, sink, indent + 2))
@@ -174,6 +200,49 @@ private:
 
         return true;
     }
+    /*
+    template <YamlOutputSink Sink>
+    static constexpr bool emitMapping(const YamlNode::Mapping &mapping, Sink &sink, std::size_t indent)
+    {
+        if (mapping.empty()) {
+            sink.append("{}");
+            return true;
+        }
+
+        for (const auto &entry : mapping) {
+            appendIndent(sink, indent);
+
+            sink.append(entry.key);
+            sink.push_back(':');
+
+            const bool emptyMapping =
+                entry.value.isMapping() && entry.value.mapping().empty();
+
+            const bool emptySequence =
+                entry.value.isSequence() && entry.value.sequence().empty();
+
+            if (entry.value.isScalar() ||
+                entry.value.isNull() ||
+                emptyMapping ||
+                emptySequence) {
+                sink.push_back(' ');
+
+                if (!emitNode(entry.value, sink, indent + 2))
+                    return false;
+
+                sink.push_back('\n');
+                continue;
+            }
+
+            sink.push_back('\n');
+
+            if (!emitNode(entry.value, sink, indent + 2))
+                return false;
+        }
+
+        return true;
+    }
+    */
 
     template <YamlOutputSink Sink>
     static constexpr bool emitSequence(const YamlNode::Sequence &sequence, Sink &sink, std::size_t indent)
@@ -345,6 +414,31 @@ private:
         }
 
         sink.push_back('"');
+
+        return true;
+    }
+
+    [[nodiscard]] static constexpr bool isPlainMappingKey(std::string_view key)
+    {
+        if (key.empty())
+            return false;
+
+        const auto isAlpha = [](char ch) {
+            return (ch >= 'a' && ch <= 'z') ||
+                   (ch >= 'A' && ch <= 'Z');
+        };
+
+        const auto isDigit = [](char ch) {
+            return ch >= '0' && ch <= '9';
+        };
+
+        if (!isAlpha(key.front()) && key.front() != '_')
+            return false;
+
+        for (const char ch : key) {
+            if (!isAlpha(ch) && !isDigit(ch) && ch != '_')
+                return false;
+        }
 
         return true;
     }

@@ -13,93 +13,93 @@
 #include "test_nlohmann_fixtures.h"
 
 
-    namespace job::json::tests {
+namespace job::json::tests {
 
-    struct AllocationStats
-    {
-        std::size_t allocations{};
-        std::size_t deallocations{};
-        std::size_t bytes{};
-    };
+struct AllocationStats
+{
+    std::size_t allocations{};
+    std::size_t deallocations{};
+    std::size_t bytes{};
+};
 
-    inline thread_local bool allocationTrackingEnabled = false;
-    inline thread_local AllocationStats allocationStats{};
+inline thread_local bool allocationTrackingEnabled = false;
+inline thread_local AllocationStats allocationStats{};
 
-    inline void recordAllocation(std::size_t size) noexcept
-    {
-        if (!allocationTrackingEnabled)
-            return;
+inline void recordAllocation(std::size_t size) noexcept
+{
+    if (!allocationTrackingEnabled)
+        return;
 
-        ++allocationStats.allocations;
-        allocationStats.bytes += size;
-    }
+    ++allocationStats.allocations;
+    allocationStats.bytes += size;
+}
 
-    inline void recordDeallocation() noexcept
-    {
-        if (allocationTrackingEnabled)
-            ++allocationStats.deallocations;
-    }
+inline void recordDeallocation() noexcept
+{
+    if (allocationTrackingEnabled)
+        ++allocationStats.deallocations;
+}
 
-    inline void beginAllocationTracking() noexcept
-    {
-        allocationStats = {};
-        allocationTrackingEnabled = true;
-    }
+inline void beginAllocationTracking() noexcept
+{
+    allocationStats = {};
+    allocationTrackingEnabled = true;
+}
 
-    [[nodiscard]] inline AllocationStats endAllocationTracking() noexcept
-    {
-        allocationTrackingEnabled = false;
-        return allocationStats;
-    }
+[[nodiscard]] inline AllocationStats endAllocationTracking() noexcept
+{
+    allocationTrackingEnabled = false;
+    return allocationStats;
+}
 
-    [[nodiscard]] inline void *allocateTracked(std::size_t size)
-    {
-        if (size == 0)
-            size = 1;
+[[nodiscard]] inline void *allocateTracked(std::size_t size)
+{
+    if (size == 0)
+        size = 1;
 
-        void *memory = std::malloc(size);
+    void *memory = std::malloc(size);
 
-        if (!memory)
-            throw std::bad_alloc{};
+    if (!memory)
+        throw std::bad_alloc{};
 
-        recordAllocation(size);
-        return memory;
-    }
+    recordAllocation(size);
+    return memory;
+}
 
-    [[nodiscard]] inline void *allocateTrackedAligned(std::size_t size, std::size_t alignment)
-    {
-        if (size == 0)
-            size = 1;
+[[nodiscard]] inline void *allocateTrackedAligned(std::size_t size, std::size_t alignment)
+{
+    if (size == 0)
+        size = 1;
 
-        void *memory = nullptr;
+    void *memory = nullptr;
 
-        if (::posix_memalign(&memory, alignment, size) != 0)
-            throw std::bad_alloc{};
+    if (::posix_memalign(&memory, alignment, size) != 0)
+        throw std::bad_alloc{};
 
-        recordAllocation(size);
-        return memory;
-    }
+    recordAllocation(size);
+    return memory;
+}
 
-    inline void deallocateTracked(void *memory) noexcept
-    {
-        if (!memory)
-            return;
+inline void deallocateTracked(void *memory) noexcept
+{
+    if (!memory)
+        return;
 
-        recordDeallocation();
-        std::free(memory);
-    }
+    recordDeallocation();
+    std::free(memory);
+}
 
-    inline void printAllocationResult(
-        std::string_view name,
-        const AllocationStats &stats,
-        std::size_t iterations)
-    {
-        std::cout << "  " << name << ":\n"
-                  << "    allocations:    " << stats.allocations << '\n'
-                  << "    allocations/op: " << static_cast<double>(stats.allocations) / static_cast<double>(iterations) << '\n'
-                  << "    bytes:          " << stats.bytes << '\n'
-                  << "    bytes/op:       " << static_cast<double>(stats.bytes) / static_cast<double>(iterations) << '\n';
-    }
+inline void printAllocationResult(
+    std::string_view name,
+    const AllocationStats &stats,
+    std::size_t iterations)
+{
+    std::cout << "  " << name << ":\n"
+              << "    allocations:    " << stats.allocations << '\n'
+              << "    allocations/op: " << static_cast<double>(stats.allocations) / static_cast<double>(iterations) << '\n'
+              << "    bytes:          " << stats.bytes << '\n'
+              << "    bytes/op:       " << static_cast<double>(stats.bytes) / static_cast<double>(iterations) << '\n';
+}
 
 } // namespace job::json::tests
 

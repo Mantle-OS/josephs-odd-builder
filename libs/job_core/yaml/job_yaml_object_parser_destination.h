@@ -10,6 +10,7 @@
 #include <string_view>
 #include <type_traits>
 #include <utility>
+#include <meta>
 
 #include "job_yaml_concepts.h"
 #include "job_yaml_indent_stack.h"
@@ -308,20 +309,20 @@ private:
         using ObjectType = YamlType<Object>;
 
         return Frame{
-            .context = Context::Object,
-            .destination = &object,
-            .nullReader = &readNull<ObjectType>,
-            .scalarReader = &readScalar<ObjectType>,
-            .mappingReader = &readMapping<ObjectType>,
-            .sequenceReader = &readSequence<ObjectType>,
-            .sequenceNullReader = nullptr,
-            .sequenceScalarReader = nullptr,
-            .sequenceMappingReader = nullptr,
-            .sequenceSequenceReader = nullptr,
-            .keyView = {},
-            .keyStorage = {},
-            .keyOwned = false,
-            .hasKey = false
+            .context                    = Context::Object,
+            .destination                = &object,
+            .nullReader                 = &readNull<ObjectType>,
+            .scalarReader               = &readScalar<ObjectType>,
+            .mappingReader              = &readMapping<ObjectType>,
+            .sequenceReader             = &readSequence<ObjectType>,
+            .sequenceNullReader         = nullptr,
+            .sequenceScalarReader       = nullptr,
+            .sequenceMappingReader      = nullptr,
+            .sequenceSequenceReader     = nullptr,
+            .keyView                    = {},
+            .keyStorage                 = {},
+            .keyOwned                   = false,
+            .hasKey                     = false
         };
     }
 
@@ -382,19 +383,19 @@ private:
 
         return Frame{
             .context = Context::Sequence,
-            .destination = &sequence,
-            .nullReader = nullptr,
-            .scalarReader = nullptr,
-            .mappingReader = nullptr,
-            .sequenceReader = nullptr,
-            .sequenceNullReader = sequenceNullReader<SequenceType>(),
-            .sequenceScalarReader = sequenceScalarReader<SequenceType>(),
-            .sequenceMappingReader = sequenceMappingReader<SequenceType>(),
-            .sequenceSequenceReader = sequenceSequenceReader<SequenceType>(),
-            .keyView = {},
-            .keyStorage = {},
-            .keyOwned = false,
-            .hasKey = false
+            .destination                = &sequence,
+            .nullReader                 = nullptr,
+            .scalarReader               = nullptr,
+            .mappingReader              = nullptr,
+            .sequenceReader             = nullptr,
+            .sequenceNullReader         = sequenceNullReader<SequenceType>(),
+            .sequenceScalarReader       = sequenceScalarReader<SequenceType>(),
+            .sequenceMappingReader      = sequenceMappingReader<SequenceType>(),
+            .sequenceSequenceReader     = sequenceSequenceReader<SequenceType>(),
+            .keyView                    = {},
+            .keyStorage                 = {},
+            .keyOwned                   = false,
+            .hasKey                     = false
         };
     }
 
@@ -404,8 +405,9 @@ private:
         bool resolved = false;
 
         const bool matched = YamlKeyDispatch::dispatch<Object>(key, [&]<auto member> {
+            using MemberType = YamlType<typename[:std::meta::type_of(member):]>;
+
             auto &destination = static_cast<Object *>(object)->[:member:];
-            using MemberType = YamlType<decltype(destination)>;
 
             if constexpr (YamlOptional<MemberType> || YamlPointer<MemberType>) {
                 destination.reset();
@@ -428,8 +430,9 @@ private:
         bool resolved = false;
 
         const bool matched = YamlKeyDispatch::dispatch<Object>(key, [&]<auto member> {
+            using MemberType = YamlType<typename[:std::meta::type_of(member):]>;
+
             auto &destination = static_cast<Object *>(object)->[:member:];
-            using MemberType = YamlType<decltype(destination)>;
 
             if constexpr (nestedObject<MemberType>()) {
                 frame = makeObjectFrame(destination);
@@ -446,8 +449,9 @@ private:
         bool resolved = false;
 
         const bool matched = YamlKeyDispatch::dispatch<Object>(key, [&]<auto member> {
+            using MemberType = YamlType<typename[:std::meta::type_of(member):]>;
+
             auto &destination = static_cast<Object *>(object)->[:member:];
-            using MemberType = YamlType<decltype(destination)>;
 
             if constexpr (YamlSequence<MemberType>) {
                 frame = makeSequenceFrame(destination);
