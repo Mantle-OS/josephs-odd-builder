@@ -46,9 +46,6 @@ set(JOB_JSON_TEST_FILES
     test_job_json_emitter_map.cpp
     test_job_json_emitter_wrapper.cpp
     test_job_json_roundtrip.cpp
-
-
-
 )
 
 if(JOB_TEST_NLOHMANN_BENCH AND NOT JOB_CI_BUILD)

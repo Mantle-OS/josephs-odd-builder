@@ -111,7 +111,7 @@ TEST_CASE("JobMmap writes through its JobFile backing", "[job_io][mmap][usage][w
     const auto path = job::io::test::mmapTestPath("write");
     job::io::JobTmpFile tmp(path, 8, '0');
 
-    job::io::JobMmap mmap(path);
+    job::io::JobMmap mmap(path, job::io::JobFile::Access::ReadWrite);
 
     REQUIRE(mmap.isValid());
 
@@ -135,7 +135,7 @@ TEST_CASE("JobMmap exposes mapped memory directly", "[job_io][mmap][usage][direc
     job::io::JobTmpFile tmp(path, pageSize, std::byte{0x00});
 
     {
-        job::io::JobMmap mmap(path);
+        job::io::JobMmap mmap(path, job::io::JobFile::Access::ReadWrite);
 
         REQUIRE(mmap.isValid());
 
@@ -162,6 +162,31 @@ TEST_CASE("JobMmap exposes mapped memory directly", "[job_io][mmap][usage][direc
     REQUIRE(bytes[2] == 0x56);
     REQUIRE(bytes[3] == 0x78);
 }
+
+TEST_CASE("JobMmap path mappings default to read only", "[job_io][mmap][usage][access]")
+{
+    const auto path = job::io::test::mmapTestPath("read_only_default");
+    job::io::JobTmpFile tmp(path, std::string_view("read only"));
+
+    job::io::JobMmap mmap(path);
+
+    REQUIRE(mmap.isValid());
+    REQUIRE(mmap.file().access() == job::io::JobFile::Access::ReadOnly);
+}
+
+TEST_CASE("JobMmap path mappings can explicitly request read write access", "[job_io][mmap][usage][access]")
+{
+    const auto path = job::io::test::mmapTestPath("read_write_explicit");
+    job::io::JobTmpFile tmp(path, std::string_view("read write"));
+
+    job::io::JobMmap mmap(path, job::io::JobFile::Access::ReadWrite);
+
+    REQUIRE(mmap.isValid());
+    REQUIRE(mmap.file().access() == job::io::JobFile::Access::ReadWrite);
+}
+
+
+
 
 TEST_CASE("JobMmap maps anonymous memory", "[job_io][mmap][usage][anonymous]")
 {
@@ -329,7 +354,6 @@ TEST_CASE("JobMmap cannot map an empty file", "[job_io][mmap][edge][empty]")
 {
     const auto path = job::io::test::mmapTestPath("empty");
     job::io::JobTmpFile tmp(path);
-
     job::io::JobMmap mmap(path);
 
     // The backing JobFile can be open while there is no valid mmap.
@@ -351,7 +375,7 @@ TEST_CASE("JobMmap zero length file IO is harmless", "[job_io][mmap][edge][zero]
     const auto path = job::io::test::mmapTestPath("zero_io");
     job::io::JobTmpFile tmp(path, 4096, std::byte{0x00});
 
-    job::io::JobMmap mmap(path);
+    job::io::JobMmap mmap(path, job::io::JobFile::Access::ReadWrite);
 
     REQUIRE(mmap.isValid());
 
@@ -368,7 +392,6 @@ TEST_CASE("JobMmap closeDevice releases mapping and file resources", "[job_io][m
     const auto path = job::io::test::mmapTestPath("close");
 
     job::io::JobTmpFile tmp(path, pageSize, std::byte{0x00});
-
     job::io::JobMmap mmap(path);
 
     REQUIRE(mmap.isValid());
@@ -546,7 +569,7 @@ TEST_CASE("JobMmap grows an unfragmented file mapping", "[job_io][mmap][edge][gr
     const auto path = job::io::test::mmapTestPath("grow");
     job::io::JobTmpFile tmp(path, pageSize, std::byte{0x00});
 
-    job::io::JobMmap mmap(path);
+    job::io::JobMmap mmap(path, job::io::JobFile::Access::ReadWrite);
 
     REQUIRE(mmap.isValid());
 
@@ -575,7 +598,7 @@ TEST_CASE("JobMmap grow with the current size is idempotent", "[job_io][mmap][ed
     const auto path = job::io::test::mmapTestPath("grow_same");
     job::io::JobTmpFile tmp(path, pageSize, std::byte{0x00});
 
-    job::io::JobMmap mmap(path);
+    job::io::JobMmap mmap(path, job::io::JobFile::Access::ReadWrite);
 
     REQUIRE(mmap.isValid());
 
@@ -595,7 +618,7 @@ TEST_CASE("JobMmap does not shrink through grow", "[job_io][mmap][edge][grow]")
     const auto path = job::io::test::mmapTestPath("grow_shrink");
     job::io::JobTmpFile tmp(path, pageSize * 2, std::byte{0x00});
 
-    job::io::JobMmap mmap(path);
+    job::io::JobMmap mmap(path, job::io::JobFile::Access::ReadWrite);
 
     REQUIRE(mmap.isValid());
 
@@ -613,7 +636,7 @@ TEST_CASE("JobMmap refuses to grow a fragmented mapping", "[job_io][mmap][edge][
     const auto path = job::io::test::mmapTestPath("grow_fragmented");
     job::io::JobTmpFile tmp(path, pageSize * 3, std::byte{0x00});
 
-    job::io::JobMmap mmap(path);
+    job::io::JobMmap mmap(path, job::io::JobFile::Access::ReadWrite);
 
     REQUIRE(mmap.isValid());
 

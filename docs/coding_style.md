@@ -429,6 +429,12 @@ Newish (needs speeling and cleanup)
   * Utils methods stay in a function file this makes it so when the test harnes is done one can look for common traits that might make it back into the libraries api (heavey reusage), this also stops me or whomever from making anayomous functions that do the same thing
   * Fixture members. All fixture members should live in one file for the same reason as the util methods. This also keeps the tests clean of classes or whatever 
 
+
+
+Test files should use the library namespace with a nested tests namespace, e.g. namespace job::usb::tests, rather than using namespace ... at file scope.
+
+
+
 ---
 
 

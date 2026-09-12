@@ -30,6 +30,12 @@ if(JOB_BUILD_UART)
     add_subdirectory(job_uart)
 endif()
 
+
+if(JOB_BUILD_USB)
+    add_subdirectory(job_usb)
+endif()
+
+
 if(JOB_BUILD_NET)
     add_subdirectory(job_net)
 endif()

@@ -19,17 +19,15 @@ public:
         using ObjectType = std::remove_cvref_t<T>;
 
         template for (constexpr auto member : job::core::reflectedDataMembersV<ObjectType>) {
-            using MemberType = typename[:std::meta::type_of(member):];
-
-            if constexpr (job::core::SignalType<MemberType> ||
-                          job::core::hasNoSerializeAnnotation(member))
+            if constexpr (!job::core::isSerializableMember<member>()) {
                 continue;
+            } else {
+                constexpr std::string_view name = std::meta::identifier_of(member);
 
-            constexpr std::string_view name = std::meta::identifier_of(member);
-
-            if (key == name) {
-                std::forward<F>(function).template operator()<member>();
-                return true;
+                if (key == name) {
+                    std::forward<F>(function).template operator()<member>();
+                    return true;
+                }
             }
         }
 

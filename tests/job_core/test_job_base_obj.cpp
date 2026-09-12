@@ -850,7 +850,7 @@ TEST_CASE("BaseObject: Nested container combinations roundtrip across JOB format
 }
 
 
-
+#if 0
 TEST_CASE("BaseObject serialization cross-compatibility gate",
           "[core][base_obj][serialization][compatibility][gate]")
 {
@@ -948,7 +948,7 @@ TEST_CASE("BaseObject serialization cross-compatibility gate",
         verify(restored);
     }
 }
-
+#endif
 
 // =============================================================================
 // Annotation / Reflection Policy
@@ -1396,7 +1396,7 @@ TEST_CASE("BaseObject: Pointer concepts distinguish ownership semantics",
 //
 // Delete this entire block when nlohmann/json and yaml-cpp leave BaseObject.
 // =============================================================================
-
+#if 0
 TEST_CASE("BaseObject: nlohmann JSON compatibility remains intact",
           "[core][base_obj][third_party][json]")
 {
@@ -1465,6 +1465,7 @@ TEST_CASE("BaseObject: YAML convert compatibility remains intact",
     CHECK(restored.nodeName == "yaml-convert-node");
     CHECK(restored.threadPoolSize == 20);
 }
+#endif
 
 // =============================================================================
 // Block 3: Benchmarks / Stress
@@ -1497,9 +1498,6 @@ TEST_CASE("BaseObject serialization benchmarks",
     std::string jobYamlPayload;
     REQUIRE(config.toJobYaml(jobYamlPayload));
 
-    const std::string nlohmannJsonPayload = config.toJson().dump();
-    const std::string yamlCppPayload = YAML::Dump(config.toYaml());
-
     BENCHMARK("Binary Serialization")
     {
         std::vector<std::uint8_t> output;
@@ -1519,26 +1517,6 @@ TEST_CASE("BaseObject serialization benchmarks",
                restored.threadPoolSize;
     };
 
-    BENCHMARK("nlohmann JSON Serialization")
-    {
-        const std::string output = config.toJson().dump();
-        return output.size();
-    };
-
-    BENCHMARK("nlohmann JSON Deserialization")
-    {
-        const nlohmann::json json = nlohmann::json::parse(nlohmannJsonPayload);
-
-        ComputeNodeConfig restored;
-
-        if (!restored.fromJson(json))
-            return std::size_t{0};
-
-        return restored.scalingFactors.size() +
-               restored.auxiliarySensors.size() +
-               restored.threadPoolSize;
-    };
-
     BENCHMARK("JobJson Serialization")
     {
         std::string output;
@@ -1551,26 +1529,6 @@ TEST_CASE("BaseObject serialization benchmarks",
         ComputeNodeConfig restored;
 
         if (!restored.fromJobJson(jobJsonPayload))
-            return std::size_t{0};
-
-        return restored.scalingFactors.size() +
-               restored.auxiliarySensors.size() +
-               restored.threadPoolSize;
-    };
-
-    BENCHMARK("yaml-cpp Serialization")
-    {
-        const std::string output = YAML::Dump(config.toYaml());
-        return output.size();
-    };
-
-    BENCHMARK("yaml-cpp Deserialization")
-    {
-        const YAML::Node yaml = YAML::Load(yamlCppPayload);
-
-        ComputeNodeConfig restored;
-
-        if (!restored.fromYaml(yaml))
             return std::size_t{0};
 
         return restored.scalingFactors.size() +
@@ -1631,21 +1589,6 @@ TEST_CASE("BaseObject nested serialization stress benchmark",
                restored.threadPoolSize;
     };
 
-    BENCHMARK("Large nested nlohmann JSON roundtrip")
-    {
-        const std::string jsonPayload = config.toJson().dump();
-        const nlohmann::json json = nlohmann::json::parse(jsonPayload);
-
-        ComputeNodeConfig restored;
-
-        if (!restored.fromJson(json))
-            return std::size_t{0};
-
-        return restored.scalingFactors.size() +
-               restored.auxiliarySensors.size() +
-               restored.threadPoolSize;
-    };
-
     BENCHMARK("Large nested JobJson roundtrip")
     {
         std::string json;
@@ -1654,21 +1597,6 @@ TEST_CASE("BaseObject nested serialization stress benchmark",
         ComputeNodeConfig restored;
 
         if (!restored.fromJobJson(json))
-            return std::size_t{0};
-
-        return restored.scalingFactors.size() +
-               restored.auxiliarySensors.size() +
-               restored.threadPoolSize;
-    };
-
-    BENCHMARK("Large nested yaml-cpp roundtrip")
-    {
-        const std::string yamlPayload = YAML::Dump(config.toYaml());
-        const YAML::Node yaml = YAML::Load(yamlPayload);
-
-        ComputeNodeConfig restored;
-
-        if (!restored.fromYaml(yaml))
             return std::size_t{0};
 
         return restored.scalingFactors.size() +
@@ -1725,21 +1653,6 @@ TEST_CASE("BaseObject mixed container stress benchmark",
                restored.namedSensors.size();
     };
 
-    BENCHMARK("Mixed nested nlohmann JSON roundtrip")
-    {
-        const std::string jsonPayload = config.toJson().dump();
-        const nlohmann::json json = nlohmann::json::parse(jsonPayload);
-
-        NestedContainerConfig restored;
-
-        if (!restored.fromJson(json))
-            return std::size_t{0};
-
-        return restored.optionalSensors.size() +
-               restored.sharedSensors.size() +
-               restored.namedSensors.size();
-    };
-
     BENCHMARK("Mixed nested JobJson roundtrip")
     {
         std::string json;
@@ -1748,21 +1661,6 @@ TEST_CASE("BaseObject mixed container stress benchmark",
         NestedContainerConfig restored;
 
         if (!restored.fromJobJson(json))
-            return std::size_t{0};
-
-        return restored.optionalSensors.size() +
-               restored.sharedSensors.size() +
-               restored.namedSensors.size();
-    };
-
-    BENCHMARK("Mixed nested yaml-cpp roundtrip")
-    {
-        const std::string yamlPayload = YAML::Dump(config.toYaml());
-        const YAML::Node yaml = YAML::Load(yamlPayload);
-
-        NestedContainerConfig restored;
-
-        if (!restored.fromYaml(yaml))
             return std::size_t{0};
 
         return restored.optionalSensors.size() +

@@ -26,8 +26,7 @@ struct LayerGene {
     std::uint32_t           auxiliaryData{0};                                  // e.g., number of experts or FMM order p
 };
 
-static_assert(sizeof(LayerGene) == 32,
-              "LayerGene must be 32 bytes for cache alignment");
+static_assert(sizeof(LayerGene) == 32, "LayerGene must be 32 bytes for cache alignment");
 
 using LayerGenes = std::vector<LayerGene>;
 

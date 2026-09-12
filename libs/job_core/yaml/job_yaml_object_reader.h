@@ -46,28 +46,6 @@ public:
         return matched && converted;
     }
 
-    // template <typename T>
-    // [[nodiscard]] static constexpr bool readScalar(T &object, std::string_view key, std::string_view value) noexcept
-    // {
-    //     bool converted = false;
-
-    //     const bool matched = YamlKeyDispatch::dispatch<T>(key, [&]<auto member> {
-    //         auto &destination = object.[:member:];
-    //         using MemberType = std::remove_cvref_t<decltype(destination)>;
-
-    //         if constexpr (std::same_as<MemberType, std::string>) {
-    //             destination.assign(value);
-    //             converted = true;
-    //         } else if constexpr (std::same_as<MemberType, std::string_view>) {
-    //             destination = value;
-    //             converted = true;
-    //         } else {
-    //             converted = YamlScalarKernel::parse(value, destination);
-    //         }
-    //     });
-
-    //     return matched && converted;
-    // }
 };
 
 } // namespace job::yaml

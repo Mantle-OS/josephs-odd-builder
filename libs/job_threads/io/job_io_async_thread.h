@@ -1,11 +1,13 @@
 #pragma once
 
 #include <functional>
-#include <map>
+#include <unordered_map>
 #include <memory>
 #include <mutex>
 #include <utility>
 #include <vector>
+
+#include <sys/epoll.h>
 
 #include "job_async_event_loop.h"
 #include "job_io_event.h"
@@ -18,10 +20,15 @@ using IOEventCallback = std::function<void(IOEvent events)>;
 class JOBTHREADS_EXPORT JobIoAsyncThread : public AsyncEventLoop {
 public:
     using Ptr = std::shared_ptr<JobIoAsyncThread>;
-    using Event_Callback = std::vector<std::pair<IOEventCallback, IOEvent>>;
+    using UPtr = std::unique_ptr<JobIoAsyncThread>;
+    using WPtr = std::weak_ptr<JobIoAsyncThread>;
+    using EventCallback = std::vector<std::pair<IOEventCallback, IOEvent>>;
 
     JobIoAsyncThread();
     ~JobIoAsyncThread() noexcept override;
+
+    [[nodiscard]] static Ptr createShared();
+    [[nodiscard]] static UPtr createUniq();
 
     JobIoAsyncThread(const JobIoAsyncThread &) = delete;
     JobIoAsyncThread &operator=(const JobIoAsyncThread &) = delete;
@@ -40,13 +47,14 @@ private:
     void loop(std::stop_token token, std::chrono::milliseconds idleHeartbeat) override;
     void processIOEvents(int eventCount);
 
-    // Linux: epoll fd + eventfd + growable event buffer.
-    // Windows: WSAPoll fd set + loopback wake-socket pair.
-    struct Backend;
-
+    struct Backend {
+        int epollFd{-1};
+        int eventFd{-1};
+        std::vector<epoll_event> epollEvents;
+    };
     std::unique_ptr<Backend> m_backend;
 
-    std::map<int, IOEventCallback> m_fdCallbacks;
+    std::unordered_map<int, IOEventCallback> m_fdCallbacks;
     mutable std::mutex m_ioMutex;
 };
 

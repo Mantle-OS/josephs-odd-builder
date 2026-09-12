@@ -16,5 +16,3 @@ bool spin_until(Pred &&pred, const std::chrono::duration<Rep,Period> &timeout)
     }
     return pred();
 }
-
-//VERSION v1.0

@@ -39,29 +39,28 @@ public:
         JsonKeyDispatchResult result = JsonKeyDispatchResult::NotFound;
 
         template for (constexpr auto member : job::core::reflectedDataMembersV<ObjectType>) {
-            using MemberType = typename[:std::meta::type_of(member):];
-
-            if constexpr (job::core::SignalType<MemberType> || job::core::hasNoSerializeAnnotation(member))
+            if constexpr (!job::core::isSerializableMember<member>()) {
                 continue;
-
-            if (result != JsonKeyDispatchResult::NotFound)
-                continue;
-
-            constexpr std::string_view name = std::meta::identifier_of(member);
-
-            if (key != name)
-                continue;
-
-            using MemberReference = decltype((object.[:member:]));
-            using ResultType = std::invoke_result_t<Function &, MemberReference>;
-
-            if constexpr (std::convertible_to<ResultType, bool>) {
-                result = std::invoke(function, object.[:member:]) ?
-                             JsonKeyDispatchResult::Accepted :
-                             JsonKeyDispatchResult::Rejected;
             } else {
-                std::invoke(function, object.[:member:]);
-                result = JsonKeyDispatchResult::Accepted;
+                if (result != JsonKeyDispatchResult::NotFound)
+                    continue;
+
+                constexpr std::string_view name = std::meta::identifier_of(member);
+
+                if (key != name)
+                    continue;
+
+                using MemberReference = decltype((object.[:member:]));
+                using ResultType = std::invoke_result_t<Function &, MemberReference>;
+
+                if constexpr (std::convertible_to<ResultType, bool>) {
+                    result = std::invoke(function, object.[:member:]) ?
+                                 JsonKeyDispatchResult::Accepted :
+                                 JsonKeyDispatchResult::Rejected;
+                } else {
+                    std::invoke(function, object.[:member:]);
+                    result = JsonKeyDispatchResult::Accepted;
+                }
             }
         }
 

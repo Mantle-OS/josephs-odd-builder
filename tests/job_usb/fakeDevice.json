@@ -1,0 +1,27 @@
+{
+  "m_descriptor": {
+    "m_vendorId": 2389,
+    "m_productId": 29473,
+    "m_usbSpecVersion": 768,
+    "m_deviceVersion": 258,
+    "m_deviceClass": 239,
+    "m_subClass": 2,
+    "m_protocol": 1
+  },
+  "m_location": {
+    "m_portPath": [
+      2,
+      4,
+      1
+    ],
+    "m_path": "/sys/bus/usb/devices/3-2.4.1",
+    "m_busNumber": 3,
+    "m_deviceAddress": 17
+  },
+  "m_strings": {
+    "m_manufacturer": "EMAC Inc.",
+    "m_product": "SOM-215GS",
+    "m_serialNumber": "ABC123456"
+  },
+  "m_state": {}
+}

@@ -25,11 +25,8 @@ RUN apt-get update && \
         pkgconf libpkgconf-dev \
         zlib1g-dev \
         libsodium-dev \
-        libflatbuffers-dev \
-        libmsgpack-cxx-dev \
+        libflatbuffers-dev libmsgpack-cxx-dev nlohmann-json3-dev libyaml-cpp-dev \
         libcatch2-dev \
-        nlohmann-json3-dev \
-        libyaml-cpp-dev \
         qt6-base-dev \
         libqt6gui6 qt6-declarative-dev qt6-3d-dev qt6-quick3d-dev qt6-graphs-dev \
         qml6-module-qtquick3d qml6-module-qtquick-layouts qml6-module-qtquick-controls \
@@ -38,7 +35,7 @@ RUN apt-get update && \
         libspa-0.2-jack libspa-0.2-bluetooth libspa-0.2-modules libasound2-dev \
         libopus-dev libflac-dev libogg-dev libvorbis-dev  libwavpack-dev \
         libgl1 libglib2.0-0 \
-        libudev-dev \
+        libudev-dev libusb-1.0-0-dev \
         libopenblas-dev libblas3 && \
     rm -rf /var/lib/apt/lists/*
 

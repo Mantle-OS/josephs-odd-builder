@@ -16,9 +16,9 @@ namespace job::io {
 // Construction
 //////////////////////////////////////////////////////////
 
-JobMmap::JobMmap(std::filesystem::path filePath, std::size_t prefetch, bool numa) :
+JobMmap::JobMmap(std::filesystem::path filePath, JobFile::Access access, std::size_t prefetch, bool numa) :
     m_backing(Backing::File),
-    m_file(std::move(filePath), JobFile::Access::ReadWrite, JobFile::OpenMode::OpenExisting),
+    m_file(std::move(filePath), access, JobFile::OpenMode::OpenExisting),
     m_prefetch(prefetch),
     m_numa(numa)
 {

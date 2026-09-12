@@ -136,8 +136,6 @@ set(JOB_CORE_SOURCES
     job_timer.cpp
     job_siphash.cpp
 
-
-    #  new
     job_base_obj.cpp
     job_connection.cpp
     job_light_object.cpp
@@ -173,6 +171,14 @@ set(JOB_CORE_HEADERS
     job_light_object.h
     job_object.h
 )
+
+
+
+set(JOB_LATTICE_SOURCES)
+set(JOB_LATTICE_HEADERS)
+
+set(JOB_TEXT_SOURCES)
+set(JOB_TEXT_HEADERS)
 
 
 set(JOBCORE_COMPILE_THIS

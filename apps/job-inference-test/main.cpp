@@ -69,8 +69,7 @@ int main(int argc, char *argv[])
     }
 
     //  lets test it now.
-    const auto json = presetConfig.toJson();
-    presetConfig.debugJson();
+    presetConfig.debugJobJson();
 
 
     job::model::SamplerConfig samplerConfig = presetConfig.samplerConfig();

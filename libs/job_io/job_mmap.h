@@ -35,7 +35,9 @@ public:
     // Construction
     //////////////////////////////////////////////////////////
 
-    explicit JobMmap(std::filesystem::path filePath, std::size_t prefetch = 0, bool numa = false);
+    explicit JobMmap(std::filesystem::path filePath,
+                     JobFile::Access access = JobFile::Access::ReadOnly,
+                     std::size_t prefetch = 0, bool numa = false);
 
     JobMmap(int fd, std::size_t prefetch = 0, bool numa = false, bool fdOwned = false)
         pre(fd >= 0);
@@ -57,9 +59,12 @@ public:
     // Factories
     //////////////////////////////////////////////////////////
 
-    [[nodiscard]] static Ptr createShared(std::filesystem::path filePath, std::size_t prefetch = 0, bool numa = false)
+    [[nodiscard]] static Ptr createShared(std::filesystem::path filePath,
+                                          JobFile::Access access = JobFile::Access::ReadOnly,
+                                          std::size_t prefetch = 0,
+                                          bool numa = false)
     {
-        return std::make_shared<JobMmap>(std::move(filePath), prefetch, numa);
+        return std::make_shared<JobMmap>(std::move(filePath), access, prefetch, numa);
     }
 
     [[nodiscard]] static Ptr createShared(int fd, std::size_t prefetch = 0, bool numa = false, bool fdOwned = false)
@@ -80,9 +85,11 @@ public:
         return std::make_shared<JobMmap>(size, prefetch, numa);
     }
 
-    [[nodiscard]] static UPtr createUniq(std::filesystem::path filePath, std::size_t prefetch = 0, bool numa = false)
+    [[nodiscard]] static UPtr createUniq(std::filesystem::path filePath,
+                                         JobFile::Access access = JobFile::Access::ReadOnly,
+                                         std::size_t prefetch = 0, bool numa = false)
     {
-        return std::make_unique<JobMmap>(std::move(filePath), prefetch, numa);
+        return std::make_unique<JobMmap>(std::move(filePath), access, prefetch, numa);
     }
 
     [[nodiscard]] static UPtr createUniq(int fd, std::size_t prefetch = 0, bool numa = false, bool fdOwned = false)

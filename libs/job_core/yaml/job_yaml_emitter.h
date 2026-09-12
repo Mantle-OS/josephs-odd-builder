@@ -27,25 +27,26 @@ public:
         bool success = true;
 
         template for (constexpr auto member : job::core::reflectedDataMembersV<ObjectType>) {
-            using MemberType = typename[:std::meta::type_of(member):];
-
-            if constexpr (job::core::SignalType<MemberType> || job::core::hasNoSerializeAnnotation(member))
+            if constexpr (!job::core::isSerializableMember<member>()) {
                 continue;
+            } else {
+                using MemberType = typename[:std::meta::type_of(member):];
 
-            static_assert(isSupportedValue<MemberType>(), "YamlEmitter encountered unsupported member type");
+                static_assert(isSupportedValue<MemberType>(), "YamlEmitter encountered unsupported member type");
 
-            if (!success)
-                continue;
+                if (!success)
+                    continue;
 
-            constexpr std::string_view name = std::meta::identifier_of(member);
+                constexpr std::string_view name = std::meta::identifier_of(member);
 
-            sink.append(name);
-            sink.append(": ");
+                sink.append(name);
+                sink.append(": ");
 
-            success = emitValue(object.[:member:], sink);
+                success = emitValue(object.[:member:], sink);
 
-            if (success)
-                sink.push_back('\n');
+                if (success)
+                    sink.push_back('\n');
+            }
         }
 
         return success;
@@ -200,49 +201,6 @@ private:
 
         return true;
     }
-    /*
-    template <YamlOutputSink Sink>
-    static constexpr bool emitMapping(const YamlNode::Mapping &mapping, Sink &sink, std::size_t indent)
-    {
-        if (mapping.empty()) {
-            sink.append("{}");
-            return true;
-        }
-
-        for (const auto &entry : mapping) {
-            appendIndent(sink, indent);
-
-            sink.append(entry.key);
-            sink.push_back(':');
-
-            const bool emptyMapping =
-                entry.value.isMapping() && entry.value.mapping().empty();
-
-            const bool emptySequence =
-                entry.value.isSequence() && entry.value.sequence().empty();
-
-            if (entry.value.isScalar() ||
-                entry.value.isNull() ||
-                emptyMapping ||
-                emptySequence) {
-                sink.push_back(' ');
-
-                if (!emitNode(entry.value, sink, indent + 2))
-                    return false;
-
-                sink.push_back('\n');
-                continue;
-            }
-
-            sink.push_back('\n');
-
-            if (!emitNode(entry.value, sink, indent + 2))
-                return false;
-        }
-
-        return true;
-    }
-    */
 
     template <YamlOutputSink Sink>
     static constexpr bool emitSequence(const YamlNode::Sequence &sequence, Sink &sink, std::size_t indent)

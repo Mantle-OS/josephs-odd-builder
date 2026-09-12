@@ -80,10 +80,8 @@ private:
         } else if constexpr (std::is_class_v<ValueType>) {
             return emitObject(value, sink);
         } else {
-            static_assert(
-                std::is_same_v<ValueType, void>,
-                "JsonEmitter encountered unsupported value type");
-
+            //  we need more information at compile time
+            static_assert(std::is_same_v<ValueType, void>, "JsonEmitter encountered unsupported value type");
             return false;
         }
     }
@@ -187,28 +185,27 @@ private:
         bool success = true;
 
         template for (constexpr auto member : job::core::reflectedDataMembersV<ObjectType>) {
-            using MemberType = typename[:std::meta::type_of(member):];
-
-            if constexpr (job::core::SignalType<MemberType> || job::core::hasNoSerializeAnnotation(member))
+            if constexpr (!job::core::isSerializableMember<member>()) {
                 continue;
+            } else {
+                if (!success)
+                    continue;
 
-            if (!success)
-                continue;
+                if (!first)
+                    append(sink, ",");
 
-            if (!first)
-                append(sink, ",");
+                constexpr std::string_view name = std::meta::identifier_of(member);
 
-            constexpr std::string_view name = std::meta::identifier_of(member);
+                success = emitString(name, sink);
 
-            success = emitString(name, sink);
+                if (!success)
+                    continue;
 
-            if (!success)
-                continue;
+                append(sink, ":");
 
-            append(sink, ":");
-
-            success = emitValue(object.[:member:], sink);
-            first = false;
+                success = emitValue(object.[:member:], sink);
+                first = false;
+            }
         }
 
         if (!success)

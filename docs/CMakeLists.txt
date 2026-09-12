@@ -15,6 +15,7 @@ add_custom_target(JOB_Documentation SOURCES
     job/threading_overview.md
     job/tui_overview.md
     job/uart_overview.md
+    job/usb_overview.md
     job/zstd_overview.md
     job/sound_overview.md
     job/job_token.md

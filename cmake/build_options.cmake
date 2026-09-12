@@ -70,6 +70,8 @@ endif()
 ##############################
 option(JOB_BUILD_CORE "Build the job_core library" ON)
 option(JOB_BUILD_THREADS "Build the job_threads library" ON)
+option(JOB_BUILD_USB "Build the job_usb library" ON)
+
 option(JOB_BUILD_CRYPTO "Build the job_crypto library" ON)
 option(JOB_BUILD_ZSTD "Build the job_zstd library" ON)
 
