@@ -3,7 +3,6 @@ add_custom_target(JOB_DOCUMENTATION SOURCES
     ../LICENSE.txt
     ../COMMERCIAL.txt
     coding_style.md
-    what_is_a_job.md
     job/job.md
     job/ansi_overview.md
     job/core_overview.md
