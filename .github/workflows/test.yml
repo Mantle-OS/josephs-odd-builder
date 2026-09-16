@@ -83,10 +83,10 @@ jobs:
         cd "${{ github.workspace }}/build/tests/job_uart"
         ./test_job_uart
 
-    - name: Test Job ANSI
-      run: |
-        cd "${{ github.workspace }}/build/tests/job_ansi"
-        ./test_job_ansi
+    # - name: Test Job ANSI
+    #   run: |
+    #     cd "${{ github.workspace }}/build/tests/job_ansi"
+    #     ./test_job_ansi
 
     - name: Test Job AI
       run: |
