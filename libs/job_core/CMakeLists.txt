@@ -4,7 +4,6 @@ project(JosephOddBuild_Core
     LANGUAGES CXX
 )
 
-
 set(JOB_BINARY_HEADERS
     binary/job_binary.h
 )
@@ -134,10 +133,7 @@ set(JOB_CORE_SOURCES
     job_logger.cpp
     job_timer.cpp
     job_siphash.cpp
-
 )
-
-
 
 set(JOB_OBJ_HEADERS
     obj/job_obj_concept.h
@@ -149,12 +145,11 @@ set(JOB_OBJ_HEADERS
     obj/job_light_object.h
     obj/job_object.h
 
-    ## Macros and "Helpers"
     obj/job_obj_grammar.h
     obj/job_obj_members.h
     obj/job_obj_ptr.h
     obj/job_obj_class.h
-    # Facade
+
     obj/job_obj.h
 )
 
@@ -353,8 +348,6 @@ configure_file(
 )
 
 install(FILES "${PKGCONFIG_FILE}" DESTINATION "${PKGCONFIG_INSTALL_DIR}")
-
-
 install(EXPORT JosephsOddBuilderCoreTargets
     FILE JosephsOddBuilderCoreTargets.cmake
     NAMESPACE JOB::
