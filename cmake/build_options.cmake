@@ -70,20 +70,25 @@ endif()
 ##############################
 option(JOB_BUILD_CORE "Build the job_core library" ON)
 option(JOB_BUILD_THREADS "Build the job_threads library" ON)
-option(JOB_BUILD_USB "Build the job_usb library" ON)
 
 option(JOB_BUILD_CRYPTO "Build the job_crypto library" ON)
-option(JOB_BUILD_ZSTD "Build the job_zstd library" ON)
-
 option(JOB_BUILD_IO "Build the job_io library" ON)
-option(JOB_BUILD_UART "Build the job_uart library" ON)
 option(JOB_BUILD_NET "Build the job_net library" ON)
-option(JOB_BUILD_SCIENCE "Build the job_science library" ON)
-option(JOB_BUILD_AI "Build the job_ai library" ON)
-option(JOB_BUILD_ANSI "Build the job_ansi library" ON)
-option(JOB_BUILD_TUI "Build the job_tui library" ON)
-option(JOB_BUILD_SOUND "Build the job_sound pipeline alsa stack library" ON)
 
+option(JOB_BUILD_SOUND "Build the job_sound library" ON)
+option(JOB_BUILD_UART "Build the job_uart library" ON)
+option(JOB_BUILD_USB "Build the job_usb library" ON)
+
+# option(JOB_BUILD_DAMAGE "Build the job_damage library" OFF)
+
+option(JOB_BUILD_ZSTD "Build the job_zstd library" ON)
+option(JOB_BUILD_SCIENCE "Build the job_science library" ON)
+
+option(JOB_BUILD_ANSI "Build the job_ansi library" ON)
+option(JOB_BUILD_ANSI_LEGACY "Build the job_ansi library" OFF)
+option(JOB_BUILD_TUI "Build the job_tui library" OFF)
+
+option(JOB_BUILD_AI "Build the micro job_ai library" ON)
 option(JOB_BUILD_GGML "Build JobGgml " ON)
 option(JOB_BUILD_TOKEN "Build the job_token library" ON)
 option(JOB_BUILD_MODEL "Build the job_model library" ON)
@@ -93,6 +98,3 @@ option(JOB_BUILD_SERIALIZER "Build the job_serializer library" ON)
         option(JOB_BUILD_AIPKG_SCHEMA "Build the generated AiPkg schema library" ${JOB_BUILD_SERIALIZER_MSGPACK})
         option(JOB_BUILD_AIPKG "Build the job_aipkg package library" ${JOB_BUILD_SERIALIZER_MSGPACK})
     option(JOB_BUILD_SERIALIZER_FLATBUFFERS "Enable FlatBuffers backend" OFF)
-
-option(JOB_BUILD_SCHEMA "Build the job_schema library" ON)
-

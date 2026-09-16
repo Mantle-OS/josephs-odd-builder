@@ -185,10 +185,13 @@ void ANSIParser::handleCodepoint(char32_t ch)
 
 void ANSIParser::appendToBuffer(char32_t ch)
 {
-    if (ch <= 0x7F)
+    if (ch <= 0x7F){
         m_buffer.push_back(static_cast<char>(ch));
-    else
+
+    }else{
+        // FIXME 1
         ansi::utils::Utf8Decoder::encodeTo(ch, m_buffer);
+    }
 
 }
 

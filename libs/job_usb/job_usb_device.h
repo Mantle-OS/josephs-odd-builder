@@ -4,6 +4,8 @@
 #include <memory>
 #include <utility>
 
+// #include <job_file.h>
+
 #include <job_object.h>
 #include <job_signal.h>
 #include <job_obj_annotation.h>
@@ -24,6 +26,9 @@ public:
     using Ptr = std::shared_ptr<JobUsbDevice>;
     using WPtr = std::weak_ptr<JobUsbDevice>;
     using UPtr = std::unique_ptr<JobUsbDevice>;
+
+    // using ReadCallback = io::JobFile::ReadCallback;
+
 
     JobUsbDevice() = default;
 
@@ -132,7 +137,6 @@ public:
         m_state = std::move(value);
     }
 
-
     core::Signal<const JobUsbDevice &> updated;
     void handleUpdated(const JobUsbDevice &device)
     {
@@ -141,13 +145,20 @@ public:
         setStrings(device.strings());
     }
 
+
+    // void setReadCallback(ReadCallback cb) {
+    //     if (m_file)
+    //         m_file.setReadCallback(std::move(cb));
+    // }
+
 private:
-    JobUsbDescriptor m_descriptor;
-    JobUsbLocation m_location;
-    JobUsbStrings m_strings;
-    JobUsbState m_state;
+    JobUsbDescriptor    m_descriptor;
+    JobUsbLocation      m_location;
+    JobUsbStrings       m_strings;
+    JobUsbState         m_state;
 
     [[=core::NoSerialize{}]] uint64_t m_uid = 0;
+    // [[=core::NoSerialize{}]] io::JobFile::UPtr m_file;
 };
 
 } // namespace job::usb

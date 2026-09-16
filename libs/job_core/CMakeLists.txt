@@ -79,7 +79,6 @@ set(JOB_YAML_HEADERS
     yaml/job_yaml_parser_utils.h
     yaml/job_yaml_parser.h
 
-
     yaml/job_yaml_diagnostic.h
 
     # API
@@ -136,11 +135,36 @@ set(JOB_CORE_SOURCES
     job_timer.cpp
     job_siphash.cpp
 
-    job_base_obj.cpp
-    job_connection.cpp
-    job_light_object.cpp
-    job_object.cpp
 )
+
+
+
+set(JOB_OBJ_HEADERS
+    obj/job_obj_concept.h
+    obj/job_base_obj.h
+    obj/job_connection.h
+    obj/job_signal.h
+    obj/job_obj_annotation.h
+
+    obj/job_light_object.h
+    obj/job_object.h
+
+    ## Macros and "Helpers"
+    obj/job_obj_grammar.h
+    obj/job_obj_members.h
+    obj/job_obj_ptr.h
+    obj/job_obj_class.h
+    # Facade
+    obj/job_obj.h
+)
+
+set(JOB_OBJ_SOURCES
+    obj/job_base_obj.cpp
+    obj/job_connection.cpp
+    obj/job_light_object.cpp
+    obj/job_object.cpp
+)
+
 
 set(JOB_CORE_HEADERS
     crc32.h
@@ -161,24 +185,70 @@ set(JOB_CORE_HEADERS
     job_map.h
     job_obj_hash_concept.h
     job_obj_hash.h
-
-    job_obj_concept.h
-    job_base_obj.h
-    job_connection.h
-    job_signal.h
-    job_obj_annotation.h
-
-    job_light_object.h
-    job_object.h
 )
 
 
 
 set(JOB_LATTICE_SOURCES)
-set(JOB_LATTICE_HEADERS)
+set(JOB_LATTICE_HEADERS
+    lattice/job_lattice_coordinate.h
+    lattice/job_lattice_point.h
 
-set(JOB_TEXT_SOURCES)
-set(JOB_TEXT_HEADERS)
+    lattice/job_lattice_concepts.h
+    lattice/job_lattice_transform_result.h
+    lattice/job_lattice_view.h
+
+    lattice/job_lattice_codec.h
+    lattice/job_lattice_kernel.h
+
+    lattice/job_lattice_contracts.h
+
+    lattice/job_lattice.h
+)
+
+set(JOB_TEXT_SOURCES
+    text/job_utf_streambuf.cpp
+)
+set(JOB_TEXT_HEADERS
+    text/job_unicode_scalar.h
+
+    # Utf8
+    text/job_utf8_status.h
+    text/job_utf8_scalar_kernel.h
+    text/job_utf8_kernel.h
+    text/job_utf8_simd_tile.h
+    text/job_utf8_simd_kernel.h
+    text/job_ascii_simd_tile.h
+    text/job_ascii_simd_kernel.h
+    text/job_utf8.h
+
+    # Utf16
+    text/job_utf16_status.h
+    text/job_utf16_scalar_kernel.h
+    text/job_utf16_kernel.h
+    text/job_utf16_simd_tile.h
+    text/job_utf16_simd_kernel.h
+    text/job_utf16.h
+
+    # Utf32
+    text/job_utf32_status.h
+    text/job_utf32_scalar_kernel.h
+    text/job_utf32_kernel.h
+    text/job_utf32_simd_tile.h
+    text/job_utf32_simd_kernel.h
+    text/job_utf32.h
+
+    ## Higher level api usage
+    text/job_text_encoding.h
+    text/job_text_transcode_status.h
+    text/job_text_transcoder.h
+    text/job_text_dispatch.h
+
+    text/job_utf_stream_concept.h # Hello
+    text/job_utf_streambuf.h
+
+    text/job_text.h
+)
 
 
 set(JOBCORE_COMPILE_THIS
@@ -187,6 +257,9 @@ set(JOBCORE_COMPILE_THIS
     ${JOB_YAML_HEADERS}     ${JOB_YAML_SOURCES}
     ${JOB_JSON_HEADERS}     ${JOB_JSON_SOURCES}
     ${JOB_BINARY_HEADERS}
+    ${JOB_LATTICE_HEADERS}
+    ${JOB_TEXT_HEADERS}     ${JOB_TEXT_SOURCES}
+    ${JOB_OBJ_HEADERS}      ${JOB_OBJ_SOURCES}
 )
 
 
@@ -238,12 +311,17 @@ target_include_directories(JosephsOddBuilder_Core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/binary>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobcore/binary>
 
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/lattice>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobcore/lattice>
+
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/text>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobcore/text>
+
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/obj>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/jobcore/obj>
+
     ## export file
     $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
-)
-
-target_link_libraries(JosephsOddBuilder_Core PUBLIC
-    ${YAMLCpp_LIBRARIES}
 )
 
 install(TARGETS JosephsOddBuilder_Core
@@ -261,7 +339,9 @@ install(FILES ${JOB_SIMD_HEADERS}       DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/
 install(FILES ${JOB_BINARY_HEADERS}     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobcore/binary)
 install(FILES ${JOB_YAML_HEADERS}       DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobcore/yaml)
 install(FILES ${JOB_JSON_HEADERS}       DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobcore/json)
-
+install(FILES ${JOB_LATTICE_HEADERS}    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobcore/lattice)
+install(FILES ${JOB_TEXT_HEADERS}       DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobcore/text)
+install(FILES ${JOB_OBJ_HEADERS}        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobcore/obj)
 
 set(PKGCONFIG_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/pkgconfig")
 set(PKGCONFIG_FILE "${CMAKE_CURRENT_BINARY_DIR}/jobcore.pc")

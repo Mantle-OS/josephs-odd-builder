@@ -227,19 +227,15 @@ private:
     void reset() noexcept;
     void moveFrom(JobFile &&other) noexcept;
 
-    std::filesystem::path m_path;
-
-    int m_fd{-1};
-    FILE *m_fp{nullptr};
-
-    Access m_access{Access::ReadOnly};
-    OpenMode m_openMode{OpenMode::OpenExisting};
-    Handle m_handle{Handle::None};
-
-    bool m_owned{false};
-    bool m_nonBlocking{false};
-
-    ReadCallback m_readCallback;
+    std::filesystem::path   m_path;
+    int                     m_fd{-1};
+    FILE                    *m_fp{nullptr};
+    Access                  m_access{Access::ReadOnly};
+    OpenMode                m_openMode{OpenMode::OpenExisting};
+    Handle                  m_handle{Handle::None};
+    bool                    m_owned{false};
+    bool                    m_nonBlocking{false};
+    ReadCallback            m_readCallback;
 };
 
 } // namespace job::io

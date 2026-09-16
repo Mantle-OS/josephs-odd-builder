@@ -69,29 +69,6 @@ public:
         return job::simd::SIMD::siphashTile4(uids, m_k0, m_k1);
     }
 
-    // [[nodiscard]] inline uint64_t hash128(const std::uint64_t *uid) const noexcept
-    // {
-    //     const auto *data = reinterpret_cast<const std::byte *>(uid);
-    //     return siphash24Key(std::span<const std::byte>(data, 16), m_k0, m_k1);
-    // }
-
-    // [[nodiscard]] inline uint64_t hash128(const std::uint64_t *uid) const noexcept
-    // {
-    //     if (m_useAvx) {
-    //         // Replicate the 16-byte UID into a 4-lane SIMD vector and extract lane 0
-    //         const uint64_t uids[4] = { uid[0], uid[1], 0, 0 };
-    //         const job::simd::i64 res = job::simd::SIMD::siphashTile4(uids, m_k0, m_k1);
-
-    //         // Extract low 64-bit element from lane 0
-    //         alignas(32) std::uint64_t out[4];
-    //         job::simd::SIMD::mov_i64(reinterpret_cast<std::int64_t *>(out), res);
-    //         return out[0];
-    //     }
-
-    //     // Fallback when m_useAvx is set to false at construction
-    //     const auto *data = reinterpret_cast<const std::byte *>(uid);
-    //     return siphash24Key(std::span<const std::byte>(data, 16), m_k0, m_k1);
-    // }
 
     [[nodiscard]] inline uint64_t hash128(const std::uint64_t *uid) const noexcept
     {

@@ -45,10 +45,6 @@ if(JOB_BUILD_USB)
     add_subdirectory(job_usb)
 endif()
 
-if(JOB_BUILD_SCHEMA)
-    add_subdirectory(job_schema)
-endif()
-
 if(JOB_BUILD_SERIALIZER)
     add_subdirectory(job_serializer)
 
@@ -76,9 +72,13 @@ if(JOB_BUILD_ANSI)
     add_subdirectory(job_ansi)
 endif()
 
-if(JOB_BUILD_TUI)
-    add_subdirectory(job_tui)
+if(JOB_BUILD_ANSI_LEGACY)
+    add_subdirectory(job_ansi_legacy)
+    if(JOB_BUILD_TUI)
+        add_subdirectory(job_tui)
+    endif()
 endif()
+
 
 if(JOB_BUILD_SOUND)
     add_subdirectory(job_sound)

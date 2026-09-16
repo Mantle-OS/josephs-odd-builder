@@ -2,6 +2,8 @@ if(JOB_BUILD_CORE)
     add_subdirectory(job_simd)
     add_subdirectory(job_yaml)
     add_subdirectory(job_json)
+    add_subdirectory(job_text)
+    add_subdirectory(job_obj)
     add_subdirectory(job_core)
 endif()
 
@@ -9,14 +11,9 @@ if(JOB_BUILD_THREADS)
     add_subdirectory(job_threads)
 endif()
 
-if(JOB_BUILD_SCHEMA)
-    add_subdirectory(job_schema)
-endif()
-
 if(JOB_BUILD_CRYPTO)
     add_subdirectory(job_crypto)
 endif()
-
 
 if(JOB_BUILD_ZSTD)
     add_subdirectory(job_zstd)
@@ -50,9 +47,15 @@ if(JOB_BUILD_SERIALIZER)
     endif()
 endif()
 
-if(JOB_BUILD_ANSI)
-    add_subdirectory(job_ansi)
+if(JOB_BUILD_ANSI_LEGACY)
+    add_subdirectory(job_ansi_legacy)
 endif()
+
+if(JOB_BUILD_ANSI)
+    # add_subdirectory(job_ansi)
+endif()
+
+
 
 if(JOB_BUILD_SCIENCE)
     add_subdirectory(job_science)

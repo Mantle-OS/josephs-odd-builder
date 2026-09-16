@@ -1,8 +1,9 @@
-add_custom_target(JOB_Documentation SOURCES
+add_custom_target(JOB_DOCUMENTATION SOURCES
     ../README.md
     ../LICENSE.txt
     ../COMMERCIAL.txt
     coding_style.md
+    what_is_a_job.md
     job/job.md
     job/ansi_overview.md
     job/core_overview.md
@@ -21,7 +22,7 @@ add_custom_target(JOB_Documentation SOURCES
     job/job_token.md
 )
 
-add_custom_target(JOB_AI_Documentation SOURCES
+add_custom_target(JOB_AI_DOCUMENTATION  SOURCES
     job/ai.md
     job/ai_benchmarks.md
     job/ai/cords.md
@@ -38,7 +39,7 @@ add_custom_target(JOB_AI_Documentation SOURCES
     job/ai/cache.md
 )
 
-add_custom_target(JOBGGML_Documentation SOURCES
+add_custom_target(JOBGGML_DOCUMENTATION  SOURCES
     job_ggml/overview.md
     job_ggml/devices.md
     job_ggml/impl_devices.md
@@ -50,13 +51,4 @@ add_custom_target(JOBGGML_Documentation SOURCES
     job_ggml/optimizer.md
     job_ggml/quant.md
     job_ggml/misc.md  # this is enums & type_traits and abort callback threadpool stuff;
-)
-
-add_custom_target(JOBSCHEMA_Documentation SOURCES
-    job_schema/design/intro.md
-    job_schema/design/job_schema_design.md
-    job_schema/design/job_schema_gen_design.md
-    job_schema/design/job_schema_gen_example_design.md
-    job_schema/design/test_job_schema_design.md
-    job_schema/design/job_schema_design_deps.md
 )

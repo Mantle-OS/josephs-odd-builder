@@ -35,9 +35,9 @@ private:
         Charset,    // Charset designator (e.g. ESC ( B)
     };
 
-    Screen                  *m_screen = nullptr;
-    Utf8Decoder             m_utf8;
-    std::string             m_buffer;
+    Screen                  *m_screen = nullptr; // Borrowed will become damage
+    Utf8Decoder             m_utf8;             // Is upgrading to core::text modules
+    std::string             m_buffer;           // stupid and should be a span of whatever the PTY is outputting that is the real next question becuase job_ansi already can depend on job_io
     ParserState             m_state = ParserState::Ground;
     csi::DispatchCSI        m_dispatchCSI;
     csi::DispatchESC        m_dispatchESC;

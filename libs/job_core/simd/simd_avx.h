@@ -5,7 +5,10 @@
 #include "rounding_mode.h"
 namespace job::simd  {
 
+using u8 = __m256i;
 using f16 = __m128;
+using u16 = __m256i;
+using u32 = __m256i;
 using f32 = __m256;
 using i32 = __m256i;
 using i64 = __m256i;
@@ -134,6 +137,72 @@ struct AVX_F {
     {
         return _mm256_srli_epi64(a, Shift);
     }
+
+
+    // ----------- JOB TEXT -----------
+    // U8
+    static constexpr inline int width_u8() { return 32; }
+    [[nodiscard]] static inline u8 pull_u8(const std::uint8_t *p) {     return _mm256_loadu_si256(reinterpret_cast<const __m256i *>(p)); }
+    [[nodiscard]] static inline u8 set1_u8(std::uint8_t value) {        return _mm256_set1_epi8(static_cast<char>(value)); }
+    [[nodiscard]] static inline u8 and_u8(u8 a, u8 b) {                 return _mm256_and_si256(a, b); }
+    [[nodiscard]] static inline u8 or_u8(u8 a, u8 b) {                  return _mm256_or_si256(a, b); }
+    [[nodiscard]] static inline u8 eq_u8(u8 a, u8 b) {                  return _mm256_cmpeq_epi8(a, b); }
+    [[nodiscard]] static inline u8 shuffle_u8(u8 table, u8 indices) {   return _mm256_shuffle_epi8(table, indices); }
+    [[nodiscard]] static inline std::uint32_t movemask_u8(u8 reg) {     return static_cast<std::uint32_t>(_mm256_movemask_epi8(reg)); }
+    [[nodiscard]] static inline bool any_high_bit_u8(u8 reg) {          return movemask_u8(reg) != 0; }
+
+    // U16
+    static constexpr inline int width_u16() { return 16; }
+    [[nodiscard]] static inline u16 pull_u16(const std::uint16_t *p) {  return _mm256_loadu_si256(reinterpret_cast<const __m256i *>(p)); }
+    [[nodiscard]] static inline u16 set1_u16(std::uint16_t value) {     return _mm256_set1_epi16(static_cast<std::int16_t>(value)); }
+    [[nodiscard]] static inline u16 and_u16(u16 a, u16 b) {             return _mm256_and_si256(a, b); }
+    [[nodiscard]] static inline u16 eq_u16(u16 a, u16 b) {              return _mm256_cmpeq_epi16(a, b); }
+
+    template <int Shift>
+    [[nodiscard]] static inline u16 srli_u16(u16 value)
+    {
+        static_assert(Shift >= 0 && Shift <= 15);
+        return _mm256_srli_epi16(value, Shift);
+    }
+
+    [[nodiscard]] static inline std::uint32_t movemask_u16(u16 reg)
+    {
+        std::uint32_t mask = static_cast<std::uint32_t>(_mm256_movemask_epi8(reg));
+
+        mask &= 0x55555555u;
+        mask = (mask | (mask >> 1)) & 0x33333333u;
+        mask = (mask | (mask >> 2)) & 0x0F0F0F0Fu;
+        mask = (mask | (mask >> 4)) & 0x00FF00FFu;
+        mask = (mask | (mask >> 8)) & 0x0000FFFFu;
+
+        return mask;
+    }
+
+    // U32
+    static constexpr inline int width_u32() { return 8; }
+    [[nodiscard]] static inline u32 pull_u32(const std::uint32_t *p) {      return _mm256_loadu_si256(reinterpret_cast<const __m256i *>(p)); }
+    [[nodiscard]] static inline u32 set1_u32(std::uint32_t value) {         return _mm256_set1_epi32(static_cast<std::int32_t>(value)); }
+    [[nodiscard]] static inline u32 and_u32(u32 a, u32 b) {                 return _mm256_and_si256(a, b); }
+    [[nodiscard]] static inline u32 eq_u32(u32 a, u32 b) {                  return _mm256_cmpeq_epi32(a, b); }
+    [[nodiscard]] static inline bool any_u32(u32 reg) {                     return !_mm256_testz_si256(reg, reg); }
+    [[nodiscard]] static inline u32 or_u32(u32 a, u32 b) {                  return _mm256_or_si256(a, b); }
+    [[nodiscard]] static inline u32 gt_u32(u32 a, u32 b)
+    {
+        const u32 sign = set1_u32(0x80000000u);
+        return _mm256_cmpgt_epi32(_mm256_xor_si256(a, sign), _mm256_xor_si256(b, sign));
+    }
+
+    // I32
+    // [[nodiscard]] static inline i32 gt_i32(i32 a, i32 b) { return _mm256_cmpgt_epi32(a, b); }
+    // [[nodiscard]] static inline i32 xor_si(i32 a, i32 b) { return _mm256_xor_si256(a, b); }
+    // [[nodiscard]] static inline i32 gt_u32(i32 a, i32 b) {
+    //     const i32 sign = set1_i32(static_cast<int>(0x80000000u));
+    //     return gt_i32(xor_si(a, sign), xor_si(b, sign));
+    // }
+    // [[nodiscard]] static inline bool any_i32(i32 reg) { return !_mm256_testz_si256(reg, reg); }
+
+    // ------------- END JOB TEXT --------
+
 
     template<int Shift>
     [[nodiscard]] static inline i64 rotl_i64(i64 a)

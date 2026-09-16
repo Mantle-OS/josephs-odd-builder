@@ -1,0 +1,39 @@
+cmake_minimum_required(VERSION 3.16)
+
+add_executable(test_job_ansi_legacy
+    main.cpp
+    ## utils
+    test_color_utils.cpp
+    test_utf8_endcoder_decoder.cpp
+    test_rgb_color.cpp
+    test_enums.cpp
+    test_job_ansi_utils.cpp
+    test_charset_translator.cpp
+    test_attributes.cpp
+    test_cell.cpp
+    test_grid.cpp
+    test_scrollback.cpp
+    test_screen.cpp
+    test_parser.cpp
+    test_dispatch_csi.cpp
+)
+target_compile_options(test_job_ansi_legacy PRIVATE -freflection -fcontracts)
+target_link_options(test_job_ansi_legacy PRIVATE -fcontracts)
+
+set_target_properties(test_job_ansi_legacy PROPERTIES
+    CXX_STANDARD 26
+    CXX_STANDARD_REQUIRED ON
+)
+target_link_libraries(test_job_ansi_legacy PRIVATE
+    ${CatchTwo_LIBRARIES}
+    JosephsOddBuilder_Ansi
+    JosephsOddBuilder_Core
+    Threads::Threads
+    atomic
+)
+
+target_include_directories(test_job_ansi_legacy PRIVATE
+    ${CatchTwo_INCLUDE_DIRS}
+)
+
+add_test(NAME job_ansi_legacy COMMAND test_job_ansi_legacy)

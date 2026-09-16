@@ -357,83 +357,422 @@ If you are confused you can [also see Cpp Core Guidelines](https://isocpp.github
 
 ## 11. Tests
 
-We use Catch2 (version 3) for tests
+JOB uses Catch2 version 3 for unit tests and benchmarks.
 
-Tests serve as both verification and documentation. 
+Tests serve two purposes:
 
-We generally structure tests in **three conceptual blocks**. Some older tests don’t follow this yet..., but this is the direction:
+1. verify behavior; and
+2. document how an object is intended to be used.
 
-- **Block one: usage / examples**
-  - “How do I use this class or struct?”
-  - Real-world usage as tests. The goal is for tests to *also* be examples, so we don’t have to maintain a separate “examples” section for most things.
-  - Prefer small, realistic scenarios over synthetic ones.
+The detailed testing, validation, benchmarking, debugging, and accreditation workflow is defined in the [JOB Work Instructions](work_instructions/work_instructions.md) and the associated testing process documentation.
 
-- **Block two: edge cases**
-  - Stress the corners: empty inputs, zero sizes, null pools, timeouts, weird parameters, “workerCount = 0”, etc.
-  - These exist mainly to catch regressions and guard invariants.
-  - It’s fine if these are a bit more mechanical or verbose.
+For new work, these rules apply beginning with JOB pre-alpha **0.0.0007**.
 
-- **Block three: benchmarks / stress if needed (they are not all the time)**
-  - There is a compile time option called ```JOB_TEST_BENCHMARKS``` wrap all benchmarks in this please **Example**
+Tests written before `0.0.0007` may use the previous three-block testing structure. Existing tests do not need to be rewritten solely to conform to the newer process. Migration should occur naturally when older tests or modules are substantially modified.
+
+### 11.1 Validation Structure
+
+Unit tests are structured around two conceptual blocks.
+
+#### Block One — Usage / Examples
+
+Show how the object is intended to be used.
+
+Ask:
+
+> How should a developer use this object correctly?
+
+Prefer small, realistic scenarios over artificial examples.
+
+Tests in this block should act as executable documentation where practical so that JOB does not need to maintain a separate example suite for every object.
+
+Examples include:
+
+* constructing and configuring an object;
+* performing the expected operation;
+* demonstrating normal ownership and lifetime;
+* showing realistic interaction between related objects; and
+* validating expected output or state.
+
+#### Block Two — Edge Cases / Breakage
+
+Attempt to break the object.
+
+Ask:
+
+> What happens at the boundaries of the object's contract?
+
+Examples include:
+
+* empty inputs;
+* zero sizes;
+* null or missing resources where permitted;
+* timeouts;
+* unusual parameters;
+* minimum and maximum values;
+* invalid states;
+* partial failures;
+* `workerCount == 0`;
+* empty graphs;
+* `0x0` grids; and
+* other behavior that protects invariants or catches regressions.
+
+These tests may be more mechanical or verbose than the usage block.
+
+### 11.2 Not Every Type Requires a Dedicated Test
+
+Do not create a test file merely because a type exists.
+
+Simple enums, passive data representations, and structs/classes containing only a few data members may be exercised naturally through the behavioral objects that consume them.
+
+A dedicated test is warranted when an object has behavior, ownership, invariants, transformations, algorithms, state transitions, resource management, or another meaningful **job** that deserves independent validation.
+
+See [What Is a JOB?](what_is_a_job.md) for the project terminology surrounding jobs and object responsibilities.
+
+### 11.3 Test File Naming
+
+Tests for an object should normally use:
+
+```text
+test_<object>.cpp
+```
+
+Test files are added to the test module's CMake `TESTS` collection.
+
+Tests should validate one meaningful object at a time where practical.
+
+### 11.4 Benchmarks Are Separate From Unit-Test Validation
+
+Benchmarks are no longer the third validation block.
+
+Benchmarking is a separate responsibility that occurs only after the object's unit-test validation has passed.
+
+When benchmarking is warranted, use:
+
+```text
+benchmark_<object>.cpp
+```
+
+and add the file to the CMake `BENCHMARKS` collection.
+
+Benchmarks are intended to characterize the released implementation, including:
+
+* execution time;
+* throughput;
+* scaling;
+* saturation;
+* latency;
+* stress behavior; and
+* other relevant performance characteristics.
+
+Benchmarks are only considered authoritative when run under the supported Release benchmark configuration.
+
+Running benchmarks in Debug, RelWithDebInfo, or another unsupported configuration may be useful for private investigation, but resulting numbers are not considered a source of truth.
+
+### 11.5 Benchmark Guards
+
+Benchmark code must remain protected by `JOB_TEST_BENCHMARKS`.
+
+Example:
+
 ```cpp
-// at the top add the guard and pull in the upstream header
 #ifdef JOB_TEST_BENCHMARKS
     #include <catch2/benchmark/catch_benchmark.hpp>
 #endif
+```
 
-// Section 3 benchmarks
+Benchmark test cases must also be guarded:
+
+```cpp
 #ifdef JOB_TEST_BENCHMARKS
-TEST_CASE("some benchmark", "[module][some_feature][some_scope][benchmark]")
+
+TEST_CASE("SomeObject benchmarks", "[module][some_object][benchmark]")
 {
-// .....
+    // ...
 }
+
 #endif
 ```
-  - [Push it to the limit](https://youtu.be/3-3Yok5D3Aw?si=S7LgO8yxn0OCCdMK)
-  - Micro-benchmarks (e.g. thread startup latency) and stress tests (e.g. 10k tasks through a scheduler, high-volume actor mailboxes).
-  - These tests are about performance characteristics and stability, not correctness alone.
 
-* Use Catch2 test names and tags that describe behavior:
+### 11.6 Every Independently Meaningful Benchmark Must Use a Catch2 SECTION
+
+Benchmarks that may need to be run or diagnosed independently **must** be wrapped in their own Catch2 `SECTION`.
+
+This is required.
+
+Do not place multiple independently meaningful benchmarks into one generic section.
+
+Preferred:
+
+```cpp
+#ifdef JOB_TEST_BENCHMARKS
+
+TEST_CASE("UTF-8 validation benchmarks", "[core][utf8][benchmark]")
+{
+    SECTION("scalar validation")
+    {
+        BENCHMARK("scalar validation") {
+            // ...
+        };
+    }
+
+    SECTION("SIMD validation")
+    {
+        BENCHMARK("SIMD validation") {
+            // ...
+        };
+    }
+
+    SECTION("ASCII validation")
+    {
+        BENCHMARK("ASCII validation") {
+            // ...
+        };
+    }
+}
+
+#endif
+```
+
+Avoid:
+
+```cpp
+SECTION("benchmarks")
+{
+    BENCHMARK("scalar") {
+        // ...
+    };
+
+    BENCHMARK("SIMD") {
+        // ...
+    };
+}
+```
+
+The section boundary allows the testing and debugging process to isolate a specific benchmark when investigating an anomaly.
+
+See the testing work instructions for the diagnostic process and process-runner usage.
+
+### 11.7 Test Names and Tags
+
+Use Catch2 test names and tags that describe behavior.
+
+Example:
 
 ```cpp
 TEST_CASE("JobThreadGraph fan-in waits for all prerequisites", "[threading][graph][fanin]")
-{ /* ... */ }
+{
+    // ...
+}
 ```
 
-* Prefer realistic mini-scenarios:
-  * E.g. “fan-in waits for all prerequisites”, “partial failure blocks only dependents”, “Game of Life blinker oscillates”.
+Prefer names such as:
 
-* Cover:
-  * Happy paths.
-  * Edge cases (empty graphs, 0x0 grids, workerCount = 0, etc.).
-  * Failure behavior (exceptions, rejection, timeouts).
-
-* It’s acceptable for tests to contain more narrative comments than production code.
-
-JOB_CI_BUILD is here as well to help so that things dont run on the auto builder that saturate things.
-
-example 
+```text
+fan-in waits for all prerequisites
+partial failure blocks only dependents
+Game of Life blinker oscillates
 ```
+
+over generic names such as:
+
+```text
+test graph
+test case 2
+basic test
+```
+
+### 11.8 Realistic Scenarios
+
+Prefer realistic mini-scenarios when possible.
+
+Tests should normally cover:
+
+* expected usage;
+* happy paths;
+* edge conditions;
+* failure behavior;
+* invariant protection; and
+* regression cases discovered during development.
+
+It is acceptable for test code to contain more narrative comments than production code when those comments improve understanding of the scenario.
+
+Tests still follow the project-wide rules for naming, intent, comments, and documentation.
+
+Before adding comments merely to explain test code, review:
+
+* [Section 12 — Comments and Naming for Intent](#12-comments-and-naming-for-intent)
+* [Section 13 — Documentation, Evolution, and Inline Comments](#13-documentation-evolution-and-inline-comments)
+
+Those sections define when comments add useful meaning, when names should carry the intent instead, and how JOB treats inline documentation while APIs are still evolving.
+
+The testing process does not override those rules.
+
+### 11.9 CI/CD
+
+`JOB_CI_BUILD` indicates that tests are being built or executed as part of JOB CI/CD infrastructure.
+
+Example:
+
+```cpp
 #ifdef JOB_CI_BUILD
-//  we are running the unit tests on the ci/cd
-#endif 
+// Running under JOB CI/CD.
+#endif
+```
 
+Use this guard for tests or workloads that should not execute on automated builders, such as:
 
-* Common tools. 
-  * tests-fast-math-workaround.h  Job is compiled with fastmath so this is your workarounds. 
-  * transient_test_file.h this is used if you are below job_io and can not link to it, example job_core or job_threads or job_yaml its used as reading a writng to temp files
-  * test_spin_till.h does what it sounds like... 
+* hardware saturation workloads;
+* extremely long-running stress tests;
+* environment-specific tests;
+* benchmark workloads whose results are meaningful only on controlled physical hardware.
 
-Newish (needs speeling and cleanup)
-* Common approches
-  * Utils methods stay in a function file this makes it so when the test harnes is done one can look for common traits that might make it back into the libraries api (heavey reusage), this also stops me or whomever from making anayomous functions that do the same thing
-  * Fixture members. All fixture members should live in one file for the same reason as the util methods. This also keeps the tests clean of classes or whatever 
+The detailed rules for CI/CD remain outside this section.
 
+### 11.10 Common Test Tools
 
+JOB provides common test-support utilities where appropriate.
 
-Test files should use the library namespace with a nested tests namespace, e.g. namespace job::usb::tests, rather than using namespace ... at file scope.
+Current examples include:
 
+* `tests-fast-math-workaround.h`
+  Provides test-side workarounds required because JOB is compiled with fast-math behavior.
 
+* `transient_test_file.h`
+  Provides temporary-file support for libraries that sit below `job_io` and therefore cannot depend on it directly. Examples include `job_core`, `job_threads`, and other low-level libraries that need temporary file I/O during testing.
+
+* `test_spin_till.h`
+  Provides common spin-until behavior for tests that need to wait for a condition.
+
+Use existing common test infrastructure before creating another local implementation of the same behavior.
+
+### 11.11 Fixtures
+
+Each test module should maintain a shared fixture header.
+
+The preferred name is:
+
+```text
+<module>_fixtures.h
+```
+
+Fixtures contain test-specific data structures, shared literal data, reusable fixture state, and other representations required to exercise the module.
+
+Keep fixture definitions out of individual test files when they are shared or when centralizing them improves clarity.
+
+Fixtures are reviewed during the testing process to determine whether anything has accidentally evolved into reusable production functionality.
+
+### 11.12 Test Utilities
+
+Each test module should maintain a shared utility header.
+
+The preferred name is:
+
+```text
+<module>_utils.h
+```
+
+Test-only helper functions should live here rather than being repeatedly recreated as anonymous or local helper functions across different test files.
+
+Utilities may begin as:
+
+* one-off test helpers;
+* shared setup functions;
+* synthetic data constructors;
+* benchmark fixture helpers; or
+* other support behavior used by the test executable.
+
+Repeated use is evidence.
+
+When a utility reaches a fourth genuine use, review whether it still belongs in test infrastructure.
+
+The fourth use does not automatically require promotion into the production library. Test-specific behavior may legitimately remain test-only regardless of reuse.
+
+However, a repeatedly reused helper is a strong production-API candidate when:
+
+* its behavior is generic;
+* it is not inherently tied to Catch2, benchmarking, assertions, fixture construction, or test-process behavior; and
+* the functionality would still make sense if the test executable did not exist.
+
+The testing work instructions define the review and accreditation process for these candidates.
+
+### 11.13 Namespaces
+
+Test files should use the library namespace with a nested `tests` namespace.
+
+Example:
+
+```cpp
+namespace job::usb::tests {
+
+// ...
+
+} // namespace job::usb::tests
+```
+
+Do not use broad file-scope `using namespace ...` directives as a substitute for the proper test namespace.
+
+### 11.14 Validation Before Benchmarking
+
+An object must pass its required validation before authoritative benchmarking begins.
+
+Compilation alone is not validation.
+
+Green assertions alone are not sufficient when behavior remains unexplained.
+
+If tests fail, expose questionable behavior, or reveal a poor representation or contract, resolve those issues before moving to benchmarking.
+
+Debug, RelWithDebInfo, IDE debugging, GDB, tracing, or other diagnostic configurations may be used while resolving validation problems.
+
+After diagnosis, the object must return to the supported validation configuration and pass again before progressing.
+
+### 11.15 Review Benchmark Results
+
+A benchmark producing a number does not make that number correct.
+
+Benchmark results must be reviewed for plausibility.
+
+Investigate:
+
+* unexpectedly poor results;
+* unexpectedly good results;
+* unexplained variance;
+* suspiciously stable values;
+* unexpected scaling;
+* strange throughput;
+* fixed-duration plateaus;
+* performance inconsistent with the implementation; and
+* anything else that appears anomalous.
+
+There are no stupid questions during benchmark review.
+
+Independent review from another developer or an AI agent is encouraged when a result is not understood.
+
+Do not accept a benchmark result merely because it is favorable.
+
+### 11.16 Scope Discipline
+
+Testing and review should remain focused on the active object and active process step.
+
+A good engineer can find problems almost anywhere.
+
+Do not turn unrelated observations into active cleanup, redesign, refactoring, or optimization work unless the current task requires it or the developer explicitly expands the scope.
+
+When a genuine blocker depends on an unclear contract or lower-level assumption, stop and resolve that misunderstanding rather than guessing.
+
+### 11.17 Detailed Testing Process
+
+This section defines the coding-style requirements for tests and benchmarks.
+
+The complete testing lifecycle is defined by the JOB work instructions:
+
+* [JOB Work Instructions](work_instructions/work_instructions.md)
+* [Testing Process Steps](work_instructions/testing_process_steps.md)
+* [Testing and Debugging](work_instructions/testing_debug.md)
+* [Testing AI Context](work_instructions/testing_ai_ctx.md)
+* [Real-Time Testing](work_instructions/testing_rt.md)
+
+The work instructions define the process gates, diagnostic workflow, benchmark review, fixture and utility accreditation, module completion, and handoff to later versioning or CI/CD processes.
 
 ---
 
@@ -487,6 +826,7 @@ Examples of “on-brand” comments:
 // Late to the party ?
 // Who's the boss? Tony Danza.
 // Highway to the danger zone Goose ...
+// Euler is Rk4's drunk cousin 
 ```
 
 The only hard rule:

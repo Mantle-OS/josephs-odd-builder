@@ -14,7 +14,11 @@ namespace job::io {
 class IODevice {
 
 public:
-    using Ptr                   = std::shared_ptr<IODevice>;
+    using Ptr                    = std::shared_ptr<IODevice>;
+    using UPtr                   = std::unique_ptr<IODevice>;
+    using WPtr                   = std::weak_ptr<IODevice>;
+
+
     using ReadCallback          = std::function<void(const char *data, size_t size)>;
     using PermissionsCallback   = std::function<void(IOPermissions perms)>;
 
