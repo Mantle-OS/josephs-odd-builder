@@ -1,5 +1,4 @@
 # Note: tested on debian sid(only)
-# see the Dockerfile for all build and runtime deps including testing against thingies for benchmarks and what not.
 include(GenerateExportHeader)
 include(GNUInstallDirs)
 find_package(Threads REQUIRED)
@@ -24,23 +23,149 @@ pkg_check_modules(NlohmannJson REQUIRED nlohmann_json)
 pkg_check_modules(YAMLCpp      REQUIRED yaml-cpp)
 
 ## Sound land madness
-pkg_check_modules(LibAlsa           REQUIRED alsa)
-pkg_check_modules(LibSPA            REQUIRED libspa-0.2)
-pkg_check_modules(LibPipewire       REQUIRED libpipewire-0.3)
-pkg_check_modules(LibWirePlumber    REQUIRED wireplumber-0.5)
+if(JOB_BUILD_SOUND)
+    pkg_check_modules(LibAlsa           REQUIRED alsa)
+    pkg_check_modules(LibSPA            REQUIRED libspa-0.2)
+    pkg_check_modules(LibPipewire       REQUIRED libpipewire-0.3)
+    pkg_check_modules(LibWirePlumber    REQUIRED wireplumber-0.5)
 
-## Sound land codec madness
-pkg_check_modules(LibOpus        REQUIRED opus)
-pkg_check_modules(LibFLAC        REQUIRED flac)
-pkg_check_modules(LibOgg         REQUIRED ogg)
-pkg_check_modules(LibVorbis      REQUIRED vorbis vorbisenc vorbisfile)
-pkg_check_modules(LibWavPack     wavpack)
-if(LibWavPack_FOUND)
-    add_compile_definitions(JOB_HAS_WAVPACK=1)
+    ## Sound land codec madness
+    pkg_check_modules(LibOpus        REQUIRED opus)
+    pkg_check_modules(LibFLAC        REQUIRED flac)
+    pkg_check_modules(LibOgg         REQUIRED ogg)
+    pkg_check_modules(LibVorbis      REQUIRED vorbis vorbisenc vorbisfile)
+    pkg_check_modules(LibWavPack     wavpack)
+    if(LibWavPack_FOUND)
+        add_compile_definitions(JOB_HAS_WAVPACK=1)
+    endif()
 endif()
 
+## Start Graphics
+if(JOB_BUILD_OPENGL)
+    pkg_check_modules(OpenGl REQUIRED opengl)
+    pkg_check_modules(GlesV2 REQUIRED glesv2)
+    # glproto.pc
+    add_compile_definitions(JOB_HAS_OPENGL=1)
+endif()
 
-## more ai
+if(JOB_BUILD_VULKAN)
+    pkg_check_modules(VulkanLoader REQUIRED vulkan)
+    # pkg_check_modules(       REQUIRED SPIRV-Headers.pc
+    add_compile_definitions(JOB_HAS_VULKAN=1)
+endif()
+
+if(JOB_BUILD_RENDER)
+    option(HAS_RENDER_BACKEND  "" OFF)
+    option(HAS_DRM             "" OFF)
+    option(HAS_DRI             "" OFF)
+    option(HAS_EGL             "" OFF)
+    option(HAS_GBM             "" OFF)
+    option(HAS_3D_GFX          "" OFF)
+    option(HAS_SIMPLE_KMS      "" OFF)
+    option(HAS_FULL_KMS        "" OFF)
+    # set(HAS_WAYLAND         OFF)
+
+
+    pkg_check_modules(XkbCommon REQUIRED xkbcommon)
+    pkg_check_modules(LibInput  REQUIRED libinput)
+    pkg_check_modules(FreeType  REQUIRED freetype2)
+    pkg_check_modules(Harfbuzz  REQUIRED harfbuzz)
+
+    if(JOB_BUILD_RENDER_FB)
+        add_compile_definitions(JOB_FB=1)
+        set(HAS_RENDER_BACKEND ON)
+     endif()
+
+
+    if(JOB_BUILD_OPENGL OR JOB_BUILD_VULKAN OR JOB_BUILD_RENDER_KMS OR JOB_BUILD_RENDER_WAYLAND)
+        pkg_check_modules(LibDrm libdrm)
+        if(LibDrm_FOUND)
+            set(HAS_DRM ON)
+            # add_compile_definitions(JOB_DRM=1)
+        else()
+            message(FATAL_ERROR "JOB_BUILD_OPENGL JOB_BUILD_VULKAN JOB_BUILD_RENDER_WAYLAND JOB_BUILD_RENDER_KMS Require Linux DRM")
+        endif()
+
+        pkg_check_modules(LibDri dri)
+        if(LibDri_FOUND)
+            set(HAS_DRI ON)
+            # add_compile_definitions(JOB_DRI=1)
+        endif()
+
+        pkg_check_modules(LibEgl egl)
+        if(LibEgl_FOUND)
+            set(HAS_EGL ON)
+            # add_compile_definitions(JOB_EGL=1)
+        endif()
+
+        pkg_check_modules(LibGbm gbm)
+        if(LibGbm_FOUND)
+            set(HAS_GBM ON)
+            # add_compile_definitions(JOB_GBM=1)
+        endif()
+
+        if(HAS_EGL AND HAS_GBM AND HAS_DRM)
+            set(HAS_3D_GFX ON)
+            # add_compile_definitions(JOB_3D_GFX=1)
+        endif()
+
+    endif()
+
+    if(JOB_BUILD_RENDER_KMS)
+        if(HAS_DRM)
+            set(HAS_SIMPLE_KMS ON)
+            add_compile_definitions(JOB_SIMPLE_KMS=1)
+            set(HAS_RENDER_BACKEND ON)
+        endif()
+        if(HAS_3D_GFX)
+            set(HAS_FULL_KMS ON)
+            add_compile_definitions(JOB_FULL_KMS=1)
+            set(HAS_RENDER_BACKEND ON)
+        endif()
+    endif()
+
+    if(JOB_BUILD_RENDER_WAYLAND AND HAS_3D_GFX)
+        pkg_check_modules(XWayland          REQUIRED xwayland)
+        pkg_check_modules(WaylandClient     REQUIRED wayland-client)
+        pkg_check_modules(WaylandCursor     REQUIRED wayland-cursor)
+        pkg_check_modules(WaylandServer     REQUIRED wayland-server)
+
+        pkg_check_modules(WaylandEgl        REQUIRED wayland-egl)
+
+        pkg_check_modules(WaylandProtocols  REQUIRED wayland-protocols)
+        pkg_get_variable(JOB_WAYLAND_PROTOCOLS_DIR wayland-protocols pkgdatadir)
+
+        set(JOB_WAYLAND_SCANNER  "" CACHE STRING "Where the wayland scanner is located")
+        if(NOT JOB_WAYLAND_SCANNER)
+            pkg_check_modules(WaylandScanner    REQUIRED wayland-scanner)
+            pkg_get_variable(JOB_WAYLAND_SCANNER wayland-scanner wayland_scanner)
+        else()
+            # for cross compile hints
+            if(EXISTS JOB_WAYLAND_SCANNER)
+                message("wayland-scanner found")
+            else()
+                message(FATAL_ERROR "Could not find wayland-scanner in /usr/bin")
+            endif()
+        endif()
+
+        set(JOB_WAYLAND_LIBS
+            ${XWayland_LIBRARIES}
+            ${WaylandClient_LIBRARIES}
+            ${WaylandCursor_LIBRARIES}
+            ${WaylandEgl_LIBRARIES}
+            ${WaylandServer_LIBRARIES}
+        )
+
+        set(HAS_RENDER_BACKEND ON)
+
+    endif()
+
+    if(NOT HAS_RENDER_BACKEND)
+        message(FATAL_ERROR "JOB_BUILD_RENDER is set but there is no backend set")
+    endif()
+
+endif()
+
 if(JOB_CUDA)
     find_package(CUDAToolkit REQUIRED)
     set(JOB_CUDA_LIBS

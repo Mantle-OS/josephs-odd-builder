@@ -6,7 +6,7 @@ option(JOB_TEXT_IO_BRIDGE "Enable JobText and JobIO bridge tests" ON)
 set(JOB_TEXT_IO_BRIDGE_TEST_FILES)
 if(JOB_TEXT_IO_BRIDGE)
     list(APPEND JOB_TEXT_IO_BRIDGE_TEST_FILES
-        test_job_utf_streambuf_io.cpp
+        test_job_utf_streambuf_io.cpp  ## hello there
     )
 endif()
 

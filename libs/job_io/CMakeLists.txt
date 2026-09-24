@@ -54,9 +54,8 @@ set(JOBIO_HEADERS
     job_xdg_exec.h
     job_xdg_entry.h
     job_xdg_desktop_entry.h
-    job_xdg.h           # parser and owns lists and all this is the MVC and helpers
-
-    job_process.h # the wrapper around pty_io.h
+    job_xdg.h
+    job_process.h
 
     file_io.h
     mock_io.h
@@ -88,12 +87,12 @@ set(JOBIO_HEADERS
     job_arena_pool.h
 )
 
-add_library(JosephsOddBuilder_IO SHARED
-    ${JOBIO_HEADERS}
-    ${JOBIO_SOURCES}
-)
+if(BUILD_SHARED_LIBS)
+    add_library(JosephsOddBuilder_IO SHARED ${JOBIO_HEADERS} ${JOBIO_SOURCES})
+else()
+    add_library(JosephsOddBuilder_IO STATIC ${JOBIO_HEADERS} ${JOBIO_SOURCES})
+endif()
 
-# bring in things that need c++23 as a test and also just some randoms
 target_compile_options(JosephsOddBuilder_IO PRIVATE
     -freflection
     -fcontracts)

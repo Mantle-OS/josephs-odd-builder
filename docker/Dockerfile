@@ -19,7 +19,6 @@ RUN apt-get update && \
     apt-get install --no-install-recommends -y \
         gcc-16 g++-16 build-essential cargo \
         chrpath wget curl git ca-certificates cmake ninja-build pkg-config \
-        glslc libvulkan-dev libvulkan1 spirv-tools spirv-headers mesa-vulkan-drivers \
         libwebp-dev \
         libssl-dev libzstd-dev \
         pkgconf libpkgconf-dev \
@@ -34,9 +33,13 @@ RUN apt-get update && \
         libwireplumber-0.5-dev libspa-0.2-dev pipewire-alsa libpipewire-0.3-dev \
         libspa-0.2-jack libspa-0.2-bluetooth libspa-0.2-modules libasound2-dev \
         libopus-dev libflac-dev libogg-dev libvorbis-dev  libwavpack-dev \
-        libgl1 libglib2.0-0 \
         libudev-dev libusb-1.0-0-dev \
-        libopenblas-dev libblas3 && \
+        libopenblas-dev libblas3 \
+        libgl1 libglib2.0-0 libegl-dev mesa-common-dev \
+        glslc libvulkan-dev libvulkan1 spirv-tools spirv-headers mesa-vulkan-drivers \
+        wayland-protocols libwayland-dev libwayland-egl-backend-dev libwayland-client0 libwayland-server0 libwayland-cursor0 xwayland libwayland-bin \
+        libdrm-dev libdrm-common libgbm-dev \
+        libharfbuzz-dev libxkbcommon-dev libinput-dev && \
     rm -rf /var/lib/apt/lists/*
 
 RUN update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-16 100 --slave /usr/bin/g++ g++ /usr/bin/g++-16 && \
@@ -55,7 +58,8 @@ RUN wget https://developer.download.nvidia.com/compute/cuda/repos/debian12/x86_6
         libcurand-13-3 libcurand-dev-13-3 \
         cuda-opencl-dev-13-3 cuda-opencl-13-3 \
         nvidia-vulkan-icd && \
-    rm cuda-keyring_1.1-1_all.deb
+    rm cuda-keyring_1.1-1_all.deb && \
+    rm -rf /var/lib/apt/lists/*
 
 RUN update-alternatives --install /usr/bin/nvcc nvcc /usr/local/cuda-13.3/bin/nvcc 100 && \
     update-alternatives --set nvcc /usr/local/cuda-13.3/bin/nvcc

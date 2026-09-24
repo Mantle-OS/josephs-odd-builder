@@ -53,6 +53,16 @@ set(JOB_ANSI_ESC_SOURCES
 )
 
 set(JOB_ANSI_UTILS_HEADERS
+
+    # utils/job_csi_grammar.h
+    # utils/job_esc_grammar.h
+    # utils/job_dec_grammar.h
+    # utils/job_charset_grammar.h
+    # utils/job_osc_grammar.h
+    utils/job_ansi_grammar.h ## aka give me everything
+
+
+
     utils/charset_translator.h
     utils/color_utils.h
     utils/calback_macros.h

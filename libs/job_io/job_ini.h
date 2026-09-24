@@ -294,14 +294,12 @@ private:
     // Lexer
     //////////////////////////////////////////////////////////
 
-    [[nodiscard]] static bool nextLineView(Cursor &cursor,
-                                           std::string_view &line) noexcept
+    [[nodiscard]] static bool nextLineView(Cursor &cursor, std::string_view &line) noexcept
     {
         if (cursor.position >= cursor.source.size())
             return false;
 
-        const std::size_t newline =
-            cursor.source.find(Grammar::NewLine, cursor.position);
+        const std::size_t newline = cursor.source.find(Grammar::NewLine, cursor.position);
 
         if (newline == std::string_view::npos) {
             line = cursor.source.subview(cursor.position);

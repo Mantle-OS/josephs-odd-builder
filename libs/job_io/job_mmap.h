@@ -28,7 +28,8 @@ public:
     {
         Unknown = 0,
         File,
-        Anonymous
+        Anonymous,
+        Device
     };
 
     //////////////////////////////////////////////////////////
@@ -42,8 +43,14 @@ public:
     JobMmap(int fd, std::size_t prefetch = 0, bool numa = false, bool fdOwned = false)
         pre(fd >= 0);
 
+    JobMmap(int fd, std::size_t size, std::uint64_t offset, JobFile::Access access, bool fdOwned = false)
+        pre(fd >= 0)
+        pre(size > 0);
+
     JobMmap(FILE *fp, std::size_t prefetch = 0, bool numa = false, bool fpOwned = false)
         pre(fp != nullptr);
+
+
 
     explicit JobMmap(std::size_t size, std::size_t prefetch = 0, bool numa = false)
         pre(size > 0);
@@ -73,6 +80,13 @@ public:
         return std::make_shared<JobMmap>(fd, prefetch, numa, fdOwned);
     }
 
+    [[nodiscard]] static Ptr createShared(int fd, std::size_t size, std::uint64_t offset, JobFile::Access access, bool fdOwned = false)
+        pre(fd >= 0)
+        pre(size > 0)
+    {
+        return std::make_shared<JobMmap>(fd, size, offset, access, fdOwned);
+    }
+
     [[nodiscard]] static Ptr createShared(FILE *fp, std::size_t prefetch = 0, bool numa = false, bool fpOwned = false)
         pre(fp != nullptr)
     {
@@ -85,9 +99,7 @@ public:
         return std::make_shared<JobMmap>(size, prefetch, numa);
     }
 
-    [[nodiscard]] static UPtr createUniq(std::filesystem::path filePath,
-                                         JobFile::Access access = JobFile::Access::ReadOnly,
-                                         std::size_t prefetch = 0, bool numa = false)
+    [[nodiscard]] static UPtr createUniq(std::filesystem::path filePath, JobFile::Access access = JobFile::Access::ReadOnly, std::size_t prefetch = 0, bool numa = false)
     {
         return std::make_unique<JobMmap>(std::move(filePath), access, prefetch, numa);
     }
@@ -96,6 +108,13 @@ public:
         pre(fd >= 0)
     {
         return std::make_unique<JobMmap>(fd, prefetch, numa, fdOwned);
+    }
+
+    [[nodiscard]] static UPtr createUniq(int fd, std::size_t size, std::uint64_t offset, JobFile::Access access, bool fdOwned = false)
+        pre(fd >= 0)
+        pre(size > 0)
+    {
+        return std::make_unique<JobMmap>(fd, size, offset, access, fdOwned);
     }
 
     [[nodiscard]] static UPtr createUniq(FILE *fp, std::size_t prefetch = 0, bool numa = false, bool fpOwned = false)
@@ -117,6 +136,9 @@ public:
     [[nodiscard]] Backing backing() const noexcept;
     [[nodiscard]] bool fileBacked() const noexcept;
     [[nodiscard]] bool anonymous() const noexcept;
+    [[nodiscard]] bool deviceBacked() const noexcept;
+    [[nodiscard]] bool descriptorBacked() const noexcept;
+
 
     //////////////////////////////////////////////////////////
     // IODevice
@@ -235,10 +257,11 @@ private:
     //////////////////////////////////////////////////////////
 
     [[nodiscard]] bool initFileMap();
-    [[nodiscard]] bool initAnonymousMap(std::size_t size)
-        pre(size > 0);
+    [[nodiscard]] bool initAnonymousMap(std::size_t size) pre(size > 0);
 
     void destroyMap() noexcept;
+
+    [[nodiscard]] bool initDeviceMap();
 
     [[nodiscard]] bool validRange(const JobMemRange &range) const noexcept;
     [[nodiscard]] bool mappedRange(const JobMemRange &range) const noexcept;
@@ -254,21 +277,18 @@ private:
     void reset() noexcept;
     void moveFrom(JobMmap &&other) noexcept;
 
-    Backing m_backing{Backing::Unknown};
-
-    JobFile m_file;
-    JobMemLock m_memLock;
-
-    void *m_addr{nullptr};
-
-    std::size_t m_mapLength{0};
-    std::size_t m_pageSize{0};
-    std::size_t m_alignment{1};
-    std::size_t m_prefetch{0};
-
-    bool m_numa{false};
-
-    Ranges m_mappedRanges;
+    Backing         m_backing{Backing::Unknown};
+    std::uint64_t   m_mapOffset{};
+    JobFile::Access m_mapAccess{JobFile::Access::ReadOnly};
+    JobFile         m_file;
+    JobMemLock      m_memLock;
+    void            *m_addr{nullptr};
+    std::size_t     m_mapLength{0};
+    std::size_t     m_pageSize{0};
+    std::size_t     m_alignment{1};
+    std::size_t     m_prefetch{0};
+    bool            m_numa{false};
+    Ranges          m_mappedRanges;
 };
 
 } // namespace job::io

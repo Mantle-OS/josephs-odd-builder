@@ -109,8 +109,10 @@ std::string Attributes::toString() const
     str += " ul=";
     str += underlineToString(getUnderline());
 
-    if (hasFg) str += " fg=" + m_fg.toHexString();
-    if (hasBg) str += " bg=" + m_bg.toHexString();
+    if (hasFg)
+        str += " fg=" + m_fg.toHexString();
+    if (hasBg)
+        str += " bg=" + m_bg.toHexString();
 
     return str;
 }
@@ -119,8 +121,6 @@ void Attributes::reset()
 {
     flags = 0;
 }
-
-
 
 Attributes::Ptr Attributes::intern(const Attributes &value)
 {

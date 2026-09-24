@@ -56,9 +56,8 @@ constexpr bool is_HEXDIG(char32_t c) noexcept
 }
 
 // Literal strings
-
-inline constexpr std::string_view false_ = "false";
-inline constexpr std::string_view null = "null";
-inline constexpr std::string_view true_ = "true";
+inline constexpr std::string_view false_    = "false";
+inline constexpr std::string_view null      = "null";
+inline constexpr std::string_view true_     = "true";
 
 } // namespace job::json::grammar

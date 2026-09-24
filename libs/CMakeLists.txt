@@ -18,6 +18,28 @@ if(JOB_BUILD_ZSTD)
     add_subdirectory(job_zstd)
 endif()
 
+
+if(JOB_BUILD_DAMAGE)
+    add_subdirectory(job_damage)
+endif()
+
+if(JOB_BUILD_RENDER)
+    if(JOB_BUILD_RENDER_WAYLAND)
+        add_subdirectory(job_wayland_protocols)
+    endif()
+
+    add_subdirectory(job_render)
+endif()
+
+if(JOB_BUILD_GUI)
+    add_subdirectory(job_gui)
+endif()
+
+if(JOB_BUILD_OPENGL)
+endif()
+if(JOB_BUILD_VULKAN)
+endif()
+
 if(JOB_CUDA)
     # add_subdirectory(job_cuda)  ## OLD me learning cuda can be deleted
     if(JOB_BUILD_GGML)
@@ -69,7 +91,7 @@ if(JOB_BUILD_AI)
 endif()
 
 if(JOB_BUILD_ANSI)
-    add_subdirectory(job_ansi)
+    # add_subdirectory(job_ansi)
 endif()
 
 if(JOB_BUILD_ANSI_LEGACY)

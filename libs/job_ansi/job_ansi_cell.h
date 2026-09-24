@@ -86,16 +86,16 @@ private:
     char32_t                            m_char = U' ';
 
 
-    uint32_t m_charWidth     : 4 = 1; // Supports widths 0-15
-    uint32_t m_lineWidth     : 4 = 1;
-    uint32_t m_lineHeight    : 4 = 1;
-    uint32_t m_lineMode      : 3 = 0; // Enum LineDisplayMode
+    std::uint32_t m_charWidth     : 4 = 1; // Supports widths 0-15
+    std::uint32_t m_lineWidth     : 4 = 1;
+    std::uint32_t m_lineHeight    : 4 = 1;
+    std::uint32_t m_lineMode      : 3 = 0; // Enum LineDisplayMode
 
-    uint32_t m_dirty         : 1 = 1;
-    uint32_t m_trailing      : 1 = 0;
-    uint32_t m_isTopHalf     : 1 = 0;
-    uint32_t m_protectErase  : 1 = 0;
-    uint32_t m_protectWrite  : 1 = 0;
+    std::uint32_t m_dirty         : 1 = 1;
+    std::uint32_t m_trailing      : 1 = 0;
+    std::uint32_t m_isTopHalf     : 1 = 0;
+    std::uint32_t m_protectErase  : 1 = 0;
+    std::uint32_t m_protectWrite  : 1 = 0;
 };
 
 } // namespace Core

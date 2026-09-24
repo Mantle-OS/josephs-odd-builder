@@ -27,23 +27,23 @@ inline int charWidth(char32_t ch)
 
 // Primary Device Attributes (DA1)
 #ifndef DA1_RESPONSE_OVERRIDE
-    inline constexpr const char *DA1_RESPONSE = "\033[?1;2c";
+    inline constexpr const char *da1_response = "\033[?1;2c";
 #else
-    inline constexpr const char *DA1_RESPONSE = DA1_RESPONSE_OVERRIDE;
+    inline constexpr const char *da1_response = DA1_RESPONSE_OVERRIDE;
 #endif
 
 // Secondary Device Attributes (DA2)
 #ifndef DA2_RESPONSE_OVERRIDE
-    inline constexpr const char *DA2_RESPONSE = "\033[>0;95;0c";
+    inline constexpr const char *da2_response = "\033[>0;95;0c";
 #else
-    inline constexpr const char *DA2_RESPONSE = DA2_RESPONSE_OVERRIDE;
+    inline constexpr const char *da2_response = DA2_RESPONSE_OVERRIDE;
 #endif
 
 // Tertiary Device Attributes (DA3)
 #ifndef DA3_RESPONSE_OVERRIDE
-    inline constexpr const char *DA3_RESPONSE = "\033P!|00000000\033\\";
+    inline constexpr const char *da3_response = "\033P!|00000000\033\\";
 #else
-    inline constexpr const char *DA3_RESPONSE = DA3_RESPONSE_OVERRIDE;
+    inline constexpr const char *da3_response = DA3_RESPONSE_OVERRIDE;
 #endif
 
 // Escape sequence classification

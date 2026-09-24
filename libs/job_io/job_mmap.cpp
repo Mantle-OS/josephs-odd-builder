@@ -34,6 +34,16 @@ JobMmap::JobMmap(int fd, std::size_t prefetch, bool numa, bool fdOwned) :
     (void)openDevice();
 }
 
+JobMmap::JobMmap(int fd, std::size_t size, std::uint64_t offset, JobFile::Access access, bool fdOwned) :
+    m_backing(Backing::Device),
+    m_file(fd, fdOwned),
+    m_mapLength(size),
+    m_mapOffset(offset),
+    m_mapAccess(access)
+{
+    (void)openDevice();
+}
+
 JobMmap::JobMmap(FILE *fp, std::size_t prefetch, bool numa, bool fpOwned) :
     m_backing(Backing::File),
     m_file(fp, fpOwned),
@@ -91,6 +101,16 @@ bool JobMmap::anonymous() const noexcept
     return m_backing == Backing::Anonymous;
 }
 
+bool JobMmap::deviceBacked() const noexcept
+{
+    return m_backing == Backing::Device;
+}
+
+bool JobMmap::descriptorBacked() const noexcept
+{
+    return fileBacked() || deviceBacked();
+}
+
 //////////////////////////////////////////////////////////
 // IODevice
 //////////////////////////////////////////////////////////
@@ -115,6 +135,13 @@ bool JobMmap::openDevice()
 
     case Backing::Unknown:
         return false;
+
+    case Backing::Device:
+        if (!m_file.isOpen() && !m_file.openDevice())
+            return false;
+
+        return initDeviceMap();
+
     }
 
     return false;
@@ -124,13 +151,13 @@ void JobMmap::closeDevice()
 {
     unmap();
 
-    if (fileBacked())
+    if (descriptorBacked())
         m_file.closeDevice();
 }
 
 ssize_t JobMmap::read(char *buffer, std::size_t maxlen)
 {
-    if (!fileBacked())
+    if (!descriptorBacked())
         return -1;
 
     return m_file.read(buffer, maxlen);
@@ -138,7 +165,7 @@ ssize_t JobMmap::read(char *buffer, std::size_t maxlen)
 
 ssize_t JobMmap::write(const char *data, std::size_t len)
 {
-    if (!fileBacked())
+    if (!descriptorBacked())
         return -1;
 
     return m_file.write(data, len);
@@ -149,7 +176,7 @@ bool JobMmap::isOpen() const
     if (anonymous())
         return isValid();
 
-    if (fileBacked())
+    if (descriptorBacked())
         return m_file.isOpen();
 
     return false;
@@ -157,27 +184,28 @@ bool JobMmap::isOpen() const
 
 int JobMmap::fd() const
 {
-    if (!fileBacked())
+    if (!descriptorBacked())
         return -1;
 
     return m_file.fd();
 }
 
+
 void JobMmap::setNonBlocking(bool enabled)
 {
-    if (fileBacked())
+    if (descriptorBacked())
         m_file.setNonBlocking(enabled);
 }
 
 void JobMmap::setReadCallback(ReadCallback cb)
 {
-    if (fileBacked())
+    if (descriptorBacked())
         m_file.setReadCallback(std::move(cb));
 }
 
 bool JobMmap::flush()
 {
-    if (!fileBacked())
+    if (!descriptorBacked())
         return true;
 
     return m_file.flush();
@@ -185,7 +213,7 @@ bool JobMmap::flush()
 
 IOPermissions JobMmap::permissions() const
 {
-    if (!fileBacked())
+    if (!descriptorBacked())
         return m_permissions;
 
     return m_file.permissions();
@@ -193,7 +221,7 @@ IOPermissions JobMmap::permissions() const
 
 void JobMmap::setPermissions(IOPermissions perms)
 {
-    if (!fileBacked()) {
+    if (!descriptorBacked()) {
         IODevice::setPermissions(perms);
         return;
     }
@@ -341,6 +369,9 @@ void JobMmap::unmap() noexcept
 bool JobMmap::grow(std::size_t newSize)
 {
     if (!isValid())
+        return false;
+
+    if (deviceBacked())
         return false;
 
     if (newSize == m_mapLength)
@@ -611,6 +642,62 @@ bool JobMmap::initAnonymousMap(std::size_t size)
     return true;
 }
 
+bool JobMmap::initDeviceMap()
+{
+    if (!deviceBacked() || !m_file.isOpen() || m_mapLength == 0)
+        return false;
+
+    const long nativePageSize = ::sysconf(_SC_PAGESIZE);
+
+    if (nativePageSize <= 0)
+        return false;
+
+    m_pageSize = static_cast<std::size_t>(nativePageSize);
+    m_alignment = m_pageSize;
+
+    int protection = 0;
+
+    switch (m_mapAccess) {
+    case JobFile::Access::ReadOnly:
+        protection = PROT_READ;
+        break;
+
+    case JobFile::Access::WriteOnly:
+        protection = PROT_WRITE;
+        break;
+
+    case JobFile::Access::ReadWrite:
+        protection = PROT_READ | PROT_WRITE;
+        break;
+    }
+
+    void *mapped = ::mmap(
+        nullptr,
+        m_mapLength,
+        protection,
+        MAP_SHARED,
+        m_file.fd(),
+        static_cast<off_t>(m_mapOffset)
+        );
+
+    if (mapped == MAP_FAILED)
+        return false;
+
+    m_addr = mapped;
+
+    m_mappedRanges.clear();
+    m_mappedRanges.emplace_back(0, m_mapLength);
+
+    if (!m_memLock.reset(m_addr, m_mapLength, m_pageSize)) {
+        (void)::munmap(m_addr, m_mapLength);
+        m_addr = nullptr;
+        m_mappedRanges.clear();
+        return false;
+    }
+
+    return true;
+}
+
 void JobMmap::destroyMap() noexcept
 {
     unmap();
@@ -710,59 +797,48 @@ void JobMmap::reset() noexcept
     destroyMap();
     m_file.closeDevice();
 
-    m_backing = Backing::Unknown;
-
-    m_addr = nullptr;
-
-    m_mapLength = 0;
-    m_pageSize = 0;
-    m_alignment = 1;
-    m_prefetch = 0;
-
-    m_numa = false;
-
+    m_backing               = Backing::Unknown;
+    m_mapOffset             = 0;
+    m_mapAccess             = JobFile::Access::ReadOnly;
+    m_addr                  = nullptr;
+    m_mapLength             = 0;
+    m_pageSize              = 0;
+    m_alignment             = 1;
+    m_prefetch              = 0;
+    m_numa                  = false;
     m_mappedRanges.clear();
-
-    m_permissions = IOPermissions::DefaultFile;
-    m_permissionsCallback = nullptr;
+    m_permissions           = IOPermissions::DefaultFile;
+    m_permissionsCallback   = nullptr;
 }
 
 void JobMmap::moveFrom(JobMmap &&other) noexcept
 {
-    m_backing = other.m_backing;
-
-    m_file = std::move(other.m_file);
-    m_memLock = std::move(other.m_memLock);
-
-    m_addr = other.m_addr;
-
-    m_mapLength = other.m_mapLength;
-    m_pageSize = other.m_pageSize;
-    m_alignment = other.m_alignment;
-    m_prefetch = other.m_prefetch;
-
-    m_numa = other.m_numa;
-
-    m_mappedRanges = std::move(other.m_mappedRanges);
-
-    m_permissions = other.m_permissions;
-    m_permissionsCallback = other.m_permissionsCallback;
-
-    other.m_backing = Backing::Unknown;
-
-    other.m_addr = nullptr;
-
-    other.m_mapLength = 0;
-    other.m_pageSize = 0;
-    other.m_alignment = 1;
-    other.m_prefetch = 0;
-
-    other.m_numa = false;
-
+    m_backing                       = other.m_backing;
+    m_mapOffset                     = other.m_mapOffset;
+    m_mapAccess                     = other.m_mapAccess;
+    m_file                          = std::move(other.m_file);
+    m_memLock                       = std::move(other.m_memLock);
+    m_addr                          = other.m_addr;
+    m_mapLength                     = other.m_mapLength;
+    m_pageSize                      = other.m_pageSize;
+    m_alignment                     = other.m_alignment;
+    m_prefetch                      = other.m_prefetch;
+    m_numa                          = other.m_numa;
+    m_mappedRanges                  = std::move(other.m_mappedRanges);
+    m_permissions                   = other.m_permissions;
+    m_permissionsCallback           = other.m_permissionsCallback;
+    other.m_backing                 = Backing::Unknown;
+    other.m_mapOffset               = 0;
+    other.m_mapAccess               = JobFile::Access::ReadOnly;
+    other.m_addr                    = nullptr;
+    other.m_mapLength               = 0;
+    other.m_pageSize                = 0;
+    other.m_alignment               = 1;
+    other.m_prefetch                = 0;
+    other.m_numa                    = false;
     other.m_mappedRanges.clear();
-
-    other.m_permissions = IOPermissions::DefaultFile;
-    other.m_permissionsCallback = nullptr;
+    other.m_permissions             = IOPermissions::DefaultFile;
+    other.m_permissionsCallback     = nullptr;
 }
 
 } // namespace job::io

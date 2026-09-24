@@ -1,8 +1,13 @@
 cmake_minimum_required(VERSION 3.16)
 project(JosephsOddBuilder
-    VERSION 0.1
+    VERSION 0.0.1
     LANGUAGES CXX
 )
+
+add_compile_definitions(JOB_VERSION_MAJOR=${PROJECT_VERSION_MAJOR})
+add_compile_definitions(JOB_VERSION_MINOR=${PROJECT_VERSION_MINOR})
+add_compile_definitions(JOB_VERSION_PATCH=${PROJECT_VERSION_PATCH})
+
 
 # Build time options and overrrides
 include(cmake/build_options.cmake)
@@ -20,6 +25,10 @@ include(cmake/build_deps.cmake)
 if(JOB_BUILD_SERIALIZER_MSGPACK)
     include(cmake/job_msgpack_gen_lib.cmake)
     add_subdirectory(apps/job_msg_gen)
+endif()
+
+if(JOB_BUILD_RENDER_WAYLAND)
+    include(cmake/job_wayland_scanner.cmake)
 endif()
 
 if(JOB_CUDA)

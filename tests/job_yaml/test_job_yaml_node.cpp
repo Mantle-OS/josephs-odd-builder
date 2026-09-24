@@ -335,7 +335,8 @@ TEST_CASE("YamlNode materialized scalar becomes independent of source",
     YamlNode node;
     node.setScalarView(std::string_view{source, 5});
 
-    node.scalar();
+    std::string s = node.scalar();
+    REQUIRE(!s.empty());
 
     source[0] = 'X';
 

@@ -251,7 +251,7 @@ private:
     bool                                                m_focusEventEnabled = false;
     char32_t                                            m_lastCharPrinted = U' ';
     Attributes                                          m_lastCharAttr;
-    SEE_MODE                                            m_editingExtent = SEE_MODE::LINE;
+    SEE_MODE                                            m_editingExtent  = SEE_MODE::LINE;
     DECSCA_MODE                                         m_protectionMode = DECSCA_MODE::NONE;
     std::vector<std::string>                            m_titleStack;
 

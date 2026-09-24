@@ -3,6 +3,7 @@
 #include <array>
 #include <chrono>
 #include <cstring>
+#include <limits>
 
 #include <job_logger.h>
 
@@ -21,10 +22,7 @@ FrameSerializer::FrameSerializer(IFrameSink::Ptr sink) noexcept :
         JOB_LOG_WARN("[FrameSerializer] constructed with null sink. writeFrame() will fail.");
 }
 
-bool FrameSerializer::writeFrame(std::uint64_t    frameId,
-                                 const Particles &particles,
-                                 const DiskModel &diskModel,
-                                 const Zones     &zones)
+bool FrameSerializer::writeFrame(std::uint64_t frameId, const Particles &particles, const DiskModel &diskModel, const Zones &zones)
 {
     if (!m_sink || !m_sink->isReady()) {
         JOB_LOG_WARN("[FrameSerializer] writeFrame called with no open sink");
@@ -34,19 +32,26 @@ bool FrameSerializer::writeFrame(std::uint64_t    frameId,
     if (particles.empty())
         return false;
 
-    const std::uint64_t timestampNs =
-        std::chrono::duration_cast<std::chrono::nanoseconds>(
-            std::chrono::steady_clock::now().time_since_epoch())
-            .count();
+    constexpr std::size_t configBytes = sizeof(DiskModel) + sizeof(Zones);
+    constexpr std::size_t maxPayloadBytes = std::numeric_limits<std::uint32_t>::max();
+    constexpr std::size_t maxParticleCount = std::numeric_limits<std::uint32_t>::max();
 
-    const std::size_t configBytes   = sizeof(DiskModel) + sizeof(Zones);
+    if (particles.size() > maxParticleCount) {
+        JOB_LOG_WARN("[FrameSerializer] particle count exceeds frame format limit");
+        return false;
+    }
+
+    if (particles.size() > (maxPayloadBytes - configBytes) / sizeof(Particle)) {
+        JOB_LOG_WARN("[FrameSerializer] frame payload exceeds frame format limit");
+        return false;
+    }
+
+    const std::uint64_t timestampNs = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
     const std::size_t particleBytes = particles.size() * sizeof(Particle);
-    const std::uint32_t totalPayloadSize =
-        static_cast<std::uint32_t>(configBytes + particleBytes);
+    const std::size_t payloadBytes = configBytes + particleBytes;
+    const std::uint32_t totalPayloadSize = static_cast<std::uint32_t>(payloadBytes);
 
-    std::vector<std::uint8_t> buffer;
-    buffer.resize(totalPayloadSize);
-
+    std::vector<std::uint8_t> buffer(payloadBytes);
     std::uint8_t *currentPtr = buffer.data();
 
     std::memcpy(currentPtr, &diskModel, sizeof(DiskModel));
@@ -63,15 +68,12 @@ bool FrameSerializer::writeFrame(std::uint64_t    frameId,
         static_cast<std::uint32_t>(particles.size()),
         totalPayloadSize);
 
-    // Magic is stored little-endian on disk
     header.magic = job::core::toLE32(FrameHeader::kMagic);
 
-    // CRC over the payload
     header.crc32 = job::core::Crc32::compute(
-        reinterpret_cast<const std::uint8_t *>(buffer.data()),
+        buffer.data(),
         static_cast<std::size_t>(header.byteLength));
 
-    // Let the sink deal with *how* this goes out (file, socket, shm, etc.)
     return m_sink->writeFrame(header, buffer.data(), buffer.size());
 }
 

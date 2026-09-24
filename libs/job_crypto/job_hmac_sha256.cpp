@@ -117,7 +117,6 @@ JobSecureMem JobHmacSha256::computeSecure(const void *data,
                                           std::size_t keySize) noexcept
 {
     Mac mac = compute(data, dataSize, key, keySize);
-
     JobSecureMem secureMac{kMacSize};
     if (secureMac.empty()) {
 #ifndef NDEBUG

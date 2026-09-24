@@ -59,12 +59,12 @@ public:
             std::size_t h = std::hash<uint16_t>{}(attr.flags);
 
             // Only hash colors if the validity bit is set
-            if (attr.hasFg) {
+            if (attr.hasFg)
                 h ^= std::hash<uint32_t>{}(attr.m_fg.toInt()) + 0x9e3779b9 + (h << 6) + (h >> 2);
-            }
-            if (attr.hasBg) {
+
+            if (attr.hasBg)
                 h ^= std::hash<uint32_t>{}(attr.m_bg.toInt()) + 0x9e3779b9 + (h << 6) + (h >> 2);
-            }
+
             return h;
         }
     };
@@ -77,28 +77,28 @@ public: // Direct access allowed for bitfields (standard C++ practice for POD-li
 #pragma GCC diagnostic ignored "-Wpedantic"
         struct {
             // Style Flags (9 bits)
-            uint16_t bold          : 1;
-            uint16_t faint         : 1;
-            uint16_t italic        : 1;
-            uint16_t strikethrough : 1;
-            uint16_t inverse       : 1;
-            uint16_t conceal       : 1;
-            uint16_t framed        : 1;
-            uint16_t encircled     : 1;
-            uint16_t overline      : 1;
+            std::uint16_t bold          : 1;
+            std::uint16_t faint         : 1;
+            std::uint16_t italic        : 1;
+            std::uint16_t strikethrough : 1;
+            std::uint16_t inverse       : 1;
+            std::uint16_t conceal       : 1;
+            std::uint16_t framed        : 1;
+            std::uint16_t encircled     : 1;
+            std::uint16_t overline      : 1;
 
             // Blink (2 bits)
-            uint16_t blink         : 2;  // 0=none, 1=slow, 2=rapid
+            std::uint16_t blink         : 2;  // 0=none, 1=slow, 2=rapid
 
             // Packed Underline Style (3 bits, fits 0-7)
-            uint16_t underlineVal  : 3;
+            std::uint16_t underlineVal  : 3;
 
             // Packed "Has Color" flags (2 bits) -> Replaces std::optional overhead
-            uint16_t hasFg         : 1;
-            uint16_t hasBg         : 1;
+            std::uint16_t hasFg         : 1;
+            std::uint16_t hasBg         : 1;
         };
         // Total: 16 bits = 2 bytes
-        uint16_t flags = 0;
+        std::uint16_t flags = 0;
 #pragma GCC diagnostic pop
     };
 

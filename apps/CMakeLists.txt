@@ -14,3 +14,8 @@ endif()
 if(JOB_BUILD_MODEL AND JOB_BUILD_GGML AND JOB_BUILD_TOKEN AND JOB_CUDA)
     add_subdirectory(job-inference-test)
 endif()
+
+
+if(JOB_BUILD_RENDER)
+    add_subdirectory(job_render)
+endif()

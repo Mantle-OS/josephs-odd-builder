@@ -85,11 +85,13 @@ public:
         return m_frames.size();
     }
 
+    // Allow warning in gcc 16.2 the contract is real and works but the warning is a bit much. should be const later.
     [[nodiscard]] constexpr YamlParserContext context() const noexcept pre(!m_frames.empty())
     {
         return m_frames.back().context;
     }
 
+    // Allow warning in gcc 16.2 the contract is real and works but the warning is a bit much. should be const later.
     [[nodiscard]] constexpr std::size_t indent() const noexcept pre(!m_frames.empty())
     {
         return m_frames.back().indent;

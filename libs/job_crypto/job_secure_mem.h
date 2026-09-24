@@ -14,7 +14,7 @@ public:
     using Ptr  = std::shared_ptr<JobSecureMem>;
     using UPtr = std::unique_ptr<JobSecureMem>;
 
-    explicit JobSecureMem(size_t size = 0);    
+    JobSecureMem(size_t size = 0);
     [[nodiscard]] static Ptr createShared(size_t size = 0)
     {
         return std::make_shared<JobSecureMem>(size);

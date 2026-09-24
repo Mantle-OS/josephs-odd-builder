@@ -233,7 +233,7 @@ TEST_CASE("JsonNumberKernel benchmarks", "[job_json][number_kernel][benchmark]")
         const auto text = job::json::tests::benchmarkOpaque<std::string_view>("123456789");
 
         std::int32_t value{};
-        job::json::JsonNumberKernel::parse(text, value);
+        REQUIRE(job::json::JsonNumberKernel::parse(text, value));
 
         job::json::tests::benchmarkDoNotOptimize(value);
         return value;
@@ -244,7 +244,7 @@ TEST_CASE("JsonNumberKernel benchmarks", "[job_json][number_kernel][benchmark]")
         const auto text = job::json::tests::benchmarkOpaque<std::string_view>("18446744073709551615");
 
         std::uint64_t value{};
-        job::json::JsonNumberKernel::parse(text, value);
+        REQUIRE(job::json::JsonNumberKernel::parse(text, value));
 
         job::json::tests::benchmarkDoNotOptimize(value);
         return value;
@@ -255,7 +255,7 @@ TEST_CASE("JsonNumberKernel benchmarks", "[job_json][number_kernel][benchmark]")
         const auto text = job::json::tests::benchmarkOpaque<std::string_view>("123.456");
 
         float value{};
-        job::json::JsonNumberKernel::parse(text, value);
+        REQUIRE(job::json::JsonNumberKernel::parse(text, value));
 
         job::json::tests::benchmarkDoNotOptimize(value);
         return value;
@@ -266,7 +266,7 @@ TEST_CASE("JsonNumberKernel benchmarks", "[job_json][number_kernel][benchmark]")
         const auto text = job::json::tests::benchmarkOpaque<std::string_view>("-1.23456789e42");
 
         double value{};
-        job::json::JsonNumberKernel::parse(text, value);
+        REQUIRE(job::json::JsonNumberKernel::parse(text, value));
 
         job::json::tests::benchmarkDoNotOptimize(value);
         return value;

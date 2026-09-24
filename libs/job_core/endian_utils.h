@@ -5,11 +5,14 @@
 #include <cstdint>
 #include <type_traits>
 
-#if defined(_MSC_VER)
-#include <cstdlib>
-#endif
-
 namespace job::core {
+
+enum class EndianType : std::uint8_t
+{
+    Native,
+    Little,
+    Big
+};
 
 template <std::integral T>
 [[nodiscard]] constexpr T byteswapInternal(T value) noexcept
@@ -25,16 +28,6 @@ template <std::integral T>
 #if defined(__cpp_lib_byteswap) && __cpp_lib_byteswap >= 202110L
     else {
         return static_cast<T>(std::byteswap(unsignedValue));
-    }
-#elif defined(_MSC_VER)
-    else if constexpr (sizeof(T) == 2) {
-        return static_cast<T>(_byteswap_ushort(static_cast<unsigned short>(unsignedValue)));
-    } else if constexpr (sizeof(T) == 4) {
-        return static_cast<T>(_byteswap_ulong(static_cast<unsigned long>(unsignedValue)));
-    } else if constexpr (sizeof(T) == 8) {
-        return static_cast<T>(_byteswap_uint64(static_cast<unsigned __int64>(unsignedValue)));
-    } else {
-        static_assert(sizeof(T) == 2 || sizeof(T) == 4 || sizeof(T) == 8, "byteswapInternal: unsupported integral size for this platform's intrinsics");
     }
 #elif defined(__GNUC__) || defined(__clang__)
     else if constexpr (sizeof(T) == 2) {

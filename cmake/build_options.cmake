@@ -42,6 +42,8 @@ endif()
 # Gate Keepers
 ##############################
 option(JOB_CUDA   "Add nvidia cuda support " ON)
+option(JOB_OPENGL "Add full openGl support " ON)
+
 option(JOB_APPS   "Build the Example applications that are supported" ON)
 
 
@@ -79,7 +81,24 @@ option(JOB_BUILD_SOUND "Build the job_sound library" ON)
 option(JOB_BUILD_UART "Build the job_uart library" ON)
 option(JOB_BUILD_USB "Build the job_usb library" ON)
 
+option(JOB_BUILD_RASTER "Build the job_raster library" ON)
+option(JOB_BUILD_OPENGL "Build the job_opengl library" ON)
+option(JOB_BUILD_VULKAN "Build the job_vulkan library" ON)
+
+option(JOB_BUILD_RENDER "Build the job_render library" ON)
+option(JOB_BUILD_RENDER_FB "Build the Linux framebuffer backend for job_render" ON)
+option(JOB_BUILD_RENDER_KMS "Build the KMS/DRM backend for job_render" ON)
+
+option(JOB_BUILD_RENDER_WAYLAND "Build the Wayland backend for job_render" ON)
+option(JOB_BUILD_RENDER_WAYLAND_CLIENT "Build the Wayland client for job_render" ON)
+option(JOB_BUILD_RENDER_WAYLAND_SERVER "Build the Wayland server for job_render" ON)
+
+
+# option(JOB_BUILD_RENDER_MIR "Build the KMS MIR backend for job_render" OFF)
+
+option(JOB_BUILD_GUI "Build the job_gui library" ON)
 # option(JOB_BUILD_DAMAGE "Build the job_damage library" OFF)
+option(JOB_BUILD_TUI "Build the job_tui library" OFF)
 
 option(JOB_BUILD_ZSTD "Build the job_zstd library" ON)
 option(JOB_BUILD_SCIENCE "Build the job_science library" ON)
@@ -88,7 +107,7 @@ option(JOB_BUILD_ANSI "Build the job_ansi library" ON)
 option(JOB_BUILD_ANSI_LEGACY "Build the job_ansi library" OFF)
 option(JOB_BUILD_TUI "Build the job_tui library" OFF)
 
-option(JOB_BUILD_AI "Build the micro job_ai library" ON)
+option(JOB_BUILD_AI "Build the micro job_ai library" OFF)
 option(JOB_BUILD_GGML "Build JobGgml " ON)
 option(JOB_BUILD_TOKEN "Build the job_token library" ON)
 option(JOB_BUILD_MODEL "Build the job_model library" ON)

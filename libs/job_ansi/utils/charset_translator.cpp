@@ -82,105 +82,21 @@ const std::unordered_map<char32_t, char32_t> CharsetTranslator::DEC_SUPPLEMENTAL
     {U'@', U'€'}   // Euro sign
 };
 
-CharsetTranslator::CharsetTranslator() = default;
+CharsetTranslator::CharsetTranslator() noexcept = default;
 
-void CharsetTranslator::selectCharset(CharsetSet set, CharsetDesignator designator)
-{
-    switch (set) {
-    case CharsetSet::G0:
-        m_g0 = designator;
-        break;
-    case CharsetSet::G1:
-        m_g1 = designator;
-        break;
-    case CharsetSet::G2:
-        m_g2 = designator;
-        break;
-    case CharsetSet::G3:
-        m_g3 = designator;
-        break;
-    }
-}
-
-void CharsetTranslator::setCharSet(CharsetSet set)
-{
-    m_charSet = set;
-}
-
-CharsetSet CharsetTranslator::charSet() const
-{
-    return m_charSet;
-}
-
-CharsetDesignator CharsetTranslator::activeCharset() const
-{
-    CharsetDesignator ret;
-    switch (m_charSet) {
-    case CharsetSet::G0:
-        ret = g0();
-        break;
-    case CharsetSet::G1:
-        ret = g1();
-        break;
-    case CharsetSet::G2:
-        ret = g2();
-        break;
-    case CharsetSet::G3:
-        ret = g3();
-        break;
-    }
-    return ret;
-}
-
-CharsetDesignator CharsetTranslator::g0() const
-{
-    return m_g0;
-}
-
-CharsetDesignator CharsetTranslator::g1() const
-{
-    return m_g1;
-}
-
-CharsetDesignator CharsetTranslator::g2() const
-{
-    return m_g2;
-}
-
-CharsetDesignator CharsetTranslator::g3() const
-{
-    return m_g3;
-}
-
-char32_t CharsetTranslator::applyCharset(char32_t ch) const
+char32_t CharsetTranslator::applyCharset(char32_t ch) const noexcept
 {
     const auto &map = getMap(getDesignatorFor(m_charSet));
-    auto it = map.find(ch);
+    const auto it = map.find(ch);
     return it != map.end() ? it->second : ch;
 }
 
-char32_t CharsetTranslator::resolveCharsetChar(char32_t ch) const
+char32_t CharsetTranslator::resolveCharsetChar(char32_t ch) const noexcept
 {
     return applyCharset(ch);
 }
 
-CharsetDesignator CharsetTranslator::getDesignatorFor(CharsetSet set) const
-{
-    switch (set) {
-    case CharsetSet::G0:
-        return m_g0;
-    case CharsetSet::G1:
-        return m_g1;
-    case CharsetSet::G2:
-        return m_g2;
-    case CharsetSet::G3:
-        return m_g3;
-    default:
-        return CharsetDesignator::UNUSED;
-    }
-}
-
-const std::unordered_map<char32_t, char32_t> &CharsetTranslator::getMap(CharsetDesignator designator) const
+const CharsetTranslator::CharsetMap &CharsetTranslator::getMap(CharsetDesignator designator) const noexcept
 {
     switch (designator) {
     case CharsetDesignator::DEC_SPECIAL_GRAPHICS:
@@ -189,17 +105,18 @@ const std::unordered_map<char32_t, char32_t> &CharsetTranslator::getMap(CharsetD
         return DEC_SUPPLEMENTAL;
     case CharsetDesignator::DEC_TECHNICAL:
         return DEC_TECHNICAL;
-    default:
-        static const std::unordered_map<char32_t, char32_t> empty;
+    default: {
+        static const CharsetMap empty;
         return empty;
+    }
     }
 }
 
-char32_t CharsetTranslator::mapCharForCharset(char32_t ch, CharsetDesignator charset) const
+char32_t CharsetTranslator::mapCharForCharset(char32_t ch, CharsetDesignator charset) const noexcept
 {
     const auto &map = getMap(charset);
-    auto it = map.find(ch);
+    const auto it = map.find(ch);
     return it != map.end() ? it->second : ch;
 }
 
-}
+} // namespace job::ansi::utils

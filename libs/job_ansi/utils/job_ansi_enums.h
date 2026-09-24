@@ -2,11 +2,11 @@
 
 namespace job::ansi::utils::enums {
 
-enum class AnsiSequenceType {
-    CSI,        // \x1B[
-    DECSET,     // \x1B[?
-    OSC,        // \x1B]
-    ESC,        // \x1B + 1 char
+enum class Ansi: char{
+    CSI     = '\x1B[',        // \x1B[
+    DECSET  = '\x1B[?',     // \x1B[?
+    OSC     = '\x1B]',
+    ESC,        // '\x1B' + 1 char
     TEXT,       // Normal printable characters
     UNKNOWN
 };
@@ -218,7 +218,7 @@ enum class CSI_CODE : char {
     RCP_DECRC                   = 'u',          // Restore cursor/attrs
 
 
-    TILDE = '~',                                // Used by CSI sequences like CSI 200~ and CSI 201~ (e.g. bracketed paste)
+    TILDE                       = '~',          // Used by CSI sequences like CSI 200~ and CSI 201~ (e.g. bracketed paste)
 
     PASTE_BEGIN                 = '{',          // Bracketed paste start — internal use
     PASTE_END                   = '|',          // Bracketed paste end — internal use

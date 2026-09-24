@@ -69,7 +69,6 @@ inline const std::string DISABLE_MOUSE_SGR = CSI + "?1006l";
 
 // --- Combined Mouse Tracking ---
 inline const std::string ENABLE_MOUSE_ALL = ENABLE_MOUSE_X10 + ENABLE_MOUSE_BUTTON_EVENT + ENABLE_MOUSE_SGR;
-
 inline const std::string DISABLE_MOUSE_ALL = DISABLE_MOUSE_X10 + DISABLE_MOUSE_BUTTON_EVENT + DISABLE_MOUSE_SGR;
 
 }
