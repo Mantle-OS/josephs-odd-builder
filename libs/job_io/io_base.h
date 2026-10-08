@@ -6,6 +6,8 @@
 #include <memory>
 #include <string>
 #include <unistd.h>
+#include <utility>
+#include <vector>
 
 #include "job_permissions.h"
 

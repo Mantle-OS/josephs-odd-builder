@@ -2,7 +2,7 @@
 
 #include <cstdint>
 
-namespace job::render {
+namespace job::core {
 
 enum class FormatType : std::uint16_t
 {

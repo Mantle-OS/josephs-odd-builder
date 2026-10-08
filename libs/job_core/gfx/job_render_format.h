@@ -8,7 +8,7 @@
 #include "job_render_format_type.h"
 #include "job_color_channel_info.h"
 
-namespace job::render {
+namespace job::core {
 
 class JobRenderFormat
 {

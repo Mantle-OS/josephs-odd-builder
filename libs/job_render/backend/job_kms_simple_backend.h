@@ -37,7 +37,7 @@ public:
         return std::make_unique<JobKmsSimpleBackend>();
     }
 
-    [[nodiscard]] bool start(const threads::JobIoAsyncThread::Ptr &loop, const std::string &device = {}, FormatType format = FormatType::XRGB8888);
+    [[nodiscard]] bool start(const threads::JobIoAsyncThread::Ptr &loop, const std::string &device = {}, core::FormatType format = core::FormatType::XRGB8888);
 
     void stop() noexcept;
 

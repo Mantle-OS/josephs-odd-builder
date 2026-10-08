@@ -12,14 +12,19 @@ set(JOBGUI_SOURCES
 )
 
 set(JOBGUI_COLOR_HEADERS
+    color/job_color_keywords.h
+    color/job_color_string.h
+
     color/job_rgba.h # unit8_t
     color/job_rgba_16.h # unit16_t
     color/job_hsv.h
     color/job_hsl.h
     color/job_cmyk.h
+    color/job_hwb.h
     color/job_ncol.h
 
-    color/job_color_keywords.h
+
+
     color/job_color_utils.h
     color/job_color.h
     color/job_color_codec.h
@@ -69,7 +74,7 @@ if(BUILD_SHARED_LIBS)
     add_library(JosephsOddBuilder_Gui SHARED ${JOBGUI_COMPILE_THIS})
 else()
     add_library(JosephsOddBuilder_Gui STATIC ${JOBGUI_COMPILE_THIS})
-    add_compile_definitions(JOBGUI_STATIC_DEFINE)
+    target_compile_definitions(JosephsOddBuilder_Gui PUBLIC JOBGUI_STATIC_DEFINE)
 endif()
 
 set(JOB_GUI_EXPORT_FILE ${CMAKE_CURRENT_BINARY_DIR}/jobgui_export.h)
@@ -147,14 +152,14 @@ install(FILES ${JOBGUI_ELEMENTS_HEADERS}    DESTINATION ${CMAKE_INSTALL_INCLUDED
 install(FILES ${JOBGUI_CONTAINERS_HEADERS}  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/job_gui/containers)
 install(FILES ${JOBGUI_LAYOUTS_HEADERS}     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/job_gui/layouts)
 
-# set(PKGCONFIG_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/pkgconfig")
-# set(PKGCONFIG_FILE "${CMAKE_CURRENT_BINARY_DIR}/job_gui.pc")
-# configure_file(
-#     "${CMAKE_CURRENT_SOURCE_DIR}/jobgui.pc.in"
-#     "${PKGCONFIG_FILE}"
-#     @ONLY
-# )
-# install(FILES "${PKGCONFIG_FILE}"   DESTINATION "${PKGCONFIG_INSTALL_DIR}")
+set(PKGCONFIG_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/pkgconfig")
+set(PKGCONFIG_FILE "${CMAKE_CURRENT_BINARY_DIR}/job_gui.pc")
+configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/jobgui.pc.in"
+    "${PKGCONFIG_FILE}"
+    @ONLY
+)
+install(FILES "${PKGCONFIG_FILE}"   DESTINATION "${PKGCONFIG_INSTALL_DIR}")
 
 install(EXPORT JosephsOddBuilderGuiTargets
     FILE JosephsOddBuilderGuiTargets.cmake

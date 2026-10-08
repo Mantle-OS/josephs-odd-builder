@@ -6,7 +6,7 @@
 #include <gbm.h>
 
 #include "job_drm_format.h"
-#include "job_render_format_type.h"
+#include <job_render_format_type.h>
 
 namespace job::render {
 
@@ -68,7 +68,7 @@ public:
         return JobDrmFormat{m_value};
     }
 
-    [[nodiscard]] constexpr FormatType renderFormat() const noexcept
+    [[nodiscard]] constexpr core::FormatType renderFormat() const noexcept
     {
         return drmFormat().renderFormat();
     }

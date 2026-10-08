@@ -6,6 +6,7 @@
 #include <string>
 #include <string_view>
 
+#include "job_string_utils.h"
 namespace job::ansi::utils {
 
 class RGBColor
@@ -96,26 +97,26 @@ public:
 
     [[nodiscard]] std::string toHexString(bool includeAlpha = false) const
     {
-        constexpr char hex[] = "0123456789ABCDEF";
+        // constexpr char hex[] = "0123456789ABCDEF";
 
         char buffer[9]{};
 
         buffer[0] = '#';
 
-        buffer[1] = hex[(m_red >> 4) & 0x0f];
-        buffer[2] = hex[m_red & 0x0f];
+        buffer[1] = JobStringUtils::kHexChars[(m_red >> 4) & 0x0f];
+        buffer[2] = JobStringUtils::kHexChars[m_red & 0x0f];
 
-        buffer[3] = hex[(m_green >> 4) & 0x0f];
-        buffer[4] = hex[m_green & 0x0f];
+        buffer[3] = JobStringUtils::kHexChars[(m_green >> 4) & 0x0f];
+        buffer[4] = JobStringUtils::kHexChars[m_green & 0x0f];
 
-        buffer[5] = hex[(m_blue >> 4) & 0x0f];
-        buffer[6] = hex[m_blue & 0x0f];
+        buffer[5] = JobStringUtils::kHexChars[(m_blue >> 4) & 0x0f];
+        buffer[6] = JobStringUtils::kHexChars[m_blue & 0x0f];
 
         if (!includeAlpha)
             return std::string(buffer, 7);
 
-        buffer[7] = hex[(m_alpha >> 4) & 0x0f];
-        buffer[8] = hex[m_alpha & 0x0f];
+        buffer[7] = JobStringUtils::kHexChars[(m_alpha >> 4) & 0x0f];
+        buffer[8] = JobStringUtils::kHexChars[m_alpha & 0x0f];
 
         return std::string(buffer, 9);
     }

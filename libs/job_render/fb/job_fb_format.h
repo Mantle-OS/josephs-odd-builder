@@ -22,14 +22,14 @@ public:
 
     [[nodiscard]] static JobFbFormatResult detect(const JobFbFixedInfo &fixed, const JobFbVariableInfo &variable) noexcept;
 
-    [[nodiscard]] static FormatType fromFourCc(FourCc fourCc) noexcept;
+    [[nodiscard]] static core::FormatType fromFourCc(FourCc fourCc) noexcept;
 
 private:
     [[nodiscard]] static JobFbFormatResult detectFourCc(const JobFbFixedInfo &fixed, const JobFbVariableInfo &variable) noexcept;
     [[nodiscard]] static JobFbFormatResult detectLegacy(const JobFbFixedInfo &fixed, const JobFbVariableInfo &variable) noexcept;
-    [[nodiscard]] static FormatType detectTrueColor(const JobFbVariableInfo &variable) noexcept;
-    [[nodiscard]] static FormatType detectMonochrome(const JobFbFixedInfo &fixed, const JobFbVariableInfo &variable) noexcept;
-    [[nodiscard]] static FormatType detectPseudoColor(const JobFbFixedInfo &fixed, const JobFbVariableInfo &variable) noexcept;
+    [[nodiscard]] static core::FormatType detectTrueColor(const JobFbVariableInfo &variable) noexcept;
+    [[nodiscard]] static core::FormatType detectMonochrome(const JobFbFixedInfo &fixed, const JobFbVariableInfo &variable) noexcept;
+    [[nodiscard]] static core::FormatType detectPseudoColor(const JobFbFixedInfo &fixed, const JobFbVariableInfo &variable) noexcept;
 };
 
 }

@@ -160,6 +160,19 @@ public:
                m_presenter;
     }
 
+    [[nodiscard]] const JobDrmFormat &format() const noexcept
+    {
+        return m_format;
+    }
+    [[nodiscard]] const JobDrmPlane &plane() const noexcept
+    {
+        return  m_plane;
+    }
+    [[nodiscard]] bool explicitModifiers() const noexcept
+    {
+        return m_explicitModifiers;
+    }
+
 private:
     [[nodiscard]] bool discoverDisplay();
     [[nodiscard]] bool createGbm();

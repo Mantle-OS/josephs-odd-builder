@@ -17,6 +17,10 @@ set(JOB_CORE_HEADERS
 
     split_mix64.h
     job_siphash.h
+
+    job_string_utils.h
+
+
 )
 
 set(JOB_CORE_SOURCES
@@ -221,6 +225,8 @@ set(JOB_TEXT_HEADERS
     text/job_utf_stream_concept.h # Hello
     text/job_utf_streambuf.h
 
+
+
     text/job_text.h
 )
 
@@ -229,11 +235,15 @@ set(JOB_GFX_SOURCES
 )
 
 set(JOB_GFX_HEADERS
+    gfx/job_rect.h
+    gfx/job_rgb.h
     gfx/job_color_channel.h
     gfx/job_color_channel_info.h
-    gfx/job_render_format.h
     gfx/job_render_format_type.h
+    gfx/job_render_format.h
+    gfx/job_color_type.h
     gfx/job_color_concept.h
+    gfx/job_ansi_color_utils.h # hello
 )
 
 set(JOB_CONTAINER_HEADERS
@@ -249,13 +259,6 @@ set(JOB_CONTAINER_SOURCES
 
 )
 
-set(JOB_GFX_HEADERS
-    gfx/job_color_channel.h
-    gfx/job_color_channel_info.h
-    gfx/job_render_format.h
-    gfx/job_render_format_type.h
-    gfx/job_color_concept.h
-)
 
 
 set(JOBCORE_COMPILE_THIS

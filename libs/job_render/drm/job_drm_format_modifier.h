@@ -39,7 +39,7 @@ public:
         return m_format.valid() && m_modifier.valid();
     }
 
-    [[nodiscard]] constexpr FormatType renderFormat() const noexcept
+    [[nodiscard]] constexpr core::FormatType renderFormat() const noexcept
     {
         return m_format.renderFormat();
     }

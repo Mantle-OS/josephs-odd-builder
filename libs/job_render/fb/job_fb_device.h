@@ -94,7 +94,7 @@ public:
         return m_format;
     }
 
-    [[nodiscard]] FormatType format() const noexcept
+    [[nodiscard]] core::FormatType format() const noexcept
     {
         return m_format.format;
     }

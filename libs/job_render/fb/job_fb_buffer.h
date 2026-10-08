@@ -26,7 +26,7 @@ public:
                 std::uint32_t xOffset, std::uint32_t yOffset,
                 std::uint32_t stride,
                 std::uint32_t bitsPerPixel,
-                FormatType format,
+                core::FormatType format,
                 JobFbVisual visual) noexcept :
         m_data(data),
         m_size(size),
@@ -61,7 +61,7 @@ public:
                                           std::uint32_t yOffset,
                                           std::uint32_t stride,
                                           std::uint32_t bitsPerPixel,
-                                          FormatType format,
+                                          core::FormatType format,
                                           JobFbVisual visual)
     {
         return std::make_shared<JobFbBuffer>(data,
@@ -88,7 +88,7 @@ public:
                                          std::uint32_t yOffset,
                                          std::uint32_t stride,
                                          std::uint32_t bitsPerPixel,
-                                         FormatType format,
+                                         core::FormatType format,
                                          JobFbVisual visual)
     {
         return std::make_unique<JobFbBuffer>(data,
@@ -170,7 +170,7 @@ public:
         return m_bitsPerPixel;
     }
 
-    [[nodiscard]] FormatType format() const noexcept
+    [[nodiscard]] core::FormatType format() const noexcept
     {
         return m_format;
     }
@@ -194,7 +194,7 @@ public:
                m_height         <= m_virtualHeight - m_yOffset &&
                m_stride         != 0 &&
                m_bitsPerPixel   != 0 &&
-               m_format         != FormatType::Unknown;
+               m_format         != core::FormatType::Unknown;
     }
 
 private:
@@ -208,7 +208,7 @@ private:
     std::uint32_t   m_yOffset{};
     std::uint32_t   m_stride{};
     std::uint32_t   m_bitsPerPixel{};
-    FormatType      m_format{FormatType::Unknown};
+    core::FormatType      m_format{core::FormatType::Unknown};
     JobFbVisual     m_visual;
 };
 

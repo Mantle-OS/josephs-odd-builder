@@ -12,7 +12,8 @@ enum class RenderBackend : std::uint8_t
     Default,
     Kms,
     KmsSimple,
-    Framebuffer
+    Framebuffer,
+    Ansi
 };
 
 class JobRenderApplicationArgs

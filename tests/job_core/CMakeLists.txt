@@ -17,6 +17,7 @@ add_executable(test_job_core
     test_job_siphash.cpp
     test_timer.cpp
     test_logger.cpp
+    test_string_utils.cpp
     ${JOB_CORE_TEST_CONTAINERS_FILES}
 
 )

@@ -67,6 +67,21 @@ if(JOB_BUILD_USB)
     add_subdirectory(job_usb)
 endif()
 
+if(JOB_BUILD_INPUT)
+    add_subdirectory(job_input)
+    if(HAS_LIBINPUT)
+        # add_subdirectory(job_input/libinput)
+    endif()
+    if(HAS_LIBEVDEV)
+        # add_subdirectory(job_input/evdev)
+    endif()
+endif()
+
+
+
+
+
+
 if(JOB_BUILD_SERIALIZER)
     add_subdirectory(job_serializer)
 

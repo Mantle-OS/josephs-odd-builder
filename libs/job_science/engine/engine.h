@@ -381,7 +381,7 @@ private:
                 {
                     auto ioWrite = std::make_shared<job::io::FileIO>(
                         outPath,
-                        job::io::FileMode::RegularFile,
+                         job::io::FileMode::RegularFile,
                         true // write mode
                         );
 

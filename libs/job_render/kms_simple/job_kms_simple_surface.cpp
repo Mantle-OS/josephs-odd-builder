@@ -34,7 +34,7 @@ JobKmsSimpleSurface::UPtr JobKmsSimpleSurface::createUniq(JobDrmSimpleDevice::Pt
     return std::make_unique<JobKmsSimpleSurface>(std::move(device));
 }
 
-bool JobKmsSimpleSurface::create(std::uint32_t width, std::uint32_t height, FormatType format)
+bool JobKmsSimpleSurface::create(std::uint32_t width, std::uint32_t height, core::FormatType format)
 {
     destroy();
 
@@ -91,7 +91,7 @@ void JobKmsSimpleSurface::destroy()
         m_height            = 0;
         m_stride            = 0;
         m_size              = 0;
-        m_format            = FormatType::Unknown;
+        m_format            = core::FormatType::Unknown;
         return;
     }
 
@@ -119,7 +119,7 @@ void JobKmsSimpleSurface::destroy()
     m_height    = 0;
     m_stride    = 0;
     m_size      = 0;
-    m_format    = FormatType::Unknown;
+    m_format    = core::FormatType::Unknown;
 }
 
 std::uint32_t JobKmsSimpleSurface::width() const noexcept
@@ -132,7 +132,7 @@ std::uint32_t JobKmsSimpleSurface::height() const noexcept
     return m_height;
 }
 
-FormatType JobKmsSimpleSurface::format() const noexcept
+core::FormatType JobKmsSimpleSurface::format() const noexcept
 {
     return m_format;
 }

@@ -11,7 +11,7 @@ JobKmsSimpleBackend::~JobKmsSimpleBackend()
     stop();
 }
 
-bool JobKmsSimpleBackend::start(const threads::JobIoAsyncThread::Ptr &loop, const std::string &device, FormatType format)
+bool JobKmsSimpleBackend::start(const threads::JobIoAsyncThread::Ptr &loop, const std::string &device, core::FormatType format)
 {
     if (running())
         return true;
@@ -77,7 +77,7 @@ bool JobKmsSimpleBackend::refresh()
     if (m_presenter->presentPending())
         return false;
 
-    const FormatType format = m_surface->format();
+    const core::FormatType format = m_surface->format();
 
     if (!m_presenter->refresh())
         return false;

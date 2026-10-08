@@ -15,15 +15,15 @@ enum class FbFormatSource : std::uint8_t
 
 struct JobFbFormatResult
 {
-    FormatType      format{FormatType::Unknown};
-    FbFormatSource  source{FbFormatSource::Unknown};
+    core::FormatType    format{core::FormatType::Unknown};
+    FbFormatSource      source{FbFormatSource::Unknown};
 
     using FourCc = std::uint32_t;
     FourCc          fourCc{};
 
     [[nodiscard]] constexpr bool valid() const noexcept
     {
-        return format != FormatType::Unknown;
+        return format != core::FormatType::Unknown;
     }
 
     [[nodiscard]] constexpr bool legacy() const noexcept

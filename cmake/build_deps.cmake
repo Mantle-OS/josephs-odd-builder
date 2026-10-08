@@ -11,8 +11,17 @@ pkg_check_modules(LibZstd    REQUIRED libzstd)
 pkg_check_modules(LibZ       REQUIRED zlib)
 pkg_check_modules(LibSodium  REQUIRED libsodium)
 
-## UART (used in both job_serial and job_usb)
-pkg_check_modules(LibUdev REQUIRED libudev)
+## UART (used in both job_serial and job_usb, job_render)
+set(HAS_UDEV OFF)
+pkg_check_modules(LibUdev libudev)
+if(${LibUdev_FOUND})
+    set(HAS_UDEV ON)
+    add_compile_definitions(JOB_HAS_UDEV=1)
+
+endif()
+if(JOB_BUILD_UART OR JOB_BUILD_INPUT_LIBINPUT OR JOB_BUILD_INPUT_USB AND NOT ${LibUdev_FOUND})
+    message("Your Current Build setup needs LibInput please install the development package")
+endif()
 
 ## USB (job_usb)
 pkg_check_modules(LibUsb-1.0 REQUIRED libusb-1.0)
@@ -40,6 +49,22 @@ if(JOB_BUILD_SOUND)
     endif()
 endif()
 
+
+set(HAS_LIBINPUT OFF)
+pkg_check_modules(LibInput libinput)
+if(${LibInput_FOUND})
+    set(HAS_LIBINPUT ON)
+    add_compile_definitions(JOB_HAS_LIBINPUT=1)
+endif()
+
+set(HAS_LIBEVDEV OFF)
+pkg_check_modules(LibEvdev evdev)
+if(${LibEvdev})
+    set(HAS_LIBEVDEV ON)
+    add_compile_definitions(JOB_HAS_LIBEVDEV=1)
+endif()
+
+
 ## Start Graphics
 if(JOB_BUILD_OPENGL)
     pkg_check_modules(OpenGl REQUIRED opengl)
@@ -55,19 +80,25 @@ if(JOB_BUILD_VULKAN)
 endif()
 
 if(JOB_BUILD_RENDER)
-    option(HAS_RENDER_BACKEND  "" OFF)
-    option(HAS_DRM             "" OFF)
-    option(HAS_DRI             "" OFF)
-    option(HAS_EGL             "" OFF)
-    option(HAS_GBM             "" OFF)
-    option(HAS_3D_GFX          "" OFF)
-    option(HAS_SIMPLE_KMS      "" OFF)
-    option(HAS_FULL_KMS        "" OFF)
+    set(HAS_RENDER_BACKEND   OFF)
+    set(HAS_DRM              OFF)
+    set(HAS_DRI              OFF)
+    set(HAS_EGL              OFF)
+    set(HAS_GBM              OFF)
+    set(HAS_3D_GFX           OFF)
+    set(HAS_SIMPLE_KMS       OFF)
+    set(HAS_FULL_KMS         OFF)
     # set(HAS_WAYLAND         OFF)
 
 
     pkg_check_modules(XkbCommon REQUIRED xkbcommon)
-    pkg_check_modules(LibInput  REQUIRED libinput)
+
+    # FIXME come back to this after job_input is a real thing.
+    if(NOT HAS_LIBINPUT)
+        message(FATAL_ERROR "JOB_BUILD_RENDER currently needs libinput and friends")
+        # pkg_check_modules(LibInput  REQUIRED libinput)
+    endif()
+
     pkg_check_modules(FreeType  REQUIRED freetype2)
     pkg_check_modules(Harfbuzz  REQUIRED harfbuzz)
 

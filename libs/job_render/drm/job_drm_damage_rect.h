@@ -19,7 +19,7 @@ public:
 
     }
 
-    explicit constexpr JobDrmDamageRect(JobRect rect) noexcept :
+    explicit constexpr JobDrmDamageRect(core::JobRect rect) noexcept :
         m_rect(rect)
     {
 
@@ -68,7 +68,7 @@ public:
         return m_rect.valid() && m_rect.x1 >= 0 && m_rect.y1 >= 0;
     }
 
-    [[nodiscard]] constexpr const JobRect &rect() const noexcept
+    [[nodiscard]] constexpr const core::JobRect &rect() const noexcept
     {
         return m_rect;
     }
@@ -91,7 +91,7 @@ public:
     [[nodiscard]] friend constexpr bool operator==(const JobDrmDamageRect &, const JobDrmDamageRect &) noexcept = default;
 
 private:
-    JobRect m_rect;
+    core::JobRect m_rect;
 };
 //FB_DAMAGE_CLIPS
 }

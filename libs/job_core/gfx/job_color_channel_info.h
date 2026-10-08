@@ -4,7 +4,7 @@
 
 #include "job_color_channel.h"
 
-namespace job::render {
+namespace job::core {
 static constexpr std::size_t kMaximumChannelCount = 4;
 struct JobColorChannelInfo
 {

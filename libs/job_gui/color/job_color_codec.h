@@ -5,7 +5,8 @@
 
 #include <job_render_format.h>
 #include <job_render_format_type.h>
-
+#include <job_color_concept.h>
+#include <job_rgb.h>
 #include "job_color.h"
 
 namespace job::render {
@@ -24,13 +25,12 @@ public:
     JobColorCodec(JobColorCodec &&) = delete;
     JobColorCodec &operator=(JobColorCodec &&) = delete;
 
-    [[nodiscard]] static constexpr bool supports(FormatType format) noexcept
+    [[nodiscard]] static constexpr bool supports(core::FormatType format) noexcept
     {
-        if (format == FormatType::Unknown)
+        if (format == core::FormatType::Unknown)
             return false;
 
-        const auto info = JobRenderFormat::info(format);
-
+        const auto info = core::JobRenderFormat::info(format);
         if (info.planeCount != 1)
             return false;
 
@@ -48,22 +48,22 @@ public:
         return false;
     }
 
-    [[nodiscard]] static constexpr std::optional<Packed> pack(JobColor color, FormatType format) noexcept
+    template <core::JobColorConcept Color>
+    [[nodiscard]] static constexpr std::optional<Packed> pack(const Color &color, core::FormatType format) noexcept
     {
         if (!supports(format))
             return std::nullopt;
 
-        const auto info = JobRenderFormat::info(format);
+        if (!color.supports(format))
+            return std::nullopt;
 
+        const auto info = core::JobRenderFormat::info(format);
         Packed packed{};
-
         for (const auto &channel : info.channels) {
             if (!channel.valid())
                 continue;
 
-            const auto source = color.channel(channel.channel);
-            const auto scaled = scale(source, channel.bits);
-
+            const auto scaled = scale(color, channel.channel, channel.bits);
             packed |= scaled << channel.shift;
         }
 
@@ -71,20 +71,20 @@ public:
     }
 
 private:
-    [[nodiscard]] static constexpr Packed scale(JobColor::Channel value, std::uint8_t bits) noexcept
+    template <core::JobColorConcept Color>
+    [[nodiscard]] static constexpr Packed scale(const Color &color, core::JobColorChannel channel, std::uint8_t bits) noexcept
     {
-        if (bits == 0)
+        if (bits == 0 || bits >= 64)
             return 0;
 
-        if (bits == 8)
-            return static_cast<Packed>(value);
+        const auto value = color.channel(channel);
+        const auto sourceMaximum = color.channelMaximum(channel);
 
-        if (bits >= 64)
+        if (sourceMaximum == 0)
             return 0;
 
-        const Packed maximum = (Packed{1} << bits) - 1;
-
-        return (static_cast<Packed>(value) * maximum + 127u) / 255u;
+        const Packed destinationMaximum = (Packed{1} << bits) - 1;
+        return (static_cast<Packed>(value) * destinationMaximum + static_cast<Packed>(sourceMaximum / 2)) / static_cast<Packed>(sourceMaximum);
     }
 };
 

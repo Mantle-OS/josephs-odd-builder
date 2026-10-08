@@ -31,8 +31,8 @@ public:
     {
     }
 
-    AlsaDevice(const AlsaDevice &other)
-        : m_pcmClass(other.m_pcmClass),
+    AlsaDevice(const AlsaDevice &other) :
+        m_pcmClass(other.m_pcmClass),
         m_subClass(other.m_subClass),
         m_name(other.m_name),
         m_uid(other.m_uid),

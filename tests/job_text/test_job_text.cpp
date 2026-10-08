@@ -44,21 +44,14 @@ TEST_CASE("job_text exposes transcoding", "[core][text][usage][transcode]")
 
     std::array<char16_t, 4> utf16{};
 
-    const auto toUtf16 = TextTranscoder::transcode<
-        TextCodec<TextEncoding::Utf8>,
-        TextCodec<TextEncoding::Utf16>
-        >(input, utf16);
-
+    const auto toUtf16 = TextTranscoder::transcode<TextCodec<TextEncoding::Utf8>, TextCodec<TextEncoding::Utf16>>(input, utf16);
     REQUIRE(toUtf16.status == TextTranscodeStatus::Complete);
     CHECK(toUtf16.inputConsumed == input.size());
     CHECK(toUtf16.outputProduced == utf16.size());
 
     std::array<char32_t, 3> utf32{};
 
-    const auto toUtf32 = TextTranscoder::transcode<
-        TextCodec<TextEncoding::Utf16>,
-        TextCodec<TextEncoding::Utf32>
-        >(utf16, utf32);
+    const auto toUtf32 = TextTranscoder::transcode<TextCodec<TextEncoding::Utf16>, TextCodec<TextEncoding::Utf32>>(utf16, utf32);
 
     REQUIRE(toUtf32.status == TextTranscodeStatus::Complete);
     CHECK(toUtf32.inputConsumed == utf16.size());
@@ -72,16 +65,9 @@ TEST_CASE("job_text exposes transcoding", "[core][text][usage][transcode]")
 TEST_CASE("job_text public surface supports constexpr transcoding", "[core][text][constexpr]")
 {
     constexpr auto result = [] {
-        constexpr std::array<char32_t, 1> input{
-            0x1F680
-        };
-
+        constexpr std::array<char32_t, 1> input{ 0x1F680 };
         std::array<std::uint8_t, 4> output{};
-
-        const auto transcodeResult = TextTranscoder::transcode<
-            TextCodec<TextEncoding::Utf32>,
-            TextCodec<TextEncoding::Utf8>
-            >(input, output);
+        const auto transcodeResult = TextTranscoder::transcode<TextCodec<TextEncoding::Utf32>, TextCodec<TextEncoding::Utf8>>(input, output);
 
         return std::pair{output, transcodeResult};
     }();
@@ -102,20 +88,9 @@ TEST_CASE("job_text public surface supports constexpr transcoding", "[core][text
 
 TEST_CASE("job_text public surface preserves transcode progress", "[core][text][edge][progress]")
 {
-    constexpr std::array<std::uint8_t, 4> input{
-        0x41,
-        0x42,
-        0xE2,
-        0x82
-    };
-
+    constexpr std::array<std::uint8_t, 4> input{ 0x41, 0x42, 0xE2, 0x82 };
     std::array<char32_t, 4> output{};
-
-    const auto result = TextTranscoder::transcode<
-        TextCodec<TextEncoding::Utf8>,
-        TextCodec<TextEncoding::Utf32>
-        >(input, output);
-
+    const auto result = TextTranscoder::transcode<TextCodec<TextEncoding::Utf8>, TextCodec<TextEncoding::Utf32>>(input, output);
     REQUIRE(result.status == TextTranscodeStatus::Incomplete);
     CHECK(result.inputConsumed == 2);
     CHECK(result.outputProduced == 2);

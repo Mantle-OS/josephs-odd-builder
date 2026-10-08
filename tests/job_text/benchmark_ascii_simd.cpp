@@ -18,9 +18,7 @@ namespace job::core::text::tests {
 
 static void benchmarkAsciiValidateSize(std::size_t size)
 {
-    const std::vector<std::uint8_t> input(
-        size,
-        static_cast<std::uint8_t>('A'));
+    const std::vector<std::uint8_t> input(size, static_cast<std::uint8_t>('A'));
 
     BENCHMARK("ASCII validate batch " + std::to_string(size) + " bytes")
     {

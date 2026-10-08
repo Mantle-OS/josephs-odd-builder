@@ -7,5 +7,11 @@ if(HAS_SIMPLE_KMS)
 endif()
 if(HAS_FULL_KMS)
     add_subdirectory(job-kms-basic-test)
+    add_subdirectory(job-kms-damage-quadrant-test)
+
+
+
+    # the final boss lol
+    # add_subdirectory(job-kms-damage-test)
 endif()
 

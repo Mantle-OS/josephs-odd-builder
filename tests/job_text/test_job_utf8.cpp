@@ -23,7 +23,6 @@ TEST_CASE("Utf8 decodes normal UTF-8 text", "[core][text][utf8][usage]")
     };
 
     std::array<UnicodeScalar, 6> output{};
-
     const auto result = Utf8::decode(input, output);
 
     REQUIRE(result.status == Utf8Status::Complete);

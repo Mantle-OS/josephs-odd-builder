@@ -15,45 +15,45 @@ JobFbFormatResult JobFbFormat::detect(const JobFbFixedInfo &fixed, const JobFbVa
     return detectLegacy(fixed, variable);
 }
 
-FormatType JobFbFormat::fromFourCc(FourCc fourCc) noexcept
+core::FormatType JobFbFormat::fromFourCc(FourCc fourCc) noexcept
 {
     switch (fourCc) {
     case V4L2_PIX_FMT_RGB565:
-        return FormatType::RGB565;
+        return core::FormatType::RGB565;
     case V4L2_PIX_FMT_RGB24:
-        return FormatType::RGB888;
+        return core::FormatType::RGB888;
     case V4L2_PIX_FMT_BGR24:
-        return FormatType::BGR888;
+        return core::FormatType::BGR888;
     case V4L2_PIX_FMT_XRGB32:
-        return FormatType::XRGB8888;
+        return core::FormatType::XRGB8888;
     case V4L2_PIX_FMT_XBGR32:
-        return FormatType::XBGR8888;
+        return core::FormatType::XBGR8888;
     case V4L2_PIX_FMT_RGBX32:
-        return FormatType::RGBX8888;
+        return core::FormatType::RGBX8888;
     case V4L2_PIX_FMT_BGRX32:
-        return FormatType::BGRX8888;
+        return core::FormatType::BGRX8888;
     case V4L2_PIX_FMT_ARGB32:
-        return FormatType::ARGB8888;
+        return core::FormatType::ARGB8888;
     case V4L2_PIX_FMT_ABGR32:
-        return FormatType::ABGR8888;
+        return core::FormatType::ABGR8888;
     case V4L2_PIX_FMT_RGBA32:
-        return FormatType::RGBA8888;
+        return core::FormatType::RGBA8888;
     case V4L2_PIX_FMT_BGRA32:
-        return FormatType::BGRA8888;
+        return core::FormatType::BGRA8888;
     case V4L2_PIX_FMT_GREY:
-        return FormatType::Y8;
+        return core::FormatType::Y8;
     case V4L2_PIX_FMT_YUYV:
-        return FormatType::YUYV;
+        return core::FormatType::YUYV;
     case V4L2_PIX_FMT_YVYU:
-        return FormatType::YVYU;
+        return core::FormatType::YVYU;
     case V4L2_PIX_FMT_UYVY:
-        return FormatType::UYVY;
+        return core::FormatType::UYVY;
     case V4L2_PIX_FMT_VYUY:
-        return FormatType::VYUY;
+        return core::FormatType::VYUY;
     case V4L2_PIX_FMT_AYUV32:
-        return FormatType::AYUV;
+        return core::FormatType::AYUV;
     default:
-        return FormatType::Unknown;
+        return core::FormatType::Unknown;
     }
 }
 
@@ -63,8 +63,8 @@ JobFbFormatResult JobFbFormat::detectFourCc(const JobFbFixedInfo &fixed, const J
         return {};
 
     const FourCc fourCc = variable.fourCc();
-    const FormatType format = fromFourCc(fourCc);
-    if (format == FormatType::Unknown)
+    const core::FormatType format = fromFourCc(fourCc);
+    if (format == core::FormatType::Unknown)
         return {};
 
     return JobFbFormatResult{
@@ -79,7 +79,7 @@ JobFbFormatResult JobFbFormat::detectLegacy(const JobFbFixedInfo &fixed, const J
     if (!fixed.type().packedPixels())
         return {};
 
-    FormatType format = FormatType::Unknown;
+    core::FormatType format = core::FormatType::Unknown;
 
     if (fixed.visual().trueColor() || fixed.visual().directColor())
         format = detectTrueColor( variable);
@@ -88,7 +88,7 @@ JobFbFormatResult JobFbFormat::detectLegacy(const JobFbFixedInfo &fixed, const J
     else if (fixed.visual().pseudoColor() || fixed.visual().staticPseudoColor())
         format = detectPseudoColor( fixed, variable);
 
-    if (format == FormatType::Unknown)
+    if (format == core::FormatType::Unknown)
         return {};
 
     return JobFbFormatResult{
@@ -98,7 +98,7 @@ JobFbFormatResult JobFbFormat::detectLegacy(const JobFbFixedInfo &fixed, const J
     };
 }
 
-FormatType JobFbFormat::detectTrueColor(const JobFbVariableInfo &variable) noexcept
+core::FormatType JobFbFormat::detectTrueColor(const JobFbVariableInfo &variable) noexcept
 {
     const JobFbBitfield &red    = variable.red();
     const JobFbBitfield &green  = variable.green();
@@ -106,17 +106,17 @@ FormatType JobFbFormat::detectTrueColor(const JobFbVariableInfo &variable) noexc
     const JobFbBitfield &alpha  = variable.alpha();
 
     if (!red.valid() || !green.valid() || !blue.valid() || !alpha.valid())
-        return FormatType::Unknown;
+        return core::FormatType::Unknown;
 
     if (red.msbRight || green.msbRight || blue.msbRight || alpha.msbRight)
-        return FormatType::Unknown;
+        return core::FormatType::Unknown;
 
     if (variable.bitsPerPixel() == 16 &&
         red.offset == 11 && red.length == 5 &&
         green.offset == 5 && green.length == 6 &&
         blue.offset == 0 && blue.length == 5 &&
         alpha.length == 0) {
-        return FormatType::RGB565;
+        return core::FormatType::RGB565;
     }
 
     if (variable.bitsPerPixel() == 16 &&
@@ -124,7 +124,7 @@ FormatType JobFbFormat::detectTrueColor(const JobFbVariableInfo &variable) noexc
         green.offset == 5 && green.length == 6 &&
         blue.offset == 11 && blue.length == 5 &&
         alpha.length == 0) {
-        return FormatType::BGR565;
+        return core::FormatType::BGR565;
     }
 
     if (variable.bitsPerPixel() == 24 &&
@@ -132,7 +132,7 @@ FormatType JobFbFormat::detectTrueColor(const JobFbVariableInfo &variable) noexc
         green.offset == 8 && green.length == 8 &&
         blue.offset == 0 && blue.length == 8 &&
         alpha.length == 0) {
-        return FormatType::RGB888;
+        return core::FormatType::RGB888;
     }
 
     if (variable.bitsPerPixel() == 24 &&
@@ -140,7 +140,7 @@ FormatType JobFbFormat::detectTrueColor(const JobFbVariableInfo &variable) noexc
         green.offset == 8 && green.length == 8 &&
         blue.offset == 16 && blue.length == 8 &&
         alpha.length == 0) {
-        return FormatType::BGR888;
+        return core::FormatType::BGR888;
     }
 
     if (variable.bitsPerPixel() == 32 &&
@@ -148,14 +148,14 @@ FormatType JobFbFormat::detectTrueColor(const JobFbVariableInfo &variable) noexc
         green.offset == 8 && green.length == 8 &&
         blue.offset == 0 && blue.length == 8) {
         if (alpha.length == 0)
-            return FormatType::XRGB8888;
+            return core::FormatType::XRGB8888;
 
         if (alpha.offset == 24 &&
             alpha.length == 8) {
-            return FormatType::ARGB8888;
+            return core::FormatType::ARGB8888;
         }
 
-        return FormatType::Unknown;
+        return core::FormatType::Unknown;
     }
 
     if (variable.bitsPerPixel() == 32 &&
@@ -163,46 +163,46 @@ FormatType JobFbFormat::detectTrueColor(const JobFbVariableInfo &variable) noexc
         green.offset == 8 && green.length == 8 &&
         blue.offset == 16 && blue.length == 8) {
         if (alpha.length == 0)
-            return FormatType::XBGR8888;
+            return core::FormatType::XBGR8888;
 
         if (alpha.offset == 24 &&
             alpha.length == 8) {
-            return FormatType::ABGR8888;
+            return core::FormatType::ABGR8888;
         }
 
-        return FormatType::Unknown;
+        return core::FormatType::Unknown;
     }
 
-    return FormatType::Unknown;
+    return core::FormatType::Unknown;
 }
 
-FormatType JobFbFormat::detectMonochrome(const JobFbFixedInfo &fixed, const JobFbVariableInfo &variable) noexcept
+core::FormatType JobFbFormat::detectMonochrome(const JobFbFixedInfo &fixed, const JobFbVariableInfo &variable) noexcept
 {
     if (!fixed.visual().monochrome())
-        return FormatType::Unknown;
+        return core::FormatType::Unknown;
 
     if (variable.bitsPerPixel() != 1)
-        return FormatType::Unknown;
+        return core::FormatType::Unknown;
 
-    return FormatType::C1;
+    return core::FormatType::C1;
 }
 
-FormatType JobFbFormat::detectPseudoColor(const JobFbFixedInfo &fixed, const JobFbVariableInfo &variable) noexcept
+core::FormatType JobFbFormat::detectPseudoColor(const JobFbFixedInfo &fixed, const JobFbVariableInfo &variable) noexcept
 {
     if (!fixed.visual().pseudoColor() && !fixed.visual().staticPseudoColor())
-        return FormatType::Unknown;
+        return core::FormatType::Unknown;
 
     switch (variable.bitsPerPixel()) {
     case 1:
-        return FormatType::C1;
+        return core::FormatType::C1;
     case 2:
-        return FormatType::C2;
+        return core::FormatType::C2;
     case 4:
-        return FormatType::C4;
+        return core::FormatType::C4;
     case 8:
-        return FormatType::C8;
+        return core::FormatType::C8;
     default:
-        return FormatType::Unknown;
+        return core::FormatType::Unknown;
     }
 }
 

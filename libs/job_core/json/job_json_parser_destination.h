@@ -98,99 +98,12 @@
                 using DestinationType = JsonParserDestination<T>;
 
                 static_assert(
-                    std::convertible_to<
-                        std::invoke_result_t<Function &, DestinationType &>,
-                        bool>,
+                    std::convertible_to< std::invoke_result_t<Function &, DestinationType &>, bool>,
                     "JsonParserDestination::withValue callback must return a bool-convertible result");
 
                 return std::invoke(std::forward<Function>(function), *this);
             }
         }
-
-
-        // template <typename Function>
-        // [[nodiscard]] bool withValue(Function &&function)
-        // {
-        //     if constexpr (JsonOptional<T>) {
-        //         using InnerType = JsonOptionalValue<T>;
-        //         using DestinationType = JsonParserDestination<InnerType>;
-
-        //         static_assert(
-        //             std::convertible_to<
-        //                 std::invoke_result_t<Function &, DestinationType &>,
-        //                 bool>,
-        //             "JsonParserDestination::withValue callback must return a bool-convertible result");
-
-        //         if (!m_value) {
-        //             if constexpr (std::default_initializable<InnerType>) {
-        //                 m_value.emplace();
-        //             } else {
-        //                 return false;
-        //             }
-        //         }
-
-        //         // DestinationType destination{*m_value};
-        //         // return std::invoke(std::forward<Function>(function), destination);
-
-        //         DestinationType destination{*m_value};
-        //         return destination.withValue(std::forward<Function>(function));
-
-        //     } else if constexpr (JsonSharedPointer<T>) {
-        //         using ElementType = JsonSharedPointerElement<T>;
-        //         using DestinationType = JsonParserDestination<ElementType>;
-
-        //         static_assert(
-        //             std::convertible_to<
-        //                 std::invoke_result_t<Function &, DestinationType &>,
-        //                 bool>,
-        //             "JsonParserDestination::withValue callback must return a bool-convertible result");
-
-        //         if (!m_value) {
-        //             if constexpr (std::default_initializable<ElementType>) {
-        //                 m_value = std::make_shared<ElementType>();
-        //             } else {
-        //                 return false;
-        //             }
-        //         }
-
-        //         DestinationType destination{*m_value};
-        //         return std::invoke(std::forward<Function>(function), destination);
-        //     } else if constexpr (JsonUniquePointer<T>) {
-        //         using ElementType = JsonUniquePointerElement<T>;
-        //         using DestinationType = JsonParserDestination<ElementType>;
-
-        //         static_assert(
-        //             std::convertible_to<
-        //                 std::invoke_result_t<Function &, DestinationType &>,
-        //                 bool>,
-        //             "JsonParserDestination::withValue callback must return a bool-convertible result");
-
-        //         if (!m_value) {
-        //             if constexpr (
-        //                 std::default_initializable<ElementType> &&
-        //                 requires {
-        //                     ValueType{new ElementType{}};
-        //                 }) {
-        //                 m_value = ValueType{new ElementType{}};
-        //             } else {
-        //                 return false;
-        //             }
-        //         }
-
-        //         DestinationType destination{*m_value};
-        //         return std::invoke(std::forward<Function>(function), destination);
-        //     } else {
-        //         using DestinationType = JsonParserDestination<T>;
-
-        //         static_assert(
-        //             std::convertible_to<
-        //                 std::invoke_result_t<Function &, DestinationType &>,
-        //                 bool>,
-        //             "JsonParserDestination::withValue callback must return a bool-convertible result");
-
-        //         return std::invoke(std::forward<Function>(function), *this);
-        //     }
-        // }
 
         [[nodiscard]] bool null()
         {

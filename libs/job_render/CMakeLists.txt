@@ -9,7 +9,6 @@ set(JOBRENDER_HEADERS
     job_render_application_args.h
     job_render_application.h
 
-    job_rect.h
     job_damage.h
 
     input/job_udev_monitor.h

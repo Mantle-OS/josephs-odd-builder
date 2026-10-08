@@ -27,9 +27,7 @@ public:
     TextTranscoder &operator=(TextTranscoder &&) = delete;
 
     template <lattice::LatticeCodec FromCodec, lattice::LatticeCodec ToCodec>
-    [[nodiscard]] static constexpr Result transcode(
-        typename FromCodec::UnitInput input,
-        typename ToCodec::UnitOutput output) noexcept
+    [[nodiscard]] static constexpr Result transcode(typename FromCodec::UnitInput input, typename ToCodec::UnitOutput output) noexcept
     {
         using FromStatus = std::remove_cvref_t<decltype(std::declval<typename FromCodec::Result>().status)>;
         using ToStatus = std::remove_cvref_t<decltype(std::declval<typename ToCodec::Result>().status)>;
@@ -47,11 +45,10 @@ public:
             if (decodeResult.status == FromStatus::Invalid)
                 return {inputConsumed, outputProduced, TextTranscodeStatus::Invalid};
 
-            const bool scalarDecoded =
-                decodeResult.outputProduced == 1 &&
-                decodeResult.inputConsumed > 0 &&
-                (decodeResult.status == FromStatus::Complete ||
-                 decodeResult.status == FromStatus::OutputFull);
+            const bool scalarDecoded = decodeResult.outputProduced == 1 &&
+                                       decodeResult.inputConsumed > 0 &&
+                                       (decodeResult.status == FromStatus::Complete ||
+                                        decodeResult.status == FromStatus::OutputFull);
 
             if (!scalarDecoded)
                 return {inputConsumed, outputProduced, TextTranscodeStatus::Invalid};

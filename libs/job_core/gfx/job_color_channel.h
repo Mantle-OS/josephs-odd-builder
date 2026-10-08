@@ -2,15 +2,32 @@
 
 #include <cstdint>
 
-namespace job::render {
+namespace job::core {
 
 enum class JobColorChannel : std::uint8_t
 {
+    // RGBA[8, 16]
     None,
     Red,
     Green,
     Blue,
-    Alpha
+    Alpha,
+
+    // HS[LV]
+    Hue,
+    Saturation,
+    Value,
+    Lightness,
+
+    // CMYK
+    Cyan,
+    Magenta,
+    Yellow,
+    Black,
+
+    // NCol
+    Whiteness,
+    Blackness,
 };
 
 }

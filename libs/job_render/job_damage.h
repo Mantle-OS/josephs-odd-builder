@@ -5,7 +5,7 @@
 #include <utility>
 #include <vector>
 
-#include "job_rect.h"
+#include <job_rect.h>
 
 namespace job::render {
 
@@ -91,7 +91,7 @@ public:
 
     [[nodiscard]] friend bool operator==(const JobDamage &, const JobDamage &) noexcept = default;
 private:
-    Rects m_rects;
+    core::Rects m_rects;
 };
 
 }

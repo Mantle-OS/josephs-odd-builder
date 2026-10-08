@@ -1,163 +1,190 @@
 #pragma once
 // https://www.w3.org/TR/SVG11/types.html#ColorKeywords
 
-namespace job_::render {
+#include <cstdint>
+#include <string_view>
+#include <unordered_map>
+#include <job_rgb.h>
 
+namespace job_::gui {
 
-aliceblue               rgb(240, 248, 255)
-antiquewhite            rgb(250, 235, 215)
-aqua                    rgb( 0, 255, 255)
-aquamarine              rgb(127, 255, 212)
-azure                   rgb(240, 255, 255)
-beige                   rgb(245, 245, 220)
-bisque                  rgb(255, 228, 196)
-black                   rgb( 0, 0, 0)
-blanchedalmond          rgb(255, 235, 205)
-blue                    rgb( 0, 0, 255)
-blueviolet              rgb(138, 43, 226)
-brown                   rgb(165, 42, 42)
-burlywood               rgb(222, 184, 135)
-cadetblue               rgb( 95, 158, 160)
-chartreuse              rgb(127, 255, 0)
-chocolate               rgb(210, 105, 30)
-coral                   rgb(255, 127, 80)
-cornflowerblue          rgb(100, 149, 237)
-cornsilk                rgb(255, 248, 220)
-crimson                 rgb(220, 20, 60)
-cyan                    rgb( 0, 255, 255)
-darkblue                rgb( 0, 0, 139)
-darkcyan                rgb( 0, 139, 139)
-darkgoldenrod           rgb(184, 134, 11)
-darkgray                rgb(169, 169, 169)
-darkgreen               rgb( 0, 100, 0)
-darkgrey                rgb(169, 169, 169)
-darkkhaki               rgb(189, 183, 107)
-darkmagenta             rgb(139, 0, 139)
-darkolivegreen          rgb( 85, 107, 47)
-darkorange              rgb(255, 140, 0)
-darkorchid              rgb(153, 50, 204)
-darkred                 rgb(139, 0, 0)
-darksalmon              rgb(233, 150, 122)
-darkseagreen            rgb(143, 188, 143)
-darkslateblue           rgb( 72, 61, 139)
-darkslategray           rgb( 47, 79, 79)
-darkslategrey           rgb( 47, 79, 79)
-darkturquoise           rgb( 0, 206, 209)
-darkviolet              rgb(148, 0, 211)
-deeppink                rgb(255, 20, 147)
-deepskyblue             rgb( 0, 191, 255)
-dimgray                 rgb(105, 105, 105)
-dimgrey                 rgb(105, 105, 105)
-dodgerblue              rgb( 30, 144, 255)
-firebrick               rgb(178, 34, 34)
-floralwhite             rgb(255, 250, 240)
-forestgreen             rgb( 34, 139, 34)
-fuchsia                 rgb(255, 0, 255)
-gainsboro               rgb(220, 220, 220)
-ghostwhite              rgb(248, 248, 255)
-gold                    rgb(255, 215, 0)
-goldenrod               rgb(218, 165, 32)
-gray                    rgb(128, 128, 128)
-grey                    rgb(128, 128, 128)
-green                   rgb( 0, 128, 0)
-greenyellow             rgb(173, 255, 47)
-honeydew                rgb(240, 255, 240)
-hotpink                 rgb(255, 105, 180)
-indianred               rgb(205, 92, 92)
-indigo                  rgb( 75, 0, 130)
-ivory                   rgb(255, 255, 240)
-khaki                   rgb(240, 230, 140)
-lavender                rgb(230, 230, 250)
-lavenderblush           rgb(255, 240, 245)
-lawngreen               rgb(124, 252, 0)
-lemonchiffon            rgb(255, 250, 205)
-lightblue               rgb(173, 216, 230)
-lightcoral              rgb(240, 128, 128)
-lightcyan               rgb(224, 255, 255)
-lightgoldenrodyellow	rgb(250, 250, 210)
-lightgray               rgb(211, 211, 211)
-lightgreen              rgb(144, 238, 144)
-lightgrey               rgb(211, 211, 211)
-lightpink               rgb(255, 182, 193)
-lightsalmon             rgb(255, 160, 122)
-lightseagreen           rgb( 32, 178, 170)
-lightskyblue            rgb(135, 206, 250)
-lightslategray          rgb(119, 136, 153)
-lightslategrey          rgb(119, 136, 153)
-lightsteelblue          rgb(176, 196, 222)
-lightyellow             rgb(255, 255, 224)
-lime                    rgb( 0, 255, 0)
-limegreen               rgb( 50, 205, 50)
-linen                   rgb(250, 240, 230)
-magenta                 rgb(255, 0, 255)
-maroon                  rgb(128, 0, 0)
-mediumaquamarine        rgb(102, 205, 170)
-mediumblue              rgb( 0, 0, 205)
-mediumorchid            rgb(186, 85, 211)
-mediumpurple            rgb(147, 112, 219)
-mediumseagreen          rgb( 60, 179, 113)
-mediumslateblue         rgb(123, 104, 238)
-mediumspringgreen       rgb( 0, 250, 154)
-mediumturquoise         rgb( 72, 209, 204)
-mediumvioletred         rgb(199, 21, 133)
-midnightblue            rgb( 25, 25, 112)
-mintcream               rgb(245, 255, 250)
-mistyrose               rgb(255, 228, 225)
-moccasin                rgb(255, 228, 181)
-navajowhite             rgb(255, 222, 173)
-navy                    rgb( 0, 0, 128)
-oldlace                 rgb(253, 245, 230)
-olive                   rgb(128, 128, 0)
-olivedrab               rgb(107, 142, 35)
-orange                  rgb(255, 165, 0)
-orangered               rgb(255, 69, 0)
-orchid                  rgb(218, 112, 214)
-palegoldenrod           rgb(238, 232, 170)
-palegreen               rgb(152, 251, 152)
-paleturquoise           rgb(175, 238, 238)
-palevioletred           rgb(219, 112, 147)
-papayawhip              rgb(255, 239, 213)
-peachpuff               rgb(255, 218, 185)
-peru                    rgb(205, 133, 63)
-pink                    rgb(255, 192, 203)
-plum                    rgb(221, 160, 221)
-powderblue              rgb(176, 224, 230)
-purple                  rgb(128, 0, 128)
-red                     rgb(255, 0, 0)
-rosybrown               rgb(188, 143, 143)
-royalblue               rgb( 65, 105, 225)
-saddlebrown             rgb(139, 69, 19)
-salmon                  rgb(250, 128, 114)
-sandybrown              rgb(244, 164, 96)
-seagreen                rgb( 46, 139, 87)
-seashell                rgb(255, 245, 238)
-sienna                  rgb(160, 82, 45)
-silver                  rgb(192, 192, 192)
-skyblue                 rgb(135, 206, 235)
-slateblue               rgb(106, 90, 205)
-slategray               rgb(112, 128, 144)
-slategrey               rgb(112, 128, 144)
-snow                    rgb(255, 250, 250)
-springgreen             rgb( 0, 255, 127)
-steelblue               rgb( 70, 130, 180)
-tan                     rgb(210, 180, 140)
-teal                    rgb( 0, 128, 128)
-thistle                 rgb(216, 191, 216)
-tomato                  rgb(255, 99, 71)
-turquoise               rgb( 64, 224, 208)
-violet                  rgb(238, 130, 238)
-wheat                   rgb(245, 222, 179)
-white                   rgb(255, 255, 255)
-whitesmoke              rgb(245, 245, 245)
-yellow                  rgb(255, 255, 0)
-yellowgreen             rgb(154, 205, 50)
+class JobColorKeyword {
+    using KeywordColors = std::unordered_map<std::string_view, core::JobRgb>;
 
+    JobColorKeyword() = delete;
+    ~JobColorKeyword() = delete;
 
+    JobColorKeyword(const JobColorKeyword &) = delete;
+    JobColorKeyword &operator=(const JobColorKeyword &) = delete;
 
+    JobColorKeyword(JobColorKeyword &&) noexcept = delete;
+    JobColorKeyword &operator=(JobColorKeyword &&) noexcept = delete;
 
+    static const KeywordColors kKeywordMap;
 
+    [[nodiscard]] static inline core::JobRgb rgb(std::string_view name) noexcept
+    {
+        if(!kKeywordMap.contains(name))
+            return {0, 0, 0, 255};
+        return kKeywordMap.at(name);
+    }
+    [[nodiscard]] static inline std::string_view toString(core::JobRgb rgb) noexcept
+    {
+        for (const auto &[name, value] : kKeywordMap) {
+            if (value == rgb)
+                return name;
+        }
+        return "unknown";
+    }
+};
 
+inline const JobColorKeyword::KeywordColors JobColorKeyword::kKeywordMap = {
+    { "aliceblue"               , core::JobRgb{   240, 248, 255   , 255 } },
+    { "antiquewhite"            , core::JobRgb{   250, 235, 215   , 255 } },
+    { "aqua"                    , core::JobRgb{    0, 255, 255    , 255 } },
+    { "aquamarine"              , core::JobRgb{   127, 255, 212   , 255 } },
+    { "azure"                   , core::JobRgb{   240, 255, 255   , 255 } },
+    { "beige"                   , core::JobRgb{   245, 245, 220   , 255 } },
+    { "bisque"                  , core::JobRgb{   255, 228, 196   , 255 } },
+    { "black"                   , core::JobRgb{    0, 0, 0        , 255 } },
+    { "blanchedalmond"          , core::JobRgb{   255, 235, 205   , 255 } },
+    { "blue"                    , core::JobRgb{    0, 0, 255      , 255 } },
+    { "blueviolet"              , core::JobRgb{   138, 43, 226    , 255 } },
+    { "brown"                   , core::JobRgb{   165, 42, 42     , 255 } },
+    { "burlywood"               , core::JobRgb{   222, 184, 135   , 255 } },
+    { "cadetblue"               , core::JobRgb{    95, 158, 160   , 255 } },
+    { "chartreuse"              , core::JobRgb{   127, 255, 0     , 255 } },
+    { "chocolate"               , core::JobRgb{   210, 105, 30    , 255 } },
+    { "coral"                   , core::JobRgb{   255, 127, 80    , 255 } },
+    { "cornflowerblue"          , core::JobRgb{   100, 149, 237   , 255 } },
+    { "cornsilk"                , core::JobRgb{   255, 248, 220   , 255 } },
+    { "crimson"                 , core::JobRgb{   220, 20, 60     , 255 } },
+    { "cyan"                    , core::JobRgb{    0, 255, 255    , 255 } },
+    { "darkblue"                , core::JobRgb{    0, 0, 139      , 255 } },
+    { "darkcyan"                , core::JobRgb{    0, 139, 139    , 255 } },
+    { "darkgoldenrod"           , core::JobRgb{   184, 134, 11    , 255 } },
+    { "darkgray"                , core::JobRgb{   169, 169, 169   , 255 } },
+    { "darkgreen"               , core::JobRgb{    0, 100, 0      , 255 } },
+    { "darkgrey"                , core::JobRgb{   169, 169, 169   , 255 } },
+    { "darkkhaki"               , core::JobRgb{   189, 183, 107   , 255 } },
+    { "darkmagenta"             , core::JobRgb{   139, 0, 139     , 255 } },
+    { "darkolivegreen"          , core::JobRgb{    85, 107, 47    , 255 } },
+    { "darkorange"              , core::JobRgb{   255, 140, 0     , 255 } },
+    { "darkorchid"              , core::JobRgb{   153, 50, 204    , 255 } },
+    { "darkred"                 , core::JobRgb{   139, 0, 0       , 255 } },
+    { "darksalmon"              , core::JobRgb{   233, 150, 122   , 255 } },
+    { "darkseagreen"            , core::JobRgb{   143, 188, 143   , 255 } },
+    { "darkslateblue"           , core::JobRgb{    72, 61, 139    , 255 } },
+    { "darkslategray"           , core::JobRgb{    47, 79, 79     , 255 } },
+    { "darkslategrey"           , core::JobRgb{    47, 79, 79     , 255 } },
+    { "darkturquoise"           , core::JobRgb{    0, 206, 209    , 255 } },
+    { "darkviolet"              , core::JobRgb{   148, 0, 211     , 255 } },
+    { "deeppink"                , core::JobRgb{   255, 20, 147    , 255 } },
+    { "deepskyblue"             , core::JobRgb{    0, 191, 255    , 255 } },
+    { "dimgray"                 , core::JobRgb{   105, 105, 105   , 255 } },
+    { "dimgrey"                 , core::JobRgb{   105, 105, 105   , 255 } },
+    { "dodgerblue"              , core::JobRgb{    30, 144, 255   , 255 } },
+    { "firebrick"               , core::JobRgb{   178, 34, 34     , 255 } },
+    { "floralwhite"             , core::JobRgb{   255, 250, 240   , 255 } },
+    { "forestgreen"             , core::JobRgb{    34, 139, 34    , 255 } },
+    { "fuchsia"                 , core::JobRgb{   255, 0, 255     , 255 } },
+    { "gainsboro"               , core::JobRgb{   220, 220, 220   , 255 } },
+    { "ghostwhite"              , core::JobRgb{   248, 248, 255   , 255 } },
+    { "gold"                    , core::JobRgb{   255, 215, 0     , 255 } },
+    { "goldenrod"               , core::JobRgb{   218, 165, 32    , 255 } },
+    { "gray"                    , core::JobRgb{   128, 128, 128   , 255 } },
+    { "grey"                    , core::JobRgb{   128, 128, 128   , 255 } },
+    { "green"                   , core::JobRgb{    0, 128, 0      , 255 } },
+    { "greenyellow"             , core::JobRgb{   173, 255, 47    , 255 } },
+    { "honeydew"                , core::JobRgb{   240, 255, 240   , 255 } },
+    { "hotpink"                 , core::JobRgb{   255, 105, 180   , 255 } },
+    { "indianred"               , core::JobRgb{   205, 92, 92     , 255 } },
+    { "indigo"                  , core::JobRgb{    75, 0, 130     , 255 } },
+    { "ivory"                   , core::JobRgb{   255, 255, 240   , 255 } },
+    { "khaki"                   , core::JobRgb{   240, 230, 140   , 255 } },
+    { "lavender"                , core::JobRgb{   230, 230, 250   , 255 } },
+    { "lavenderblush"           , core::JobRgb{   255, 240, 245   , 255 } },
+    { "lawngreen"               , core::JobRgb{   124, 252, 0     , 255 } },
+    { "lemonchiffon"            , core::JobRgb{   255, 250, 205   , 255 } },
+    { "lightblue"               , core::JobRgb{   173, 216, 230   , 255 } },
+    { "lightcoral"              , core::JobRgb{   240, 128, 128   , 255 } },
+    { "lightcyan"               , core::JobRgb{   224, 255, 255   , 255 } },
+    { "lightgoldenrodyellow"	, core::JobRgb{   250, 250, 210   , 255 } },
+    { "lightgray"               , core::JobRgb{   211, 211, 211   , 255 } },
+    { "lightgreen"              , core::JobRgb{   144, 238, 144   , 255 } },
+    { "lightgrey"               , core::JobRgb{   211, 211, 211   , 255 } },
+    { "lightpink"               , core::JobRgb{   255, 182, 193   , 255 } },
+    { "lightsalmon"             , core::JobRgb{   255, 160, 122   , 255 } },
+    { "lightseagreen"           , core::JobRgb{    32, 178, 170   , 255 } },
+    { "lightskyblue"            , core::JobRgb{   135, 206, 250   , 255 } },
+    { "lightslategray"          , core::JobRgb{   119, 136, 153   , 255 } },
+    { "lightslategrey"          , core::JobRgb{   119, 136, 153   , 255 } },
+    { "lightsteelblue"          , core::JobRgb{   176, 196, 222   , 255 } },
+    { "lightyellow"             , core::JobRgb{   255, 255, 224   , 255 } },
+    { "lime"                    , core::JobRgb{    0, 255, 0      , 255 } },
+    { "limegreen"               , core::JobRgb{    50, 205, 50    , 255 } },
+    { "linen"                   , core::JobRgb{   250, 240, 230   , 255 } },
+    { "magenta"                 , core::JobRgb{   255, 0, 255     , 255 } },
+    { "maroon"                  , core::JobRgb{   128, 0, 0       , 255 } },
+    { "mediumaquamarine"        , core::JobRgb{   102, 205, 170   , 255 } },
+    { "mediumblue"              , core::JobRgb{    0, 0, 205      , 255 } },
+    { "mediumorchid"            , core::JobRgb{   186, 85, 211    , 255 } },
+    { "mediumpurple"            , core::JobRgb{   147, 112, 219   , 255 } },
+    { "mediumseagreen"          , core::JobRgb{    60, 179, 113   , 255 } },
+    { "mediumslateblue"         , core::JobRgb{   123, 104, 238   , 255 } },
+    { "mediumspringgreen"       , core::JobRgb{    0, 250, 154    , 255 } },
+    { "mediumturquoise"         , core::JobRgb{    72, 209, 204   , 255 } },
+    { "mediumvioletred"         , core::JobRgb{   199, 21, 133    , 255 } },
+    { "midnightblue"            , core::JobRgb{    25, 25, 112    , 255 } },
+    { "mintcream"               , core::JobRgb{   245, 255, 250   , 255 } },
+    { "mistyrose"               , core::JobRgb{   255, 228, 225   , 255 } },
+    { "moccasin"                , core::JobRgb{   255, 228, 181   , 255 } },
+    { "navajowhite"             , core::JobRgb{   255, 222, 173   , 255 } },
+    { "navy"                    , core::JobRgb{    0, 0, 128      , 255 } },
+    { "oldlace"                 , core::JobRgb{   253, 245, 230   , 255 } },
+    { "olive"                   , core::JobRgb{   128, 128, 0     , 255 } },
+    { "olivedrab"               , core::JobRgb{   107, 142, 35    , 255 } },
+    { "orange"                  , core::JobRgb{   255, 165, 0     , 255 } },
+    { "orangered"               , core::JobRgb{   255, 69, 0      , 255 } },
+    { "orchid"                  , core::JobRgb{   218, 112, 214   , 255 } },
+    { "palegoldenrod"           , core::JobRgb{   238, 232, 170   , 255 } },
+    { "palegreen"               , core::JobRgb{   152, 251, 152   , 255 } },
+    { "paleturquoise"           , core::JobRgb{   175, 238, 238   , 255 } },
+    { "palevioletred"           , core::JobRgb{   219, 112, 147   , 255 } },
+    { "papayawhip"              , core::JobRgb{   255, 239, 213   , 255 } },
+    { "peachpuff"               , core::JobRgb{   255, 218, 185   , 255 } },
+    { "peru"                    , core::JobRgb{   205, 133, 63    , 255 } },
+    { "pink"                    , core::JobRgb{   255, 192, 203   , 255 } },
+    { "plum"                    , core::JobRgb{   221, 160, 221   , 255 } },
+    { "powderblue"              , core::JobRgb{   176, 224, 230   , 255 } },
+    { "purple"                  , core::JobRgb{   128, 0, 128     , 255 } },
+    { "red"                     , core::JobRgb{   255, 0, 0       , 255 } },
+    { "rosybrown"               , core::JobRgb{   188, 143, 143   , 255 } },
+    { "royalblue"               , core::JobRgb{    65, 105, 225   , 255 } },
+    { "saddlebrown"             , core::JobRgb{   139, 69, 19     , 255 } },
+    { "salmon"                  , core::JobRgb{   250, 128, 114   , 255 } },
+    { "sandybrown"              , core::JobRgb{   244, 164, 96    , 255 } },
+    { "seagreen"                , core::JobRgb{    46, 139, 87    , 255 } },
+    { "seashell"                , core::JobRgb{   255, 245, 238   , 255 } },
+    { "sienna"                  , core::JobRgb{   160, 82, 45     , 255 } },
+    { "silver"                  , core::JobRgb{   192, 192, 192   , 255 } },
+    { "skyblue"                 , core::JobRgb{   135, 206, 235   , 255 } },
+    { "slateblue"               , core::JobRgb{   106, 90, 205    , 255 } },
+    { "slategray"               , core::JobRgb{   112, 128, 144   , 255 } },
+    { "slategrey"               , core::JobRgb{   112, 128, 144   , 255 } },
+    { "snow"                    , core::JobRgb{   255, 250, 250   , 255 } },
+    { "springgreen"             , core::JobRgb{    0, 255, 127    , 255 } },
+    { "steelblue"               , core::JobRgb{    70, 130, 180   , 255 } },
+    { "tan"                     , core::JobRgb{   210, 180, 140   , 255 } },
+    { "teal"                    , core::JobRgb{    0, 128, 128    , 255 } },
+    { "thistle"                 , core::JobRgb{   216, 191, 216   , 255 } },
+    { "tomato"                  , core::JobRgb{   255, 99, 71     , 255 } },
+    { "turquoise"               , core::JobRgb{    64, 224, 208   , 255 } },
+    { "violet"                  , core::JobRgb{   238, 130, 238   , 255 } },
+    { "wheat"                   , core::JobRgb{   245, 222, 179   , 255 } },
+    { "white"                   , core::JobRgb{   255, 255, 255   , 255 } },
+    { "whitesmoke"              , core::JobRgb{   245, 245, 245   , 255 } },
+    { "yellow"                  , core::JobRgb{   255, 255, 0     , 255 } },
+    { "yellowgreen"             , core::JobRgb{   154, 205, 50    , 255 } }
+};
 }
-
-
-

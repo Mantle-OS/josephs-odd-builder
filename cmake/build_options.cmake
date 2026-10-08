@@ -81,6 +81,10 @@ option(JOB_BUILD_SOUND "Build the job_sound library" ON)
 option(JOB_BUILD_UART "Build the job_uart library" ON)
 option(JOB_BUILD_USB "Build the job_usb library" ON)
 
+option(JOB_BUILD_INPUT "Build the job_input library" ON)
+option(JOB_BUILD_INPUT_EVDEV "Build the job_input wth libevdev library" ON)
+option(JOB_BUILD_INPUT_LIBINPUT "Build the job_input wth libinput library" ON)
+
 option(JOB_BUILD_RASTER "Build the job_raster library" ON)
 option(JOB_BUILD_OPENGL "Build the job_opengl library" ON)
 option(JOB_BUILD_VULKAN "Build the job_vulkan library" ON)
