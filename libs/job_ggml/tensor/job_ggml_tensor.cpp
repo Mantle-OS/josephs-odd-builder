@@ -105,6 +105,17 @@ bool JobGgmlTensor::hasName() const noexcept
     return nativeName && nativeName[0] != '\0';
 }
 
+void JobGgmlTensor::setOutput(bool enabled) noexcept
+{
+    if (!m_tensor)
+        return;
+
+    if (enabled)
+        ggml_set_output(m_tensor);
+    else
+        m_tensor->flags &= ~GGML_TENSOR_FLAG_OUTPUT;
+}
+
 JobGgmlTensorExtents *JobGgmlTensor::extents() noexcept
 {
     return m_extents.get();

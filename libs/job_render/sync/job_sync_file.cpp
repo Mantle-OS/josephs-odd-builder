@@ -90,7 +90,7 @@ JobSyncFile::Info JobSyncFile::info(const JobRenderFence &fence)
     Info result;
     if(!info(fence, result)){
 #ifndef NDEBUG
-        JOB_LOG_DEBUG("[JobSyncFile] unable to get info from the fence, the result is most likley bad.")
+        JOB_LOG_DEBUG("[JobSyncFile] unable to get info from the fence, the result is most likley bad.");
 #endif
     }
     return result;

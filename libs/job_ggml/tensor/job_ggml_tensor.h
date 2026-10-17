@@ -63,6 +63,9 @@ public:
     void setName(const std::string &name);
     [[nodiscard]] bool hasName() const noexcept;
 
+
+    void setOutput(bool enabled = true) noexcept;
+
     // Core inspection objects
     [[nodiscard]] JobGgmlTensorExtents *extents() noexcept;
     [[nodiscard]] const JobGgmlTensorExtents *extents() const noexcept;

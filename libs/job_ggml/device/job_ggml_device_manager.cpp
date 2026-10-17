@@ -618,13 +618,11 @@ JobGgmlBackendSched::Ptr JobGgmlDeviceManager::buildScheduler(const std::string 
     }
 
     JobGgmlBackendSched::BufferTypes bufferTypes;
-    auto scheduler = JobGgmlBackendSched::createShared(
-        std::move(backends),
-        std::move(bufferTypes),
-        graphSize,
-        parallel,
-        opOffload
-        );
+    auto scheduler = JobGgmlBackendSched::createShared(std::move(backends),
+                                                       std::move(bufferTypes),
+                                                       graphSize,
+                                                       parallel,
+                                                       opOffload);
 
     if (!scheduler || !scheduler->isValid())
         throw std::runtime_error{ "Failed to create a valid GGML backend scheduler" };

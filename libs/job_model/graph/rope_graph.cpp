@@ -11,7 +11,7 @@ ggml::JobGgmlTensorOp::UPtr RopeGraph::build(ggml::JobGgmlTensorOp::UPtr input,
                                              int mode)
 {
 
-    // contractsd ......
+    // contracts ......
     if (!input || !input->isValid())
         throw std::invalid_argument{"RopeGraph requires a valid input tensor"};
 

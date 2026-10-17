@@ -10,7 +10,7 @@ JobRenderApplicationArgs::JobRenderApplicationArgs(int argc, char *argv[])
 {
     if(!parse(argc, argv)){
 #ifndef NDEBUG
-        JOB_LOG_DEBUG("[JobRenderApplicationArgs] Unable to parse arguments")
+        JOB_LOG_DEBUG("[JobRenderApplicationArgs] Unable to parse arguments");
 #endif
     }
 }

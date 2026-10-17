@@ -5,6 +5,7 @@ project(JosephsOddBuilder_Model
 
 
 set(JOBMODEL_HEADERS
+    job_activation.h  # new
     job_model_enums.h  ## empty
     job_model.h # Facade
 )
@@ -14,10 +15,9 @@ set(JOBMODEL_SOURCES
 # our first target is
 set(JOBMODEL_CONFIG_HEADERS
 
-
+    # config/activation_config.h for now it could be cool later on
     config/model_architecture.h
     config/model_config_concept.h
-
 
     config/arch_config.h
     config/sampler_config.h

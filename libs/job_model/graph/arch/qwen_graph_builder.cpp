@@ -3,8 +3,6 @@
 #include <stdexcept>
 #include <vector>
 
-// #include <job_ggml_tensor_op_graph.h>
-
 #include "graph/attention_graph.h"
 #include "graph/embedding_graph.h"
 #include "graph/linear_graph.h"
@@ -82,7 +80,7 @@ ggml::JobGgmlCGraph::UPtr QwenGraphBuilder::buildForward(ggml::JobGgmlContext &c
     auto positions = cur->arange(static_cast<float>(nPast),
                                 static_cast<float>(nPast + nTokens), 1.0f)->cast(ggml::JobGgmlType::I32);
 
-    const GatedFfnGraph::Activation hiddenActivation = activation(m_config.archConfig().hiddenActivation());
+    const ActivationType hiddenActivation = JobActivation::fromStringView(m_config.archConfig().hiddenActivation());
 
     // Qwen transformer blocks:
     //
@@ -167,9 +165,12 @@ ggml::JobGgmlCGraph::UPtr QwenGraphBuilder::buildForward(ggml::JobGgmlContext &c
     if (softCap > 0.0f)
         logits = logits->scale(1.0f / softCap)->tanh()->scale(softCap);
 
-    logits->setName("logits");
+    // logits->setName("logits");
 
-    //  FIXME 8192 lives where ?
+    logits->setName("logits");
+    logits->setOutput(true);
+
+
     auto graph = ctx.newGraphCustom(8192, false);
 
     if (!graph)
@@ -185,20 +186,6 @@ ggml::JobGgmlCGraph::UPtr QwenGraphBuilder::buildForward(ggml::JobGgmlContext &c
     graph->buildForwardExpand(*logits);
 
     return graph;
-}
-
-GatedFfnGraph::Activation QwenGraphBuilder::activation(std::string_view name)
-{
-    if (name == "silu" || name == "swiglu")
-        return GatedFfnGraph::Activation::Silu;
-
-    if (name == "gelu")
-        return GatedFfnGraph::Activation::Gelu;
-
-    if (name == "relu")
-        return GatedFfnGraph::Activation::Relu;
-
-    throw std::invalid_argument{"QwenGraphBuilder received an unsupported hidden activation"};
 }
 
 } // namespace job::model

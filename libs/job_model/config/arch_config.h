@@ -53,7 +53,7 @@ public:
 private:
     ModelArchitecture   m_arch{ModelArchitecture::Unknown};
     std::string         m_archName{"unknown"};
-    std::string         m_modelName{"unknown"};    
+    std::string         m_modelName{"unknown"};
     std::string         m_hiddenActivation{"silu"};
 };
 

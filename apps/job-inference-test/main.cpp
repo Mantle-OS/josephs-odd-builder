@@ -22,9 +22,11 @@ int main(int argc, char *argv[])
     const std::filesystem::path tokenizerDir{ "/home/jmills/git/opensource/qwen_tmp" };
     const std::filesystem::path tokenizerJson = tokenizerDir / "tokenizer.json";
     const std::filesystem::path tokenizerConfig = tokenizerDir / "tokenizer_config.json";
+
+    // Just for now. Obv this will or should be changed later on
     const std::filesystem::path modelPath{
-        "/srv/ai/ComfyUI/models/text_encoders/"
-        "ZImage_Turbo/Qwen3-4B-Instruct-2507-Q4_K_M.gguf"
+        "/srv/ai/ComfyUI/models/text_encoders/ZImage_Turbo/"
+        "Qwen3-4B-Instruct-2507-Q4_K_M.gguf"
     };
 
     constexpr std::uint32_t InferenceContext = 4096;
@@ -50,11 +52,16 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    job::ggml::JobGgmlCpu *cpu = manager->cpu();
+
+    // job::ggml::JobGgmlDevice *cpu = manager->cpu();
+    job::ggml::JobGgmlCuda *cpu = manager->cudaDevices().at(0);
+
+
     if (!cpu) {
         std::cerr << "No CPU GGML device\n";
         return 1;
     }
+    std::cout << cpu->dump();
 
     auto scheduler = manager->buildScheduler(cpu, 4096);
     if (!scheduler || !scheduler->isValid()) {
@@ -85,8 +92,8 @@ int main(int argc, char *argv[])
     job::token::ChatMessage systemMessage;
     systemMessage.setRole(job::token::ChatRole::System);
     systemMessage.setContent(
-        "You are an expert C++ systems programmer. "
-        "Provide high-performance, clean code without unnecessary explanations. "
+        "You are an expert at writing poetry. "
+        "Your goal is to provide poetry without unnecessary explanations. "
         "Your response must fit within " +
         std::to_string(MaxNewTokens) +
         " tokens.");
@@ -94,8 +101,8 @@ int main(int argc, char *argv[])
     job::token::ChatMessage userMessage;
     userMessage.setRole(job::token::ChatRole::User);
     userMessage.setContent(
-        "Write a high-performance C++ function that computes "
-        "the inverse square root of a float.");
+        "Write a beatiful poem about when electricity and vectors line up to"
+        "create a sense of wonder");
 
     const std::vector<job::token::ChatMessage> dialogue{ systemMessage, userMessage };
     const std::string formattedPrompt = tokenizer.applyChatMessages(dialogue, true);

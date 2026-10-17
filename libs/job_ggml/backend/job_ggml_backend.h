@@ -119,6 +119,8 @@ public:
     // }
 
 private:
+    static void validateTensorRange(const JobGgmlTensor *tensor, std::size_t offset, std::size_t size);
+    static void validateTensor2dRange(const JobGgmlTensor *tensor, std::size_t offset, std::size_t size, std::size_t copies, std::size_t tensorStride);
     ggml_backend_ptr    m_backend;
     JobGgmlDevice       *m_device{nullptr}; // Borrowed.
     std::string         m_name{"unknown"};

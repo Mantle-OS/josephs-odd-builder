@@ -41,7 +41,7 @@ public:
         for(size_t i=0; i<kMaxCapacity; ++i)
             m_motifUsage[i] = 0;
 
-        // "God Particles" (immutable-ish starter motifs)
+        // (immutable-ish starter motifs)
         addMotif("The ");
         addMotif(" the ");
         addMotif(" of ");

@@ -52,8 +52,6 @@ public:
                                                          ggml::JobGgmlType inputType = ggml::JobGgmlType::F16) override;
 
 private:
-    [[nodiscard]] static GatedFfnGraph::Activation activation(std::string_view name);
-
     const ModelConfig  &m_config;
     const ModelWeights &m_weights;
     KvCache            &m_kvCache;

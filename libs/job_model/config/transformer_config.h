@@ -13,7 +13,7 @@
 
 namespace job::model {
 
-// Core, genuinely global transformer dimensions -- values needed across
+// Core, genuinely global transformer dimensions, values needed across
 // every block (embeddings, attention, FFN, output head), not exclusive
 // to any one graph-builder piece. Attention geometry (headCount/GQA),
 // normalization epsilon, RoPE, and FFN width have all been split out into

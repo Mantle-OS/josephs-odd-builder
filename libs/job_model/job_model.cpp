@@ -1,9 +1,14 @@
 #include "job_model.h"
 
 #include <algorithm>
+#include <cmath>
+#include <cstddef>
+#include <cstring>
 #include <exception>
+#include <limits>
 #include <stdexcept>
 #include <utility>
+#include <vector>
 
 // job_core
 #include <job_logger.h>
@@ -62,6 +67,7 @@ void JobModel::reset() noexcept
 
     m_weights.clear();
     m_weightCtx.reset();
+    m_weightBuffer.reset();
 
     m_config = ModelConfig{};
 
@@ -179,6 +185,7 @@ bool JobModel::loadWeights(const std::filesystem::path &ggufPath)
 {
     ggml::JobGgmlContext::UPtr weightCtx;
     ggml::JobGguf gguf{&weightCtx};
+
     // DeviceConfig::noAlloc() describes the GGUF tensor-data allocation
     // preference. mmap/mlock have no direct JobGguf wrapper hook yet, so
     // they are intentionally not faked here.
@@ -191,7 +198,6 @@ bool JobModel::loadWeights(const std::filesystem::path &ggufPath)
     if (!gguf.open(ggufPath)) {
         JOB_LOG_ERROR("[JobModel] Failed to open GGUF '{}': {}",
                       ggufPath.string(), gguf.errorString());
-
         return false;
     }
 
@@ -215,6 +221,118 @@ bool JobModel::loadWeights(const std::filesystem::path &ggufPath)
         return false;
     }
 
+    if (m_device.impl() != ggml::JobGgmlDeviceImpl::Cpu) {
+        // Stage GGUF's original quantized bytes in host memory, then create
+        // persistent backend-backed tensors for the graph builder to borrow.
+        auto *bufferType = m_device.bufferType();
+        auto backend = m_device.backend();
+
+        if (!bufferType || !bufferType->isValid() || !backend || !backend->isValid()) {
+            JOB_LOG_ERROR("[JobModel] No valid backend for weight materialization");
+            return false;
+        }
+
+        // A separate metadata-only context avoids replacing GGUF's host data
+        // pointers while the source bytes are still needed for the upload.
+        std::size_t tensorCount = 0;
+
+        for (auto tensor = weightCtx->firstTensor(); tensor; tensor = weightCtx->nextTensor(*tensor))
+            ++tensorCount;
+
+        auto deviceCtx = ggml::JobGgmlContext::createUniqMetadata(tensorCount, 0, false);
+        if (!deviceCtx || !deviceCtx->isValid()) {
+            JOB_LOG_ERROR("[JobModel] Failed to create device weight metadata context");
+            return false;
+        }
+
+        std::size_t totalBytes = 0;
+        const std::size_t alignment = bufferType->alignment();
+
+        if (alignment == 0) {
+            JOB_LOG_ERROR("[JobModel] Invalid weight backend alignment");
+            return false;
+        }
+
+        for (auto source = weightCtx->firstTensor(); source; source = weightCtx->nextTensor(*source)) {
+            const int64_t shape[4] = {
+                source->extent(0),
+                source->extent(1),
+                source->extent(2),
+                source->extent(3)
+            };
+
+            auto destination = deviceCtx->newTensor(source->type(), 4, shape);
+            if (!destination || !destination->isValid())
+                return false;
+
+            destination->setName(source->name());
+
+            const std::size_t bytes = ggml::JobGgmlTensorAllocator::requiredBufferSize(*bufferType, *destination);
+
+            if (bytes == 0 ||
+                bytes > std::numeric_limits<std::size_t>::max() - alignment ||
+                totalBytes > std::numeric_limits<std::size_t>::max() - (bytes + alignment)) {
+                JOB_LOG_ERROR("[JobModel] Weight buffer size overflow for '{}'", source->name());
+                return false;
+            }
+
+            totalBytes += bytes + alignment;
+        }
+
+        auto uniqueBuffer = bufferType->allocateBuffer(totalBytes);
+        if (!uniqueBuffer || !uniqueBuffer->isValid()) {
+            JOB_LOG_ERROR("[JobModel] Failed to allocate {} bytes for model weights", totalBytes);
+            return false;
+        }
+
+        auto deviceBuffer = ggml::JobGgmlBackendBuffer::Ptr{std::move(uniqueBuffer)};
+        ggml::JobGgmlTensorAllocator allocator{deviceBuffer};
+
+        for (auto source = weightCtx->firstTensor(); source; source = weightCtx->nextTensor(*source)) {
+            auto destination = deviceCtx->tensor(source->name());
+
+            if (!destination || !destination->isValid() || !source->tensor()->data ||
+                allocator.allocate(*destination) != ggml::JobGgmlStatus::Success) {
+                JOB_LOG_ERROR("[JobModel] Failed to allocate weight '{}'", source->name());
+                return false;
+            }
+
+            backend->setTensorAsync(*destination, source->tensor()->data, 0, source->byteCount());
+            backend->synchronize();
+
+            // Temporary verification of original GGUF quantized weight bytes.
+            if (source->name() == "blk.0.attn_k.weight") {
+                std::vector<std::byte> downloaded(source->byteCount());
+
+                backend->getTensorAsync(*destination, downloaded.data(), 0, downloaded.size());
+                backend->synchronize();
+
+                const bool matches = std::memcmp(
+                                         downloaded.data(),
+                                         source->tensor()->data,
+                                         downloaded.size()) == 0;
+
+                JOB_LOG_WARN("[JobModel WEIGHTS] {} bytes={} roundTrip={}",
+                             source->name(), downloaded.size(), matches ? "PASS" : "FAIL");
+            }
+        }
+
+        // ModelWeights is a borrowing index into its context: rebind only
+        // after all tensors are fully materialized on the selected backend.
+        ModelWeights deviceWeights;
+
+        if (!deviceWeights.loadFromContext(*deviceCtx, m_config)) {
+            JOB_LOG_ERROR("[JobModel] Failed to bind device-resident model weights");
+            return false;
+        }
+
+        m_weights = std::move(deviceWeights);
+        m_weightBuffer = std::move(deviceBuffer);
+        weightCtx = std::move(deviceCtx);
+
+        JOB_LOG_INFO("[JobModel] Materialized {} tensors in {} backend bytes", tensorCount, totalBytes);
+    }
+
     m_weightCtx = std::move(weightCtx);
     return true;
 }
@@ -222,12 +340,15 @@ bool JobModel::loadWeights(const std::filesystem::path &ggufPath)
 bool JobModel::createKvCache(uint32_t maxContextLength)
 {
     const auto *bufferType = m_device.bufferType();
+
     if (!bufferType || !bufferType->isValid()) {
-        JOB_LOG_ERROR ("[JobModel] Resolved device does not expose a valid buffer type");
+        JOB_LOG_ERROR("[JobModel] Resolved device does not expose a valid buffer type");
         return false;
     }
 
-    const uint32_t contextLength = maxContextLength > 0 ? maxContextLength : m_config.transformerConfig().contextLength();
+    const uint32_t contextLength = maxContextLength > 0 ?
+                                       maxContextLength :
+                                       m_config.transformerConfig().contextLength();
 
     if (contextLength == 0) {
         JOB_LOG_ERROR("[JobModel] Cannot create KV cache with zero context length");
@@ -246,10 +367,10 @@ bool JobModel::createKvCache(uint32_t maxContextLength)
 
 bool JobModel::createComputeContext()
 {
-
     // This eventually needs a separately configurable metadata budget, that becomes an explicit DeviceConfig field.
     const std::size_t graphSize = std::max<std::size_t>(m_scheduler.graphSize(), 1);
     const std::size_t tensorCount = graphSize * 4;
+
     auto initParams = ggml::JobGgmlInitParams::createUniqMetadataFor(tensorCount,
                                                                      graphSize,
                                                                      false);
@@ -283,10 +404,10 @@ bool JobModel::createGraphBuilder()
         case ModelArchitecture::Qwen3:
             m_graphBuilder = QwenGraphBuilder::createUniq(m_config, m_weights, *m_kvCache);
             break;
+
         default:
             JOB_LOG_ERROR("[JobModel] Unsupported graph architecture '{}'",
                           modelArchitectureToString(m_config.archConfig().arch()));
-
             return false;
         }
     } catch (const std::exception &error) {
@@ -313,15 +434,17 @@ ggml::JobGgmlTensor::UPtr JobModel::createInputTensor(std::span<const int32_t> t
         throw std::runtime_error{"JobModel device does not expose a valid buffer type"};
 
     auto tensor = m_computeCtx->newTensor1d(ggml::JobGgmlType::I32, static_cast<int64_t>(tokens.size()));
+
     if (!tensor || !tensor->isValid())
         throw std::runtime_error{"JobModel failed to create input token tensor"};
 
     const std::size_t allocationSize = ggml::JobGgmlTensorAllocator::requiredBufferSize(*bufferType, *tensor);
+
     auto uniqueBuffer = bufferType->allocateBuffer(allocationSize);
     if (!uniqueBuffer || !uniqueBuffer->isValid())
         throw std::runtime_error{"JobModel failed to allocate input token buffer"};
 
-    buffer = ggml::JobGgmlBackendBuffer::Ptr{ std::move(uniqueBuffer) };
+    buffer = ggml::JobGgmlBackendBuffer::Ptr{std::move(uniqueBuffer)};
 
     ggml::JobGgmlTensorAllocator allocator{buffer};
     if (!allocator.isValid())
@@ -330,20 +453,15 @@ ggml::JobGgmlTensor::UPtr JobModel::createInputTensor(std::span<const int32_t> t
     if (allocator.allocate(*tensor) != ggml::JobGgmlStatus::Success)
         throw std::runtime_error{"JobModel failed to allocate input token tensor"};
 
-    // Direct element writes are only valid for host-accessible buffers.
-    // Device-local token input needs the backend tensor-set/copy abstraction,
-    // which should live in job_ggml rather than being recreated here.
-    ggml::JobGgmlTensorData data{tensor->tensor()};
-    if (!data.isHostAccessible()) {
-        throw std::runtime_error {
-            "JobModel input token buffer is not host accessible; "
-            "backend tensor upload is not implemented yet"
-        };
-    }
+    // Device-local token input uses the backend tensor-set/copy abstraction
+    // provided by job_ggml instead of accessing tensor storage directly.
+    auto backend = m_device.backend();
 
-    for (std::size_t i = 0; i < tokens.size(); ++i) {
-        data.setValueI32(static_cast<int64_t>(i), tokens[i]);
-    }
+    if (!backend || !backend->isValid())
+        throw std::runtime_error{"JobModel requires a valid input transfer backend"};
+
+    backend->setTensorAsync(*tensor, tokens.data(), 0, tokens.size_bytes());
+    backend->synchronize();
 
     return tensor;
 }
@@ -353,6 +471,7 @@ int32_t JobModel::sampleLastToken(ggml::JobGgmlCGraph &graph,
                                   std::span<const int32_t> contextTokens)
 {
     auto logits = graph.tensor("logits");
+
     if (!logits || !logits->isValid()) {
         JOB_LOG_ERROR("[JobModel] Graph does not contain valid logits");
         return -1;
@@ -366,30 +485,135 @@ int32_t JobModel::sampleLastToken(ggml::JobGgmlCGraph &graph,
         return -1;
     }
 
-    // Sampler currently requires host-accessible logits. Do not hide a
-    // device->host transfer inside JobModel; that belongs in the ggml/runtime
-    // transfer layer once the abstraction exists.
-    ggml::JobGgmlTensorData logitsData{ logits->tensor() };
-    if (!logitsData.isHostAccessible()) {
-        JOB_LOG_ERROR("[JobModel] Sampler requires host-accessible logits; device-to-host logits transfer is not implemented yet");
+    if (logits->type() != ggml::JobGgmlType::F32) {
+        JOB_LOG_ERROR("[JobModel] Sampler requires F32 logits");
         return -1;
     }
 
-    const std::size_t rowBytes = logitsData.rowSize();
-    const std::size_t offset = static_cast<std::size_t>(sequenceLength - 1) * rowBytes;
+    const std::size_t rowBytes = static_cast<std::size_t>(vocabSize) * sizeof(float);
+    const std::size_t offset = static_cast<std::size_t>(sequenceLength - 1) * logits->stride(1);
 
-    auto lastLogits = ggml::JobGgmlTensorOp::createUniq(const_cast<struct ggml_tensor *>(logits->tensor()),
-                                                        m_computeCtx.get())->view1d(vocabSize, offset);
-
-    if (!lastLogits || !lastLogits->isValid()) {
-        JOB_LOG_ERROR("[JobModel] Failed to create final-token logits view");
+    if (logits->stride(0) != sizeof(float) ||
+        offset > logits->byteCount() ||
+        rowBytes > logits->byteCount() - offset) {
+        JOB_LOG_ERROR("[JobModel] Logits tensor has an unsupported layout");
         return -1;
     }
 
-    return sampler.sample(*lastLogits, contextTokens);
+    // Temporary numerical diagnostics for CPU/CUDA comparison.
+    auto inspectLogits = [&](const float *values, const char *label) {
+        std::size_t nonFinite = 0;
+        std::size_t nonzero = 0;
+        float maximum = -std::numeric_limits<float>::infinity();
+        int64_t argmax = -1;
+
+        for (int64_t i = 0; i < vocabSize; ++i) {
+            const float value = values[i];
+
+            if (!std::isfinite(value)) {
+                ++nonFinite;
+                continue;
+            }
+
+            if (value != 0.0f)
+                ++nonzero;
+
+            if (value > maximum) {
+                maximum = value;
+                argmax = i;
+            }
+        }
+
+        // JOB_LOG_WARN("[JobModel LOGITS] {} vocab={} nonzero={} nonFinite={} argmax={} max={} first=[{}, {}, {}, {}]",
+        //              label, vocabSize, nonzero, nonFinite, argmax, maximum,
+        //              values[0], values[1], values[2], values[3]);
+    };
+
+    ggml::JobGgmlTensorData logitsData{logits->tensor()};
+
+    if (logitsData.isHostAccessible()) {
+        auto lastLogits = ggml::JobGgmlTensorOp::createUniq(
+                              const_cast<struct ggml_tensor *>(logits->tensor()),
+                              m_computeCtx.get())->view1d(vocabSize, offset);
+
+        if (!lastLogits || !lastLogits->isValid()) {
+            JOB_LOG_ERROR("[JobModel] Failed to create final-token logits view");
+            return -1;
+        }
+
+        const auto *values = static_cast<const float *>(lastLogits->tensor()->data);
+        inspectLogits(values, "CPU last row");
+
+        return sampler.sample(*lastLogits, contextTokens);
+    }
+
+    // Download the first and last logits rows to verify whether CUDA
+    // produced values for the sequence, or whether the output is empty.
+    auto backend = m_scheduler.tensorBackend(*logits);
+
+    if (!backend || !backend->isValid()) {
+        JOB_LOG_ERROR("[JobModel] Failed to resolve logits backend");
+        return -1;
+    }
+
+    // const auto *tensor = logits->tensor();
+
+    // JOB_LOG_WARN("[JobModel LOGITS STORAGE] name={} data={} buffer={} op={} shape=[{}, {}] stride=[{}, {}] offset={} bytes={}",
+    //              logits->name(),
+    //              tensor->data,
+    //              static_cast<void *>(tensor->buffer),
+    //              static_cast<int>(tensor->op),
+    //              vocabSize,
+    //              sequenceLength,
+    //              logits->stride(0),
+    //              logits->stride(1),
+    //              offset,
+    //              rowBytes);
+
+    std::vector<float> firstLogits(static_cast<std::size_t>(vocabSize));
+    std::vector<float> hostLogits(static_cast<std::size_t>(vocabSize));
+
+    try {
+        backend->getTensorAsync(*logits, firstLogits.data(), 0, rowBytes);
+        backend->getTensorAsync(*logits, hostLogits.data(), offset, rowBytes);
+        backend->synchronize();
+    } catch (const std::exception &error) {
+        JOB_LOG_ERROR("[JobModel] Failed to download logits: {}", error.what());
+        return -1;
+    }
+
+    // Both buffers have now been populated by the backend transfers.
+    inspectLogits(firstLogits.data(), "CUDA first row");
+    inspectLogits(hostLogits.data(), "CUDA last row");
+
+    // Temporary host-backed tensor descriptor for the existing sampler.
+    // The vector owns the data and remains alive throughout sampling.
+    struct ggml_tensor hostTensor = *logits->tensor();
+
+    hostTensor.ne[0] = vocabSize;
+    hostTensor.ne[1] = 1;
+    hostTensor.ne[2] = 1;
+    hostTensor.ne[3] = 1;
+
+    hostTensor.nb[0] = sizeof(float);
+    hostTensor.nb[1] = rowBytes;
+    hostTensor.nb[2] = rowBytes;
+    hostTensor.nb[3] = rowBytes;
+
+    hostTensor.data = hostLogits.data();
+    hostTensor.buffer = nullptr;
+    hostTensor.view_src = nullptr;
+    hostTensor.view_offs = 0;
+    hostTensor.op = GGML_OP_NONE;
+
+    ggml::JobGgmlTensor hostView{&hostTensor};
+
+    return sampler.sample(hostView, contextTokens);
 }
 
-std::vector<int32_t> JobModel::generate(std::span<const int32_t> promptTokens, int32_t maxNewTokens, const SamplerConfig &samplerConfig)
+std::vector<int32_t> JobModel::generate(std::span<const int32_t> promptTokens,
+                                        int32_t maxNewTokens,
+                                        const SamplerConfig &samplerConfig)
 {
     if (!isLoaded()) {
         JOB_LOG_ERROR("[JobModel] Cannot generate: model is not loaded");
@@ -419,7 +643,10 @@ std::vector<int32_t> JobModel::generate(std::span<const int32_t> promptTokens, i
     // ------------------------------------------------------------
     // Prefill
     // ------------------------------------------------------------
+    m_scheduler.synchronize();
+    m_scheduler.reset();
     m_computeCtx->reset();
+
     ggml::JobGgmlBackendBuffer::Ptr inputBuffer;
     ggml::JobGgmlTensor::UPtr inputTensor;
 
@@ -440,43 +667,23 @@ std::vector<int32_t> JobModel::generate(std::span<const int32_t> promptTokens, i
         return {};
     }
 
-    {
-        const auto graphNodes = graph->nodes();
+    // m_scheduler.splitGraph(*graph);
 
-        for (std::size_t index = 0; index < graphNodes.size(); ++index) {
-            const auto &node = graphNodes[index];
-            if (!node || !node->isValid())
-                continue;
+    // if (!m_scheduler.allocateGraph(*graph)) {
+    //     JOB_LOG_ERROR("[JobModel] Failed to allocate prefill graph");
+    //     return {};
+    // }
 
-            // if (!m_device.deviceInterface()->supportsOp(*node)) {
-            //     const auto *operation = node->operation();
-
-            // JOB_LOG_WARN(
-            //     "[JobModel LOOK] unsupported prefill node {}: name='{}', op='{}', type='{}', shape=[{}, {}, {}, {}]",
-            //     index,
-            //     node->name(),
-            //     operation ? operation->operationName() : "unknown",
-            //     node->typeName(),
-            //     node->extent(0),
-            //     node->extent(1),
-            //     node->extent(2),
-            //     node->extent(3));
-            // }
-        }
-    }
-
-    m_scheduler.splitGraph(*graph);
-    if (!m_scheduler.allocateGraph(*graph)) {
-        JOB_LOG_ERROR("[JobModel] Failed to allocate prefill graph");
-        return {};
-    }
-
+    // if (m_scheduler.computeGraph(*graph) != ggml::JobGgmlStatus::Success) {
+    //     JOB_LOG_ERROR("[JobModel] Prefill graph execution failed");
+    //     return {};
+    // }
     if (m_scheduler.computeGraph(*graph) != ggml::JobGgmlStatus::Success) {
         JOB_LOG_ERROR("[JobModel] Prefill graph execution failed");
         return {};
     }
-
     m_scheduler.synchronize();
+
     int32_t nextToken = sampleLastToken(*graph, sampler, outputTokens);
     if (nextToken < 0)
         return {};
@@ -489,17 +696,19 @@ std::vector<int32_t> JobModel::generate(std::span<const int32_t> promptTokens, i
     // Decode
     // ------------------------------------------------------------
     for (int32_t step = 1; step < maxNewTokens; ++step) {
-        m_computeCtx->reset();
+        // Release scheduler references before resetting compute metadata.
+        m_scheduler.synchronize();
         m_scheduler.reset();
+        m_computeCtx->reset();
 
         const int32_t token = nextToken;
+
         ggml::JobGgmlBackendBuffer::Ptr stepInputBuffer;
         ggml::JobGgmlTensor::UPtr stepInput;
 
         try {
             stepInput = createInputTensor(std::span<const int32_t>{&token, 1}, stepInputBuffer);
-        }
-        catch (const std::exception &error) {
+        } catch (const std::exception &error) {
             JOB_LOG_ERROR("[JobModel] Failed to create decode input at step {}: {}", step, error.what());
             break;
         }
@@ -514,22 +723,8 @@ std::vector<int32_t> JobModel::generate(std::span<const int32_t> promptTokens, i
             break;
         }
 
-        {
-            const auto graphNodes = stepGraph->nodes();
-            for (std::size_t i = 0; i < graphNodes.size(); ++i) {
-                const auto &node = graphNodes[i];
-
-                if (!node || !node->isValid())
-                    continue;
-
-                if (!m_device.deviceInterface()->supportsOp(*node)) {
-                    JOB_LOG_WARN("[JobModel LOOK] device does not support decode graph node {} at step {}: name='{}'",
-                                 i, step, node->name());
-                }
-            }
-        }
-
         m_scheduler.splitGraph(*stepGraph);
+
         if (!m_scheduler.allocateGraph(*stepGraph)) {
             JOB_LOG_ERROR("[JobModel] Failed to allocate decode graph at step {}", step);
             break;
@@ -541,6 +736,7 @@ std::vector<int32_t> JobModel::generate(std::span<const int32_t> promptTokens, i
         }
 
         m_scheduler.synchronize();
+
         nextToken = sampleLastToken(*stepGraph, sampler, outputTokens);
         if (nextToken < 0)
             break;

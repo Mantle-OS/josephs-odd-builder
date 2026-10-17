@@ -10,6 +10,9 @@
 #include <cstddef>
 #include <cstdint>
 #include <span>
+#include <limits>
+#include <stdexcept>
+
 #include <string>
 #include <thread>
 #include <vector>
@@ -140,6 +143,49 @@ TEST_CASE("CUDA peer access between discovered GPUs",
         CHECK(result == source);
     }
 }
+
+
+TEST_CASE("CUDA backend transfers I32 tensor values round trip", "[ggml][cuda][tensor][transfer][usage]")
+{
+    REQUIRE(g_jobGgml != nullptr);
+    JobGgmlDeviceManager *manager = g_jobGgml->deviceManager();
+    REQUIRE(manager != nullptr);
+    if (!manager->hasCuda())
+        SKIP("No CUDA GGML device is available on this system");
+
+    JobGgmlCuda *device = manager->cuda(0);
+    REQUIRE(device != nullptr);
+    const auto backend = device->backend();
+    REQUIRE(backend != nullptr);
+    REQUIRE(backend->isValid());
+
+    auto context = JobGgmlContext::createUniqMetadata(1024);
+    REQUIRE(context != nullptr);
+    auto tensor = context->newTensor1d(JobGgmlType::I32, 70);
+    REQUIRE(tensor != nullptr);
+
+    auto *bufferType = device->bufferType();
+    REQUIRE(bufferType != nullptr);
+    auto nativeBuffer = bufferType->allocateBuffer(JobGgmlTensorAllocator::requiredBufferSize(*bufferType, *tensor));
+    REQUIRE(nativeBuffer != nullptr);
+    JobGgmlBackendBuffer::Ptr buffer{std::move(nativeBuffer)};
+    auto allocator = JobGgmlTensorAllocator::createUniq(buffer);
+    REQUIRE(allocator->allocate(*tensor) == JobGgmlStatus::Success);
+
+    std::array<std::int32_t, 70> input{};
+    std::array<std::int32_t, 70> output{};
+    for (std::size_t index = 0; index < input.size(); ++index)
+        input[index] = static_cast<std::int32_t>(index * 17 - 400);
+
+    backend->setTensorAsync(*tensor, input.data(), 0, sizeof(input));
+    backend->synchronize();
+    backend->getTensorAsync(*tensor, output.data(), 0, sizeof(output));
+    backend->synchronize();
+    CHECK(output == input);
+}
+
+
+
 
 // ============================================================================
 // Block one: usage / examples
@@ -483,35 +529,48 @@ TEST_CASE("CUDA device index matches native CUDA backend ordinal",
               std::string{GGML_CUDA_NAME} + std::to_string(index));
     }
 }
-/*
-TEST_CASE("CUDA all-reduce rejects invalid wrapper collections",
-          "[ggml][device][cuda][allreduce][edge]")
+
+TEST_CASE("CUDA tensor transfer rejects out of bounds byte ranges", "[ggml][cuda][tensor][transfer][edge]")
 {
-    const std::vector<JobGgmlBackend::Ptr> noBackends;
-    const std::vector<JobGgmlTensor::Ptr> noTensors;
-
-    CHECK_FALSE(JobGgmlCuda::allReduceTensor(noBackends, noTensors));
-
     REQUIRE(g_jobGgml != nullptr);
-
     JobGgmlDeviceManager *manager = g_jobGgml->deviceManager();
     REQUIRE(manager != nullptr);
-
-    manager->scan();
-
     if (!manager->hasCuda())
         SKIP("No CUDA GGML device is available on this system");
 
-    JobGgmlCuda *cuda = manager->cuda(0);
-    REQUIRE(cuda != nullptr);
+    JobGgmlCuda *device = manager->cuda(0);
+    REQUIRE(device != nullptr);
+    auto backend = device->backend();
+    REQUIRE(backend != nullptr);
 
-    std::vector<JobGgmlBackend::Ptr> backends{
-        cuda->backend()
-    };
+    auto context = JobGgmlContext::createUniqMetadata(1024);
+    REQUIRE(context != nullptr);
+    auto tensor = context->newTensor1d(JobGgmlType::I32, 70);
+    REQUIRE(tensor != nullptr);
+    auto *bufferType = device->bufferType();
+    REQUIRE(bufferType != nullptr);
 
-    CHECK_FALSE(JobGgmlCuda::allReduceTensor(backends, noTensors));
+    auto nativeBuffer = bufferType->allocateBuffer(JobGgmlTensorAllocator::requiredBufferSize(*bufferType, *tensor));
+    REQUIRE(nativeBuffer != nullptr);
+
+    JobGgmlBackendBuffer::Ptr buffer{std::move(nativeBuffer)};
+    auto allocator = JobGgmlTensorAllocator::createUniq(buffer);
+    REQUIRE(allocator->allocate(*tensor) == JobGgmlStatus::Success);
+
+    constexpr std::size_t ByteCount = 70 * sizeof(std::int32_t);
+    std::array<std::int32_t, 70> values{};
+    CHECK_NOTHROW(backend->setTensorAsync(*tensor, values.data(), ByteCount, 0));
+    CHECK_NOTHROW(backend->getTensorAsync(*tensor, values.data(), ByteCount, 0));
+    CHECK_THROWS_AS(backend->setTensorAsync(*tensor, values.data(), ByteCount, 1), std::out_of_range);
+    CHECK_THROWS_AS(backend->getTensorAsync(*tensor, values.data(), ByteCount + 1, 0), std::out_of_range);
+    CHECK_THROWS_AS(backend->setTensorAsync(*tensor, values.data(), 1, ByteCount), std::out_of_range);
+    CHECK_THROWS_AS(backend->getTensorAsync(*tensor, values.data(), std::numeric_limits<std::size_t>::max(), 4), std::out_of_range);
+    CHECK_THROWS_AS(backend->setTensor2dAsync(*tensor, values.data(), ByteCount - 4, 4, 2, 4, 4), std::out_of_range);
+    CHECK_THROWS_AS(backend->getTensor2dAsync(*tensor, values.data(), ByteCount - 4, 4, 2, 4, 4), std::out_of_range);
+    CHECK_THROWS_AS(backend->setTensorAsync(*tensor, nullptr, 0, 4), std::invalid_argument);
 }
-*/
+
+
 
 // ============================================================================
 // Block three: benchmarks / stress

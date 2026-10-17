@@ -7,6 +7,30 @@
 
 namespace job::ggml {
 
+void JobGgmlBackend::validateTensorRange(const JobGgmlTensor *tensor, std::size_t offset, std::size_t size)
+{
+    const std::size_t capacity = tensor->byteCount();
+    if (offset > capacity || size > capacity - offset)
+        throw std::out_of_range{"Tensor transfer exceeds tensor byte range"};
+}
+
+void JobGgmlBackend::validateTensor2dRange(const JobGgmlTensor *tensor, std::size_t offset, std::size_t size,
+                                           std::size_t copies, std::size_t tensorStride)
+{
+    validateTensorRange(tensor, offset, 0);
+    if (copies == 0)
+        return;
+
+    const std::size_t capacity = tensor->byteCount();
+    const std::size_t available = capacity - offset;
+
+    if (tensorStride == 0 && copies > 1)
+        throw std::invalid_argument{"2D tensor transfer requires a nonzero stride for multiple copies"};
+
+    if (size > available || (tensorStride != 0 && (copies - 1) > (available - size) / tensorStride))
+        throw std::out_of_range{"2D tensor transfer exceeds tensor byte range"};
+}
+
 JobGgmlBackend::JobGgmlBackend(ggml_backend_t backend) :
     m_backend{backend}
 {
@@ -83,6 +107,7 @@ void JobGgmlBackend::setTensorAsync(JobGgmlTensor &tensor,
     if (!data && size > 0)
         throw std::invalid_argument{ "setTensorAsync requires valid data when size is greater than zero" };
 
+    validateTensorRange(&tensor, offset, size);
 
     ggml_backend_tensor_set_async(m_backend.get(),
                                   tensor.tensor(),
@@ -101,6 +126,8 @@ void JobGgmlBackend::getTensorAsync(const JobGgmlTensor &tensor, void *data, std
 
     if (!data && size > 0)
         throw std::invalid_argument{ "getTensorAsync requires valid output storage when size is greater than zero" };
+
+    validateTensorRange(&tensor, offset, size);
 
     ggml_backend_tensor_get_async(m_backend.get(),
                                   tensor.tensor(),
@@ -125,6 +152,8 @@ void JobGgmlBackend::setTensor2dAsync(JobGgmlTensor &tensor,
 
     if (!data && size > 0)
         throw std::invalid_argument{ "setTensor2dAsync requires valid data when size is greater than zero" };
+
+    validateTensor2dRange(&tensor, offset, size, copies, tensorStride);
 
     ggml_backend_tensor_set_2d_async(m_backend.get(),
                                      tensor.tensor(),
@@ -153,6 +182,7 @@ void JobGgmlBackend::getTensor2dAsync(const JobGgmlTensor &tensor,
     if (!data && size > 0)
         throw std::invalid_argument{ "getTensor2dAsync requires valid output storage when size is greater than zero" };
 
+    validateTensor2dRange(&tensor, offset, size, copies, tensorStride);
 
     ggml_backend_tensor_get_2d_async(m_backend.get(),
                                      tensor.tensor(),

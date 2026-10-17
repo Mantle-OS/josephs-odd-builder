@@ -68,7 +68,7 @@ public:
     [[nodiscard]] uint32_t headDimensionKv(uint32_t embeddingLength) const noexcept;
 
     // Semantic tensor shape helpers for downstream graph builders.
-    // embeddingLength is TransformerConfig::embeddingLength() -- passed in
+    // embeddingLength is TransformerConfig::embeddingLength() passed in
     // explicitly rather than looked up, since this class doesn't hold a
     // TransformerConfig reference.
     [[nodiscard]] ggml::JobGgmlLinearShape  qProjectionShape(uint32_t embeddingLength) const noexcept;

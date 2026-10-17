@@ -7,6 +7,7 @@
 #include <vector>
 
 #include <job_ggml_backend_sched.h>
+#include <job_ggml_backend_buffer.h>
 #include <job_ggml_context.h>
 #include <job_ggml_device.h>
 #include <job_ggml_enums.h>
@@ -88,7 +89,6 @@ public:
     [[nodiscard]] const ggml::JobGgmlContext *computeContext() const noexcept { return m_computeCtx.get(); }
 
     void reset() noexcept;
-
 private:
     [[nodiscard]] bool loadConfigFromGguf(const std::filesystem::path &ggufPath);
     [[nodiscard]] bool loadWeights(const std::filesystem::path &ggufPath);
@@ -107,6 +107,7 @@ private:
     ModelConfig                 m_config;           // Owned
     ModelWeights                m_weights;          // Owned
     ggml::JobGgmlContext::UPtr  m_weightCtx;        // OWNED
+    ggml::JobGgmlBackendBuffer::Ptr m_weightBuffer;  // OWNED, accelerator weights
     ggml::JobGgmlContext::UPtr  m_computeCtx;       // OWNED
     KvCache::UPtr               m_kvCache;          // OWNED
     GraphBuilder::UPtr          m_graphBuilder;     // OWNED

@@ -6,21 +6,15 @@
 #include <job_ggml_tensor_op.h>
 
 #include "jobmodel_export.h"
+#include "job_activation.h"
 #include "weights/model_weights.h"
 
 namespace job::model {
 
-// we already(or should) a have a config for this why in the heck is this inherit of the config itsself
+// FIXME LATER we already(or should) a have a config for this why in the heck is this inherit of the config itsself
 class JOBMODEL_EXPORT GatedFfnGraph final
 {
 public:
-    // TODO ADD THE REST These should really live in there own file not here.
-    enum class Activation : uint8_t {
-        Silu,
-        Gelu,
-        Relu
-    };
-
     GatedFfnGraph() = delete;
     ~GatedFfnGraph() = delete;
 
@@ -31,11 +25,9 @@ public:
 
     [[nodiscard]] static ggml::JobGgmlTensorOp::UPtr build(ggml::JobGgmlTensorOp::UPtr input,
                                                            const LayerWeights &weights,
-                                                           Activation activation = Activation::Silu,
+                                                           ActivationType activation = ActivationType::Silu,
                                                            ggml::JobGgmlType inputType = ggml::JobGgmlType::F16);
 
-private:
-    [[nodiscard]] static ggml::JobGgmlTensorOp::UPtr activate(ggml::JobGgmlTensorOp::UPtr input, Activation activation);
 };
 
 } // namespace job::model
