@@ -11,6 +11,7 @@ ggml::JobGgmlTensorOp::UPtr GatedFfnGraph::build(ggml::JobGgmlTensorOp::UPtr inp
                                                  ActivationType activation,
                                                  ggml::JobGgmlType inputType)
 {
+#ifndef NDEBUG
     if (!input || !input->isValid())
         throw std::invalid_argument{"GatedFfnGraph requires a valid input tensor"};
 
@@ -31,6 +32,7 @@ ggml::JobGgmlTensorOp::UPtr GatedFfnGraph::build(ggml::JobGgmlTensorOp::UPtr inp
 
     if (weights.ffnDownBias && !weights.ffnDownBias->isValid())
         throw std::invalid_argument{"GatedFfnGraph down bias is invalid"};
+#endif
 
     auto contiguousInput = input->cont();
 
@@ -50,13 +52,13 @@ ggml::JobGgmlTensorOp::UPtr GatedFfnGraph::build(ggml::JobGgmlTensorOp::UPtr inp
 
     const int64_t intermediateSize = weights.ffnDown->extent(0);
     const int64_t nTokens          = hidden->extent(1);
-
+#ifndef NDEBUG
     if (intermediateSize <= 0)
         throw std::invalid_argument{"GatedFfnGraph requires a positive intermediate dimension"};
 
     if (nTokens <= 0)
         throw std::invalid_argument{"GatedFfnGraph requires at least one token"};
-
+#endif
     auto hiddenContiguous = hidden->reshape2d(intermediateSize, nTokens)->cont();
     return LinearGraph::build(std::move(hiddenContiguous),
                               *weights.ffnDown,

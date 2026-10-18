@@ -3,6 +3,8 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <chrono>
+
 
 #include <job_ggml.h>
 #include <job_ggml_backend_sched.h>
@@ -12,7 +14,15 @@
 #include <job_token.h>
 
 #include <chat/chat_message.h>
-#include <config/arch/qwen/qwen3_instruct_2507.h>
+// #include <config/arch/qwen/qwen3_instruct_2507.h>
+#include <config/model_config.h>
+#include <io/gguf_model_config_reader.h>
+
+
+void shutUp(ggml_log_level, const char *, void *)
+{
+    return;
+}
 
 int main(int argc, char *argv[])
 {
@@ -29,6 +39,7 @@ int main(int argc, char *argv[])
         "Qwen3-4B-Instruct-2507-Q4_K_M.gguf"
     };
 
+    // constexpr std::uint32_t InferenceContext = 4096;
     constexpr std::uint32_t InferenceContext = 4096;
     constexpr std::int32_t MaxNewTokens = 256;
 
@@ -44,50 +55,61 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    job::ggml::JobGgml interface;
+    job::ggml::JobGgml interface{false};
+    interface.setLogCallback(&shutUp);
+
     job::ggml::JobGgmlDeviceManager *manager = interface.deviceManager();
 
-    if (!manager || !manager->isValid()) {
+    if (!manager) {
         std::cerr << "Device manager unavailable\n";
         return 1;
     }
 
-
-    // job::ggml::JobGgmlDevice *cpu = manager->cpu();
-    job::ggml::JobGgmlCuda *cpu = manager->cudaDevices().at(0);
-
-
-    if (!cpu) {
-        std::cerr << "No CPU GGML device\n";
+    manager->scan();
+    if(!manager->isValid()){
+        std::cerr << "Device manager Has no devices\n";
         return 1;
     }
-    std::cout << cpu->dump();
 
-    auto scheduler = manager->buildScheduler(cpu, 4096);
+
+    job::ggml::JobGgmlDevice *device = nullptr;
+    if(!manager->cudaDevices().isEmpty())
+        device = manager->cudaDevices().at(0);
+    else
+        device = manager->cpu();
+
+    if (!device) {
+        std::cerr << "No CPU Or GPU GGML device\n";
+        return 1;
+    }
+#ifndef NDEBUG
+    std::cout << cpu->dump();
+#endif
+
+    auto scheduler = manager->buildScheduler(device, 8192);
     if (!scheduler || !scheduler->isValid()) {
         std::cerr << "Failed to create CPU scheduler\n";
         return 1;
     }
 
-    job::model::arch::qwen::Qwen3Instruct2507Config presetConfig;
-    if (!presetConfig.isValid()) {
-        std::cerr << "Qwen3 preset failed validation\n";
+    job::model::GgufModelConfigReader reader;
+    job::model::ModelConfig modelConfig;
+    if (!reader.read(modelPath, modelConfig)) {
+        std::cerr << "Failed to read GGUF model configuration\n";
         return 1;
     }
 
-    //  lets test it now.
-    presetConfig.debugJobJson();
+    if (!modelConfig.isValid()) {
+        std::cerr << "Invalid GGUF model configuration\n";
+        return 1;
+    }
 
-
-    job::model::SamplerConfig samplerConfig = presetConfig.samplerConfig();
+    job::model::SamplerConfig samplerConfig = modelConfig.samplerConfig();
     samplerConfig.setGreedy(true);
-
-    job::model::JobModel model{ *cpu, *scheduler };
-    if (!model.load(modelPath, presetConfig, InferenceContext)) {
-        std::cerr << "Failed to load model\n";
-        return 1;
-    }
-
+    samplerConfig.setSeed(42);
+#ifndef NDEBUG
+    modelConfig.debugJobJson();
+#endif
 
     job::token::ChatMessage systemMessage;
     systemMessage.setRole(job::token::ChatRole::System);
@@ -101,12 +123,11 @@ int main(int argc, char *argv[])
     job::token::ChatMessage userMessage;
     userMessage.setRole(job::token::ChatRole::User);
     userMessage.setContent(
-        "Write a beatiful poem about when electricity and vectors line up to"
+        "Write a beautiful poem about when electricity and vectors line up to"
         "create a sense of wonder");
 
     const std::vector<job::token::ChatMessage> dialogue{ systemMessage, userMessage };
     const std::string formattedPrompt = tokenizer.applyChatMessages(dialogue, true);
-
     if (formattedPrompt.empty()) {
         std::cerr << "Failed to apply chat messages\n";
         return 1;
@@ -117,6 +138,16 @@ int main(int argc, char *argv[])
         std::cerr << "Tokenizer produced no tokens\n";
         return 1;
     }
+
+
+    // Okay now taht the Chat deal is setup we should pass it into the model ?
+    job::model::JobModel model{ *device, *scheduler };
+    if (!model.load(modelPath, modelConfig, InferenceContext)) {
+        std::cerr << "Failed to load model\n";
+        return 1;
+    }
+
+    model.setTokenizer(&tokenizer);
 
     const std::vector<job::token::TokenId> generatedTokens = model.generate(promptTokens, MaxNewTokens, samplerConfig);
     if (generatedTokens.size() <= promptTokens.size()) {
@@ -129,6 +160,7 @@ int main(int argc, char *argv[])
 
     const std::string responseText = tokenizer.decode(responseTokens);
     std::cout << responseText << '\n';
+
 
     return 0;
 }

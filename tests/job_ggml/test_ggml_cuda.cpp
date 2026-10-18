@@ -777,9 +777,7 @@ TEST_CASE("GGML CUDA multi GPU pipeline 2-layer mul_mat 4096 cubed FP16",
 
     const std::size_t elemCount = static_cast<std::size_t>(M * K);
 
-    std::vector<ggml_fp16_t> initData(
-        elemCount,
-        JobGgmlTypeTraits::fp32ToFp16(0.01f));
+    std::vector<ggml_fp16_t> initData(elemCount, JobGgmlTypeTraits::fp32ToFp16(0.01f));
 
     cuda0Backend->setTensorAsync(
         *left1,

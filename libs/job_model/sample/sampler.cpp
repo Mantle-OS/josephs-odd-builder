@@ -9,9 +9,9 @@
 
 namespace job::model {
 
-Sampler::Sampler(const SamplerConfig& config)
-    : m_config(config)
-    , m_rngState(config.seed())
+Sampler::Sampler(const SamplerConfig& config) :
+    m_config(config),
+    m_rngState(config.seed())
 {
 }
 
@@ -25,138 +25,153 @@ float Sampler::nextRandomFloat() noexcept
     uint64_t val = m_rngState * kMultiplier;
     return static_cast<float>(val >> 11) / static_cast<float>(1ULL << 53);
 }
+int32_t Sampler::sample(std::span<const float> logits,
+                        std::span<const int32_t> contextTokens)
+{
+    if (logits.empty()) {
+        JOB_LOG_ERROR("[Sampler] Cannot sample from empty logits");
+        return -1;
+    }
 
-int32_t Sampler::sample(
-    ggml::JobGgmlTensor& logitsTensor,
-    std::span<const int32_t> contextTokens)
+    std::vector<TokenCandidate> candidates;
+    candidates.reserve(logits.size());
+
+    for (size_t i = 0; i < logits.size(); ++i) {
+        candidates.push_back(TokenCandidate{
+            .id = static_cast<int32_t>(i),
+            .logit = logits[i],
+            .probability = 0.0f
+        });
+    }
+
+    // Apply penalties before greedy selection.
+    applyPenalties(candidates, contextTokens);
+
+    const auto best = std::max_element(candidates.begin(), candidates.end(),
+                                       [](const TokenCandidate& a, const TokenCandidate& b) {
+                                           return a.logit < b.logit;
+                                       });
+
+    const int32_t fallbackToken = best->id;
+
+    if (m_config.greedy() || m_config.temperature() <= 0.0f)
+        return fallbackToken;
+
+    // Top-K can operate directly on logits.
+    filterTopK(candidates);
+
+    // Scale surviving logits by temperature.
+    applyTemperature(candidates);
+
+    // Normalize the remaining candidates.
+    computeSoftmax(candidates);
+
+    // Probability-based filtering.
+    filterTopP(candidates);
+    filterMinP(candidates);
+
+    if (candidates.empty())
+        return fallbackToken;
+
+    return sampleIndex(candidates);
+}
+
+int32_t Sampler::sample(ggml::JobGgmlTensor& logitsTensor,
+                        std::span<const int32_t> contextTokens)
 {
     if (!logitsTensor.isValid()) {
         JOB_LOG_ERROR("[Sampler] Cannot sample from an invalid logits tensor");
         return -1;
     }
 
+    if (logitsTensor.type() != ggml::JobGgmlType::F32) {
+        JOB_LOG_ERROR("[Sampler] Requires F32 logits");
+        return -1;
+    }
+
     ggml::JobGgmlTensorData tensorData(logitsTensor.tensor());
+
     if (!tensorData.isHostAccessible()) {
         JOB_LOG_ERROR("[Sampler] Logits tensor storage is not host accessible");
         return -1;
     }
 
     const int64_t vocabSize = logitsTensor.extent(0);
+
     if (vocabSize <= 0) {
-        JOB_LOG_ERROR("[Sampler] Logits tensor vocabulary size is zero or negative");
+        JOB_LOG_ERROR("[Sampler] Invalid vocabulary size");
         return -1;
     }
 
-    // Extract logits for the final sequence token in the batch
-    std::vector<TokenCandidate> candidates;
-    candidates.reserve(static_cast<size_t>(vocabSize));
+    std::vector<float> logits(static_cast<size_t>(vocabSize));
 
-    for (int64_t i = 0; i < vocabSize; ++i) {
-        float val = tensorData.valueF32(i);
-        candidates.push_back(TokenCandidate{
-            .id = static_cast<int32_t>(i),
-            .logit = val,
-            .probability = 0.0f
-        });
-    }
+    for (int64_t i = 0; i < vocabSize; ++i)
+        logits[static_cast<size_t>(i)] = tensorData.valueF32(i);
 
-    // Greedy argmax selection shortcut
-    if (m_config.greedy() || m_config.temperature() <= 0.0f) {
-        auto best = std::max_element(candidates.begin(), candidates.end(),
-            [](const TokenCandidate& a, const TokenCandidate& b) {
-                return a.logit < b.logit;
-            });
-        return best != candidates.end() ? best->id : 0;
-    }
-
-    // Repetition, Frequency, and Presence Penalties
-    applyPenalties(candidates, contextTokens);
-
-    // Temperature Scaling
-    applyTemperature(candidates);
-
-    // Softmax Normalization
-    computeSoftmax(candidates);
-
-    // Truncation Filters (Top-K, Top-P, Min-P)
-    filterTopK(candidates);
-    filterTopP(candidates);
-    filterMinP(candidates);
-
-    // If all candidates got filtered out, fall back to argmax
-    if (candidates.empty()) {
-        auto best = std::max_element(candidates.begin(), candidates.end(),
-            [](const TokenCandidate& a, const TokenCandidate& b) {
-                return a.logit < b.logit;
-            });
-        return best != candidates.end() ? best->id : 0;
-    }
-
-    // Stochastic sampling from filtered distribution
-    return sampleIndex(candidates);
+    return sample(std::span<const float>{logits}, contextTokens);
 }
 
-void Sampler::applyPenalties(
-    std::vector<TokenCandidate>& candidates,
-    std::span<const int32_t> contextTokens) const
-{
-    if (contextTokens.empty()) return;
 
-    for (int32_t token : contextTokens) {
-        if (token >= 0 && static_cast<size_t>(token) < candidates.size()) {
-            auto& cand = candidates[static_cast<size_t>(token)];
-            // Repetition penalty (multiplicative on positive logits, divisive on negative)
-            if (m_config.repeatPenalty() != 1.0f) {
-                if (cand.logit < 0.0f) {
-                    cand.logit *= m_config.repeatPenalty();
-                } else {
-                    cand.logit /= m_config.repeatPenalty();
-                }
-            }
-        }
+void Sampler::applyPenalties(std::vector<TokenCandidate>& candidates, std::span<const int32_t> contextTokens) const
+{
+    if (contextTokens.empty() || candidates.empty())
+        return;
+
+    const float repeatPenalty = m_config.repeatPenalty();
+    const float frequencyPenalty = m_config.frequencyPenalty();
+    const float presencePenalty = m_config.presencePenalty();
+
+    if (repeatPenalty == 1.0f && frequencyPenalty == 0.0f && presencePenalty == 0.0f)
+        return;
+
+    std::vector<uint32_t> counts(candidates.size(), 0);
+
+    for (const int32_t token : contextTokens) {
+        if (token >= 0 && static_cast<size_t>(token) < counts.size())
+            ++counts[static_cast<size_t>(token)];
     }
 
-    // Frequency and presence penalties
-    if (m_config.frequencyPenalty() != 0.0f || m_config.presencePenalty() != 0.0f) {
-        std::vector<int> counts(candidates.size(), 0);
-        for (int32_t token : contextTokens) {
-            if (token >= 0 && static_cast<size_t>(token) < counts.size()) {
-                counts[static_cast<size_t>(token)]++;
-            }
+    for (size_t i = 0; i < candidates.size(); ++i) {
+        const uint32_t count = counts[i];
+        if (count == 0)
+            continue;
+
+        auto &candidate = candidates[i];
+
+        if (repeatPenalty != 1.0f) {
+            if (candidate.logit < 0.0f)
+                candidate.logit *= repeatPenalty;
+            else
+                candidate.logit /= repeatPenalty;
         }
 
-        for (size_t i = 0; i < candidates.size(); ++i) {
-            int count = counts[i];
-            if (count > 0) {
-                candidates[i].logit -= static_cast<float>(count) * m_config.frequencyPenalty();
-                candidates[i].logit -= m_config.presencePenalty();
-            }
-        }
+        candidate.logit -= static_cast<float>(count) * frequencyPenalty;
+        candidate.logit -= presencePenalty;
     }
 }
 
 void Sampler::applyTemperature(std::vector<TokenCandidate>& candidates) const
 {
-    if (m_config.temperature() == 1.0f) return;
+    if (m_config.temperature() == 1.0f)
+        return;
 
     float invTemp = 1.0f / m_config.temperature();
-    for (auto& cand : candidates) {
+    for (auto& cand : candidates)
         cand.logit *= invTemp;
-    }
 }
 
 void Sampler::computeSoftmax(std::vector<TokenCandidate>& candidates) const
 {
-    if (candidates.empty()) return;
+    if (candidates.empty())
+        return;
 
-    float maxLogit = std::max_element(candidates.begin(), candidates.end(),
-        [](const TokenCandidate& a, const TokenCandidate& b) {
-            return a.logit < b.logit;
-        })->logit;
+    float maxLogit = std::max_element(candidates.begin(), candidates.end(), [](const TokenCandidate& a, const TokenCandidate& b) {
+                         return a.logit < b.logit;
+                     })->logit;
 
     float sumExp = 0.0f;
     for (auto& cand : candidates) {
-        cand.probability = std::exp(cand.logit - maxLogit);
+        cand.probability = std::exp(cand.logit - maxLogit); // <<< Damn it exp is known to be slow
         sumExp += cand.probability;
     }
 
@@ -175,10 +190,9 @@ void Sampler::filterTopK(std::vector<TokenCandidate>& candidates) const
     }
 
     // Sort descending by probability/logit
-    std::sort(candidates.begin(), candidates.end(),
-        [](const TokenCandidate& a, const TokenCandidate& b) {
-            return a.logit > b.logit;
-        });
+    std::sort(candidates.begin(), candidates.end(), [](const TokenCandidate& a, const TokenCandidate& b) {
+        return a.logit > b.logit;
+    });
 
     candidates.resize(static_cast<size_t>(m_config.topK()));
 }
@@ -188,10 +202,9 @@ void Sampler::filterTopP(std::vector<TokenCandidate>& candidates) const
     if (m_config.topP() >= 1.0f || candidates.empty()) return;
 
     // Ensure sorted descending
-    std::sort(candidates.begin(), candidates.end(),
-        [](const TokenCandidate& a, const TokenCandidate& b) {
-            return a.logit > b.logit;
-        });
+    std::sort(candidates.begin(), candidates.end(), [](const TokenCandidate& a, const TokenCandidate& b) {
+        return a.logit > b.logit;
+    });
 
     float cumulativeProb = 0.0f;
     size_t cutoffIndex = candidates.size();
@@ -209,13 +222,13 @@ void Sampler::filterTopP(std::vector<TokenCandidate>& candidates) const
 
 void Sampler::filterMinP(std::vector<TokenCandidate>& candidates) const
 {
-    if (m_config.minP() <= 0.0f || candidates.empty()) return;
+    if (m_config.minP() <= 0.0f || candidates.empty())
+        return;
 
     // Find highest probability
-    auto maxIt = std::max_element(candidates.begin(), candidates.end(),
-        [](const TokenCandidate& a, const TokenCandidate& b) {
-            return a.probability < b.probability;
-        });
+    auto maxIt = std::max_element(candidates.begin(), candidates.end(), [](const TokenCandidate& a, const TokenCandidate& b) {
+        return a.probability < b.probability;
+    });
 
     if (maxIt == candidates.end()) return;
     float maxProb = maxIt->probability;

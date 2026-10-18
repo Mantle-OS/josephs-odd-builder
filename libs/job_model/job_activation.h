@@ -50,7 +50,7 @@ public:
     JobActivation(JobActivation &&) = delete;
     JobActivation &operator=(JobActivation &&) = delete;
 
-    [[nodiscard]] static ActivationType fromStringView(std::string_view name)
+    [[nodiscard]] constexpr static ActivationType fromStringView(std::string_view name)
     {
         if (name == "identity" || name == "linear")                                         return ActivationType::Identity;
         if (name == "sigmoid")                                                              return ActivationType::Sigmoid;

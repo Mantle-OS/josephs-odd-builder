@@ -8,6 +8,7 @@ ggml::JobGgmlTensorOp::UPtr EmbeddingGraph::build(ggml::JobGgmlContext &ctx,
                                                   const ggml::JobGgmlTensor &tokens,
                                                   const ggml::JobGgmlTensor &weight)
 {
+#ifndef NDEBUG
     if (!ctx.isValid())
         throw std::invalid_argument{"EmbeddingGraph requires a valid GGML context"};
 
@@ -19,7 +20,7 @@ ggml::JobGgmlTensorOp::UPtr EmbeddingGraph::build(ggml::JobGgmlContext &ctx,
 
     if (tokens.type() != ggml::JobGgmlType::I32)
         throw std::invalid_argument{"EmbeddingGraph token tensor must use I32"};
-
+#endif
     auto weightOp = ggml::JobGgmlTensorOp::createUniq(const_cast<struct ggml_tensor *>(weight.tensor()), &ctx);
     return weightOp->getRows(tokens);
 }

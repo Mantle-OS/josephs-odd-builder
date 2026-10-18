@@ -36,7 +36,7 @@ ggml::JobGgmlTensorOp::UPtr AttentionGraph::build(ggml::JobGgmlTensorOp::UPtr in
                                                   const RopeConfig *ropeConfig)
 {
 
-    //  contracts .......
+#ifndef NDEBUG
     if (!input || !input->isValid())
         throw std::invalid_argument{"AttentionGraph requires a valid input tensor"};
 
@@ -69,13 +69,17 @@ ggml::JobGgmlTensorOp::UPtr AttentionGraph::build(ggml::JobGgmlTensorOp::UPtr in
 
     if (config.slidingWindowSize() > 0)
         throw std::invalid_argument{"AttentionGraph sliding-window attention is not implemented"};
+#endif
 
     auto *ctx = input->context();
+#ifndef NDEBUG
     if (!ctx || !ctx->isValid())
         throw std::invalid_argument{"AttentionGraph requires an input with a valid GGML context"};
-
+#endif
     const uint32_t embeddingLength = static_cast<uint32_t>(input->extent(0));
     const uint32_t nTokens         = static_cast<uint32_t>(input->extent(1));
+
+#ifndef NDEBUG
     if (embeddingLength == 0)
         throw std::invalid_argument{"AttentionGraph requires a positive embedding length"};
 
@@ -84,21 +88,25 @@ ggml::JobGgmlTensorOp::UPtr AttentionGraph::build(ggml::JobGgmlTensorOp::UPtr in
 
     if (positions.extent(0) != static_cast<int64_t>(nTokens))
         throw std::invalid_argument{"AttentionGraph position count must match token count"};
+#endif
 
     const uint32_t headCount       = config.headCount();
     const uint32_t headCountKv     = config.headCountKv();
     const uint32_t headDimension   = config.headDimension(embeddingLength);
     const uint32_t headDimensionKv = config.headDimensionKv(embeddingLength);
+#ifndef NDEBUG
     if (headCount == 0 || headCountKv == 0)
         throw std::invalid_argument{"AttentionGraph requires valid attention head counts"};
 
     if (headDimension == 0 || headDimensionKv == 0)
         throw std::invalid_argument{"AttentionGraph requires valid attention head dimensions"};
-
+#endif
     const uint64_t totalContext = static_cast<uint64_t>(nPast) + static_cast<uint64_t>(nTokens);
+
+#ifndef NDEBUG
     if (totalContext > kvCache.maxContextLength())
         throw std::out_of_range{"AttentionGraph exceeds KV cache context length"};
-
+#endif
     // Obv should be a graph
     // Q / K / V projections.
     auto q = LinearGraph::build(input->dup(),
@@ -164,10 +172,10 @@ ggml::JobGgmlTensorOp::UPtr AttentionGraph::build(ggml::JobGgmlTensorOp::UPtr in
     // Obv should be a graph
     // Persistent layer KV cache.
     LayerKvEntry &kvEntry = kvCache.layer(layerIndex);
-
+#ifndef NDEBUG
     if (!kvEntry.k || !kvEntry.k->isValid() || !kvEntry.v || !kvEntry.v->isValid())
         throw std::runtime_error{"AttentionGraph requires valid layer KV tensors"};
-
+#endif
     const int64_t kvRowSize = static_cast<int64_t>(headCountKv) * static_cast<int64_t>(headDimensionKv);
     auto kFlat = k->reshape2d(kvRowSize, nTokens);
     auto vFlat = v->reshape2d(kvRowSize, nTokens);
@@ -185,7 +193,6 @@ ggml::JobGgmlTensorOp::UPtr AttentionGraph::build(ggml::JobGgmlTensorOp::UPtr in
     const std::size_t vCacheOffset = static_cast<std::size_t>(nPast) * vRowBytes;
 
     // Write the current K/V values into persistent cache storage.
-    //
     // The write views begin at nPast. CPY is kept here because it already
     // handles the representation conversion used by the cache.
     auto kCacheView = tensorOp(*kvEntry.k, ctx)->view2d(kvRowSize,
@@ -200,7 +207,7 @@ ggml::JobGgmlTensorOp::UPtr AttentionGraph::build(ggml::JobGgmlTensorOp::UPtr in
 
     auto kCacheWrite = kFlat->cpy(*kCacheView);
     auto vCacheWrite = vFlat->cpy(*vCacheView);
-
+#ifndef NDEBUG
     if (!kCacheWrite || !kCacheWrite->isValid())
         throw std::runtime_error{"AttentionGraph failed to create K cache write"};
 
@@ -209,7 +216,7 @@ ggml::JobGgmlTensorOp::UPtr AttentionGraph::build(ggml::JobGgmlTensorOp::UPtr in
 
     if (!kCacheWriteOut || !vCacheWriteOut)
         throw std::invalid_argument{"AttentionGraph requires cache write outputs"};
-
+#endif
     *kCacheWriteOut = std::move(kCacheWrite);
     *vCacheWriteOut = std::move(vCacheWrite);
 
@@ -225,9 +232,6 @@ ggml::JobGgmlTensorOp::UPtr AttentionGraph::build(ggml::JobGgmlTensorOp::UPtr in
     //
     // and view3d(..., 0) therefore starts at the current token rather than
     // cache position zero.
-
-
-// // Obv should be a "graph"
     const int64_t totalCtx = static_cast<int64_t>(totalContext);
     auto kAll = tensorOp(*kvEntry.k, ctx)->view3d(headDimensionKv,
                                                   headCountKv,
@@ -245,16 +249,8 @@ ggml::JobGgmlTensorOp::UPtr AttentionGraph::build(ggml::JobGgmlTensorOp::UPtr in
 
     //
     // MHA is a no-op here; GQA/MQA expand KV heads to query-head geometry.
-    //
-    // if (gqaExpander) {
-    //     kAll = gqaExpander(std::move(kAll), headCount);
-    //     vAll = gqaExpander(std::move(vAll), headCount);
-    // } else {
-        kAll = GqaGraph::expand(std::move(kAll), headCount);
-        vAll = GqaGraph::expand(std::move(vAll), headCount);
-    // }
-
-
+    // kAll = GqaGraph::expand(std::move(kAll), headCount);
+    // vAll = GqaGraph::expand(std::move(vAll), headCount);
 
     // Obv should be a graph
 
@@ -265,8 +261,6 @@ ggml::JobGgmlTensorOp::UPtr AttentionGraph::build(ggml::JobGgmlTensorOp::UPtr in
     auto scores = kTrans->mulMat(*qTrans)->scale(scale);
 
     const float softCap = config.attnLogitSoftCapping();
-
-
     if (softCap > 0.0f)
         scores = scores->scale(1.0f / softCap)->tanh()->scale(softCap);
 
@@ -276,6 +270,7 @@ ggml::JobGgmlTensorOp::UPtr AttentionGraph::build(ggml::JobGgmlTensorOp::UPtr in
     auto attention = attentionHeads
                          ->permute(0, 2, 1, 3)->cont()
                          ->reshape2d(static_cast<int64_t>(headCount) * static_cast<int64_t>(headDimension), nTokens);
+
 
     // Output projection.
     return LinearGraph::build(std::move(attention),

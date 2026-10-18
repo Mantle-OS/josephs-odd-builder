@@ -18,11 +18,14 @@ QwenGraphBuilder::QwenGraphBuilder(const ModelConfig &config,
     m_weights{weights},
     m_kvCache{kvCache}
 {
+
+#ifndef NDEBUG
     if (!m_config.isValid())
         throw std::invalid_argument{"QwenGraphBuilder requires a valid ModelConfig"};
 
     if (!m_weights.isLoaded())
         throw std::invalid_argument{"QwenGraphBuilder requires loaded model weights"};
+#endif
 }
 
 ggml::JobGgmlCGraph::UPtr QwenGraphBuilder::buildForward(ggml::JobGgmlContext &ctx,
@@ -30,6 +33,7 @@ ggml::JobGgmlCGraph::UPtr QwenGraphBuilder::buildForward(ggml::JobGgmlContext &c
                                                          uint32_t nPast,
                                                          ggml::JobGgmlType inputType)
 {
+#ifndef NDEBUG
     if (!ctx.isValid())
         throw std::invalid_argument{"QwenGraphBuilder requires a valid GGML context"};
 
@@ -41,42 +45,36 @@ ggml::JobGgmlCGraph::UPtr QwenGraphBuilder::buildForward(ggml::JobGgmlContext &c
 
     if (!m_weights.outputNorm())
         throw std::runtime_error{"QwenGraphBuilder requires output normalization weights"};
-
-    const TransformerConfig     &transformerConfig = m_config.transformerConfig();
-    const AttentionConfig       &attentionConfig   = m_config.attentionConfig();
-    const NormConfig            &normConfig        = m_config.normConfig();
-    const RopeConfig            &ropeConfig        = m_config.ropeConfig();
-    const OutputHeadConfig      &outputConfig      = m_config.outputHeadConfig();
-    const uint32_t nTokens = static_cast<uint32_t>(inputTokens.extent(0));
+#endif
+    const uint32_t              nTokens             = static_cast<uint32_t>(inputTokens.extent(0));
 
 
-    // these could all be contracts
+#ifndef NDEBUG
     if (nTokens == 0)
         throw std::invalid_argument{"QwenGraphBuilder requires at least one input token"};
 
-    if (m_weights.layerCount() != transformerConfig.blockCount())
+    if (m_weights.layerCount() != m_config.transformerConfig().blockCount())
         throw std::runtime_error{"QwenGraphBuilder weight layer count does not match model configuration"};
 
-    if (m_kvCache.layerCount() != transformerConfig.blockCount())
+    if (m_kvCache.layerCount() != m_config.transformerConfig().blockCount())
         throw std::runtime_error{"QwenGraphBuilder KV layer count does not match model configuration"};
+#endif
 
-    const uint32_t headDimension = attentionConfig.headDimension(transformerConfig.embeddingLength());
+    const uint32_t headDimension = m_config.attentionConfig().headDimension(m_config.transformerConfig().embeddingLength());
+
+#ifndef NDEBUG
     if (headDimension == 0)
         throw std::runtime_error{"QwenGraphBuilder could not resolve attention head dimension"};
+#endif
 
-    const uint32_t ropeDimensions = ropeConfig.ropeDimensionCount() > 0 ? ropeConfig.ropeDimensionCount() : headDimension;
+    const uint32_t ropeDimensions = m_config.ropeConfig().ropeDimensionCount() > 0 ?
+                                        m_config.ropeConfig().ropeDimensionCount() :
+                                        headDimension;
 
     std::vector<ggml::JobGgmlTensorOp::UPtr> cacheWrites;
-    cacheWrites.reserve(static_cast<std::size_t>(transformerConfig.blockCount()) * 2);
+    cacheWrites.reserve(static_cast<std::size_t>(m_config.transformerConfig().blockCount()) * 2);
 
-    // Token embedding.
     auto cur = EmbeddingGraph::build(ctx, inputTokens, *m_weights.tokenEmbd());
-
-    //
-    // Positions are graph-produced data rather than host-filled tensors.
-    // This keeps position storage under normal graph allocation/scheduling
-    // instead of recreating the old setTensorBackend() placement hack.
-    //
     auto positions = cur->arange(static_cast<float>(nPast),
                                 static_cast<float>(nPast + nTokens), 1.0f)->cast(ggml::JobGgmlType::I32);
 
@@ -86,18 +84,19 @@ ggml::JobGgmlCGraph::UPtr QwenGraphBuilder::buildForward(ggml::JobGgmlContext &c
     //
     //   x = x + Attention(RMSNorm(x))
     //   x = x + FFN(RMSNorm(x))
-    for (uint32_t layerIndex = 0; layerIndex < transformerConfig.blockCount(); ++layerIndex) {
+    for (uint32_t layerIndex = 0; layerIndex < m_config.transformerConfig().blockCount(); ++layerIndex) {
 
         const LayerWeights &weights = m_weights.layer(layerIndex);
+#ifndef NDEBUG
         if (!weights.attnNorm || !weights.attnNorm->isValid())
             throw std::runtime_error{"QwenGraphBuilder requires attention normalization weights"};
 
         if (!weights.ffnNorm || !weights.ffnNorm->isValid())
             throw std::runtime_error{"QwenGraphBuilder requires feed-forward normalization weights"};
-
+#endif
         auto attentionInput = NormGraph::rms(cur->dup(),
                                              *weights.attnNorm,
-                                             normConfig.rmsNormEps(),
+                                             m_config.normConfig().rmsNormEps(),
                                              weights.attnNormBias.get());
 
         ggml::JobGgmlTensorOp::UPtr kCacheWrite;
@@ -105,18 +104,18 @@ ggml::JobGgmlCGraph::UPtr QwenGraphBuilder::buildForward(ggml::JobGgmlContext &c
 
         auto attention = AttentionGraph::build(std::move(attentionInput),
                                                weights,
-                                               attentionConfig,
+                                               m_config.attentionConfig(),
                                                m_kvCache,
                                                *positions,
                                                layerIndex,
                                                nPast,
-                                               normConfig.rmsNormEps(),
+                                               m_config.normConfig().rmsNormEps(),
                                                ropeDimensions,
                                                &kCacheWrite,
                                                &vCacheWrite,
                                                2,
                                                inputType,
-                                               &ropeConfig);
+                                               &m_config.ropeConfig());
 
 
         cacheWrites.push_back(std::move(kCacheWrite));
@@ -127,7 +126,7 @@ ggml::JobGgmlCGraph::UPtr QwenGraphBuilder::buildForward(ggml::JobGgmlContext &c
 
         auto ffnInput = NormGraph::rms(cur->dup(),
                            *weights.ffnNorm,
-                           normConfig.rmsNormEps(),
+                           m_config.normConfig().rmsNormEps(),
                            weights.ffnNormBias.get());
 
 
@@ -144,42 +143,42 @@ ggml::JobGgmlCGraph::UPtr QwenGraphBuilder::buildForward(ggml::JobGgmlContext &c
     // Final RMSNorm.
     cur = NormGraph::rms(std::move(cur),
                          *m_weights.outputNorm(),
-                         normConfig.rmsNormEps(),
+                         m_config.normConfig().rmsNormEps(),
                          m_weights.outputNormBias());
 
 
     // LM head. ModelWeights::output() already handles tied embeddings by
     // returning tokenEmbd() when there is no dedicated output tensor.
-    const ggml::JobGgmlTensor *outputWeight = m_weights.output();
 
-    if (!outputWeight || !outputWeight->isValid())
+#ifndef NDEBUG
+    if (!m_weights.output() || !m_weights.output()->isValid())
         throw std::runtime_error{"QwenGraphBuilder requires valid output weights"};
-
+#endif
     auto logits = LinearGraph::build(std::move(cur),
-                                     *outputWeight,
+                                     *m_weights.output(),
                                      nullptr,
                                      inputType);
 
-    const float softCap = outputConfig.finalLogitSoftCapping();
-
-    if (softCap > 0.0f)
-        logits = logits->scale(1.0f / softCap)->tanh()->scale(softCap);
-
-    // logits->setName("logits");
+    // const float softCap = m_config.outputHeadConfig().finalLogitSoftCapping();
+    // if (softCap > 0.0f)
+    //     logits = logits->scale(1.0f / softCap)->tanh()->scale(softCap);
 
     logits->setName("logits");
     logits->setOutput(true);
 
 
-    auto graph = ctx.newGraphCustom(8192, false);
+    // auto graph = ctx.newGraphCustom(8192, false);
+    auto graph = ctx.newGraphCustom(4096, false);
 
+#ifndef NDEBUG
     if (!graph)
         throw std::runtime_error{"QwenGraphBuilder failed to create forward graph"};
-
+#endif
     for (auto &cacheWrite : cacheWrites) {
+#ifndef NDEBUG
         if (!cacheWrite || !cacheWrite->isValid())
             throw std::runtime_error{"QwenGraphBuilder received an invalid KV cache write"};
-
+#endif
         graph->buildForwardExpand(*cacheWrite);
     }
 

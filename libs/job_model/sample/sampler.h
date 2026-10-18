@@ -44,12 +44,11 @@ public:
     Sampler& operator=(Sampler&&) noexcept = default;
 
     // Sample a token ID from raw logits tensor and context history
-    [[nodiscard]] int32_t sample(
-        ggml::JobGgmlTensor& logitsTensor,
-        std::span<const int32_t> contextTokens = {});
+    [[nodiscard]] int32_t sample(ggml::JobGgmlTensor &logitsTensor, std::span<const int32_t> contextTokens = {});
+    [[nodiscard]] int32_t sample(std::span<const float> logits, std::span<const int32_t> contextTokens);
 
-    void setConfig(const SamplerConfig& config) noexcept { m_config = config; }
-    [[nodiscard]] const SamplerConfig& config() const noexcept { return m_config; }
+    void setConfig(const SamplerConfig &config) noexcept { m_config = config; }
+    [[nodiscard]] const SamplerConfig &config() const noexcept { return m_config; }
 
     void seed(uint64_t seedValue) noexcept
     {

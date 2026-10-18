@@ -18,7 +18,7 @@ KvCache::KvCache(const ModelConfig &config, const ggml::JobGgmlBackendBufferType
     m_kvType{kvType}
 {
     const uint32_t numLayers = config.transformerConfig().blockCount();
-
+#ifndef NDEBUG
     if (!bufferType.isValid())
         throw std::invalid_argument{"KvCache requires a valid JobGgmlBackendBufferType"};
 
@@ -33,7 +33,7 @@ KvCache::KvCache(const ModelConfig &config, const ggml::JobGgmlBackendBufferType
 
     if (m_headDimKv == 0)
         throw std::invalid_argument{"KvCache requires a KV head dimension greater than zero"};
-
+#endif
     const std::size_t tensorCount = static_cast<std::size_t>(numLayers) * 2;
 
     // The context owns tensor metadata only. K/V payload storage is owned by
@@ -42,10 +42,7 @@ KvCache::KvCache(const ModelConfig &config, const ggml::JobGgmlBackendBufferType
     if (!m_ctx || !m_ctx->isValid())
         throw std::runtime_error{"Failed to create KV cache metadata context"};
 
-    const int64_t kvRowSize =
-        static_cast<int64_t>(m_nHeadKv) *
-        static_cast<int64_t>(m_headDimKv);
-
+    const int64_t kvRowSize = static_cast<int64_t>(m_nHeadKv) * static_cast<int64_t>(m_headDimKv);
     m_layers.reserve(numLayers);
 
     for (uint32_t i = 0; i < numLayers; ++i) {
@@ -54,13 +51,13 @@ KvCache::KvCache(const ModelConfig &config, const ggml::JobGgmlBackendBufferType
 
         entry.k = m_ctx->newTensor2d(m_kvType, kvRowSize, static_cast<int64_t>(m_maxCtx));
         entry.v = m_ctx->newTensor2d(m_kvType, kvRowSize, static_cast<int64_t>(m_maxCtx));
-
+#ifndef NDEBUG
         if (!entry.k || !entry.k->isValid())
             throw std::runtime_error{ std::format("Failed to create KV key tensor for layer {}", i) };
 
         if (!entry.v || !entry.v->isValid())
             throw std::runtime_error{ std::format("Failed to create KV value tensor for layer {}", i) };
-
+#endif
         entry.k->setName(std::format("cache_k_l{}", i));
         entry.v->setName(std::format("cache_v_l{}", i));
 
@@ -89,10 +86,10 @@ KvCache::KvCache(const ModelConfig &config, const ggml::JobGgmlBackendBufferType
     m_buffer = ggml::JobGgmlBackendBuffer::Ptr{
         bufferType.allocateBuffer(requiredBytes)
     };
-
+#ifndef NDEBUG
     if (!m_buffer || !m_buffer->isValid())
         throw std::runtime_error{"Failed to allocate KV cache backend buffer"};
-
+#endif
     ggml::JobGgmlTensorAllocator allocator{m_buffer};
 
     if (!allocator.isValid())
@@ -100,15 +97,19 @@ KvCache::KvCache(const ModelConfig &config, const ggml::JobGgmlBackendBufferType
 
     for (LayerKvEntry &entry : m_layers) {
         if (allocator.allocate(*entry.k) != ggml::JobGgmlStatus::Success) {
+#ifndef NDEBUG
             throw std::runtime_error{
                 std::format("Failed to allocate KV key tensor for layer {}", entry.layerIndex)
             };
+#endif
         }
 
         if (allocator.allocate(*entry.v) != ggml::JobGgmlStatus::Success) {
+#ifndef NDEBUG
             throw std::runtime_error{
                 std::format("Failed to allocate KV value tensor for layer {}", entry.layerIndex)
             };
+#endif
         }
     }
 

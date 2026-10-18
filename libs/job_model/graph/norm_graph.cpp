@@ -10,6 +10,7 @@ ggml::JobGgmlTensorOp::UPtr NormGraph::rms(ggml::JobGgmlTensorOp::UPtr input,
                                            float eps,
                                            const ggml::JobGgmlTensor *bias)
 {
+#ifndef NDEBUG
     if (!input || !input->isValid())
         throw std::invalid_argument{"NormGraph requires a valid input tensor"};
 
@@ -21,7 +22,7 @@ ggml::JobGgmlTensorOp::UPtr NormGraph::rms(ggml::JobGgmlTensorOp::UPtr input,
 
     if (!core::isSafeFinite(eps) || eps <= 0.0f)
         throw std::invalid_argument{"NormGraph requires epsilon to be finite and greater than zero"};
-
+#endif
     auto result = input->rmsNorm(eps)->mul(weight);
     if (bias)
         result = result->add(*bias);

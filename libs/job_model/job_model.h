@@ -12,6 +12,17 @@
 #include <job_ggml_device.h>
 #include <job_ggml_enums.h>
 
+#include <job_token.h>
+
+/////
+#include <array>
+#include <cstring>
+#include <ggml-backend.h>
+#include <ggml.h>
+#include <job_logger.h>
+///
+
+
 
 #include "config/model_config.h"
 #include "config/sampler_config.h"
@@ -89,6 +100,12 @@ public:
     [[nodiscard]] const ggml::JobGgmlContext *computeContext() const noexcept { return m_computeCtx.get(); }
 
     void reset() noexcept;
+
+
+    [[nodiscard]] token::JobToken *tokenizer()const { return m_tokenizer;}
+    void setTokenizer(token::JobToken *tokenizer) { m_tokenizer = tokenizer;}
+
+
 private:
     [[nodiscard]] bool loadConfigFromGguf(const std::filesystem::path &ggufPath);
     [[nodiscard]] bool loadWeights(const std::filesystem::path &ggufPath);
@@ -101,9 +118,64 @@ private:
 
     [[nodiscard]] int32_t sampleLastToken(ggml::JobGgmlCGraph &graph, Sampler &sampler, std::span<const int32_t> contextTokens);
 
+    [[nodiscard]] bool isStopToken(int32_t tokenId) const noexcept
+    {
+        if (!m_tokenizer || !m_tokenizer->isReady())
+            return false;
+
+        const auto *token = m_tokenizer->token();
+        if (!token)
+            return false;
+
+        const auto *special = token->specialTokens();
+        if (!special)
+            return false;
+
+        return tokenId == special->eosId() || tokenId == special->eotId();
+    }
+
 private:
+
+    static void debugKvPosition(const ggml_tensor *tensor,
+                                const char *label,
+                                std::size_t position)
+    {
+        if (!tensor || !tensor->buffer || tensor->type != GGML_TYPE_F16)
+            return;
+
+        if (position >= static_cast<std::size_t>(tensor->ne[1]))
+            return;
+
+        constexpr std::size_t kElements = 8;
+
+        std::array<ggml_fp16_t, kElements> raw{};
+
+        const std::size_t offset = position * tensor->nb[1];
+
+        ggml_backend_tensor_get(
+            tensor,
+            raw.data(),
+            offset,
+            sizeof(raw));
+
+        std::array<float, kElements> values{};
+
+        for (std::size_t i = 0; i < kElements; ++i)
+            values[i] = ggml_fp16_to_fp32(raw[i]);
+
+        JOB_LOG_WARN(
+            "[KV DEBUG] {} pos={} values=[{}, {}, {}, {}, {}, {}, {}, {}]",
+            label, position,
+            values[0], values[1], values[2], values[3],
+            values[4], values[5], values[6], values[7]);
+    }
+
+
+
     ggml::JobGgmlDevice         &m_device;          // Borrowed.
     ggml::JobGgmlBackendSched   &m_scheduler;       // Borrowed.
+    token::JobToken             *m_tokenizer = nullptr; // Borrowed
+
     ModelConfig                 m_config;           // Owned
     ModelWeights                m_weights;          // Owned
     ggml::JobGgmlContext::UPtr  m_weightCtx;        // OWNED
