@@ -9,6 +9,7 @@
 #include "chat_message.h"
 #include "job_token_enums.h"
 #include "jinja_ast.h"
+#include "jinja_vm.h"
 
 #include "jobtoken_export.h"
 
@@ -75,10 +76,10 @@ public:
     [[nodiscard]] std::string apply(std::span<const ChatMessage> messages,
                                     bool addGenerationPrompt = true,
                                     std::string_view bosToken = {},
-                                    std::string_view eosToken = {}) const;
+                                    std::string_view eosToken = {},
+                                    std::string_view tools = {}) const;
 
-    [[nodiscard]] static ChatType detectType(
-        std::string_view jinja) noexcept;
+    [[nodiscard]] static ChatType detectType(std::string_view jinja) noexcept;
 
 private:
     void compileTemplate();
@@ -86,7 +87,8 @@ private:
     [[nodiscard]] std::string formatJinja(std::span<const ChatMessage> messages,
                                           bool addGenerationPrompt,
                                           std::string_view bosToken,
-                                          std::string_view eosToken) const;
+                                          std::string_view eosToken,
+                                          std::string_view tools) const;
 
     [[nodiscard]] std::string formatChatML(std::span<const ChatMessage> messages,
                                            bool addGenerationPrompt,

@@ -14,6 +14,7 @@ set(JOB_CORE_TEST_OBJECTS
     test_job_obj_members.cpp
     test_job_obj_class.cpp
     test_job_obj_ptr.cpp
+    test_job_obj_json.cpp
 
 )
 

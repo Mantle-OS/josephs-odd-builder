@@ -508,73 +508,6 @@ ggml::JobGgmlTensor::UPtr JobModel::createInputTensor(std::span<const int32_t> t
     return tensor;
 }
 
-// int32_t JobModel::sampleLastToken(ggml::JobGgmlCGraph &graph,
-//                                   Sampler &sampler,
-//                                   std::span<const int32_t> contextTokens)
-// {
-//     auto logits = graph.tensor("logits");
-
-//     if (!logits || !logits->isValid()) {
-//         JOB_LOG_ERROR("[JobModel] Graph does not contain valid logits");
-//         return -1;
-//     }
-
-//     const int64_t vocabSize = logits->extent(0);
-//     const int64_t sequenceLength = logits->extent(1);
-
-//     if (vocabSize <= 0 || sequenceLength <= 0) {
-//         JOB_LOG_ERROR("[JobModel] Logits tensor has invalid dimensions");
-//         return -1;
-//     }
-
-//     if (logits->type() != ggml::JobGgmlType::F32) {
-//         JOB_LOG_ERROR("[JobModel] Sampler requires F32 logits");
-//         return -1;
-//     }
-
-//     const std::size_t rowBytes = static_cast<std::size_t>(vocabSize) * sizeof(float);
-//     const std::size_t offset = static_cast<std::size_t>(sequenceLength - 1) * logits->stride(1);
-
-//     if (logits->stride(0) != sizeof(float) ||
-//         offset > logits->byteCount() ||
-//         rowBytes > logits->byteCount() - offset) {
-//         JOB_LOG_ERROR("[JobModel] Logits tensor has an unsupported layout");
-//         return -1;
-//     }
-
-//     ggml::JobGgmlTensorData logitsData{logits->tensor()};
-//     // CPU
-//     if (logitsData.isHostAccessible()) {
-//         auto lastLogits = ggml::JobGgmlTensorOp::createUniq(const_cast<struct ggml_tensor *>(logits->tensor()), m_computeCtx.get())->view1d(vocabSize, offset);
-//         if (!lastLogits || !lastLogits->isValid()) {
-//             JOB_LOG_ERROR("[JobModel] Failed to create final-token logits view");
-//             return -1;
-//         }
-
-//         return sampler.sample(*lastLogits, contextTokens);
-//     }
-
-//     // Download the first and last logits rows to verify whether CUDA
-//     // produced values for the sequence, or whether the output is empty.
-//     auto backend = m_scheduler.tensorBackend(*logits);
-//     if (!backend || !backend->isValid()) {
-//         JOB_LOG_ERROR("[JobModel] Failed to resolve logits backend");
-//         return -1;
-//     }
-
-//     std::vector<float> firstLogits(static_cast<std::size_t>(vocabSize));
-//     std::vector<float> hostLogits(static_cast<std::size_t>(vocabSize));
-
-//     try {
-//         backend->getTensorAsync(*logits, firstLogits.data(), 0, rowBytes);
-//         backend->getTensorAsync(*logits, hostLogits.data(), offset, rowBytes);
-//         backend->synchronize();
-//     } catch (const std::exception &error) {
-//         JOB_LOG_ERROR("[JobModel] Failed to download logits: {}", error.what());
-//         return -1;
-//     }
-//     return sampler.sample(std::span<const float>{hostLogits}, contextTokens);
-// }
 int32_t JobModel::sampleLastToken(ggml::JobGgmlCGraph &graph,
                                   Sampler &sampler,
                                   std::span<const int32_t> contextTokens)
@@ -660,8 +593,8 @@ std::vector<int32_t> JobModel::generate(std::span<const int32_t> promptTokens, i
     // ------------------------------------------------------------
     // Prefill
     // ------------------------------------------------------------
-    m_scheduler.synchronize();  // NEEDED ?
-    m_scheduler.reset();        // NEEDED ?
+    m_scheduler.synchronize();
+    m_scheduler.reset();
     m_computeCtx->reset();
 
     ggml::JobGgmlBackendBuffer::Ptr inputBuffer;
@@ -753,7 +686,7 @@ std::vector<int32_t> JobModel::generate(std::span<const int32_t> promptTokens, i
     return outputTokens;
 }
 
-bool job::model::JobModel::isStopToken(int32_t tokenId) const noexcept noexcept
+bool job::model::JobModel::isStopToken(int32_t tokenId) const noexcept
 {
     if (!m_tokenizer || !m_tokenizer->isReady())
         return false;

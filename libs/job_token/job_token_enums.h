@@ -130,8 +130,6 @@ enum class TokenError : uint32_t {
     }
 }
 
-
-
 enum class CharType : uint8_t {
     Whitespace,
     Letter,
@@ -180,6 +178,7 @@ enum class ChatRole : uint8_t {
 
     if (str == "tool")
         return ChatRole::Tool;
+
     return ChatRole::Custom;
 }
 

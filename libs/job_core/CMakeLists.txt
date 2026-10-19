@@ -152,6 +152,7 @@ set(JOB_OBJ_HEADERS
     obj/job_obj_members.h
     obj/job_obj_ptr.h
     obj/job_obj_class.h
+    obj/job_obj_json.h
 
     obj/job_obj.h
 )

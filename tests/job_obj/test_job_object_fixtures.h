@@ -495,3 +495,29 @@ JObj(UniquePointerFixture, job::core::tests,
 
 
 
+// =============================================================================
+// Object JSON Class Macro Fixtures
+// =============================================================================
+
+JBaseObj(MacroJsonMembersFixture, job::core::tests,
+     JJSONRW(str, jsonRw, "{}")
+     JJSONRW_REQ(str, jsonRwRequired, "{}")
+
+     JJSONRO(str, jsonRo, "{}")
+     JJSONRO_REQ(str, jsonRoRequired, "{}")
+
+     JJSONCONST(str, jsonConst, "{}")
+     JJSONCONST_REQ(str, jsonConstRequired, "{}")
+)
+
+JBaseObj(MacroJsonPayloadFixture, job::core::tests,
+    JRW(str, city, "")
+    JRW(int, limit, 0)
+    JRW(bool, enabled, false)
+)
+
+JBaseObj(MacroJsonNestedFixture, job::core::tests,
+    JRW(str, name, "")
+    JUPTR_RW(MacroJsonPayloadFixture, arguments)
+)
+

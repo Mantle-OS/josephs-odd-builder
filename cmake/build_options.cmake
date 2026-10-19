@@ -115,6 +115,7 @@ option(JOB_BUILD_AI "Build the micro job_ai library" OFF)
 option(JOB_BUILD_GGML "Build JobGgml " ON)
 option(JOB_BUILD_TOKEN "Build the job_token library" ON)
 option(JOB_BUILD_MODEL "Build the job_model library" ON)
+option(JOB_BUILD_AI_TOOLS "Build the job_ai_tools library" ON)
 
 option(JOB_BUILD_SERIALIZER "Build the job_serializer library" ON)
     option(JOB_BUILD_SERIALIZER_MSGPACK "Enable MsgPack backend for Job Serlizer" ON)

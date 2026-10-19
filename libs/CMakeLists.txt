@@ -51,6 +51,10 @@ if(JOB_CUDA)
         if(JOB_BUILD_TOKEN)
             add_subdirectory(job_token)
         endif()
+        if(JOB_BUILD_AI_TOOLS)
+            add_subdirectory(job_ai_tools)
+        endif()
+
     endif()
 endif()
 

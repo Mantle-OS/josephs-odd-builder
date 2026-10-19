@@ -13,3 +13,4 @@
 #include "job_obj_members.h"
 #include "job_obj_ptr.h"
 #include "job_obj_class.h"
+#include "job_obj_json.h"

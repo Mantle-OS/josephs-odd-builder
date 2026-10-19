@@ -118,7 +118,10 @@ private:
 
     [[nodiscard]] int32_t sampleLastToken(ggml::JobGgmlCGraph &graph, Sampler &sampler, std::span<const int32_t> contextTokens);
 
-    [[nodiscard]] bool isStopToken(int32_t tokenId) const;
+    [[nodiscard]] bool isStopToken(int32_t tokenId) const noexcept;
+
+    // [[nodiscard]] bool isToolToken(int32_t tokenId) const noexcept;
+
 
 private:
 

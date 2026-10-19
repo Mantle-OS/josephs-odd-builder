@@ -70,13 +70,15 @@ void ChatEngine::compileTemplate()
 std::string ChatEngine::apply(std::span<const ChatMessage> messages,
                               bool addGenerationPrompt,
                               std::string_view bosToken,
-                              std::string_view eosToken) const
+                              std::string_view eosToken,
+                              std::string_view tools) const
 {
     if (m_compiledAst) {
         return formatJinja(messages,
                            addGenerationPrompt,
                            bosToken,
-                           eosToken);
+                           eosToken,
+                           tools);
     }
 
     switch (m_type) {
@@ -108,7 +110,8 @@ std::string ChatEngine::apply(std::span<const ChatMessage> messages,
 std::string ChatEngine::formatJinja(std::span<const ChatMessage> messages,
                                     bool addGenerationPrompt,
                                     std::string_view bosToken,
-                                    std::string_view eosToken) const
+                                    std::string_view eosToken,
+                                    std::string_view toolsToken) const
 {
     if (!m_compiledAst) {
         return formatGenericCustom(messages,
@@ -129,6 +132,7 @@ std::string ChatEngine::formatJinja(std::span<const ChatMessage> messages,
         if (!message.name().empty())
             messageMap["name"] = Value{message.name()};
 
+
         messageList.emplace_back(std::move(messageMap));
     }
 
@@ -136,6 +140,7 @@ std::string ChatEngine::formatJinja(std::span<const ChatMessage> messages,
     context["add_generation_prompt"]    = Value{addGenerationPrompt};
     context["bos_token"]                = Value{std::string{bosToken}};
     context["eos_token"]                = Value{std::string{eosToken}};
+    context["tools"]                    = Value{std::string{toolsToken}};
 
     JinjaVM vm;
     return vm.execute(*m_compiledAst, context);

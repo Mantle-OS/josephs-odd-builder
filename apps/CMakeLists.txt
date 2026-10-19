@@ -13,6 +13,7 @@ endif()
 
 if(JOB_BUILD_MODEL AND JOB_BUILD_GGML AND JOB_BUILD_TOKEN AND JOB_CUDA)
     add_subdirectory(job-inference-test)
+    add_subdirectory(job-inference-tool-test)
 endif()
 
 

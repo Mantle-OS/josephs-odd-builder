@@ -176,9 +176,7 @@ public:
     };
 
 
-    [[nodiscard]] std::optional<Match> findNext(
-        std::string_view text,
-        std::size_t offset = 0) const noexcept
+    [[nodiscard]] std::optional<Match> findNext(std::string_view text, std::size_t offset = 0) const noexcept
     {
         Match best;
 
