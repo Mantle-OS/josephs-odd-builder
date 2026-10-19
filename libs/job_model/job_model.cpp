@@ -753,4 +753,20 @@ std::vector<int32_t> JobModel::generate(std::span<const int32_t> promptTokens, i
     return outputTokens;
 }
 
+bool job::model::JobModel::isStopToken(int32_t tokenId) const noexcept noexcept
+{
+    if (!m_tokenizer || !m_tokenizer->isReady())
+        return false;
+
+    const auto *token = m_tokenizer->token();
+    if (!token)
+        return false;
+
+    const auto *special = token->specialTokens();
+    if (!special)
+        return false;
+
+    return tokenId == special->eosId() || tokenId == special->eotId();
+}
+
 } // namespace job::model

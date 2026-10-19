@@ -118,21 +118,7 @@ private:
 
     [[nodiscard]] int32_t sampleLastToken(ggml::JobGgmlCGraph &graph, Sampler &sampler, std::span<const int32_t> contextTokens);
 
-    [[nodiscard]] bool isStopToken(int32_t tokenId) const noexcept
-    {
-        if (!m_tokenizer || !m_tokenizer->isReady())
-            return false;
-
-        const auto *token = m_tokenizer->token();
-        if (!token)
-            return false;
-
-        const auto *special = token->specialTokens();
-        if (!special)
-            return false;
-
-        return tokenId == special->eosId() || tokenId == special->eotId();
-    }
+    [[nodiscard]] bool isStopToken(int32_t tokenId) const;
 
 private:
 
