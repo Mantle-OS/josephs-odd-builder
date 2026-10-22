@@ -3,8 +3,11 @@
 #include <iostream>
 #include <string>
 #include <vector>
-#include <chrono>
 
+#include <chrono>
+#include <iomanip>
+
+#include <job_tmp_file.h>
 
 #include <job_ggml.h>
 #include <job_ggml_backend_sched.h>
@@ -29,6 +32,14 @@ int main(int argc, char *argv[])
     (void)argc;
     (void)argv;
 
+
+    using Clock = std::chrono::steady_clock;
+    const auto programStart = Clock::now();
+    const auto elapsedMs = [](Clock::time_point start, Clock::time_point end) {
+        return std::chrono::duration<double, std::milli>(end - start).count();
+    };
+
+
     const std::filesystem::path tokenizerDir{ "/home/jmills/git/opensource/qwen_tmp" };
     const std::filesystem::path tokenizerJson = tokenizerDir / "tokenizer.json";
     const std::filesystem::path tokenizerConfig = tokenizerDir / "tokenizer_config.json";
@@ -49,12 +60,16 @@ int main(int argc, char *argv[])
         return 1;
     }
 
+    const auto tokenizerStart = Clock::now();
     job::token::JobToken tokenizer;
     if (!tokenizer.load(job::token::IToken::Provider::HuggingFace, tokenizerConfig, tokenizerJson)) {
         std::cerr << "Failed to load tokenizer\n";
         return 1;
     }
+    const auto tokenizerEnd = Clock::now();
 
+
+    const auto deviceStart = Clock::now();
     job::ggml::JobGgml interface{false};
     interface.setLogCallback(&shutUp);
 
@@ -73,9 +88,9 @@ int main(int argc, char *argv[])
 
 
     job::ggml::JobGgmlDevice *device = nullptr;
-    if(!manager->cudaDevices().isEmpty())
-        device = manager->cudaDevices().at(0);
-    else
+    // if(!manager->cudaDevices().isEmpty())
+        // device = manager->cudaDevices().at(0);
+    // else
         device = manager->cpu();
 
     if (!device) {
@@ -83,15 +98,22 @@ int main(int argc, char *argv[])
         return 1;
     }
 #ifndef NDEBUG
-    std::cout << cpu->dump();
+    std::cout << device->dump();
 #endif
+    const auto deviceEnd = Clock::now();
+    // -=------
 
+
+    const auto schedulerStart = Clock::now();
     auto scheduler = manager->buildScheduler(device, 8192);
     if (!scheduler || !scheduler->isValid()) {
-        std::cerr << "Failed to create CPU scheduler\n";
+        std::cerr << "Failed to create device scheduler\n" << device->dump();
         return 1;
     }
+    const auto schedulerEnd = Clock::now();
 
+
+    const auto configStart = Clock::now();
     job::model::GgufModelConfigReader reader;
     job::model::ModelConfig modelConfig;
     if (!reader.read(modelPath, modelConfig)) {
@@ -104,8 +126,11 @@ int main(int argc, char *argv[])
         return 1;
     }
 
+    const auto configEnd = Clock::now();
+
+
     job::model::SamplerConfig samplerConfig = modelConfig.samplerConfig();
-    samplerConfig.setGreedy(true);
+    samplerConfig.setGreedy(true); // test both obv false will be slower but whatever
     samplerConfig.setSeed(42);
 #ifndef NDEBUG
     modelConfig.debugJobJson();
@@ -119,7 +144,6 @@ int main(int argc, char *argv[])
         "Your response must fit within " +
         std::to_string(MaxNewTokens) +
         " tokens.");
-
     job::token::ChatMessage userMessage;
     userMessage.setRole(job::token::ChatRole::User);
     userMessage.setContent(
@@ -127,6 +151,9 @@ int main(int argc, char *argv[])
         "create a sense of wonder");
 
     const std::vector<job::token::ChatMessage> dialogue{ systemMessage, userMessage };
+
+
+    const auto promptStart = Clock::now();
     const std::string formattedPrompt = tokenizer.applyChatMessages(dialogue, true);
     if (formattedPrompt.empty()) {
         std::cerr << "Failed to apply chat messages\n";
@@ -138,18 +165,26 @@ int main(int argc, char *argv[])
         std::cerr << "Tokenizer produced no tokens\n";
         return 1;
     }
+    const auto promptEnd = Clock::now();
 
 
+    const auto modelLoadStart = Clock::now();
     // Okay now taht the Chat deal is setup we should pass it into the model ?
     job::model::JobModel model{ *device, *scheduler };
     if (!model.load(modelPath, modelConfig, InferenceContext)) {
         std::cerr << "Failed to load model\n";
         return 1;
-    }
+    }    
+    // model.setTokenizer(&tokenizer);
+    const auto modelLoadEnd = Clock::now();
 
-    model.setTokenizer(&tokenizer);
 
+
+
+    const auto generationStart = Clock::now();
     const std::vector<job::token::TokenId> generatedTokens = model.generate(promptTokens, MaxNewTokens, samplerConfig);
+    const auto generationEnd = Clock::now();
+
     if (generatedTokens.size() <= promptTokens.size()) {
         std::cerr << "Generation failed\n";
         return 1;
@@ -159,7 +194,60 @@ int main(int argc, char *argv[])
     const std::vector<job::token::TokenId> responseTokens{ responseBegin, generatedTokens.end() };
 
     const std::string responseText = tokenizer.decode(responseTokens);
+
     std::cout << responseText << '\n';
+
+    const std::size_t generatedCount = generatedTokens.size() >= promptTokens.size() ? generatedTokens.size() - promptTokens.size() : 0;
+    const double generationSeconds = std::chrono::duration<double>(generationEnd - generationStart).count();
+
+    std::cout << "\n=== JOB Inference Baseline ===\n";
+    std::cout << std::fixed << std::setprecision(3);
+    std::cout << "Inference context: " << InferenceContext << '\n';
+    std::cout << "Max new tokens:    " << MaxNewTokens << '\n';
+    std::cout << "Sampler:           " << (samplerConfig.greedy() ? "greedy" : "not greedy") << '\n';
+    std::cout << "Tokenizer load:     " << elapsedMs(tokenizerStart, tokenizerEnd) << " ms\n";
+    std::cout << "Device setup:       " << elapsedMs(deviceStart, deviceEnd) << " ms\n";
+    std::cout << "Scheduler creation: " << elapsedMs(schedulerStart, schedulerEnd) << " ms\n";
+    std::cout << "Model config:       " << elapsedMs(configStart, configEnd) << " ms\n";
+    std::cout << "Model load:         " << elapsedMs(modelLoadStart, modelLoadEnd) << " ms\n";
+    std::cout << "Prompt preparation: " << elapsedMs(promptStart, promptEnd) << " ms\n";
+    std::cout << "Generation:         " << elapsedMs(generationStart, generationEnd) << " ms\n";
+    std::cout << "Prompt tokens:      " << promptTokens.size() << '\n';
+    std::cout << "Generated tokens:   " << generatedCount << '\n';
+    std::cout << "Generation rate:    "
+              << (generationSeconds > 0.0 ? generatedCount / generationSeconds : 0.0)
+              << " tokens/s\n";
+    std::cout << "Total elapsed:      " << elapsedMs(programStart, Clock::now()) << " ms\n";
+    std::cout << "====================\n";
+    std::cout << "Model Config:      \n";
+    modelConfig.debugJobJson();
+    modelConfig.debugJobYaml();
+
+    std::cout << "Device Info:       \n";
+    std::cout << device->dump() << "\n";
+
+
+    // std::cout << "Model Timing:\n";
+
+    // const auto &timing = model.inferenceTiming();
+
+    // std::cout << "  Prefill:\n";
+    // std::cout << "    Reset:   " << timing.prefill.reset.averageMs() << " ms\n";
+    // std::cout << "    Input:   " << timing.prefill.input.averageMs() << " ms\n";
+    // std::cout << "    Build:   " << timing.prefill.build.averageMs() << " ms\n";
+    // std::cout << "    Compute: " << timing.prefill.compute.averageMs() << " ms\n";
+    // std::cout << "    Sync:    " << timing.prefill.sync.averageMs() << " ms\n";
+    // std::cout << "    Sample:  " << timing.prefill.sample.averageMs() << " ms\n";
+
+    // std::cout << "  Decode:\n";
+    // std::cout << "    Reset:   " << timing.decode.reset.averageMs() << " ms\n";
+    // std::cout << "    Input:   " << timing.decode.input.averageMs() << " ms\n";
+    // std::cout << "    Build:   " << timing.decode.build.averageMs() << " ms\n";
+    // std::cout << "    Compute: " << timing.decode.compute.averageMs() << " ms\n";
+    // std::cout << "    Sync:    " << timing.decode.sync.averageMs() << " ms\n";
+    // std::cout << "    Sample:  " << timing.decode.sample.averageMs() << " ms\n";
+
+
 
 
     return 0;

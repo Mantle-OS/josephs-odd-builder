@@ -27,6 +27,13 @@ public:
                                                          const ggml::JobGgmlTensor &weight,
                                                          float eps,
                                                          const ggml::JobGgmlTensor *bias = nullptr);
+
+
+    [[nodiscard]] static ggml::JobGgmlTensorOp::UPtr rmsView(ggml::JobGgmlTensorOp &input, const ggml::JobGgmlTensor &weight, float eps, const ggml::JobGgmlTensor *bias);
+    // [[nodiscard]] static ggml::JobGgmlTensorOp::UPtr rmsView(ggml::JobGgmlTensorOp *input,
+    //                                                      const ggml::JobGgmlTensor &weight,
+    //                                                      float eps,
+    //                                                      const ggml::JobGgmlTensor *bias = nullptr);
 };
 
 } // namespace job::model

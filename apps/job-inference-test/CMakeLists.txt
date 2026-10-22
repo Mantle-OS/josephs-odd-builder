@@ -31,6 +31,7 @@ target_link_libraries(job-inference-test
         JosephsOddBuilder_Ggml
         JosephsOddBuilder_Token
         JosephsOddBuilder_Model
+        JosephsOddBuilder_IO
         ${JOB_CUDA_LIBS}
 )
 

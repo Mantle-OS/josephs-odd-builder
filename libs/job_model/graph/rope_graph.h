@@ -25,20 +25,10 @@ public:
     RopeGraph &operator=(RopeGraph &&) = delete;
 
     // rope dim and mode should be in the config
+    // uint32_t ropeDimensions,
     [[nodiscard]] static ggml::JobGgmlTensorOp::UPtr build(ggml::JobGgmlTensorOp::UPtr input,
                                                            const ggml::JobGgmlTensor &positions,
-                                                           uint32_t ropeDimensions,
-                                                           int mode = 2);
-
-
-    // Should be renamed to ropeExt as that is what is really going on here.
-    // Fallback Dim and mode should be in the RopeConfig bottom line.
-    [[nodiscard]] static ggml::JobGgmlTensorOp::UPtr build(ggml::JobGgmlTensorOp::UPtr input,
-                                                           const ggml::JobGgmlTensor &positions,
-                                                           const RopeConfig *config,
-                                                           uint32_t fallbackDimensions,
-                                                           int mode = 2);
-
+                                                           const RopeConfig *config);
 };
 
 } // namespace job::model

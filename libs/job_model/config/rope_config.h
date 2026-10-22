@@ -4,14 +4,35 @@
 #include <memory>
 
 #include <job_base_obj.h>
+#include <job_obj_annotation.h>
+
+#include <real_type.h>
+#include <inplace_vector>
 
 #include "jobmodel_export.h"
+
 namespace job::model {
 
-// Rotary Positional Embedding (RoPE) parameters.
-// Applied to Q/K during attention, but kept as its own class rather than
-// folded into AttentionConfig -- you already named "rope" as a distinct
-// graph-split piece from "attention" and "gqa" from the start.
+enum RopeType : std::uint8_t {
+    Normal = 0,
+    NormalInplace ,
+    Ext,
+    ExtInplace,
+    ExtBack,
+    Multi,
+    MultiBack,
+    MultiInplace,
+    Custom,
+    CustomInplace
+};
+
+enum RopeMode : std::uint8_t {
+    None = 0,
+    OneD = 1,
+    TwoD = 2,
+    ThreeD = 3,
+};
+
 class JOBMODEL_EXPORT RopeConfig : public job::core::BaseObject
 {
 public:
@@ -20,7 +41,7 @@ public:
     using UPtr = std::unique_ptr<RopeConfig>;
 
     RopeConfig();
-    ~RopeConfig() = default;
+    ~RopeConfig() override = default;
 
     [[nodiscard]] static Ptr createShared() { return std::make_shared<RopeConfig>(); }
     [[nodiscard]] static UPtr createUniq()  { return std::make_unique<RopeConfig>(); }
@@ -30,26 +51,62 @@ public:
     RopeConfig(RopeConfig &&) noexcept = default;
     RopeConfig &operator=(RopeConfig &&) noexcept = default;
 
-    // Number of rotary dimensions. 0 means "derive from attention head dimension".
-    [[nodiscard]] uint32_t ropeDimensionCount() const noexcept { return m_ropeDimensionCount; }
-    void setRopeDimensionCount(uint32_t value) noexcept { m_ropeDimensionCount = value; }
+    [[nodiscard]] std::uint32_t ropeDimensionCount() const noexcept { return m_ropeDimensionCount; }
+    void setRopeDimensionCount(std::uint32_t value) noexcept { m_ropeDimensionCount = value; }
+    [[nodiscard]] int ropeDimCntInt() const noexcept { return static_cast<int>(m_ropeDimensionCount); }
 
-    // Base frequency (theta) for the rotary embedding. Throws if value is
-    // non-finite or <= 0.
     [[nodiscard]] float ropeFreqBase() const noexcept { return m_ropeFreqBase; }
     void setRopeFreqBase(float value);
 
-    // Frequency scaling factor (e.g. for context-extension schemes). Throws
-    // if value is non-finite or <= 0.
     [[nodiscard]] float ropeFreqScale() const noexcept { return m_ropeFreqScale; }
     void setRopeFreqScale(float value);
 
     [[nodiscard]] bool isValid() const noexcept;
 
+    [[nodiscard]] RopeMode mode()const noexcept {return m_mode; }
+    void setMode(RopeMode mode){m_mode = mode;}
+    void setModeInt(int mode)
+    {
+        if(mode >=0 && mode <= 3)
+            m_mode = static_cast<RopeMode>(mode);
+    }
+    [[nodiscard]] int modeInt() const noexcept { return static_cast<int>(m_mode); }
+
+    [[nodiscard]] RopeType ropeType() const noexcept { return m_type; }
+    void setRopeType(RopeType type){m_type = type;}
+
+    [[nodiscard]] std::uint32_t ctxOrigCount()const noexcept{return m_ctxOrigCount;}
+    void setCtxOrigCount(std::uint32_t value){ m_ctxOrigCount = value; }
+    [[nodiscard]] int ctxOrigCountInt() const noexcept { return static_cast<int>(m_ctxOrigCount); }
+
+    [[nodiscard]] const std::inplace_vector<int, 4> &sections() const noexcept { return m_sections; }
+    void setSections(const std::inplace_vector<int, 4> &sections) { m_sections = sections; }
+
+    [[nodiscard]] float extFactor()const noexcept{return m_extFactor;  }
+    void setExtFactor(float value){ m_extFactor = value; }
+
+    [[nodiscard]] float attnFactor()const noexcept{return m_attnFactor; }
+    void setAttnFactor(float value){ m_attnFactor = value; }
+
+    [[nodiscard]] float betaFast()const noexcept{return m_betaFast;   }
+    void setBetaFast(float value) { m_betaFast = value; }
+
+    [[nodiscard]] float betaSlow()const noexcept{return m_betaSlow;    }
+    void setBetaSlow(float value) { m_betaSlow = value; }
+
 private:
-    uint32_t m_ropeDimensionCount{0};
-    float    m_ropeFreqBase{10000.0f};
-    float    m_ropeFreqScale{1.0f};
+    RopeType        m_type{RopeType::Normal};
+    RopeMode        m_mode{RopeMode::TwoD};
+    std::uint32_t   m_ropeDimensionCount{0};
+    float           m_ropeFreqBase{10000.0f};
+    float           m_ropeFreqScale{1.0f};
+
+    std::uint32_t               m_ctxOrigCount{0};
+    std::inplace_vector<int, 4> m_sections{};// GGML_MROPE_SECTIONS  which is defined as 4
+    float                       m_extFactor{0.0f};
+    float                       m_attnFactor{1.0f};
+    float                       m_betaFast{0.0f};
+    float                       m_betaSlow{0.0f};
 };
 
 } // namespace job::model

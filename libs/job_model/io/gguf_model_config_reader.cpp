@@ -91,12 +91,21 @@ bool GgufModelConfigReader::readFromGguf(const ggml::JobGguf &gguf, ModelConfig 
             config.normConfig().setRmsNormEps(kv->value<float>());
 
         auto &rope = config.ropeConfig();
+        rope.setRopeType(RopeType::Ext);
 
         if (const auto kv = gguf.keyValue(prefix + "rope.dimension_count"))
             rope.setRopeDimensionCount(kv->value<uint32_t>());
 
         if (const auto kv = gguf.keyValue(prefix + "rope.freq_base"))
             rope.setRopeFreqBase(kv->value<float>());
+
+        if (rope.ropeDimensionCount() == 0) {
+            const uint32_t headDimension = attention.headDimension(transformer.embeddingLength());
+            if (headDimension == 0)
+                throw std::runtime_error{"Unable to resolve RoPE dimensions from GGUF metadata"};
+
+            rope.setRopeDimensionCount(headDimension);
+        }
 
         if (const auto kv = gguf.keyValue(prefix + "feed_forward_length"))
             config.feedForwardConfig().setFeedForwardLength(kv->value<uint32_t>());

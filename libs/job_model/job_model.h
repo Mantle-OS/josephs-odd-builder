@@ -6,20 +6,26 @@
 #include <span>
 #include <vector>
 
+
 #include <job_ggml_backend_sched.h>
 #include <job_ggml_backend_buffer.h>
 #include <job_ggml_context.h>
 #include <job_ggml_device.h>
 #include <job_ggml_enums.h>
+#include <job_gguf.h>
 
 #include <job_token.h>
 
 /////
 #include <array>
 #include <cstring>
+
 #include <ggml-backend.h>
 #include <ggml.h>
 #include <job_logger.h>
+
+#include <chrono>
+#include <cstdarg>
 ///
 
 
@@ -37,6 +43,88 @@
 
 #include "jobmodel_export.h"
 namespace job::model {
+
+
+enum class StageType: std::uint8_t {
+    Reset,
+    Input,
+    Build,
+    Compute,
+    Sync,
+    Sample,
+    Idle
+};
+
+enum class InferencePhase : std::uint8_t {
+    Prefill,
+    Decode
+};
+
+struct StageTiming
+{
+    using Clock = std::chrono::steady_clock;
+
+    double              totalMs{0.0};
+    std::uint64_t       calls{0};
+    bool                running{false};
+    Clock::time_point   startedAt{};
+
+    void start() noexcept
+    {
+        if (running)
+            return;
+
+        startedAt = Clock::now();
+        running = true;
+    }
+
+    void stop() noexcept
+    {
+        if (!running)
+            return;
+
+        const auto endedAt = Clock::now();
+        totalMs += std::chrono::duration<double, std::milli>(endedAt - startedAt).count();
+        ++calls;
+        running = false;
+    }
+
+    [[nodiscard]] double averageMs() const noexcept
+    {
+        return calls ? totalMs / static_cast<double>(calls) : 0.0;
+    }
+
+    void reset() noexcept
+    {
+        totalMs = 0.0;
+        calls = 0;
+        running = false;
+        startedAt = {};
+    }
+};
+
+
+struct InferenceTiming
+{
+    struct Phase
+    {
+        StageTiming reset;
+        StageTiming input;
+        StageTiming build;
+        StageTiming compute;
+        StageTiming sync;
+        StageTiming sample;
+    };
+
+    Phase prefill;
+    Phase decode;
+
+    void reset() noexcept
+    {
+        prefill = {};
+        decode = {};
+    }
+};
 
 class JOBMODEL_EXPORT JobModel
 {
@@ -105,6 +193,27 @@ public:
     [[nodiscard]] token::JobToken *tokenizer()const { return m_tokenizer;}
     void setTokenizer(token::JobToken *tokenizer) { m_tokenizer = tokenizer;}
 
+    // [[nodiscard]] StageTiming stageTimmer(){return m_stageTimmer;}
+    [[nodiscard]] const InferenceTiming &inferenceTiming() const noexcept
+    {
+        return m_inferenceTime;
+    }
+
+    void startTime(InferencePhase phase, StageType type) noexcept
+    {
+        updateTime(phase, type);
+    }
+
+    void stopTime(InferencePhase phase, StageType type) noexcept
+    {
+        updateTime(phase, type, true);
+    }
+
+    // [[nodiscard]] ggml::JobGguf *gguf(){
+    //     return m_gguf;
+    // }
+    // void setGguf(ggml::JobGguf *gguf) { m_gguf = gguf;}
+
 
 private:
     [[nodiscard]] bool loadConfigFromGguf(const std::filesystem::path &ggufPath);
@@ -121,6 +230,29 @@ private:
     [[nodiscard]] bool isStopToken(int32_t tokenId) const noexcept;
 
     // [[nodiscard]] bool isToolToken(int32_t tokenId) const noexcept;
+    void updateTime(InferencePhase phase, StageType type, bool stop = false) noexcept
+    {
+        auto &timing = phase == InferencePhase::Prefill
+                           ? m_inferenceTime.prefill
+                           : m_inferenceTime.decode;
+
+        StageTiming *stage = nullptr;
+
+        switch (type) {
+        case StageType::Reset:   stage = &timing.reset;   break;
+        case StageType::Input:   stage = &timing.input;   break;
+        case StageType::Build:   stage = &timing.build;   break;
+        case StageType::Compute: stage = &timing.compute; break;
+        case StageType::Sync:    stage = &timing.sync;    break;
+        case StageType::Sample:  stage = &timing.sample;  break;
+        case StageType::Idle:    return;
+        }
+
+        if (stop)
+            stage->stop();
+        else
+            stage->start();
+    }
 
 
 private:
@@ -159,11 +291,15 @@ private:
             values[4], values[5], values[6], values[7]);
     }
 
+    // Meta data timming
+    // StageTiming m_stageTimmer;       // OWNED
+    InferenceTiming m_inferenceTime; // OWNED
 
 
     ggml::JobGgmlDevice         &m_device;          // Borrowed.
     ggml::JobGgmlBackendSched   &m_scheduler;       // Borrowed.
-    token::JobToken             *m_tokenizer = nullptr; // Borrowed
+    token::JobToken             *m_tokenizer    = nullptr; // Borrowed
+    // ggml::JobGguf               *m_gguf         = nullptr; // Borrowed
 
     ModelConfig                 m_config;           // Owned
     ModelWeights                m_weights;          // Owned

@@ -7,62 +7,141 @@ namespace job::model {
 
 ggml::JobGgmlTensorOp::UPtr RopeGraph::build(ggml::JobGgmlTensorOp::UPtr input,
                                              const ggml::JobGgmlTensor &positions,
-                                             uint32_t ropeDimensions,
-                                             int mode)
+                                             const RopeConfig *config)
 {
-#ifndef NDEBUG
-    // contracts ......
+    if (!config || !config->isValid())
+        throw std::invalid_argument{"RopeGraph requires a valid config object"};
+
     if (!input || !input->isValid())
         throw std::invalid_argument{"RopeGraph requires a valid input tensor"};
 
     if (!positions.isValid())
         throw std::invalid_argument{"RopeGraph requires a valid position tensor"};
 
-    if (ropeDimensions == 0)
-        throw std::invalid_argument{"RopeGraph requires a rotary dimension greater than zero"};
+    switch (config->ropeType()) {
+    case RopeType::Normal:
+        return input->rope(positions, config->ropeDimCntInt(), config->modeInt());
 
-    if (ropeDimensions > static_cast<uint32_t>(std::numeric_limits<int>::max()))
-        throw std::invalid_argument{"RopeGraph rotary dimension exceeds GGML integer range"};
-#endif
-    return input->rope(positions, static_cast<int>(ropeDimensions), mode);
-}
+    case RopeType::NormalInplace:
+        return input->ropeInplace(positions, config->ropeDimCntInt(), config->modeInt());
 
-ggml::JobGgmlTensorOp::UPtr RopeGraph::build(ggml::JobGgmlTensorOp::UPtr input,
-                                             const ggml::JobGgmlTensor &positions,
-                                             const RopeConfig *config,
-                                             uint32_t fallbackDimensions,
-                                             int mode)
-{
-    #ifndef NDEBUG
-    if (!input || !input->isValid())
-        throw std::invalid_argument{ "RopeGraph requires a valid input tensor" };
-
-    if (!positions.isValid())
-        throw std::invalid_argument{ "RopeGraph requires a valid position tensor" };
-#endif
-    const uint32_t ropeDimensions = config->ropeDimensionCount() > 0 ? config->ropeDimensionCount() : fallbackDimensions;
-
-#ifndef NDEBUG
-    if (ropeDimensions == 0)
-        throw std::invalid_argument{ "RopeGraph requires a rotary dimension greater than zero" };
-
-    if (ropeDimensions > static_cast<uint32_t>( std::numeric_limits<int>::max())) {
-        throw std::invalid_argument{ "RopeGraph rotary dimension exceeds GGML integer range" };
+    default:
+        break;
     }
-#endif
 
-    // this is unacceptable. and should be from the RopeConfig That should be the only thing that is passed into this
-    // function both fallbackDimensions and mode should be in the config. RopeExtGraph should be a thing....
-    return input->ropeExt(positions,
-                          nullptr,
-                          static_cast<int>(ropeDimensions),
-                          mode,
-                          0,
-                          config->ropeFreqBase(),
-                          config->ropeFreqScale(),
-                          0.0f,
-                          1.0f,
-                          0.0f,
-                          0.0f);
+    // right here we are gonna need a fallback I bet=
+
+    switch (config->ropeType()) {
+    case RopeType::Normal:
+    case RopeType::NormalInplace:
+        break;
+
+    case RopeType::Ext:
+        return input->ropeExt(positions,
+                              nullptr,
+                              config->ropeDimCntInt(),
+                              config->modeInt(),
+                              config->ctxOrigCountInt(),
+                              config->ropeFreqBase(),
+                              config->ropeFreqScale(),
+                              config->extFactor(),
+                              config->attnFactor(),
+                              config->betaFast(),
+                              config->betaSlow());
+
+    case RopeType::ExtInplace:
+        return input->ropeExtInplace(positions,
+                                     nullptr,
+                                     config->ropeDimCntInt(),
+                                     config->modeInt(),
+                                     config->ctxOrigCountInt(),
+                                     config->ropeFreqBase(),
+                                     config->ropeFreqScale(),
+                                     config->extFactor(),
+                                     config->attnFactor(),
+                                     config->betaFast(),
+                                     config->betaSlow());
+
+    case RopeType::Multi:
+        return input->ropeMulti(positions,
+                                nullptr,
+                                config->ropeDimCntInt(),
+                                const_cast<int *>(config->sections().data()),
+                                config->modeInt(),
+                                config->ctxOrigCountInt(),
+                                config->ropeFreqBase(),
+                                config->ropeFreqScale(),
+                                config->extFactor(),
+                                config->attnFactor(),
+                                config->betaFast(),
+                                config->betaSlow());
+
+    case RopeType::MultiInplace:
+        return input->ropeMultiInplace(positions,
+                                       nullptr,
+                                       config->ropeDimCntInt(),
+                                       const_cast<int *>(config->sections().data()),
+                                       config->modeInt(),
+                                       config->ctxOrigCountInt(),
+                                       config->ropeFreqBase(),
+                                       config->ropeFreqScale(),
+                                       config->extFactor(),
+                                       config->attnFactor(),
+                                       config->betaFast(),
+                                       config->betaSlow());
+
+    case RopeType::Custom:
+        return input->ropeCustom(positions,
+                                 config->ropeDimCntInt(),
+                                 config->modeInt(),
+                                 config->ctxOrigCountInt(),
+                                 config->ropeFreqBase(),
+                                 config->ropeFreqScale(),
+                                 config->extFactor(),
+                                 config->attnFactor(),
+                                 config->betaFast(),
+                                 config->betaSlow());
+
+    case RopeType::CustomInplace:
+        return input->ropeCustomInplace(positions,
+                                        config->ropeDimCntInt(),
+                                        config->modeInt(),
+                                        config->ctxOrigCountInt(),
+                                        config->ropeFreqBase(),
+                                        config->ropeFreqScale(),
+                                        config->extFactor(),
+                                        config->attnFactor(),
+                                        config->betaFast(),
+                                        config->betaSlow());
+
+    case RopeType::ExtBack:
+        return input->ropeExtBack(positions,
+                                  nullptr,
+                                  config->ropeDimCntInt(),
+                                  config->modeInt(),
+                                  config->ctxOrigCountInt(),
+                                  config->ropeFreqBase(),
+                                  config->ropeFreqScale(),
+                                  config->extFactor(),
+                                  config->attnFactor(),
+                                  config->betaFast(),
+                                  config->betaSlow());
+    case RopeType::MultiBack:
+        return input->ropeMultiBack(positions,
+                                    nullptr,
+                                    config->ropeDimCntInt(),
+                                    const_cast<int *>(config->sections().data()),
+                                    config->modeInt(),
+                                    config->ctxOrigCountInt(),
+                                    config->ropeFreqBase(),
+                                    config->ropeFreqScale(),
+                                    config->extFactor(),
+                                    config->attnFactor(),
+                                    config->betaFast(),
+                                    config->betaSlow());
+    }
+
+    throw std::invalid_argument{"Unsupported RoPE operation"};
 }
+
 } // namespace job::model

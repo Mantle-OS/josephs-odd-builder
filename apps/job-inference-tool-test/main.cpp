@@ -179,7 +179,7 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    model.setTokenizer(&tokenizer); // just for now so it does not stop the messages and we get the full output
+    // model.setTokenizer(&tokenizer); // just for now so it does not stop the messages and we get the full output
 
     // Hook up the new library for the tools.
     // job::aitools::JobAiTool tools;

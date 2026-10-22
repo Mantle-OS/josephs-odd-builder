@@ -187,9 +187,7 @@ JobGgmlBackend::Ptr JobGgmlBackendSched::tensorBackend(const JobGgmlTensor &tens
     if (!m_scheduler || !tensor.isValid())
         return nullptr;
 
-    return backendFromNative(ggml_backend_sched_get_tensor_backend(m_scheduler.get(),
-                                                                   const_cast<ggml_tensor *>(tensor.tensor()))
-                             );
+    return backendFromNative(ggml_backend_sched_get_tensor_backend(m_scheduler.get(), const_cast<ggml_tensor *>(tensor.tensor())));
 }
 
 void JobGgmlBackendSched::splitGraph(JobGgmlCGraph &graph)

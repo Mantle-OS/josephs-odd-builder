@@ -330,6 +330,9 @@ public:
     template <typename... Args> [[nodiscard]] UPtr ropeMultiInplace(Args&&... args) { return operate<&ggml_rope_multi_inplace>(std::forward<Args>(args)...); }
     template <typename... Args> [[nodiscard]] UPtr ropeExtBack(Args&&... args) { return operate<&ggml_rope_ext_back>(std::forward<Args>(args)...); }
     template <typename... Args> [[nodiscard]] UPtr ropeMultiBack(Args&&... args) { return operate<&ggml_rope_multi_back>(std::forward<Args>(args)...); }
+    template <typename... Args> [[nodiscard]] UPtr ropeCustom(Args&&... args) { return operate<&ggml_rope_custom>(std::forward<Args>(args)...); }
+    template <typename... Args> [[nodiscard]] UPtr ropeCustomInplace(Args&&... args) { return operate<&ggml_rope_custom_inplace>(std::forward<Args>(args)...); }
+
 
     [[nodiscard]] UPtr clamp(float minVal, float maxVal) { return operate<&ggml_clamp>(minVal, maxVal); }
     template <typename... Args> [[nodiscard]] UPtr im2col(Args&&... args) { return operate<&ggml_im2col>(std::forward<Args>(args)...); }

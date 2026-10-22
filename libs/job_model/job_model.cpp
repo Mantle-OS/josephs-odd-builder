@@ -202,17 +202,12 @@ bool JobModel::loadWeights(const std::filesystem::path &ggufPath)
     }
 
     if (!gguf.open(ggufPath)) {
-#ifndef NDEBUG
-        JOB_LOG_ERROR("[JobModel] Failed to open GGUF '{}': {}",
-                      ggufPath.string(), gguf.errorString());
-#endif
+        JOB_LOG_ERROR("[JobModel] Failed to open GGUF '{}': {}", ggufPath.string(), gguf.errorString());
         return false;
     }
 
     if (!weightCtx || !weightCtx->isValid()) {
-#ifndef NDEBUG
         JOB_LOG_ERROR("[JobModel] GGUF failed to produce a valid weight context");
-#endif
         return false;
     }
 
@@ -220,18 +215,14 @@ bool JobModel::loadWeights(const std::filesystem::path &ggufPath)
     // weight-placement loader capable of materializing GGUF tensor bytes into the resolved backend buffer.
     // Refuse to pretend the metadata-only tensors are loaded weights.
     if (m_config.deviceConfig().noAlloc()) {
-#ifndef NDEBUG
         JOB_LOG_ERROR("[JobModel] DeviceConfig::noAlloc() requires backend-directed "
                       "weight materialization, which is not implemented yet");
-#endif
         return false;
     }
 
     if (!m_weights.loadFromContext(*weightCtx, m_config)) {
-#ifndef NDEBUG
         JOB_LOG_ERROR("[JobModel] Failed to bind {} model layers from GGUF context",
                       m_config.transformerConfig().blockCount());
-#endif
         return false;
     }
 
@@ -255,9 +246,7 @@ bool JobModel::loadWeights(const std::filesystem::path &ggufPath)
 
         auto deviceCtx = ggml::JobGgmlContext::createUniqMetadata(tensorCount, 0, false);
         if (!deviceCtx || !deviceCtx->isValid()) {
-#ifndef NDEBUG
             JOB_LOG_ERROR("[JobModel] Failed to create device weight metadata context");
-#endif
             return false;
         }
 
@@ -265,9 +254,7 @@ bool JobModel::loadWeights(const std::filesystem::path &ggufPath)
         const std::size_t alignment = bufferType->alignment();
 
         if (alignment == 0) {
-#ifndef NDEBUG
             JOB_LOG_ERROR("[JobModel] Invalid weight backend alignment");
-#endif
             return false;
         }
 
@@ -290,9 +277,7 @@ bool JobModel::loadWeights(const std::filesystem::path &ggufPath)
             if (bytes == 0 ||
                 bytes > std::numeric_limits<std::size_t>::max() - alignment ||
                 totalBytes > std::numeric_limits<std::size_t>::max() - (bytes + alignment)) {
-#ifndef NDEBUG
                 JOB_LOG_ERROR("[JobModel] Weight buffer size overflow for '{}'", source->name());
-#endif
                 return false;
             }
 
@@ -301,9 +286,7 @@ bool JobModel::loadWeights(const std::filesystem::path &ggufPath)
 
         auto uniqueBuffer = bufferType->allocateBuffer(totalBytes);
         if (!uniqueBuffer || !uniqueBuffer->isValid()) {
-#ifndef NDEBUG
             JOB_LOG_ERROR("[JobModel] Failed to allocate {} bytes for model weights", totalBytes);
-#endif
             return false;
         }
 
@@ -315,9 +298,7 @@ bool JobModel::loadWeights(const std::filesystem::path &ggufPath)
 
             if (!destination || !destination->isValid() || !source->tensor()->data ||
                 allocator.allocate(*destination) != ggml::JobGgmlStatus::Success) {
-#ifndef NDEBUG
                 JOB_LOG_ERROR("[JobModel] Failed to allocate weight '{}'", source->name());
-#endif
                 return false;
             }
 
@@ -346,18 +327,14 @@ bool JobModel::loadWeights(const std::filesystem::path &ggufPath)
         ModelWeights deviceWeights;
 
         if (!deviceWeights.loadFromContext(*deviceCtx, m_config)) {
-#ifndef NDEBUG
             JOB_LOG_ERROR("[JobModel] Failed to bind device-resident model weights");
-#endif
             return false;
         }
 
         m_weights = std::move(deviceWeights);
         m_weightBuffer = std::move(deviceBuffer);
         weightCtx = std::move(deviceCtx);
-#ifndef NDEBUG
         JOB_LOG_INFO("[JobModel] Materialized {} tensors in {} backend bytes", tensorCount, totalBytes);
-#endif
     }
 
     m_weightCtx = std::move(weightCtx);
@@ -573,10 +550,125 @@ int32_t JobModel::sampleLastToken(ggml::JobGgmlCGraph &graph,
     return sampler.sample(std::span<const float>{hostLogits}, contextTokens);
 }
 
+// std::vector<int32_t> JobModel::generate(std::span<const int32_t> promptTokens, int32_t maxNewTokens, const SamplerConfig &samplerConfig)
+// {
+//     if (!isLoaded()|| promptTokens.empty()) {
+//         JOB_LOG_ERROR("[JobModel] Cannot generate: model is not loaded OR from an empty prompt") ;
+//         return {};
+//     }
+
+//     if (maxNewTokens <= 0)
+//         return std::vector<int32_t>{promptTokens.begin(), promptTokens.end()};
+
+//     m_kvCache->resetPosition();
+//     std::vector<int32_t> outputTokens{ promptTokens.begin(), promptTokens.end() };
+//     outputTokens.reserve(promptTokens.size() + static_cast<std::size_t>(maxNewTokens));
+
+//     Sampler sampler{samplerConfig};
+//     uint32_t nPast = 0;
+
+//     // ------------------------------------------------------------
+//     // Prefill
+//     // ------------------------------------------------------------
+//     m_scheduler.synchronize();
+//     m_scheduler.reset();
+//     m_computeCtx->reset();
+
+//     ggml::JobGgmlBackendBuffer::Ptr inputBuffer;
+//     ggml::JobGgmlTensor::UPtr inputTensor;
+
+//     try {
+//         inputTensor = createInputTensor(promptTokens, inputBuffer);
+//     } catch (const std::exception &error) {
+//         JOB_LOG_ERROR("[JobModel] Failed to create prefill input: {}", error.what());
+//         return {};
+//     }
+
+//     auto graph = m_graphBuilder->buildForward(*m_computeCtx,
+//                                               *inputTensor,
+//                                               nPast,
+//                                               ggml::JobGgmlType::F32);
+
+//     if (!graph || !graph->isValid()) {
+//         JOB_LOG_ERROR("[JobModel] Failed to build prefill graph");
+//         return {};
+//     }
+
+//     if (m_scheduler.computeGraph(*graph) != ggml::JobGgmlStatus::Success) {
+//         JOB_LOG_ERROR("[JobModel] Prefill graph execution failed");
+//         return {};
+//     }
+
+//     m_scheduler.synchronize();
+//     int32_t nextToken = sampleLastToken(*graph, sampler, outputTokens);
+//     if (nextToken < 0)
+//         return {};
+
+//     outputTokens.push_back(nextToken);
+//     nPast = static_cast<uint32_t>(promptTokens.size());
+//     m_kvCache->advance(static_cast<uint32_t>(promptTokens.size()));
+
+//     // ------------------------------------------------------------
+//     // Decode
+//     // ------------------------------------------------------------
+//     for (int32_t step = 1; step < maxNewTokens; ++step) {
+//         // Release scheduler references before resetting compute metadata.
+//         // m_scheduler.synchronize();
+//         m_scheduler.reset();
+//         m_computeCtx->reset();
+
+//         const int32_t token = nextToken;
+//         ggml::JobGgmlBackendBuffer::Ptr stepInputBuffer;
+//         ggml::JobGgmlTensor::UPtr stepInput;
+
+//         try {
+//             stepInput = createInputTensor(std::span<const int32_t>{&token, 1}, stepInputBuffer);
+//         } catch (const std::exception &error) {
+//             JOB_LOG_ERROR("[JobModel] Failed to create decode input at step {}: {}", step, error.what());
+//             break;
+//         }
+
+//         auto stepGraph = m_graphBuilder->buildForward(*m_computeCtx,
+//                                                       *stepInput,
+//                                                       nPast,
+//                                                       ggml::JobGgmlType::F32);
+
+//         if (!stepGraph || !stepGraph->isValid()) {
+//             JOB_LOG_ERROR("[JobModel] Failed to build decode graph at step {}", step);
+//             break;
+//         }
+
+//         if (m_scheduler.computeGraph(*stepGraph) != ggml::JobGgmlStatus::Success) {
+//             JOB_LOG_ERROR("[JobModel] Decode graph execution failed at step {}", step);
+//             break;
+//         }
+//         m_scheduler.synchronize();
+
+//         nextToken = sampleLastToken(*stepGraph, sampler, outputTokens);
+//         if (nextToken < 0)
+//             break;
+
+//         // Okay we need to look at the tokens and see of we are at the end thus stoping the
+//         if(isStopToken(nextToken))
+//             break;
+
+
+
+//         outputTokens.push_back(nextToken);
+
+//         ++nPast;
+//         m_kvCache->advance();
+//     }
+
+//     return outputTokens;
+// }
+
 std::vector<int32_t> JobModel::generate(std::span<const int32_t> promptTokens, int32_t maxNewTokens, const SamplerConfig &samplerConfig)
 {
-    if (!isLoaded()|| promptTokens.empty()) {
-        JOB_LOG_ERROR("[JobModel] Cannot generate: model is not loaded OR from an empty prompt") ;
+    m_inferenceTime.reset();
+
+    if (!isLoaded() || promptTokens.empty()) {
+        JOB_LOG_ERROR("[JobModel] Cannot generate: model is not loaded OR from an empty prompt");
         return {};
     }
 
@@ -584,7 +676,7 @@ std::vector<int32_t> JobModel::generate(std::span<const int32_t> promptTokens, i
         return std::vector<int32_t>{promptTokens.begin(), promptTokens.end()};
 
     m_kvCache->resetPosition();
-    std::vector<int32_t> outputTokens{ promptTokens.begin(), promptTokens.end() };
+    std::vector<int32_t> outputTokens{promptTokens.begin(), promptTokens.end()};
     outputTokens.reserve(promptTokens.size() + static_cast<std::size_t>(maxNewTokens));
 
     Sampler sampler{samplerConfig};
@@ -593,37 +685,67 @@ std::vector<int32_t> JobModel::generate(std::span<const int32_t> promptTokens, i
     // ------------------------------------------------------------
     // Prefill
     // ------------------------------------------------------------
+
+    startTime(InferencePhase::Prefill, StageType::Reset);
+
     m_scheduler.synchronize();
     m_scheduler.reset();
     m_computeCtx->reset();
 
+    stopTime(InferencePhase::Prefill, StageType::Reset);
+
     ggml::JobGgmlBackendBuffer::Ptr inputBuffer;
     ggml::JobGgmlTensor::UPtr inputTensor;
+
+    startTime(InferencePhase::Prefill, StageType::Input);
 
     try {
         inputTensor = createInputTensor(promptTokens, inputBuffer);
     } catch (const std::exception &error) {
+        stopTime(InferencePhase::Prefill, StageType::Input);
         JOB_LOG_ERROR("[JobModel] Failed to create prefill input: {}", error.what());
         return {};
     }
+
+    stopTime(InferencePhase::Prefill, StageType::Input);
+
+    startTime(InferencePhase::Prefill, StageType::Build);
 
     auto graph = m_graphBuilder->buildForward(*m_computeCtx,
                                               *inputTensor,
                                               nPast,
                                               ggml::JobGgmlType::F32);
 
+    stopTime(InferencePhase::Prefill, StageType::Build);
+
     if (!graph || !graph->isValid()) {
         JOB_LOG_ERROR("[JobModel] Failed to build prefill graph");
         return {};
     }
 
-    if (m_scheduler.computeGraph(*graph) != ggml::JobGgmlStatus::Success) {
+    startTime(InferencePhase::Prefill, StageType::Compute);
+
+    const auto prefillStatus = m_scheduler.computeGraph(*graph);
+
+    stopTime(InferencePhase::Prefill, StageType::Compute);
+
+    if (prefillStatus != ggml::JobGgmlStatus::Success) {
         JOB_LOG_ERROR("[JobModel] Prefill graph execution failed");
         return {};
     }
 
+    startTime(InferencePhase::Prefill, StageType::Sync);
+
     m_scheduler.synchronize();
+
+    stopTime(InferencePhase::Prefill, StageType::Sync);
+
+    startTime(InferencePhase::Prefill, StageType::Sample);
+
     int32_t nextToken = sampleLastToken(*graph, sampler, outputTokens);
+
+    stopTime(InferencePhase::Prefill, StageType::Sample);
+
     if (nextToken < 0)
         return {};
 
@@ -634,48 +756,177 @@ std::vector<int32_t> JobModel::generate(std::span<const int32_t> promptTokens, i
     // ------------------------------------------------------------
     // Decode
     // ------------------------------------------------------------
+    // for (int32_t step = 1; step < maxNewTokens; ++step) {
+    //     startTime(InferencePhase::Decode, StageType::Reset);
+
+    //     // Release scheduler references before resetting compute metadata.
+    //     // m_scheduler.synchronize();
+    //     m_scheduler.reset();
+    //     m_computeCtx->reset();
+
+    //     stopTime(InferencePhase::Decode, StageType::Reset);
+
+    //     const int32_t token = nextToken;
+    //     ggml::JobGgmlBackendBuffer::Ptr stepInputBuffer;
+    //     ggml::JobGgmlTensor::UPtr stepInput;
+
+    //     startTime(InferencePhase::Decode, StageType::Input);
+
+    //     try {
+    //         stepInput = createInputTensor(std::span<const int32_t>{&token, 1}, stepInputBuffer);
+    //     } catch (const std::exception &error) {
+    //         stopTime(InferencePhase::Decode, StageType::Input);
+    //         JOB_LOG_ERROR("[JobModel] Failed to create decode input at step {}: {}", step, error.what());
+    //         break;
+    //     }
+
+    //     stopTime(InferencePhase::Decode, StageType::Input);
+    //     startTime(InferencePhase::Decode, StageType::Build);
+
+    //     auto stepGraph = m_graphBuilder->buildForward(*m_computeCtx,
+    //                                                   *stepInput,
+    //                                                   nPast,
+    //                                                   ggml::JobGgmlType::F32);
+
+    //     stopTime(InferencePhase::Decode, StageType::Build);
+
+    //     if (!stepGraph || !stepGraph->isValid()) {
+    //         JOB_LOG_ERROR("[JobModel] Failed to build decode graph at step {}", step);
+    //         break;
+    //     }
+
+    //     startTime(InferencePhase::Decode, StageType::Compute);
+
+    //     const auto decodeStatus = m_scheduler.computeGraph(*stepGraph);
+
+    //     stopTime(InferencePhase::Decode, StageType::Compute);
+
+    //     if (decodeStatus != ggml::JobGgmlStatus::Success) {
+    //         JOB_LOG_ERROR("[JobModel] Decode graph execution failed at step {}", step);
+    //         break;
+    //     }
+
+    //     startTime(InferencePhase::Decode, StageType::Sync);
+    //     m_scheduler.synchronize();
+    //     stopTime(InferencePhase::Decode, StageType::Sync);
+    //     startTime(InferencePhase::Decode, StageType::Sample);
+
+    //     nextToken = sampleLastToken(*stepGraph, sampler, outputTokens);
+
+    //     stopTime(InferencePhase::Decode, StageType::Sample);
+
+    //     if (nextToken < 0)
+    //         break;
+
+    //     if (isStopToken(nextToken))
+    //         break;
+
+    //     outputTokens.push_back(nextToken);
+
+    //     ++nPast;
+    //     m_kvCache->advance();
+    // }
+
+
+
+
+    // ------------------------------------------------------------
+    // Decode
+    // ------------------------------------------------------------
+    double decodeAllocMs = 0.0;
+    double decodeExecuteMs = 0.0;
+    std::size_t decodeMeasuredSteps = 0;
+
+    using DecodeClock = std::chrono::steady_clock;
+
     for (int32_t step = 1; step < maxNewTokens; ++step) {
+        startTime(InferencePhase::Decode, StageType::Reset);
+
         // Release scheduler references before resetting compute metadata.
-        // m_scheduler.synchronize();
         m_scheduler.reset();
         m_computeCtx->reset();
+
+        stopTime(InferencePhase::Decode, StageType::Reset);
 
         const int32_t token = nextToken;
         ggml::JobGgmlBackendBuffer::Ptr stepInputBuffer;
         ggml::JobGgmlTensor::UPtr stepInput;
 
+        startTime(InferencePhase::Decode, StageType::Input);
+
         try {
             stepInput = createInputTensor(std::span<const int32_t>{&token, 1}, stepInputBuffer);
         } catch (const std::exception &error) {
+            stopTime(InferencePhase::Decode, StageType::Input);
             JOB_LOG_ERROR("[JobModel] Failed to create decode input at step {}: {}", step, error.what());
             break;
         }
+
+        stopTime(InferencePhase::Decode, StageType::Input);
+        startTime(InferencePhase::Decode, StageType::Build);
 
         auto stepGraph = m_graphBuilder->buildForward(*m_computeCtx,
                                                       *stepInput,
                                                       nPast,
                                                       ggml::JobGgmlType::F32);
 
+        stopTime(InferencePhase::Decode, StageType::Build);
+
         if (!stepGraph || !stepGraph->isValid()) {
             JOB_LOG_ERROR("[JobModel] Failed to build decode graph at step {}", step);
             break;
         }
 
-        if (m_scheduler.computeGraph(*stepGraph) != ggml::JobGgmlStatus::Success) {
+        // --------------------------------------------------------
+        // Scheduler allocation / graph splitting
+        // --------------------------------------------------------
+        startTime(InferencePhase::Decode, StageType::Compute);
+
+        const auto allocStart = DecodeClock::now();
+        const bool allocated = m_scheduler.allocateGraph(*stepGraph);
+        const auto allocEnd = DecodeClock::now();
+
+        if (!allocated) {
+            stopTime(InferencePhase::Decode, StageType::Compute);
+            JOB_LOG_ERROR("[JobModel] Failed to allocate decode graph at step {}", step);
+            break;
+        }
+
+        // --------------------------------------------------------
+        // Graph execution
+        // --------------------------------------------------------
+        const auto executeStart = DecodeClock::now();
+        const auto decodeStatus = m_scheduler.computeGraph(*stepGraph);
+        const auto executeEnd = DecodeClock::now();
+
+        stopTime(InferencePhase::Decode, StageType::Compute);
+
+        decodeAllocMs += std::chrono::duration<double, std::milli>(allocEnd - allocStart).count();
+        decodeExecuteMs += std::chrono::duration<double, std::milli>(executeEnd - executeStart).count();
+        ++decodeMeasuredSteps;
+
+        if (decodeStatus != ggml::JobGgmlStatus::Success) {
             JOB_LOG_ERROR("[JobModel] Decode graph execution failed at step {}", step);
             break;
         }
+
+        startTime(InferencePhase::Decode, StageType::Sync);
+
         m_scheduler.synchronize();
 
+        stopTime(InferencePhase::Decode, StageType::Sync);
+
+        startTime(InferencePhase::Decode, StageType::Sample);
+
         nextToken = sampleLastToken(*stepGraph, sampler, outputTokens);
+
+        stopTime(InferencePhase::Decode, StageType::Sample);
+
         if (nextToken < 0)
             break;
 
-        // Okay we need to look at the tokens and see of we are at the end thus stoping the
-        if(isStopToken(nextToken))
+        if (isStopToken(nextToken))
             break;
-
-
 
         outputTokens.push_back(nextToken);
 
@@ -683,8 +934,20 @@ std::vector<int32_t> JobModel::generate(std::span<const int32_t> promptTokens, i
         m_kvCache->advance();
     }
 
+    if (decodeMeasuredSteps > 0) {
+        const double steps = static_cast<double>(decodeMeasuredSteps);
+
+        JOB_LOG_INFO("[JobModel] Decode scheduler timing ({} steps):", decodeMeasuredSteps);
+        JOB_LOG_INFO("  Allocate/split: {:.3f} ms total, {:.3f} ms/token",
+                     decodeAllocMs, decodeAllocMs / steps);
+        JOB_LOG_INFO("  Execute:        {:.3f} ms total, {:.3f} ms/token",
+                     decodeExecuteMs, decodeExecuteMs / steps);
+    }
+
+
     return outputTokens;
 }
+
 
 bool job::model::JobModel::isStopToken(int32_t tokenId) const noexcept
 {

@@ -18,14 +18,11 @@ QwenGraphBuilder::QwenGraphBuilder(const ModelConfig &config,
     m_weights{weights},
     m_kvCache{kvCache}
 {
-
-#ifndef NDEBUG
     if (!m_config.isValid())
         throw std::invalid_argument{"QwenGraphBuilder requires a valid ModelConfig"};
 
     if (!m_weights.isLoaded())
         throw std::invalid_argument{"QwenGraphBuilder requires loaded model weights"};
-#endif
 }
 
 ggml::JobGgmlCGraph::UPtr QwenGraphBuilder::buildForward(ggml::JobGgmlContext &ctx,
@@ -33,7 +30,6 @@ ggml::JobGgmlCGraph::UPtr QwenGraphBuilder::buildForward(ggml::JobGgmlContext &c
                                                          uint32_t nPast,
                                                          ggml::JobGgmlType inputType)
 {
-#ifndef NDEBUG
     if (!ctx.isValid())
         throw std::invalid_argument{"QwenGraphBuilder requires a valid GGML context"};
 
@@ -45,11 +41,8 @@ ggml::JobGgmlCGraph::UPtr QwenGraphBuilder::buildForward(ggml::JobGgmlContext &c
 
     if (!m_weights.outputNorm())
         throw std::runtime_error{"QwenGraphBuilder requires output normalization weights"};
-#endif
+
     const uint32_t              nTokens             = static_cast<uint32_t>(inputTokens.extent(0));
-
-
-#ifndef NDEBUG
     if (nTokens == 0)
         throw std::invalid_argument{"QwenGraphBuilder requires at least one input token"};
 
@@ -58,14 +51,10 @@ ggml::JobGgmlCGraph::UPtr QwenGraphBuilder::buildForward(ggml::JobGgmlContext &c
 
     if (m_kvCache.layerCount() != m_config.transformerConfig().blockCount())
         throw std::runtime_error{"QwenGraphBuilder KV layer count does not match model configuration"};
-#endif
 
     const uint32_t headDimension = m_config.attentionConfig().headDimension(m_config.transformerConfig().embeddingLength());
-
-#ifndef NDEBUG
     if (headDimension == 0)
         throw std::runtime_error{"QwenGraphBuilder could not resolve attention head dimension"};
-#endif
 
     const uint32_t ropeDimensions = m_config.ropeConfig().ropeDimensionCount() > 0 ?
                                         m_config.ropeConfig().ropeDimensionCount() :
@@ -87,17 +76,21 @@ ggml::JobGgmlCGraph::UPtr QwenGraphBuilder::buildForward(ggml::JobGgmlContext &c
     for (uint32_t layerIndex = 0; layerIndex < m_config.transformerConfig().blockCount(); ++layerIndex) {
 
         const LayerWeights &weights = m_weights.layer(layerIndex);
-#ifndef NDEBUG
         if (!weights.attnNorm || !weights.attnNorm->isValid())
             throw std::runtime_error{"QwenGraphBuilder requires attention normalization weights"};
 
         if (!weights.ffnNorm || !weights.ffnNorm->isValid())
             throw std::runtime_error{"QwenGraphBuilder requires feed-forward normalization weights"};
-#endif
-        auto attentionInput = NormGraph::rms(cur->dup(),
+        // auto attentionInput = NormGraph::rms(cur->dup(),
+        //                                      *weights.attnNorm,
+        //                                      m_config.normConfig().rmsNormEps(),
+        //                                      weights.attnNormBias.get());
+
+        auto attentionInput = NormGraph::rmsView(*cur,
                                              *weights.attnNorm,
                                              m_config.normConfig().rmsNormEps(),
                                              weights.attnNormBias.get());
+
 
         ggml::JobGgmlTensorOp::UPtr kCacheWrite;
         ggml::JobGgmlTensorOp::UPtr vCacheWrite;
@@ -124,10 +117,10 @@ ggml::JobGgmlCGraph::UPtr QwenGraphBuilder::buildForward(ggml::JobGgmlContext &c
         cur = ResidualGraph::build(std::move(cur),
                                    std::move(attention));
 
-        auto ffnInput = NormGraph::rms(cur->dup(),
-                           *weights.ffnNorm,
-                           m_config.normConfig().rmsNormEps(),
-                           weights.ffnNormBias.get());
+        auto ffnInput = NormGraph::rmsView(*cur,
+                                           *weights.ffnNorm,
+                                           m_config.normConfig().rmsNormEps(),
+                                           weights.ffnNormBias.get());
 
 
         auto ffn = GatedFfnGraph::build(std::move(ffnInput),
@@ -149,11 +142,9 @@ ggml::JobGgmlCGraph::UPtr QwenGraphBuilder::buildForward(ggml::JobGgmlContext &c
 
     // LM head. ModelWeights::output() already handles tied embeddings by
     // returning tokenEmbd() when there is no dedicated output tensor.
-
-#ifndef NDEBUG
     if (!m_weights.output() || !m_weights.output()->isValid())
         throw std::runtime_error{"QwenGraphBuilder requires valid output weights"};
-#endif
+
     auto logits = LinearGraph::build(std::move(cur),
                                      *m_weights.output(),
                                      nullptr,
@@ -170,15 +161,11 @@ ggml::JobGgmlCGraph::UPtr QwenGraphBuilder::buildForward(ggml::JobGgmlContext &c
     // auto graph = ctx.newGraphCustom(8192, false);
     auto graph = ctx.newGraphCustom(4096, false);
 
-#ifndef NDEBUG
     if (!graph)
         throw std::runtime_error{"QwenGraphBuilder failed to create forward graph"};
-#endif
     for (auto &cacheWrite : cacheWrites) {
-#ifndef NDEBUG
         if (!cacheWrite || !cacheWrite->isValid())
             throw std::runtime_error{"QwenGraphBuilder received an invalid KV cache write"};
-#endif
         graph->buildForwardExpand(*cacheWrite);
     }
 

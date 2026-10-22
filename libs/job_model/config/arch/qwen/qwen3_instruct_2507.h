@@ -56,9 +56,9 @@ public:
         auto &norm = normConfig();
         norm.setRmsNormEps(kDefaultRmsNormEps);
 
-        // okay so this vendor turns out needs more than just rope but really needs
-        // ropeExt
         auto &rope = ropeConfig();
+        rope.setRopeType(RopeType::Ext);
+        rope.setMode(RopeMode::TwoD);
         rope.setRopeDimensionCount(kDefaultHeadDimension);
         rope.setRopeFreqBase(kDefaultRopeTheta);
         rope.setRopeFreqScale(1.0f);
@@ -108,7 +108,12 @@ public:
             attention.valueLength() == kDefaultHeadDimension &&
             norm.rmsNormEps() == kDefaultRmsNormEps &&
             rope.ropeFreqBase() == kDefaultRopeTheta &&
-            ffn.feedForwardLength() == kDefaultIntermediate &&
+            rope.ropeType() == RopeType::Ext &&
+            rope.mode() == RopeMode::TwoD &&
+            rope.ropeDimensionCount() == kDefaultHeadDimension &&
+            rope.ropeFreqBase() == kDefaultRopeTheta &&
+
+                ffn.feedForwardLength() == kDefaultIntermediate &&
             sampler.temperature() == kDefaultTemperature &&
             sampler.topK() == kDefaultTopK &&
             sampler.topP() == kDefaultTopP &&

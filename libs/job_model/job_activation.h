@@ -50,6 +50,7 @@ public:
     JobActivation(JobActivation &&) = delete;
     JobActivation &operator=(JobActivation &&) = delete;
 
+    // TODO constexpres canidant
     [[nodiscard]] constexpr static ActivationType fromStringView(std::string_view name)
     {
         if (name == "identity" || name == "linear")                                         return ActivationType::Identity;
@@ -77,6 +78,7 @@ public:
         throw std::invalid_argument{"JobActivation received an unknown activation name"};
     }
 
+    // TODO constexpres canidant
     [[nodiscard]] static ggml::JobGgmlTensorOp::UPtr activate(ggml::JobGgmlTensorOp::UPtr input,
                                                               ActivationType activation)
     {
@@ -87,7 +89,7 @@ public:
         case ActivationType::Identity:  return input;
         case ActivationType::Sigmoid:   return input->sigmoid();
         case ActivationType::Tanh:      return input->tanh();
-        case ActivationType::HardTanh:  return input->clamp(-1.0f, 1.0f);
+        case ActivationType::HardTanh:  return input->clamp(-1.0f, 1.0f); // I know but should not have to hardcode here
         case ActivationType::Relu:      return input->relu();
         case ActivationType::LeakyRelu: return input->leakyRelu(0.01f, false);
         case ActivationType::Elu:       return input->elu();

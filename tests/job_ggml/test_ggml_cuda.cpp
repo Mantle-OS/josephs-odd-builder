@@ -597,6 +597,73 @@ TEST_CASE("CUDA device query performance",
     };
 }
 
+
+TEST_CASE("GGML CUDA mul_mat Qwen like FP16",
+          "[ggml][device][cuda][mul_mat][f16][qwenlike][benchmark]")
+{
+    struct MatMulShape {
+        const char *name;
+        std::int64_t M;
+        std::int64_t K;
+        std::int64_t N;
+    };
+
+    const std::array<MatMulShape, 6> shapes{{
+        {"Attention Q projection", 2560, 2560, 1},
+        {"Attention K projection", 1024, 2560, 1},
+        {"Attention V projection", 1024, 2560, 1},
+        {"Attention output projection", 2560, 4096, 1},
+        {"FFN gate/up projection", 9728, 2560, 1},
+        {"FFN down projection", 2560, 9728, 1}
+    }};
+
+    REQUIRE(g_jobGgml != nullptr);
+
+    JobGgmlDeviceManager *manager = g_jobGgml->deviceManager();
+    REQUIRE(manager != nullptr);
+
+    manager->scan();
+
+    if (!manager->hasCuda())
+        SKIP("No CUDA GGML device is available on this system");
+
+    const JobGgmlDeviceManager::CudaDevices cudaDevices = manager->cudaDevices();
+    REQUIRE_FALSE(cudaDevices.isEmpty());
+
+    for (std::size_t devIdx = 0; devIdx < cudaDevices.size(); ++devIdx) {
+        JobGgmlCuda *cuda = manager->cuda(devIdx);
+        REQUIRE(cuda != nullptr);
+
+        const JobGgmlBackend::Ptr backend = cuda->backend();
+        REQUIRE(backend != nullptr);
+        REQUIRE(backend->isValid());
+
+        manager->resetScheduler();
+
+        JobGgmlBackendSched::Ptr scheduler = manager->buildScheduler(cuda);
+        REQUIRE(scheduler != nullptr);
+        REQUIRE(scheduler->isValid());
+
+        for (const auto &shape : shapes) {
+            const std::string sectionName = "CUDA" + std::to_string(devIdx) + " - " + shape.name;
+            DYNAMIC_SECTION(sectionName) {
+                benchMatMul(
+                    cuda,
+                    devIdx,
+                    shape.M,
+                    shape.K,
+                    shape.N,
+                    16,
+                    1024,
+                    scheduler,
+                    backend);
+            }
+        }
+    }
+}
+
+
+
 TEST_CASE("GGML CUDA mul_mat saturation stress FP16",
           "[ggml][device][cuda][mul_mat][f16][stress][benchmark]")
 {

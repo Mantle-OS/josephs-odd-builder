@@ -62,7 +62,7 @@ public:
 
     [[nodiscard]] RopeConfig &ropeConfig() noexcept { return m_ropeConfig; }
     [[nodiscard]] const RopeConfig &ropeConfig() const noexcept { return m_ropeConfig; }
-    void setRopeConfig(RopeConfig config) noexcept { m_ropeConfig = std::move(config); }
+    void setRopeConfig(RopeConfig config) { m_ropeConfig = std::move(config); }
 
     [[nodiscard]] FeedForwardConfig &feedForwardConfig() noexcept { return m_feedForwardConfig; }
     [[nodiscard]] const FeedForwardConfig &feedForwardConfig() const noexcept { return m_feedForwardConfig; }

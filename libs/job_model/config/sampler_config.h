@@ -60,15 +60,15 @@ public:
     [[nodiscard]] bool isValid() const noexcept;
 
 private:
-    float    m_temperature{0.8f};
-    int32_t  m_topK{40};
-    float    m_topP{0.95f};
-    float    m_minP{0.05f};
-    float    m_repeatPenalty{1.1f};
-    float    m_frequencyPenalty{0.0f};
-    float    m_presencePenalty{0.0f};
-    uint64_t m_seed{1337};
-    bool     m_greedy{false};
+    float           m_temperature{0.8f};
+    std::int32_t    m_topK{40};
+    float           m_topP{0.95f};
+    float           m_minP{0.05f};
+    float           m_repeatPenalty{1.1f};
+    float           m_frequencyPenalty{0.0f};
+    float           m_presencePenalty{0.0f};
+    std::uint64_t   m_seed{1337};
+    bool            m_greedy{false};
 };
 
 } // namespace job::model
