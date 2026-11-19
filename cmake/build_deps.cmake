@@ -57,7 +57,7 @@ if(${LibInput_FOUND})
 endif()
 
 set(HAS_LIBEVDEV OFF)
-pkg_check_modules(LibEvdev evdev)
+pkg_check_modules(LibEvdev libevdev)
 if(${LibEvdev})
     set(HAS_LIBEVDEV ON)
     add_compile_definitions(JOB_HAS_LIBEVDEV=1)
@@ -66,7 +66,7 @@ endif()
 
 ## Start Graphics
 if(JOB_BUILD_OPENGL)
-    pkg_check_modules(OpenGl REQUIRED opengl)
+    pkg_check_modules(OpenGl REQUIRED gl)
     pkg_check_modules(GlesV2 REQUIRED glesv2)
     # glproto.pc
     add_compile_definitions(JOB_HAS_OPENGL=1)
