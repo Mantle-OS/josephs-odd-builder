@@ -48,14 +48,12 @@ if(JOB_BUILD_SERIALIZER)
 endif()
 
 if(JOB_BUILD_ANSI_LEGACY)
-    add_subdirectory(job_ansi_legacy)
+    # add_subdirectory(job_ansi_legacy)
 endif()
 
 if(JOB_BUILD_ANSI)
     # add_subdirectory(job_ansi)
 endif()
-
-
 
 if(JOB_BUILD_SCIENCE)
     add_subdirectory(job_science)

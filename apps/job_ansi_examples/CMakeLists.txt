@@ -12,7 +12,7 @@ set(ANSIPP_EXAMPLE_DEPS
     JosephsOddBuilder_Core
     JosephsOddBuilder_IO
     JosephsOddBuilder_Threads
-    JosephsOddBuilder_Ansi
+    JosephsOddBuilder_Ansi_Legacy
     JosephsOddBuilder_TUI
 )
 

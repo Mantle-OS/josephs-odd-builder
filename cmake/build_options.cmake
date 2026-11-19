@@ -42,10 +42,10 @@ endif()
 # Gate Keepers
 ##############################
 option(JOB_CUDA   "Add nvidia cuda support " ON)
+option(JOB_USE_SYSTEM_GGML   "use system ggml" ON)
 option(JOB_OPENGL "Add full openGl support " ON)
-
 option(JOB_APPS   "Build the Example applications that are supported" ON)
-
+option(JOB_TESTS  "Build the job tests" OFF)
 
 ##############################
 # CICD and Benchmarks.
@@ -56,16 +56,17 @@ if(JOB_CI_BUILD)
     add_compile_definitions(JOB_CI_MAX_THREADS=4)
 endif()
 
-option(JOB_TEST_BENCHMARKS "build and run the benchhmarks in the tests (release mode only)" ON)
-if(CMAKE_BUILD_TYPE STREQUAL "Release" AND JOB_TEST_BENCHMARKS)
-    message("-- Building benchmarks into tests")
-    add_compile_definitions(JOB_TEST_BENCHMARKS)
-elseif(NOT CMAKE_BUILD_TYPE STREQUAL "Release" AND JOB_TEST_BENCHMARKS)
-    message("-- Invaild Build type for for benchmarks")
-else()
-    message("-- Not adding tests for benchmarks")
+if(JOB_TESTS)
+    option(JOB_TEST_BENCHMARKS "build and run the benchhmarks in the tests (release mode only)" ${JOB_TESTS})
+    if(CMAKE_BUILD_TYPE STREQUAL "Release" AND JOB_TEST_BENCHMARKS)
+        message("-- Building benchmarks into tests")
+        add_compile_definitions(JOB_TEST_BENCHMARKS)
+    elseif(NOT CMAKE_BUILD_TYPE STREQUAL "Release" AND JOB_TEST_BENCHMARKS)
+        message("-- Invaild Build type for for benchmarks")
+    else()
+        message("-- Not adding tests for benchmarks")
+    endif()
 endif()
-
 
 ##############################
 # Core Libraries
@@ -102,13 +103,13 @@ option(JOB_BUILD_RENDER_WAYLAND_SERVER "Build the Wayland server for job_render"
 
 option(JOB_BUILD_GUI "Build the job_gui library" ON)
 # option(JOB_BUILD_DAMAGE "Build the job_damage library" OFF)
-option(JOB_BUILD_TUI "Build the job_tui library" OFF)
+option(JOB_BUILD_TUI "Build the job_tui library" ON)
 
 option(JOB_BUILD_ZSTD "Build the job_zstd library" ON)
 option(JOB_BUILD_SCIENCE "Build the job_science library" ON)
 
-option(JOB_BUILD_ANSI "Build the job_ansi library" ON)
-option(JOB_BUILD_ANSI_LEGACY "Build the job_ansi library" OFF)
+option(JOB_BUILD_ANSI "Build the job_ansi library" OFF)
+option(JOB_BUILD_ANSI_LEGACY "Build the job_ansi library" ON)
 option(JOB_BUILD_TUI "Build the job_tui library" OFF)
 
 option(JOB_BUILD_AI "Build the micro job_ai library" OFF)

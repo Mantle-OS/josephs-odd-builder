@@ -84,7 +84,7 @@ target_link_libraries(JosephsOddBuilder_TUI PUBLIC
     JosephsOddBuilder_Core
     JosephsOddBuilder_Threads
     JosephsOddBuilder_IO
-    JosephsOddBuilder_Ansi
+    JosephsOddBuilder_Ansi_Legacy
 )
 
 set_target_properties(JosephsOddBuilder_TUI PROPERTIES

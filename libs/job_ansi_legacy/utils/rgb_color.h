@@ -6,7 +6,7 @@
 #include <string>
 #include <string_view>
 
-#include "job_string_utils.h"
+#include <job_string_utils.h>
 namespace job::ansi::utils {
 
 class RGBColor
@@ -103,20 +103,20 @@ public:
 
         buffer[0] = '#';
 
-        buffer[1] = JobStringUtils::kHexChars[(m_red >> 4) & 0x0f];
-        buffer[2] = JobStringUtils::kHexChars[m_red & 0x0f];
+        buffer[1] = core::JobStringUtils::kHexChars[(m_red >> 4) & 0x0f];
+        buffer[2] = core::JobStringUtils::kHexChars[m_red & 0x0f];
 
-        buffer[3] = JobStringUtils::kHexChars[(m_green >> 4) & 0x0f];
-        buffer[4] = JobStringUtils::kHexChars[m_green & 0x0f];
+        buffer[3] = core::JobStringUtils::kHexChars[(m_green >> 4) & 0x0f];
+        buffer[4] = core::JobStringUtils::kHexChars[m_green & 0x0f];
 
-        buffer[5] = JobStringUtils::kHexChars[(m_blue >> 4) & 0x0f];
-        buffer[6] = JobStringUtils::kHexChars[m_blue & 0x0f];
+        buffer[5] = core::JobStringUtils::kHexChars[(m_blue >> 4) & 0x0f];
+        buffer[6] = core::JobStringUtils::kHexChars[m_blue & 0x0f];
 
         if (!includeAlpha)
             return std::string(buffer, 7);
 
-        buffer[7] = JobStringUtils::kHexChars[(m_alpha >> 4) & 0x0f];
-        buffer[8] = JobStringUtils::kHexChars[m_alpha & 0x0f];
+        buffer[7] = core::JobStringUtils::kHexChars[(m_alpha >> 4) & 0x0f];
+        buffer[8] = core::JobStringUtils::kHexChars[m_alpha & 0x0f];
 
         return std::string(buffer, 9);
     }

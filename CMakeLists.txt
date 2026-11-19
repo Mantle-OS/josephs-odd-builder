@@ -40,8 +40,10 @@ endif()
 add_subdirectory(libs)
 add_subdirectory(apps)
 
-enable_testing()
-add_subdirectory(tests)
+if(JOB_TESTS)
+    enable_testing()
+    add_subdirectory(tests)
+endif()
 
 add_subdirectory(docs)
 

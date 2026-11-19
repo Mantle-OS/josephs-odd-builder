@@ -82,10 +82,6 @@ if(JOB_BUILD_INPUT)
 endif()
 
 
-
-
-
-
 if(JOB_BUILD_SERIALIZER)
     add_subdirectory(job_serializer)
 
