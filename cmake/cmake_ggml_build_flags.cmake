@@ -42,7 +42,7 @@ endif()
 
 ## BLAS
 set(GGML_BLAS ON)
-set(GGML_BLAS_VENDOR "Generic")
+set(GGML_BLAS_VENDOR "Generic" CACHE STRING "BLAS vendor" FORCE)
 
 ## CUDA
 set(GGML_CUDA ON)
