@@ -92,7 +92,7 @@ target_link_libraries(JosephsOddBuilder_Crypto
       JosephsOddBuilder_Core
 )
 
-target_include_directories(JosephsOddBuilder_Crypto PUBLIC
+target_include_directories(JosephsOddBuilder_Crypto PRIVATE
     ${LibSodium_INCLUDE_DIRS}
 )
 

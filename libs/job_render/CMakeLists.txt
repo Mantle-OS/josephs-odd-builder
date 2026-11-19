@@ -401,6 +401,8 @@ if(JOB_BUILD_RENDER_KMS)
         target_include_directories(JosephsOddBuilder_Render PUBLIC
             $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/kms_simple>
             $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/job_render/kms_simple>
+        )
+        target_include_directories(JosephsOddBuilder_Render PRIVATE
             ${LibDrm_INCLUDE_DIRS}
         )
     endif()
@@ -424,8 +426,9 @@ if(JOB_BUILD_RENDER_KMS)
 
             $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/present>
             $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/job_render/present>
-
-            ${LibDrm_INCLUDE_DIRS}
+        )
+        target_include_directories(JosephsOddBuilder_Render PRIVATE
+            # PkgConfig::LibDrm
             ${LibGbm_INCLUDE_DIRS}
             ${LibEgl_INCLUDE_DIRS}
         )

@@ -30,6 +30,7 @@ target_link_libraries(job-kms-simple-basic-test
         JosephsOddBuilder_Threads
         JosephsOddBuilder_IO
         JosephsOddBuilder_Render
+        PkgConfig::LibDrm
         ${LibDrm_LIBRARIES}
         ${LibInput_LIBRARIES}
         ${LibUdev_LIBRARIES}

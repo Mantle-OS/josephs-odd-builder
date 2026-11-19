@@ -108,7 +108,8 @@ if(JOB_BUILD_RENDER)
 
 
     if(JOB_BUILD_OPENGL OR JOB_BUILD_VULKAN OR JOB_BUILD_RENDER_KMS OR JOB_BUILD_RENDER_WAYLAND)
-        pkg_check_modules(LibDrm libdrm)
+        # pkg_check_modules(LibDrm REQUIRED IMPORTED_TARGET libdrm)
+        pkg_check_modules(LibDrm REQUIRED IMPORTED_TARGET libdrm)
         if(LibDrm_FOUND)
             set(HAS_DRM ON)
             # add_compile_definitions(JOB_DRM=1)

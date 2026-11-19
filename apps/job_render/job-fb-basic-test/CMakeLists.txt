@@ -30,6 +30,7 @@ target_link_libraries(job-fb-basic-test
         JosephsOddBuilder_Threads
         JosephsOddBuilder_IO
         JosephsOddBuilder_Render
+        PkgConfig::LibDrm
 )
 
 

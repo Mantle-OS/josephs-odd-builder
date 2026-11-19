@@ -3,11 +3,6 @@ project(JosephsOddBuilder_Sound
     LANGUAGES CXX C
 )
 
-include_directories(${LibAlsa_INCLUDE_DIRS})
-include_directories(${LibPipewire_INCLUDE_DIRS})
-include_directories(${LibSPA_INCLUDE_DIRS})
-include_directories(${LibWirePlumber_INCLUDE_DIRS})
-
 set(JOBSOUND_BACKEND_ALSA_HEADERS
     backends/alsa/alsa_playback_thread.h
     backends/alsa/alsa_sound_card.h
@@ -217,7 +212,8 @@ target_include_directories(JosephsOddBuilder_Sound PUBLIC
     ## export file
     $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
 
-
+)
+target_include_directories(JosephsOddBuilder_Sound PRIVATE
     ${LibAlsa_INCLUDE_DIRS}
     ${LibPipewire_INCLUDE_DIRS}
     ${LibSPA_INCLUDE_DIRS}
@@ -249,8 +245,8 @@ install(TARGETS JosephsOddBuilder_Sound
 )
 
 install(FILES ${JOBSOUND_EXPORT_HEADER}             DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobsound)
-install(FILES ${JOBSOUND_BACKEND_ALSA_HEADERS}      DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobsound/backend/alsa)
-install(FILES ${JOBSOUND_BACKEND_PIPEWIRE_HEADERS}  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobsound/backend/pipewire)
+install(FILES ${JOBSOUND_BACKEND_ALSA_HEADERS}      DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobsound/backends/alsa)
+install(FILES ${JOBSOUND_BACKEND_PIPEWIRE_HEADERS}  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobsound/backends/pipewire)
 install(FILES ${JOBSOUND_DSP_HEADERS}               DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobsound/dsp)
 install(FILES ${JOBSOUND_MIDI_HEADERS}              DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobsound/midi)
 install(FILES ${JOBSOUND_CODECS_HEADERS}            DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/jobsound/codecs)
