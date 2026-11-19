@@ -27,7 +27,6 @@ endif()
 pkg_check_modules(LibUsb-1.0 REQUIRED libusb-1.0)
 
 ## DATA fun
-pkg_check_modules(Flatbuffers  REQUIRED flatbuffers)
 pkg_check_modules(NlohmannJson REQUIRED nlohmann_json)
 pkg_check_modules(YAMLCpp      REQUIRED yaml-cpp)
 

@@ -2,7 +2,7 @@
 
 #include <job_ggml_tensor.h>
 #include <job_ggml_tensor_op.h>
-
+#include "norm_config.h"
 #include "jobmodel_export.h"
 
 namespace job::model {
@@ -18,22 +18,16 @@ public:
     NormGraph &operator=(const NormGraph &) = delete;
     NormGraph(NormGraph &&) = delete;
     NormGraph &operator=(NormGraph &&) = delete;
-
-
-    // RMS is a okay name because that is what it does but need to talk about the full picure of this class
-    // and the fact that everything else calls this generate.
-    // This function needs contracts for pre and post.
     [[nodiscard]] static ggml::JobGgmlTensorOp::UPtr rms(ggml::JobGgmlTensorOp::UPtr input,
                                                          const ggml::JobGgmlTensor &weight,
-                                                         float eps,
+                                                         const NormConfig *normConfig,
                                                          const ggml::JobGgmlTensor *bias = nullptr);
 
 
-    [[nodiscard]] static ggml::JobGgmlTensorOp::UPtr rmsView(ggml::JobGgmlTensorOp &input, const ggml::JobGgmlTensor &weight, float eps, const ggml::JobGgmlTensor *bias);
-    // [[nodiscard]] static ggml::JobGgmlTensorOp::UPtr rmsView(ggml::JobGgmlTensorOp *input,
-    //                                                      const ggml::JobGgmlTensor &weight,
-    //                                                      float eps,
-    //                                                      const ggml::JobGgmlTensor *bias = nullptr);
+    [[nodiscard]] static ggml::JobGgmlTensorOp::UPtr rms(ggml::JobGgmlTensorOp &input,
+                                                         const ggml::JobGgmlTensor &weight,
+                                                         const NormConfig *normConfig,
+                                                         const ggml::JobGgmlTensor *bias = nullptr);
 };
 
 } // namespace job::model

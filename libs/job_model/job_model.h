@@ -49,6 +49,7 @@ enum class StageType: std::uint8_t {
     Reset,
     Input,
     Build,
+    ComputeAlloc,
     Compute,
     Sync,
     Sample,
@@ -57,7 +58,7 @@ enum class StageType: std::uint8_t {
 
 enum class InferencePhase : std::uint8_t {
     Prefill,
-    Decode
+    Decode,
 };
 
 struct StageTiming
@@ -111,9 +112,11 @@ struct InferenceTiming
         StageTiming reset;
         StageTiming input;
         StageTiming build;
+        StageTiming computeAlloc;
         StageTiming compute;
         StageTiming sync;
         StageTiming sample;
+
     };
 
     Phase prefill;
@@ -239,12 +242,13 @@ private:
         StageTiming *stage = nullptr;
 
         switch (type) {
-        case StageType::Reset:   stage = &timing.reset;   break;
-        case StageType::Input:   stage = &timing.input;   break;
-        case StageType::Build:   stage = &timing.build;   break;
-        case StageType::Compute: stage = &timing.compute; break;
-        case StageType::Sync:    stage = &timing.sync;    break;
-        case StageType::Sample:  stage = &timing.sample;  break;
+        case StageType::Reset:          stage = &timing.reset;          break;
+        case StageType::Input:          stage = &timing.input;          break;
+        case StageType::Build:          stage = &timing.build;          break;
+        case StageType::ComputeAlloc:   stage = &timing.computeAlloc;   break;
+        case StageType::Compute:        stage = &timing.compute;        break;
+        case StageType::Sync:           stage = &timing.sync;           break;
+        case StageType::Sample:         stage = &timing.sample;         break;
         case StageType::Idle:    return;
         }
 

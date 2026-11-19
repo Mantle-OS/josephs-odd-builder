@@ -56,10 +56,6 @@ ggml::JobGgmlCGraph::UPtr QwenGraphBuilder::buildForward(ggml::JobGgmlContext &c
     if (headDimension == 0)
         throw std::runtime_error{"QwenGraphBuilder could not resolve attention head dimension"};
 
-    const uint32_t ropeDimensions = m_config.ropeConfig().ropeDimensionCount() > 0 ?
-                                        m_config.ropeConfig().ropeDimensionCount() :
-                                        headDimension;
-
     std::vector<ggml::JobGgmlTensorOp::UPtr> cacheWrites;
     cacheWrites.reserve(static_cast<std::size_t>(m_config.transformerConfig().blockCount()) * 2);
 
@@ -81,14 +77,10 @@ ggml::JobGgmlCGraph::UPtr QwenGraphBuilder::buildForward(ggml::JobGgmlContext &c
 
         if (!weights.ffnNorm || !weights.ffnNorm->isValid())
             throw std::runtime_error{"QwenGraphBuilder requires feed-forward normalization weights"};
-        // auto attentionInput = NormGraph::rms(cur->dup(),
-        //                                      *weights.attnNorm,
-        //                                      m_config.normConfig().rmsNormEps(),
-        //                                      weights.attnNormBias.get());
 
-        auto attentionInput = NormGraph::rmsView(*cur,
+        auto attentionInput = NormGraph::rms(*cur,
                                              *weights.attnNorm,
-                                             m_config.normConfig().rmsNormEps(),
+                                             &m_config.normConfig(),
                                              weights.attnNormBias.get());
 
 
@@ -102,12 +94,10 @@ ggml::JobGgmlCGraph::UPtr QwenGraphBuilder::buildForward(ggml::JobGgmlContext &c
                                                *positions,
                                                layerIndex,
                                                nPast,
-                                               m_config.normConfig().rmsNormEps(),
-                                               ropeDimensions,
                                                &kCacheWrite,
                                                &vCacheWrite,
-                                               2,
                                                inputType,
+                                               &m_config.normConfig(),
                                                &m_config.ropeConfig());
 
 
@@ -117,10 +107,10 @@ ggml::JobGgmlCGraph::UPtr QwenGraphBuilder::buildForward(ggml::JobGgmlContext &c
         cur = ResidualGraph::build(std::move(cur),
                                    std::move(attention));
 
-        auto ffnInput = NormGraph::rmsView(*cur,
-                                           *weights.ffnNorm,
-                                           m_config.normConfig().rmsNormEps(),
-                                           weights.ffnNormBias.get());
+        auto ffnInput = NormGraph::rms(*cur,
+                                       *weights.ffnNorm,
+                                       &m_config.normConfig(),
+                                       weights.ffnNormBias.get());
 
 
         auto ffn = GatedFfnGraph::build(std::move(ffnInput),
@@ -136,7 +126,7 @@ ggml::JobGgmlCGraph::UPtr QwenGraphBuilder::buildForward(ggml::JobGgmlContext &c
     // Final RMSNorm.
     cur = NormGraph::rms(std::move(cur),
                          *m_weights.outputNorm(),
-                         m_config.normConfig().rmsNormEps(),
+                         &m_config.normConfig(),
                          m_weights.outputNormBias());
 
 
@@ -156,7 +146,6 @@ ggml::JobGgmlCGraph::UPtr QwenGraphBuilder::buildForward(ggml::JobGgmlContext &c
 
     logits->setName("logits");
     logits->setOutput(true);
-
 
     // auto graph = ctx.newGraphCustom(8192, false);
     auto graph = ctx.newGraphCustom(4096, false);

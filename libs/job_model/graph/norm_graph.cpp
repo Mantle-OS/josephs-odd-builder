@@ -7,10 +7,9 @@ namespace job::model {
 
 ggml::JobGgmlTensorOp::UPtr NormGraph::rms(ggml::JobGgmlTensorOp::UPtr input,
                                            const ggml::JobGgmlTensor &weight,
-                                           float eps,
+                                           const NormConfig *normConfig,
                                            const ggml::JobGgmlTensor *bias)
-{
-
+{ 
     if (!input || !input->isValid())
         throw std::invalid_argument{"NormGraph requires a valid input tensor"};
 
@@ -20,10 +19,10 @@ ggml::JobGgmlTensorOp::UPtr NormGraph::rms(ggml::JobGgmlTensorOp::UPtr input,
     if (bias && !bias->isValid())
         throw std::invalid_argument{"NormGraph requires a valid bias tensor when provided"};
 
-    if (!core::isSafeFinite(eps) || eps <= 0.0f)
+    if (!core::isSafeFinite(normConfig->rmsNormEps()) || normConfig->rmsNormEps() <= 0.0f)
         throw std::invalid_argument{"NormGraph requires epsilon to be finite and greater than zero"};
 
-    auto result = input->rmsNorm(eps)->mul(weight);
+    auto result = input->rmsNorm(normConfig->rmsNormEps())->mul(weight);
     if (bias)
         result = result->add(*bias);
 
@@ -31,7 +30,7 @@ ggml::JobGgmlTensorOp::UPtr NormGraph::rms(ggml::JobGgmlTensorOp::UPtr input,
 }
 
 
-ggml::JobGgmlTensorOp::UPtr NormGraph::rmsView(ggml::JobGgmlTensorOp &input, const ggml::JobGgmlTensor &weight, float eps, const ggml::JobGgmlTensor *bias)
+ggml::JobGgmlTensorOp::UPtr NormGraph::rms(ggml::JobGgmlTensorOp &input, const ggml::JobGgmlTensor &weight, const NormConfig *normConfig, const ggml::JobGgmlTensor *bias)
 {
     if (!input.isValid())
         throw std::invalid_argument{"NormGraph requires a valid input tensor"};
@@ -42,10 +41,10 @@ ggml::JobGgmlTensorOp::UPtr NormGraph::rmsView(ggml::JobGgmlTensorOp &input, con
     if (bias && !bias->isValid())
         throw std::invalid_argument{"NormGraph requires a valid bias tensor when provided"};
 
-    if (!core::isSafeFinite(eps) || eps <= 0.0f)
+    if (!core::isSafeFinite(normConfig->rmsNormEps()) || normConfig->rmsNormEps() <= 0.0f)
         throw std::invalid_argument{"NormGraph requires epsilon to be finite and greater than zero"};
 
-    auto result = input.rmsNorm(eps)->mul(weight);
+    auto result = input.rmsNorm(normConfig->rmsNormEps())->mul(weight);
     if (bias)
         result = result->add(*bias);
 

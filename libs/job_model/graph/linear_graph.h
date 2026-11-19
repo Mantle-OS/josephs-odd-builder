@@ -27,7 +27,7 @@ public:
                                                            const ggml::JobGgmlTensor *bias = nullptr,
                                                            ggml::JobGgmlType inputType = ggml::JobGgmlType::F16);
 
-    [[nodiscard]] static ggml::JobGgmlTensorOp::UPtr buildView(ggml::JobGgmlTensorOp &input,
+    [[nodiscard]] static ggml::JobGgmlTensorOp::UPtr build(ggml::JobGgmlTensorOp &input,
                                                                const ggml::JobGgmlTensor &weight,
                                                                const ggml::JobGgmlTensor *bias = nullptr,
                                                                ggml::JobGgmlType inputType = ggml::JobGgmlType::F16);

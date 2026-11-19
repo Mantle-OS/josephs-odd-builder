@@ -34,7 +34,7 @@ ggml::JobGgmlTensorOp::UPtr LinearGraph::build(ggml::JobGgmlTensorOp::UPtr input
 
 
 
-ggml::JobGgmlTensorOp::UPtr LinearGraph::buildView(ggml::JobGgmlTensorOp &input,
+ggml::JobGgmlTensorOp::UPtr LinearGraph::build(ggml::JobGgmlTensorOp &input,
                                                const ggml::JobGgmlTensor &weight,
                                                const ggml::JobGgmlTensor *bias,
                                                ggml::JobGgmlType inputType)

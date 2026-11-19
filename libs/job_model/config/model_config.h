@@ -38,9 +38,6 @@ public:
     ModelConfig(ModelConfig &&) noexcept = default;
     ModelConfig &operator=(ModelConfig &&) noexcept = default;
 
-    // Mutable accessors: readers (GGUF / HF JSON / SafeTensors) populate
-    // these sub-configs field-by-field in place rather than reaching past
-    // ModelConfig's own encapsulation.
     [[nodiscard]] ArchConfig &archConfig() noexcept { return m_archConfig; }
     [[nodiscard]] const ArchConfig &archConfig() const noexcept { return m_archConfig; }
     void setArchConfig(ArchConfig config) noexcept { m_archConfig = std::move(config); }
@@ -49,9 +46,6 @@ public:
     [[nodiscard]] const TransformerConfig &transformerConfig() const noexcept { return m_transformerConfig; }
     void setTransformerConfig(TransformerConfig config) noexcept { m_transformerConfig = std::move(config); }
 
-    // Always present, unlike MoeConfig below: every architecture this
-    // library targets has attention, normalization, RoPE, and an FFN
-    // block -- there's no "absent means N/A" case the way MoE has.
     [[nodiscard]] AttentionConfig &attentionConfig() noexcept { return m_attentionConfig; }
     [[nodiscard]] const AttentionConfig &attentionConfig() const noexcept { return m_attentionConfig; }
     void setAttentionConfig(AttentionConfig config) noexcept { m_attentionConfig = std::move(config); }
@@ -79,7 +73,6 @@ public:
     [[nodiscard]] DeviceConfig &deviceConfig() noexcept { return m_deviceConfig; }
     [[nodiscard]] const DeviceConfig &deviceConfig() const noexcept { return m_deviceConfig; }
     void setDeviceConfig(DeviceConfig config) noexcept { m_deviceConfig = std::move(config); }
-
 
     // Mixture of Experts (MoE) routing parameters. Lives at the ModelConfig
     [[nodiscard]] bool hasMoeConfig() const noexcept { return m_moeConfig.has_value(); }
