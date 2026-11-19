@@ -48,14 +48,13 @@ set(GGML_BLAS_VENDOR "OpenBLAS" CACHE STRING "BLAS vendor" FORCE)
 set(GGML_CUDA ON)
 
 ## OpenCL
-set(GGML_OPENCL ON)
+set(GGML_OPENCL OFF)
 
 ## Vulkan the github free runners do not have enough memory to build this.....
 if(JOB_CI_BUILD)
     set(GGML_VULKAN OFF)
 else()
     set(GGML_VULKAN ON)
-    set(GGML_VULKAN_SHADERS_GEN_TOOLCHAIN "/usr/bin/glslc")
 
     if(JOB_CUDA)
         set(NV_VULKAN_SEARCH_PATHS
