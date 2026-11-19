@@ -32,10 +32,12 @@
 
     using PKeyPtr = std::unique_ptr<EVP_PKEY, decltype(&::EVP_PKEY_free)>;
     using X509Ptr = std::unique_ptr<X509, decltype(&::X509_free)>;
+    using X509NamePtr = std::unique_ptr<X509_NAME, decltype(&::X509_NAME_free)>;
     using Pkcs12Ptr = std::unique_ptr<PKCS12, decltype(&::PKCS12_free)>;
     using BignumPtr = std::unique_ptr<BIGNUM, decltype(&::BN_free)>;
     using Asn1IntegerPtr = std::unique_ptr<ASN1_INTEGER, decltype(&::ASN1_INTEGER_free)>;
     using GeneralNamesPtr = std::unique_ptr<GENERAL_NAMES, decltype(&::GENERAL_NAMES_free)>;
+
 
     struct FileCloser {
         void operator()(FILE *file) const noexcept
@@ -253,23 +255,28 @@
 
     [[nodiscard]] bool setSubject(X509 *certificate, const JobSslOptions &opt)
     {
-        X509_NAME *subject = ::X509_get_subject_name(certificate);
+        X509NamePtr subject(::X509_NAME_new(), ::X509_NAME_free);
 
         if (!subject) {
-            fail("Failed to access certificate subject");
+            fail("Failed to allocate certificate subject");
             return false;
         }
 
-        if (!addNameEntry(subject, "C", opt.country()))
+        if (!addNameEntry(subject.get(), "C", opt.country()))
             return false;
 
-        if (!addNameEntry(subject, "O", opt.organization()))
+        if (!addNameEntry(subject.get(), "O", opt.organization()))
             return false;
 
-        if (!addNameEntry(subject, "CN", opt.commonName()))
+        if (!addNameEntry(subject.get(), "CN", opt.commonName()))
             return false;
 
-        if (::X509_set_issuer_name(certificate, subject) != 1) {
+        if (::X509_set_subject_name(certificate, subject.get()) != 1) {
+            fail("Failed to set certificate subject");
+            return false;
+        }
+
+        if (::X509_set_issuer_name(certificate, subject.get()) != 1) {
             fail("Failed to set self-signed certificate issuer");
             return false;
         }
