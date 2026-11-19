@@ -23,7 +23,7 @@ set(LLAMA_TESTS_INSTALL OFF)
 
 # 3rd party
 set(LLAMA_OPENSSL ON)
-set(LLAMA_LLGUIDANCE  ON)
+set(LLAMA_LLGUIDANCE  OFF)
 if (LLAMA_LLGUIDANCE)
     find_program(CARGO_EXECUTABLE cargo REQUIRED)
     ## this was fun lol
